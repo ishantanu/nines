@@ -42,7 +42,7 @@ bootstrap:
 - {tenant: beta, provider: company, subject: bob, role: owner}
 `, origin, idp.Server.URL)), func(string) string { return "fixture-secret" })
 	if e != nil {
-		log.Fatal(e)
+		log.Fatal("failed to parse fixture identity configuration")
 	}
 	auth, e := identity.New(context.Background(), cfg, identity.NewMemory(), map[string]bool{"alpha": true, "beta": true})
 	if e != nil {
