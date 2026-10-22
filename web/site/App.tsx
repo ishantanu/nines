@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  ArrowRight,
-  Check,
-  Copy,
-  Terminal,
-  Waypoints,
-} from "lucide-react";
+import { ArrowRight, Check, Copy, Terminal, Waypoints } from "lucide-react";
 import { Button } from "../src/components/ui/button";
 import {
   Tabs,
@@ -15,6 +9,9 @@ import {
 } from "../src/components/ui/tabs";
 import slo from "../../examples/api-availability.slo.yaml?raw";
 import journey from "../../examples/checkout.journey.yaml?raw";
+import binding from "../../examples/request-latency.binding.yaml?raw";
+import intent from "../../examples/api-success.intent.yaml?raw";
+import { examples } from "./examples";
 
 const logo = "./nines.svg";
 const repo = "https://github.com/ishantanu/nines";
@@ -22,7 +19,13 @@ const docs = `${repo}/blob/main/docs`;
 const start =
   "git clone https://github.com/ishantanu/nines.git\ncd nines\ngo run ./cmd/server -demo";
 
-function CopyCommand({ text }: { text: string }) {
+function CopyCommand({
+  text,
+  label = "Copy demo commands",
+}: {
+  text: string;
+  label?: string;
+}) {
   const [status, setStatus] = useState("");
   async function copy() {
     try {
@@ -35,12 +38,7 @@ function CopyCommand({ text }: { text: string }) {
   return (
     <div className="copy-control">
       <span role="status">{status}</span>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={copy}
-        aria-label="Copy demo commands"
-      >
+      <Button variant="outline" size="sm" onClick={copy} aria-label={label}>
         {status === "Copied" ? (
           <Check aria-hidden="true" />
         ) : (
@@ -181,6 +179,7 @@ export function App() {
           <nav aria-label="Main navigation">
             <a href="#product">Product</a>
             <a href="#as-code">As code</a>
+            <a href="#examples">Examples</a>
             <a href="#agents">For agents</a>
             <a href={`${docs}/public/deployment.md`}>Docs</a>
           </nav>
@@ -321,6 +320,10 @@ export function App() {
                   <TabsTrigger value="journey">
                     Critical user journey
                   </TabsTrigger>
+                  <TabsTrigger value="binding">Measurement binding</TabsTrigger>
+                  <TabsTrigger value="intent">
+                    Intent (experimental)
+                  </TabsTrigger>
                 </TabsList>
                 <span>YAML</span>
               </div>
@@ -339,8 +342,87 @@ export function App() {
                   <code>{journey}</code>
                 </pre>
               </TabsContent>
+              <TabsContent value="binding">
+                <div className="file-name">request-latency.binding.yaml</div>
+                <pre
+                  tabIndex={0}
+                  aria-label="Latency measurement binding YAML example"
+                >
+                  <code>{binding}</code>
+                </pre>
+              </TabsContent>
+              <TabsContent value="intent">
+                <div className="file-name">
+                  api-success.intent.yaml (experimental)
+                </div>
+                <pre
+                  tabIndex={0}
+                  aria-label="Experimental SLO intent YAML example"
+                >
+                  <code>{intent}</code>
+                </pre>
+              </TabsContent>
             </Tabs>
           </div>
+        </section>
+        <section
+          className="container examples-section"
+          id="examples"
+          aria-labelledby="examples-title"
+        >
+          <div className="section-heading">
+            <p className="eyebrow">TRY THE WORKFLOW</p>
+            <h2 id="examples-title">From a definition to a running SLO.</h2>
+            <p>
+              Use these examples from a source checkout or with the alpha
+              binaries. Each workflow makes its prerequisites and changes
+              explicit.
+            </p>
+          </div>
+          <Tabs defaultValue="playground" className="examples-panel">
+            <TabsList
+              aria-label="Practical workflow examples"
+              className="example-tabs"
+            >
+              {examples.map((example) => (
+                <TabsTrigger key={example.id} value={example.id}>
+                  {example.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {examples.map((example) => (
+              <TabsContent
+                key={example.id}
+                value={example.id}
+                forceMount
+                className="example-content"
+              >
+                <div className="example-description">
+                  <h3>{example.title}</h3>
+                  <p>{example.description}</p>
+                  <p className="example-note">{example.note}</p>
+                  <a
+                    className="text-link"
+                    href={`${repo}/blob/main/${example.path}`}
+                  >
+                    {example.link} <ArrowRight size={15} aria-hidden="true" />
+                  </a>
+                </div>
+                <div className="example-code">
+                  <div className="example-toolbar">
+                    <span>{example.language}</span>
+                    <CopyCommand
+                      text={example.code}
+                      label={`Copy ${example.label} example`}
+                    />
+                  </div>
+                  <pre tabIndex={0} aria-label={`${example.label} example`}>
+                    <code>{example.code}</code>
+                  </pre>
+                </div>
+              </TabsContent>
+            ))}
+          </Tabs>
         </section>
         <section
           className="container agent-section"
@@ -466,13 +548,16 @@ export function App() {
             <p className="eyebrow">BUILT IN THE OPEN</p>
             <h2 id="release-title">Release status and scope.</h2>
             <p>
-              Nines is a pre-release MVP under active development. Expect regular
-              features and fixes. Core SLO and critical user journey management
-              is the release focus. Intent workflows, session replay and the
-              Kubernetes reconciler are experimental.
+              Nines is a pre-release MVP under active development. Expect
+              regular features and fixes. Core SLO and critical user journey
+              management is the release focus. Intent workflows, session replay
+              and the Kubernetes reconciler are experimental.
             </p>
           </div>
           <div className="release-links">
+            <a href={`${repo}/releases`}>
+              Alpha downloads <ArrowRight size={16} aria-hidden="true" />
+            </a>
             <a href={`${docs}/public/release.md`}>
               Release checklist <ArrowRight size={16} aria-hidden="true" />
             </a>

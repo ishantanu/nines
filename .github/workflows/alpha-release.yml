@@ -1,0 +1,82 @@
+name: Alpha release
+on:
+  push:
+    tags: ['v*-alpha.*']
+permissions:
+  contents: read
+concurrency:
+  group: alpha-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    permissions:
+      actions: read
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require an alpha tag on a tested main commit
+        id: tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-alpha\.[1-9][0-9]*$ ]]
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
+            -f branch=main -f head_sha="$GITHUB_SHA" -f status=completed -F per_page=100 > "$RUNNER_TEMP/ci-runs.json"
+          python3 - "$RUNNER_TEMP/ci-runs.json" <<'PY'
+          import json, os, sys
+          runs = json.load(open(sys.argv[1]))["workflow_runs"]
+          if not any(r["head_sha"] == os.environ["GITHUB_SHA"] and r["conclusion"] == "success" for r in runs):
+              raise SystemExit("The tagged commit must have a successful main-branch CI run before release. Wait for CI, then rerun this workflow.")
+          PY
+          printf 'version=%s\n' "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+  prepare:
+    needs: validate
+    uses: ./.github/workflows/candidate.yml
+    with:
+      version: ${{ needs.validate.outputs.version }}
+  draft:
+    needs: [validate, prepare]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ALPHA_VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Download and verify exact-commit binaries
+        run: |
+          gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name nines-candidate --dir dist/releases
+          python3 scripts/release/verify.py --directory dist/releases --version "$ALPHA_VERSION" --commit "$GITHUB_SHA"
+      - name: Prepare a draft prerelease for maintainer review
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$ALPHA_VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft,targetCommitish > "$RUNNER_TEMP/release.json" 2>/dev/null; then
+            python3 - "$RUNNER_TEMP/release.json" <<'PY'
+          import json, os, sys
+          release = json.load(open(sys.argv[1]))
+          if not release["isDraft"] or release["targetCommitish"] != os.environ["GITHUB_SHA"]:
+              raise SystemExit("Refusing to overwrite a published release or a draft for another commit.")
+          PY
+            gh release upload "$ALPHA_VERSION" dist/releases/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$ALPHA_VERSION" dist/releases/* --repo "$GITHUB_REPOSITORY" \
+              --verify-tag --target "$GITHUB_SHA" --draft --prerelease \
+              --title "Nines $ALPHA_VERSION" --notes-file docs/public/alpha-release-notes.md
+          fi
+          printf 'Draft alpha release prepared: %s\nReview its notes, checksums and binaries before publishing.\n' "$ALPHA_VERSION" >> "$GITHUB_STEP_SUMMARY"

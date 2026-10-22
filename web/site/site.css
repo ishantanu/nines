@@ -927,3 +927,122 @@ h1 em {
     transition-duration: 0.01ms !important;
   }
 }
+
+.examples-section {
+  padding-block: 80px;
+}
+.examples-panel {
+  margin-top: 32px;
+  gap: 0;
+  border: 1px solid #d9d5e2;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.example-tabs {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 0;
+  padding: 10px;
+  border-bottom: 1px solid #e4e0e9;
+  gap: 4px;
+}
+.example-tabs [data-slot="tabs-trigger"] {
+  flex: 1 0 auto;
+  min-height: 34px;
+  padding-inline: 12px;
+  font-size: 12px;
+}
+.example-content {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 32px;
+  padding: 28px;
+  margin: 0;
+}
+.example-content[data-state="inactive"] {
+  display: none;
+}
+.example-description h3 {
+  font-size: 20px;
+  line-height: 1.4;
+  margin: 0 0 16px;
+}
+.example-description p {
+  color: #696477;
+  font-size: 13px;
+  line-height: 1.85;
+}
+.example-description .example-note {
+  font-size: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #e4e0e9;
+}
+.example-description .text-link {
+  margin-top: 16px;
+}
+.example-code {
+  min-width: 0;
+  border: 1px solid #e4e0e9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fffefa;
+}
+.example-toolbar {
+  min-height: 54px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e4e0e9;
+}
+.example-toolbar > span {
+  font-size: 11px;
+  color: #777180;
+  font-family: ui-monospace, monospace;
+}
+.example-code pre {
+  margin: 0;
+  padding: 18px;
+  height: 360px;
+  overflow: auto;
+  font-size: 11px;
+  line-height: 1.85;
+  color: #4d4166;
+  tab-size: 2;
+}
+.definition-toolbar [data-slot="tabs-list"] {
+  min-width: 0;
+}
+@media (max-width: 760px) {
+  .examples-section {
+    padding-block: 48px;
+  }
+  .example-content {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+    padding: 20px;
+  }
+  .example-description {
+    min-height: 280px;
+  }
+  .example-code pre {
+    height: 360px;
+  }
+  .example-tabs {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  .nav-row nav {
+    gap: 12px;
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+  .nav-row nav a {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
