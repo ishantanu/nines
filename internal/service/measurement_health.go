@@ -23,9 +23,13 @@ func (s *Service) inspectBinding(ctx context.Context, ref v1.BindingReference) (
 	if err = json.Unmarshal(row.Manifest, &b); err != nil {
 		return out, err
 	}
+	out.SourceDigest = s.SourceFingerprint(b.Spec.Source)
 	evidence, err := s.DiscoverTelemetry(ctx, b.Spec.Source, b.Spec.Metric, b.Spec.Labels)
 	if err != nil {
 		return out, nil
+	}
+	if s.SourceFingerprint(b.Spec.Source) != out.SourceDigest {
+		return out, model.ErrRevisionConflict
 	}
 	out.Fingerprint = evidence.Fingerprint
 	if evidence.Truncated || len(evidence.Metadata) != 1 || len(evidence.Series) == 0 {
@@ -76,6 +80,13 @@ func (s *Service) measurementHealth(record model.Record) (v1.BindingHealth, bool
 		return v1.BindingHealth{}, false
 	}
 	health := *check
+	if health.SourceDigest == "" || health.SourceDigest != s.SourceFingerprint(record.SLO.Source) {
+		health.State = "stale"
+		health.Code = "measurement_source_changed"
+		health.Message = "The source route changed since this measurement check. Revalidate the measurement against the current source."
+		health.EvaluationBlocked = true
+		return health, true
+	}
 	if health.State == "compatible" && s.Now().Sub(health.CheckedAt) > 10*time.Minute {
 		health.State = "stale"
 		health.Code = "measurement_check_overdue"

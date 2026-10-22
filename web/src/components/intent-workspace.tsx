@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { IntentAuthoring } from "./intent-authoring";
+import { IntentEvidence, IntentProgress } from "./intent-evidence";
 import { duration } from "@/lib/history";
 export function IntentWorkspace({
   scope,
@@ -519,6 +520,9 @@ export function IntentWorkspace({
                     <p role="status" className="text-sm text-muted-foreground">
                       Preparing evidence · {run?.steps.length ?? 0} completed
                       tools · {run?.modelCalls ?? 0} model calls
+                      {run?.progress ? (
+                        <IntentProgress progress={run.progress} />
+                      ) : null}
                     </p>
                   ) : null}
                 </div>
@@ -815,7 +819,11 @@ export function IntentWorkspace({
                   </p>
                 ) : null}
                 {value.plan?.compiled ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    <IntentEvidence
+                      compiled={value.plan.compiled}
+                      sourceDigest={value.plan.sourceDigest}
+                    />
                     <p className="text-sm font-medium">SLO proposal</p>
                     <p className="text-xs text-muted-foreground">
                       Expected resource revision {value.plan.expectedRevision}
@@ -1049,6 +1057,35 @@ export function IntentWorkspace({
                 {value.backtest ? (
                   <div className="rounded-md border p-3 text-xs">
                     <p className="mb-2 font-medium">Historical validation</p>
+                    <p className="mb-2">
+                      {value.backtest.from} to {value.backtest.to} ·{" "}
+                      {value.backtest.resolutionSeconds}s resolution
+                    </p>
+                    <details className="mb-2">
+                      <summary className="cursor-pointer font-medium">
+                        Historical evidence provenance
+                      </summary>
+                      <dl className="mt-2 space-y-2 break-all font-mono">
+                        <div>
+                          <dt>Intent digest</dt>
+                          <dd>
+                            {value.backtest.intentDigest ?? "Unavailable"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Manifest digest</dt>
+                          <dd>
+                            {value.backtest.manifestDigest ?? "Unavailable"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Source fingerprint</dt>
+                          <dd>
+                            {value.backtest.sourceDigest ?? "Unavailable"}
+                          </dd>
+                        </div>
+                      </dl>
+                    </details>
                     <p>
                       {value.backtest.completeCutoffs} complete ·{" "}
                       {value.backtest.unknownCutoffs} unknown ·{" "}

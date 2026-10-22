@@ -54,6 +54,7 @@ func (s *Service) BacktestIntent(ctx context.Context, in v1.IntentBacktestInput)
 	out.To = in.To.UTC()
 	out.ResolutionSeconds = in.ResolutionSeconds
 	out.Binding = plan.Compiled.Binding
+	out.SourceDigest = plan.SourceDigest
 	out.IntentDigest = plan.IntentDigest
 	out.ManifestDigest = plan.Compiled.Digest
 	r := model.Record{SLO: config, Windows: map[string]model.WindowObservation{}}
@@ -115,7 +116,7 @@ func (s *Service) BacktestIntent(ctx context.Context, in v1.IntentBacktestInput)
 	if e != nil {
 		return out, e
 	}
-	if latest.Revision != in.Plan.Binding.ExpectedRevision {
+	if latest.Revision != in.Plan.Binding.ExpectedRevision || s.SourceFingerprint(in.Plan.Intent.Spec.Source) != plan.SourceDigest {
 		return out, model.ErrRevisionConflict
 	}
 	return out, nil

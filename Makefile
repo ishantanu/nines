@@ -1,4 +1,4 @@
-.PHONY: demo run build server cli mcp ui test test-integration test-mimir check release-check public-source release site site-check lint lint-go lint-python
+.PHONY: demo run build server cli mcp ui test test-integration test-mimir intent-eval intent-workflow-eval check release-check public-source release site site-check lint lint-go lint-python
 VERSION ?= dev
 RELEASE_TARGETS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64
 ui:
@@ -21,6 +21,10 @@ test-integration:
 	@test -n "$$TEST_DATABASE_URL" || (echo 'Set TEST_DATABASE_URL to a dedicated test database'; exit 1)
 	go test -race -count=1 -json ./... > database-test-results.json
 	python3 scripts/release/check-tests.py database-test-results.json --required database
+intent-eval:
+	@go run ./integration/intent-eval
+intent-workflow-eval:
+	@go run ./integration/intent-eval --suite workflow
 test-mimir:
 	sh integration/mimir/run.sh
 check:

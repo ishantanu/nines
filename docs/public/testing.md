@@ -12,6 +12,8 @@ The [Compose playground](deployment/playground.md) defaults to Prometheus. CI ru
 
 The first public release also requires clean-checkout CI, native CLI/browser identity verification, demo first-run verification, a reviewed dependency/license inventory, current vulnerability scans, container startup and artifact installation checks. Historical local test reports and screenshots are not substitutes for these checks.
 
-CI configuration is committed locally before repository creation. It has not run on GitHub until an actual run URL and commit are recorded. Locally passing tests do not establish Linux CI, real Entra/LDAP deployment, public-network ingress, restore, HA or production-scale conformance.
+Review [GitHub Actions](https://github.com/ishantanu/nines/actions) for results on the exact commit under review. Locally passing tests do not establish Linux CI, real Entra/LDAP deployment, public-network ingress, restore, HA or production-scale conformance.
+
+Run `make intent-eval` and `make intent-workflow-eval` for the credential-free drafting and full workflow contract suites. The [intent evaluation guide](intent-evaluations.md) explains its fixtures, reports and explicitly enabled hosted/local model evaluation. The suite is also exercised by `go test ./...`; fixture results do not establish real model quality.
 
 See the [local verification record](verification.md) for completed candidate checks and outstanding limits.

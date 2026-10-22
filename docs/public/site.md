@@ -4,7 +4,7 @@ The product site is a static React page using the same shadcn/ui button and tabs
 
 ## Examples
 
-The site shows complete, source-backed YAML for an SLO, a critical user journey, a latency measurement binding and an experimental SLO intent. The practical examples cover the Prometheus playground, offline rule generation, connected tenant access, recorded SLI and burn metrics, the typed Go client and a read-only MCP client. Code can be copied from each example; links lead to the full guides. Workflow panels retain their dimensions when switching tabs, and inactive examples remain in prerendered HTML for readers and crawlers.
+The site shows complete, source-backed YAML for an SLO, a critical user journey, a latency measurement binding and an experimental SLO intent. The practical examples cover the Prometheus playground, offline rule generation, connected tenant access, recorded SLI and burn metrics, the typed Go client, a read-only MCP client and synthetic intent workflow evaluations. Code can be copied from each example; links lead to the full guides. Workflow panels retain their dimensions when switching tabs, and inactive examples remain in prerendered HTML for readers and crawlers.
 
 ## Local preview
 
@@ -24,7 +24,7 @@ The build goes to `dist/site`, separately from the embedded application UI. All 
 
 ## GitHub Pages
 
-The intended project is `ishantanu/nines`, with the default Pages address `https://ishantanu.github.io/nines/`. This is a planned address until a successful deployment is recorded; preparing a workflow does not create a public site.
+The product site is served at [ishantanu.github.io/nines](https://ishantanu.github.io/nines/) through GitHub Actions. Its [latest verified successful deployment](https://github.com/ishantanu/nines/actions/runs/39783586644) predates the intent evaluation update. New content reaches the live site after merge to `main` and a successful Product site deployment.
 
 1. Review and publish the curated source export as the repository root. Keep the parent analysis directory, local profiles and historical evidence outside the repository.
 2. Set the repository's default branch to `main`.
@@ -46,4 +46,10 @@ The logo source is covered by the project license. No trademark registration or 
 
 ## Local verification
 
-The production site build and source-export checks pass. Browser verification covered desktop at 1440px and mobile at 390px and 320px, with no page-level horizontal overflow. Both YAML tabs keep the same panel height; arrow-key navigation and copying demo commands work. No browser warnings or hydration errors were reported during that check. The current 58 frontend tests and the rebuilt server demo smoke check also pass. The repository is now accessible. GitHub deployment requires a successful Product site workflow and Pages configuration; the actual run URL is the deployment record.
+The production site build and source-export checks pass. Browser verification covered desktop at 1440px and mobile at 390px and 320px, with no page-level horizontal overflow. Both YAML tabs keep the same panel height; arrow-key navigation and copying demo commands work. No browser warnings or hydration errors were reported during that check. The application frontend tests and rebuilt server demo smoke check passed during that verification; repeat the release checks for the candidate being published. The repository is now accessible. GitHub deployment requires a successful Product site workflow and Pages configuration; the actual run URL is the deployment record.
+
+## Intent workflow documentation
+
+The **For agents** section explains exact-digest approval and the post-apply rollback boundary. **Examples → Intent checks** provides credential-free drafting and workflow commands. Both link to the [intent evaluation guide](intent-evaluations.md), which records provider setup, source and backtest provenance, persistence tests and measured local-model limitations. `llms.txt` carries the same scope and limits for agent readers.
+
+The site continues to mark model-assisted workflows as experimental. Passing scripted adapter fixtures does not establish real model quality. The new guide and website content are published only after this change is merged to `main` and the Product site workflow completes; a feature-branch push does not update the live site.

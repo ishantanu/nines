@@ -25,9 +25,25 @@ type fixtureModel struct{}
 func (fixtureModel) Descriptor() rm.Descriptor {
 	return rm.Descriptor{Provider: "synthetic-fixture", Model: "scripted-intent-fixture", Protocol: "fixture", RouteDigest: "synthetic-local-fixture", Local: true}
 }
-func (fixtureModel) Turn(ctx context.Context, in rm.Request, _ func(rm.Progress) error) (rm.Response, error) {
+func (fixtureModel) Turn(ctx context.Context, in rm.Request, progress func(rm.Progress) error) (rm.Response, error) {
 	if e := ctx.Err(); e != nil {
 		return rm.Response{}, e
+	}
+	// Keep synthetic transport progress visible long enough for browser polling.
+	if progress != nil {
+		if err := progress(rm.Progress{Bytes: 128}); err != nil {
+			return rm.Response{}, err
+		}
+		timer := time.NewTimer(1500 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return rm.Response{}, ctx.Err()
+		case <-timer.C:
+		}
+		if err := progress(rm.Progress{Bytes: 256, Final: true}); err != nil {
+			return rm.Response{}, err
+		}
 	}
 	name := "ask_user"
 	args := any(map[string]string{"question": "Confirm which observation point, eligible attempts and success labels match the user outcome."})

@@ -28,7 +28,7 @@ The CLI reads `NINES_API_KEY`, with `API_TOKEN` as an alias. Browser login issue
 
 `ALERT_WEBHOOK_URL` enables at-least-once delivery of alert transitions. Deduplicate the stable event ID at the receiver. Configure standard `OTEL_*` variables to export server telemetry. Browser OTLP/PostHog settings are build-time `VITE_*` configuration and are empty by default. Do not put a private server credential in browser configuration.
 
-Models are optional. Intent/review model calls require explicit workflow consent and trusted provider configuration. The first-release core does not require OpenAI, Anthropic, Gemini or a local model. Review destinations and data sharing before enabling any of them.
+Models are optional. Intent/review model calls require explicit workflow consent and trusted provider configuration. The first-release core does not require OpenAI, Anthropic, Gemini or a local model. Review destinations and data sharing before enabling any of them. The [intent evaluation guide](intent-evaluations.md) documents provider/key variables, local Ollama and vLLM endpoints, repeatable checks and measured model limitations.
 
 ## Local users
 

@@ -307,3 +307,88 @@ func TestTargetEditCannotClearPersistedMeasurementBlock(t *testing.T) {
 		t.Fatal(health, err)
 	}
 }
+
+func TestBacktestRejectsSourceChangeAndCarriesRouteProvenance(t *testing.T) {
+	s, source, err := testtelemetry.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver := &backtestSource{Source: source}
+	s.Collector = driver
+	now := time.Date(2026, 10, 22, 12, 0, 0, 0, time.UTC)
+	s.Now = func() time.Time { return now }
+	in := goal()
+	in.Binding = &v1.IntentSelection{Name: "requests", ExpectedRevision: 1}
+	request := v1.IntentBacktestInput{Plan: in, From: now.Add(-25 * time.Minute), To: now.Add(-5 * time.Minute), ResolutionSeconds: 300}
+	out, err := s.BacktestIntent(context.Background(), request)
+	if err != nil || out.SourceDigest != s.SourceFingerprint("primary") || out.IntentDigest != model.DefinitionDigest(in.Intent) || out.From != request.From || out.To != request.To {
+		t.Fatal("missing backtest provenance", out, err)
+	}
+	driver.after = func() { source.Route = "different-mimir-dataset" }
+	if _, err := s.BacktestIntent(context.Background(), request); !errors.Is(err, model.ErrRevisionConflict) {
+		t.Fatal("source changed during backtest but stale evidence was accepted", err)
+	}
+}
+
+func TestSourceChangeInvalidatesMeasurementHealthUntilRechecked(t *testing.T) {
+	s, source, err := testtelemetry.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	compiled, err := s.CompileBinding(ctx, "requests", v1.CompileBindingInput{ExpectedRevision: 1, Name: "routed-slo", DisplayName: "Routed SLO", Target: .999, WindowSeconds: 3600})
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition := model.SLODefinition(compiled.Manifest)
+	if _, err := s.ApplyDefinition(ctx, model.Definition{SLO: &definition}, 0); err != nil {
+		t.Fatal(err)
+	}
+	original, err := s.CheckMeasurement(ctx, "routed-slo")
+	if err != nil || original.State != "compatible" || original.SourceDigest == "" {
+		t.Fatal(original, err)
+	}
+	source.Route = "another-mimir-organization"
+	view, err := s.ReadSLO(ctx, "routed-slo")
+	if err != nil || view.MeasurementHealth == nil || view.MeasurementHealth.Code != "measurement_source_changed" || !view.MeasurementHealth.EvaluationBlocked || view.Status.Reliability != nil {
+		t.Fatal("cached evidence crossed a source change", view, err)
+	}
+	if _, err := s.Collect(ctx, "routed-slo", s.Now().UTC().Truncate(time.Minute).Add(-2*time.Minute), s.Now().UTC().Truncate(time.Minute).Add(-time.Minute)); err == nil {
+		t.Fatal("changed source was queried before measurement revalidation")
+	}
+	fresh, err := s.CheckMeasurement(ctx, "routed-slo")
+	if err != nil || fresh.State != "compatible" || fresh.EvaluationBlocked || fresh.SourceDigest == original.SourceDigest {
+		t.Fatal("fresh source evidence did not replace old provenance", fresh, err)
+	}
+}
+
+type sourceChangingDiscovery struct{ *testtelemetry.Source }
+
+func (d *sourceChangingDiscovery) Discover(ctx context.Context, metric string, labels map[string]string, at time.Time) (v1.TelemetryDiscovery, error) {
+	out, err := d.Source.Discover(ctx, metric, labels, at)
+	d.Route = "changed-during-discovery"
+	return out, err
+}
+
+func TestSourceChangeDuringDiscoveryRejectsEvidence(t *testing.T) {
+	for _, operation := range []string{"compile", "binding-health"} {
+		t.Run(operation, func(t *testing.T) {
+			s, source, err := testtelemetry.New()
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.Collector = &sourceChangingDiscovery{Source: source}
+			ctx := context.Background()
+			if operation == "compile" {
+				in := goal()
+				in.Binding = &v1.IntentSelection{Name: "requests", ExpectedRevision: 1}
+				_, err = s.PlanIntent(ctx, in)
+			} else {
+				_, err = s.CheckBinding(ctx, "requests", 1)
+			}
+			if !errors.Is(err, model.ErrRevisionConflict) {
+				t.Fatal("accepted evidence collected across a source change", err)
+			}
+		})
+	}
+}

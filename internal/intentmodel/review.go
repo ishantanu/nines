@@ -87,7 +87,19 @@ func (c *Client) Turn(ctx context.Context, in rm.Request, progress func(rm.Progr
 	if err != nil {
 		return out, err
 	}
-	return c.parseReview(raw, in.MaxOutputTokens)
+	parsed, err := c.parseReview(raw, in.MaxOutputTokens)
+	if err != nil {
+		return parsed, err
+	}
+	if c.ContainsCredential(parsed.Native) {
+		return out, rm.Failure("model_invalid_response")
+	}
+	for _, call := range parsed.Calls {
+		if c.ContainsCredential(call.Arguments) {
+			return out, rm.Failure("model_invalid_response")
+		}
+	}
+	return parsed, nil
 }
 func (c *Client) reviewPayload(in rm.Request) (map[string]any, error) {
 	tools := []any{}

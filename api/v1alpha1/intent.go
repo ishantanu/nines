@@ -86,6 +86,7 @@ type IntentBacktestPoint struct {
 	BurnThresholdExceeded bool      `json:"burnThresholdExceeded"`
 }
 type IntentBacktest struct {
+	SourceDigest           string                `json:"sourceDigest"`
 	APIVersion             string                `json:"apiVersion"`
 	Tenant                 string                `json:"tenant"`
 	IntentDigest           string                `json:"intentDigest"`

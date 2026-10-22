@@ -111,6 +111,7 @@ See [site setup](docs/public/site.md) for GitHub Pages configuration and local p
 - [CLI, authentication and deterministic skills](docs/cli.md)
 - [Architecture and source layout](docs/public/architecture.md)
 - [Testing and release checks](docs/public/testing.md)
+- [Intent evaluations for hosted and local models](docs/public/intent-evaluations.md)
 - [Contribution guide](CONTRIBUTING.md) and [security reporting](SECURITY.md)
 
 The Go module path is `github.com/ishantanu/nines`. Clone `https://github.com/ishantanu/nines.git` and build from source. A tagged release is not yet published.
