@@ -28,7 +28,9 @@ func main() {
 		log.Fatal(e)
 	}
 	origin := "http://" + ln.Addr().String()
-	idp.AllowRedirect(origin + "/auth/oidc/company/callback")
+	if e := idp.AllowRedirect(origin + "/auth/oidc/company/callback"); e != nil {
+		log.Fatal("failed to register fixture callback")
+	}
 	cfg, e := identity.ParseConfig([]byte(fmt.Sprintf(`publicURL: %s
 providers:
 - id: company
@@ -46,11 +48,11 @@ bootstrap:
 	}
 	auth, e := identity.New(context.Background(), cfg, identity.NewMemory(), map[string]bool{"alpha": true, "beta": true})
 	if e != nil {
-		log.Fatal(e)
+		log.Fatal("failed to initialize fixture identity")
 	}
 	handler, e := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha fixture", Service: service.New(store.NewMemory(), nil)}, {ID: "beta", Name: "Beta fixture", Service: service.New(store.NewMemory(), nil)}}, slog.New(slog.NewTextHandler(io.Discard, nil)), auth)
 	if e != nil {
-		log.Fatal(e)
+		log.Fatal("failed to initialize fixture HTTP handler")
 	}
 	fmt.Println("Synthetic Nines CLI SSO fixture: " + origin)
 	log.Fatal(http.Serve(ln, handler))

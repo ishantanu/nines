@@ -309,5 +309,5 @@ func (s *Service) authenticateLocal(ctx context.Context, provider, username, pas
 	if err = s.repo.View(ctx, func(tx Tx) error { var e error; user, e = read[User](tx, "user", "global", u.ID); return e }); err != nil {
 		return externalUser{}, err
 	}
-	return externalUser{Subject: user.Subject, Name: user.Name, Email: user.Email, LocalCredentialDigest: hash(string(credential.Hash))}, nil
+	return externalUser{Subject: user.Subject, Name: user.Name, Email: user.Email, localCredentialHash: string(credential.Hash)}, nil
 }

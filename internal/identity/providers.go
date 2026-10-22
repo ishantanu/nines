@@ -25,9 +25,9 @@ type provider struct {
 	tls      *tls.Config
 }
 type externalUser struct {
-	Subject, Name, Email  string
-	LocalCredentialDigest string
-	Authorization         *authorizationClaims
+	Subject, Name, Email string
+	localCredentialHash  string
+	Authorization        *authorizationClaims
 }
 
 func initProvider(ctx context.Context, p ProviderConfig, publicURL string) (provider, error) {

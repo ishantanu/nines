@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/ishantanu/nines/internal/model"
+	"github.com/ishantanu/nines/internal/promqlvalidate"
 	"github.com/ishantanu/nines/internal/tenancy"
 )
 
@@ -45,6 +46,32 @@ func GenerateOwned(s model.SLO, tenant, uid string) (Group, error) {
 	return generate(s, tenant, uid)
 }
 func generate(s model.SLO, tenant, ownerUID string) (Group, error) {
+	group, err := compile(s, tenant, ownerUID)
+	if err != nil {
+		return Group{}, err
+	}
+	if err := validateExpressions(group); err != nil {
+		return Group{}, err
+	}
+	return group, nil
+}
+
+// Validate every final expression, including compiler-produced window and alert
+// expressions, before a caller can export or deploy the group.
+func validateExpressions(group Group) error {
+	for _, rule := range group.Rules {
+		name := rule.Record
+		if name == "" {
+			name = rule.Alert
+		}
+		if _, err := promqlvalidate.InstantVector(rule.Expr); err != nil {
+			return model.Invalid("generated rule %s: %v", name, err)
+		}
+	}
+	return nil
+}
+
+func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
 	if err := s.Validate(); err != nil {
 		return Group{}, err
 	}
@@ -87,7 +114,17 @@ func generate(s model.SLO, tenant, ownerUID string) (Group, error) {
 	stable := func(query string) string {
 		return fmt.Sprintf("last_over_time((%s)[%ds:%ds] offset %ds)", query, s.StepSeconds, s.StepSeconds, s.StepSeconds)
 	}
-	goodQuery, totalQuery := stable(s.GoodQuery), stable(s.TotalQuery)
+	// Printing parsed expressions removes comments safely before nesting them in
+	// larger expressions. A trailing comment must not swallow generated syntax.
+	good, err := promqlvalidate.InstantVector(s.GoodQuery)
+	if err != nil {
+		return Group{}, model.Invalid("goodQuery: %v", err)
+	}
+	total, err := promqlvalidate.InstantVector(s.TotalQuery)
+	if err != nil {
+		return Group{}, model.Invalid("totalQuery: %v", err)
+	}
+	goodQuery, totalQuery := stable(good.String()), stable(total.String())
 	goodValue := "sum((" + goodQuery + "))"
 	totalValue := "sum((" + totalQuery + "))"
 	validInput := fmt.Sprintf("(count((%s)) == 1) and (count((%s)) == 1) and (%s >= 0) and (%s >= %s) and (%s <= 1e18) and ((%s == 0) or (%s >= 1e-9))", goodQuery, totalQuery, goodValue, totalValue, goodValue, totalValue, totalValue, totalValue)

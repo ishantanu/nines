@@ -220,7 +220,9 @@ func TestOIDCSignedTokensPKCEStateNonceAndReplay(t *testing.T) {
 			defer idp.Close()
 			h := httptest.NewUnstartedServer(nil)
 			public := "http://" + h.Listener.Addr().String()
-			idp.AllowRedirect(public + "/auth/oidc/company/callback")
+			if err := idp.AllowRedirect(public + "/auth/oidc/company/callback"); err != nil {
+				t.Fatal(err)
+			}
 			c := Config{PublicURL: public, SessionHours: 12, Providers: []ProviderConfig{{ID: "company", Name: "Company SSO", Type: "oidc", IssuerURL: idp.Server.URL, ClientID: "fixture-client", secret: "fixture-secret"}}, Bootstrap: []Bootstrap{{"alpha", "company", "alice", "owner"}}}
 			s, err := New(context.Background(), c, NewMemory(), map[string]bool{"alpha": true})
 			if err != nil {

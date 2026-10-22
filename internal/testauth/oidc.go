@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -22,7 +23,7 @@ import (
 type OIDC struct {
 	Server        *httptest.Server
 	mu            sync.Mutex
-	redirects     map[string]bool
+	redirects     map[string]url.URL
 	codes         map[string]oidcCode
 	key           *rsa.PrivateKey
 	BadNonce      bool
@@ -39,7 +40,7 @@ func NewOIDC() (*OIDC, error) {
 	if err != nil {
 		return nil, err
 	}
-	o := &OIDC{key: key, redirects: map[string]bool{}, codes: map[string]oidcCode{}}
+	o := &OIDC{key: key, redirects: map[string]url.URL{}, codes: map[string]oidcCode{}}
 	o.Server = httptest.NewServer(http.HandlerFunc(o.serve))
 	return o, nil
 }
@@ -59,8 +60,19 @@ func (o *OIDC) SetAuthorizationClaims(claims map[string]any) {
 		}
 	}
 }
-func (o *OIDC) Close()                   { o.Server.Close() }
-func (o *OIDC) AllowRedirect(uri string) { o.mu.Lock(); defer o.mu.Unlock(); o.redirects[uri] = true }
+func (o *OIDC) Close() { o.Server.Close() }
+
+// AllowRedirect registers a trusted callback before authorization begins.
+func (o *OIDC) AllowRedirect(uri string) error {
+	u, err := url.Parse(uri)
+	if err != nil || u.User != nil || u.Host == "" || u.Path == "" || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "http" && u.Scheme != "https") || (u.Hostname() != "localhost" && !net.ParseIP(u.Hostname()).IsLoopback()) {
+		return fmt.Errorf("fixture redirect must be a loopback HTTP(S) callback without credentials, query or fragment")
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.redirects[uri] = *u
+	return nil
+}
 func (o *OIDC) serve(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/.well-known/openid-configuration":
@@ -70,7 +82,7 @@ func (o *OIDC) serve(w http.ResponseWriter, r *http.Request) {
 	case "/authorize":
 		q := r.URL.Query()
 		o.mu.Lock()
-		allowed := o.redirects[q.Get("redirect_uri")]
+		callback, allowed := o.redirects[q.Get("redirect_uri")]
 		o.mu.Unlock()
 		if !allowed || q.Get("client_id") != "fixture-client" || q.Get("code_challenge_method") != "S256" || q.Get("nonce") == "" || q.Get("state") == "" {
 			http.Error(w, "invalid fixture authorization", 400)
@@ -90,9 +102,10 @@ func (o *OIDC) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		code := fmt.Sprintf("fixture-%d", time.Now().UnixNano())
 		o.mu.Lock()
-		o.codes[code] = oidcCode{q.Get("nonce"), q.Get("code_challenge"), q.Get("redirect_uri"), sub}
+		o.codes[code] = oidcCode{q.Get("nonce"), q.Get("code_challenge"), callback.String(), sub}
 		o.mu.Unlock()
-		u, _ := url.Parse(q.Get("redirect_uri"))
+		// Build the destination from the registered URL, never from request data.
+		u := callback
 		values := u.Query()
 		values.Set("state", q.Get("state"))
 		values.Set("code", code)

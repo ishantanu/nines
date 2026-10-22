@@ -177,7 +177,9 @@ func TestCLIOIDCSignInReturnsToExplicitApproval(t *testing.T) {
 	defer idp.Close()
 	h := httptest.NewUnstartedServer(nil)
 	public := "http://" + h.Listener.Addr().String()
-	idp.AllowRedirect(public + "/auth/oidc/company/callback")
+	if err := idp.AllowRedirect(public + "/auth/oidc/company/callback"); err != nil {
+		t.Fatal(err)
+	}
 	cfg := Config{PublicURL: public, SessionHours: 12, Providers: []ProviderConfig{{ID: "company", Name: "Company SSO", Type: "oidc", IssuerURL: idp.Server.URL, ClientID: "fixture-client", secret: "fixture-secret"}}, Bootstrap: []Bootstrap{{"alpha", "company", "alice", "owner"}}}
 	s, e := New(context.Background(), cfg, NewMemory(), map[string]bool{"alpha": true})
 	if e != nil {
