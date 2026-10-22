@@ -11,6 +11,7 @@ import (
 	"time"
 
 	v1alpha1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/promqlvalidate"
 )
 
 var (
@@ -65,9 +66,12 @@ func (s SLO) Validate() error {
 		if p.ScrapeIntervalSeconds < 1 || p.ScrapeIntervalSeconds > s.StepSeconds/2 || s.StepSeconds%p.ScrapeIntervalSeconds != 0 {
 			return Invalid("scrapeIntervalSeconds must divide stepSeconds with at least two scrapes per step")
 		}
-		for _, q := range []string{p.GoodSelector, p.TotalSelector} {
-			if !counterSelector.MatchString(q) || len(q) > 8000 {
+		for _, q := range []struct{ field, text string }{{"providerWindow.goodSelector", p.GoodSelector}, {"providerWindow.totalSelector", p.TotalSelector}} {
+			if !counterSelector.MatchString(q.text) || len(q.text) > 8000 {
 				return Invalid("providerWindow requires counter selectors with exact label matchers")
+			}
+			if _, err := promqlvalidate.InstantVector(q.text); err != nil {
+				return Invalid("%s: %v", q.field, err)
 			}
 		}
 	}
@@ -102,6 +106,13 @@ func (s SLO) Validate() error {
 	}
 	if (s.GoodQuery == "") != (s.TotalQuery == "") || len(s.GoodQuery) > 16000 || len(s.TotalQuery) > 16000 {
 		return Invalid("provide both goodQuery and totalQuery, each at most 16000 bytes")
+	}
+	for _, q := range []struct{ field, text string }{{"goodQuery", s.GoodQuery}, {"totalQuery", s.TotalQuery}} {
+		if q.text != "" {
+			if _, err := promqlvalidate.InstantVector(q.text); err != nil {
+				return Invalid("%s: %v", q.field, err)
+			}
+		}
 	}
 	if len(s.Policies) > 8 || (s.Policy != nil && len(s.Policies) > 0) {
 		return Invalid("use either policy or up to eight named policies")

@@ -63,3 +63,5 @@ For Prometheus Operator output, review generated `PrometheusRule` resources and 
 ## Verify the measurement
 
 Check the original query directly in the intended backend, then check Nines sample freshness and coverage. Confirm the error numerator, traffic denominator, selectors and instrumentation semantics. SLO YAML does not prove those metrics exist. Missing data stays unknown, and a provider accepting a query is not evidence that the query represents successful user journeys.
+
+Nines validates input PromQL and every generated recording/alert expression offline before export or deployment. Syntax/type validation does not verify metric availability, query cost, result cardinality or backend-version support. See [PromQL validation](../promql-validation.md).

@@ -227,9 +227,11 @@ func (s *Service) login(ctx context.Context, id string, e externalUser) (string,
 	token := randomToken()
 	expires := s.Now().Add(time.Duration(s.config.SessionHours) * time.Hour)
 	err := s.repo.Update(ctx, "user:"+u.ID, func(tx Tx) error {
-		if e.LocalCredentialDigest != "" {
+		// Recheck the already-bcrypt-hashed credential in the session transaction.
+		// A password reset or disable between verification and login must win.
+		if e.localCredentialHash != "" {
 			credential, err := read[localCredential](tx, "local_password", "global", u.ID)
-			if err != nil || credential.Disabled || hash(string(credential.Hash)) != e.LocalCredentialDigest {
+			if err != nil || credential.Disabled || !equal(string(credential.Hash), e.localCredentialHash) {
 				return ErrForbidden
 			}
 		}

@@ -16,7 +16,7 @@ nines capabilities --offline --agent
 nines skills show nines-cli --offline > SKILL.md
 ```
 
-`-f -` reads stdin; file inputs retain their command-specific size limits. Generated files use exclusive creation and do not overwrite an existing file. Offline `validate` supports SLOs, critical user journeys, measurement bindings, dependency maps and intent YAML. SLO override flags apply only to SLO definitions; intent validation does not select or confirm a measurement. Offline validation proves declared schema/numerical validity. It cannot prove metric presence, provider evaluation, business semantics or a CUJ's end-to-end success. Offline rule generation renders YAML without deploying it. For `operator render --rules-only`, supply an explicit `--tenant` or `NINES_TENANT`; Kubernetes namespace and Nines tenant are separate identities.
+`-f -` reads stdin; file inputs retain their command-specific size limits. Generated files use exclusive creation and do not overwrite an existing file. Offline `validate` supports SLOs, critical user journeys, measurement bindings, dependency maps and intent YAML. SLO override flags apply only to SLO definitions; intent validation does not select or confirm a measurement. Offline validation proves declared schema/numerical validity. For query-backed SLOs it also parses PromQL, requires instant-vector results and checks the generated recording and alert expressions. It cannot prove metric presence, result cardinality, provider evaluation, business semantics or a CUJ's end-to-end success. Offline rule generation renders YAML without deploying it. For `operator render --rules-only`, supply an explicit `--tenant` or `NINES_TENANT`; Kubernetes namespace and Nines tenant are separate identities.
 
 `nines integration SLO_ID --agent` reads separate definition, collection, rule deployment and live external evaluation states. It does not deploy or reload anything. Provider errors and unavailable runtime APIs remain unverified.
 
@@ -96,3 +96,5 @@ Generate shell completion with `nines completion bash|zsh|fish|powershell`. Inst
 See [testing and verification limits](public/testing.md) for required clean-checkout and external-provider checks.
 
 For the controller image, CRD installation, provider prerequisites and ownership boundaries, see the [operator guide](public/deployment/operator.md). Offline rendering does not install a controller or synchronize resources into the portal.
+
+See [PromQL validation](public/promql-validation.md) for examples, shared API/operator behavior and the limits of offline checks.

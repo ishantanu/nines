@@ -33,7 +33,7 @@ func main() {
 	}
 	err = run(telemetry.Logger)
 	if err != nil {
-		telemetry.Logger.Error("server stopped", "error", err)
+		telemetry.Logger.Error("server stopped; check authentication, tenant and connection configuration")
 	}
 	shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	flushErr := telemetry.Shutdown(shutdown)

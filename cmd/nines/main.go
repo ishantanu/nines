@@ -223,7 +223,14 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			return o.generated(out, *pathOut, body)
 		}
 		if action == "validate" {
-			return render(out, map[string]string{"status": "valid", "apiVersion": model.APIVersion, "kind": definition.Kind(), "name": definition.Metadata().Name, "digest": model.DefinitionDigest(definition.Manifest()), "note": "schema validated; plan/apply also checks source and SLO references"}, *output, "validation")
+			note := "schema validated; plan/apply also checks source and SLO references"
+			if definition.SLO != nil && definition.SLO.SLO().HasQueries() {
+				if _, err := rules.Generate(definition.SLO.SLO(), "validation"); err != nil {
+					return err
+				}
+				note = "schema, PromQL types and generated expressions validated offline; metric availability, cardinality and data semantics require provider evidence"
+			}
+			return render(out, map[string]string{"status": "valid", "apiVersion": model.APIVersion, "kind": definition.Kind(), "name": definition.Metadata().Name, "digest": model.DefinitionDigest(definition.Manifest()), "note": note}, *output, "validation")
 		}
 		u, err := url.Parse(*server)
 		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" && u.Path != "/" {

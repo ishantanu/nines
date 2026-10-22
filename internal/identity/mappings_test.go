@@ -283,7 +283,9 @@ func TestSSOClaimsFromSignedOIDCTokens(t *testing.T) {
 			idp.SetAuthorizationClaims(tc.claims)
 			h := httptest.NewUnstartedServer(nil)
 			public := "http://" + h.Listener.Addr().String()
-			idp.AllowRedirect(public + "/auth/oidc/company/callback")
+			if err := idp.AllowRedirect(public + "/auth/oidc/company/callback"); err != nil {
+				t.Fatal(err)
+			}
 			s := mappingFixture(t, NewMemory())
 			p := s.providers["microsoft"].config
 			p.ID = "company"

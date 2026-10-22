@@ -216,7 +216,9 @@ func TestSSOMappedRolesEnforcedByTenantAPI(t *testing.T) {
 	defer idp.Close()
 	server := httptest.NewUnstartedServer(nil)
 	public := "http://" + server.Listener.Addr().String()
-	idp.AllowRedirect(public + "/auth/oidc/company/callback")
+	if err := idp.AllowRedirect(public + "/auth/oidc/company/callback"); err != nil {
+		t.Fatal(err)
+	}
 	config, err := identity.ParseConfig([]byte(fmt.Sprintf(`publicURL: %s
 providers:
 - id: company
