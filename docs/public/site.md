@@ -2,6 +2,10 @@
 
 The product site is a static React page using the same shadcn/ui button and tabs as the application. The build prerenders HTML for readers and crawlers without JavaScript; hydration enables tabs and copying commands. An `llms.txt` file summarizes resource contracts and agent interfaces. It has no server, sign-in flow, analytics, replay recorder, model integration or API credentials. Product screenshots are represented by a clearly labeled illustration with synthetic values.
 
+## Examples
+
+The site shows complete, source-backed YAML for an SLO, a critical user journey, a latency measurement binding and an experimental SLO intent. The practical examples cover the Prometheus playground, offline rule generation, connected tenant access, recorded SLI and burn metrics, the typed Go client and a read-only MCP client. Code can be copied from each example; links lead to the full guides. Workflow panels retain their dimensions when switching tabs, and inactive examples remain in prerendered HTML for readers and crawlers.
+
 ## Local preview
 
 ```sh

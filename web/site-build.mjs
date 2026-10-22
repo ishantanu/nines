@@ -20,9 +20,9 @@ try {
     define: { "process.env.NODE_ENV": '"production"' },
     plugins: [
       {
-        name: "raw-definition-examples",
+        name: "raw-source-examples",
         setup(bundler) {
-          bundler.onResolve({ filter: /\.yaml\?raw$/ }, (args) => ({
+          bundler.onResolve({ filter: /\.(?:yaml|go)\?raw$/ }, (args) => ({
             path: path.resolve(args.resolveDir, args.path.slice(0, -4)),
             namespace: "raw-definition",
           }));

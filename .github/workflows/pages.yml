@@ -9,6 +9,7 @@ on:
       - 'web/site-brand.ts'
       - 'web/site-build.mjs'
       - 'web/tsconfig.site.json'
+      - 'web/tsconfig.json'
       - 'web/package*.json'
       - 'web/src/components/ui/**'
       - 'web/public/shadcn-license.txt'

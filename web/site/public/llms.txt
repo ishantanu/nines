@@ -12,6 +12,12 @@ SLOs and CriticalUserJourney resources use YAML with apiVersion nines.dev/v1alph
 
 The Cobra CLI supports offline validation and recording-rule generation. Connected commands require an explicit server and tenant context. Use --agent for JSON output, plan before apply, and check the expected resource revision. The MCP adapter uses stdio and the same HTTP resource contracts. Model-assisted intent and review workflows are experimental. Models are optional, provider-configurable, and may run locally.
 
+## Runnable examples
+
+The product site's #examples section covers the Docker Compose Prometheus playground, offline CLI validation and rule generation, tenant contexts and SSO, recorded SLI/burn metrics, the typed Go client and read-only MCP configuration. The #as-code section includes complete SLO, critical user journey, measurement binding and experimental SLO intent YAML from the source repository. Prometheus recording results are queried through /query, not its /metrics instrumentation endpoint.
+
+Alpha binary archives are prepared for Linux/macOS on amd64/arm64. Releases include the CLI, server and MCP adapter, SHA256SUMS, source commit metadata and dependency licenses. Tagged alpha releases are drafted for maintainer review before publication. See https://github.com/ishantanu/nines/releases.
+
 ## Community credits
 
 Nines takes inspiration from Sloth (https://github.com/slok/sloth) and Pyrra (https://github.com/pyrra-dev/pyrra) for SLOs as code, Prometheus rules, and approachable SLO workflows.

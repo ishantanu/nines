@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Tag-triggered alpha release drafts for Linux/macOS on amd64/arm64, with archive verification, build metadata and binary smoke checks.
+- Practical site examples for the Prometheus playground, CLI, tenant access, SLI queries, Go client and MCP, plus measurement-binding and experimental intent YAML.
+
 - Consistent `admin` / `admin` login for the in-memory demo and loopback playground, with persistent password policy unchanged.
 
 - Prominent web-login credential reference, required environment-backed Compose database passwords and generated CI database credentials.
