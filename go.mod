@@ -9,7 +9,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/go-ldap/ldap/v3 v3.4.15
 	github.com/google/jsonschema-go v0.4.3
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/prometheus/prometheus v0.314.0
 	github.com/spf13/cobra v1.10.2
