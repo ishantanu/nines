@@ -3,7 +3,6 @@ import {
   ArrowRight,
   Check,
   Copy,
-  Github,
   Terminal,
   Waypoints,
 } from "lucide-react";
@@ -186,9 +185,7 @@ export function App() {
             <a href={`${docs}/public/deployment.md`}>Docs</a>
           </nav>
           <Button asChild variant="outline" size="sm">
-            <a href={repo}>
-              <Github aria-hidden="true" /> GitHub
-            </a>
+            <a href={repo}>GitHub</a>
           </Button>
         </div>
       </header>
