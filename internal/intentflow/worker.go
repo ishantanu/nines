@@ -75,6 +75,30 @@ func decodeArgs(raw json.RawMessage, out any) error {
 	if len(raw) > 4096 {
 		return rm.Failure("unsafe_tool_call")
 	}
+	// Tool schemas require one object with unique keys. encoding/json otherwise
+	// accepts null objects and silently keeps the last duplicate field.
+	keys := json.NewDecoder(bytes.NewReader(raw))
+	first, err := keys.Token()
+	if err != nil || first != json.Delim('{') {
+		return rm.Failure("unsafe_tool_call")
+	}
+	seen := map[string]bool{}
+	for keys.More() {
+		token, err := keys.Token()
+		name, ok := token.(string)
+		if err != nil || !ok || seen[name] {
+			return rm.Failure("unsafe_tool_call")
+		}
+		seen[name] = true
+		var value json.RawMessage
+		if keys.Decode(&value) != nil {
+			return rm.Failure("unsafe_tool_call")
+		}
+	}
+	last, err := keys.Token()
+	if err != nil || last != json.Delim('}') || keys.Decode(new(any)) != io.EOF {
+		return rm.Failure("unsafe_tool_call")
+	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
 	if d.Decode(out) != nil || d.Decode(new(any)) != io.EOF {
@@ -213,19 +237,20 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 			}
 			current(n).ModelCalls++
 			current(n).ModelInputBytes += len(body)
+			current(n).Progress = &v1.IntentModelProgress{ModelCall: current(n).ModelCalls, State: "waiting", At: now}
 			touch(n, now)
 			return nil
 		})
 		if e != nil {
 			return true, e
 		}
-		response, err := s.Model.Turn(job, req, func(rm.Progress) error { return job.Err() })
+		response, err := s.Model.Turn(job, req, s.modelProgress(job, id, token))
 		operationErr = err
 		if ctx.Err() != nil {
 			return true, ctx.Err()
 		}
 		if err != nil {
-			return fail("model_unavailable")
+			return fail(safeModelFailure(err))
 		}
 		if len(response.Calls) != 1 || response.InputTokens < 0 || response.OutputTokens < 0 || response.OutputTokens > 1024 || len(response.Native) > 64<<10 || !json.Valid(response.Native) {
 			return fail("unsafe_model_response")
@@ -288,6 +313,7 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 				return e
 			}
 			current(n).ModelCalls++
+			current(n).Progress = &v1.IntentModelProgress{ModelCall: current(n).ModelCalls, State: "waiting", At: now}
 			touch(n, now)
 			return nil
 		})
@@ -312,7 +338,7 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 		}
 		var provider *rm.Error
 		if errors.As(err, &provider) {
-			code = provider.Code
+			code = safeModelFailure(provider)
 		}
 		return fail(code)
 	}
@@ -330,6 +356,10 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 		n.Session.Plan = next.Session.Plan
 		n.Session.Backtest = next.Session.Backtest
 		n.Session.Selection = next.Session.Selection
+		if call.Name == "draft_goal" && current(n).Progress != nil {
+			current(n).Progress.State = "received"
+			current(n).Progress.At = now
+		}
 		current(n).Steps = append(current(n).Steps, v1.IntentFlowStep{Tool: call.Name, At: now, Digest: bytesDigest(data), Result: json.RawMessage(data)})
 		current(n).UpdatedAt = now
 		if !active(next) {

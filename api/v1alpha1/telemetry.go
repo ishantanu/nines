@@ -181,6 +181,7 @@ type DependencyView struct {
 
 // BindingHealth verifies the measurement contract, not observed reliability.
 type BindingHealth struct {
+	SourceDigest      string           `json:"sourceDigest"`
 	SLORevision       int64            `json:"sloRevision,omitempty"`
 	APIVersion        string           `json:"apiVersion"`
 	Tenant            string           `json:"tenant"`

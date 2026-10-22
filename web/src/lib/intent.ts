@@ -29,6 +29,7 @@ export interface IntentDocument {
   spec: IntentSpec;
 }
 export interface IntentPlan {
+  sourceDigest?: string;
   status: string;
   expectedRevision: number;
   intentDigest: string;
@@ -39,12 +40,19 @@ export interface IntentPlan {
   clarifications: string[];
   truncated: boolean;
   compiled?: {
-    binding: { name: string; revision: number };
+    binding: { name: string; revision: number; digest?: string };
     definition: BindingManifest;
     yaml: string;
     digest: string;
     warnings: string[];
-    evidence: { fingerprint: string; to: string; warnings: string[] };
+    evidence: {
+      source?: string;
+      metric?: string;
+      from?: string;
+      fingerprint: string;
+      to: string;
+      warnings: string[];
+    };
   };
   journey?: {
     yaml: string;
@@ -79,6 +87,9 @@ export function intentGoal(target: string, window: string) {
 }
 
 export interface IntentBacktest {
+  sourceDigest?: string;
+  intentDigest?: string;
+  manifestDigest?: string;
   from: string;
   to: string;
   resolutionSeconds: number;

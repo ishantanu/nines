@@ -33,3 +33,6 @@ backups/
 # Local Python lint tooling and caches.
 .venv-lint/
 .ruff_cache/
+
+# Private local model evaluation reports.
+/intent-evaluation*.json

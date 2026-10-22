@@ -53,10 +53,25 @@ func sameScope(scope v1.IntentAuthoringScope, g v1.SLOIntent) bool {
 		Journey                 *v1.IntentJourney
 	}{scope.Metadata, scope.Service, scope.Source, scope.NoDataPolicy, scope.Population, scope.Journey})
 }
+func (s *Service) sensitiveInput(value any) bool {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return true
+	}
+	for _, adapter := range []any{s.Platform.IntentDrafter, s.Model} {
+		if guard, ok := adapter.(interface{ ContainsCredential([]byte) bool }); ok && guard.ContainsCredential(encoded) {
+			return true
+		}
+	}
+	return false
+}
 func (s *Service) Create(ctx context.Context, in v1.CreateIntentConversation) (v1.IntentConversation, error) {
 	a, e := actor(ctx, s.Platform.TenantID)
 	if e != nil {
 		return v1.IntentConversation{}, e
+	}
+	if s.sensitiveInput(in) {
+		return v1.IntentConversation{}, model.Invalid("credentials do not belong in intent conversations; configure an environment reference instead")
 	}
 	if (!identifier.MatchString(in.ID) || in.ID == "capabilities") || !text(in.Title, 160) || !text(in.Text, 2000) {
 		return v1.IntentConversation{}, model.Invalid("provide a conversation ID, title and goal description")
@@ -119,6 +134,9 @@ func (s *Service) Append(ctx context.Context, id string, in v1.AppendIntentConve
 	a, e := actor(ctx, s.Platform.TenantID)
 	if e != nil {
 		return v1.IntentConversation{}, e
+	}
+	if s.sensitiveInput(in) {
+		return v1.IntentConversation{}, model.Invalid("credentials do not belong in intent conversations; configure an environment reference instead")
 	}
 	if !identifier.MatchString(id) || !identifier.MatchString(in.ID) || !text(in.Text, 2000) || in.ExpectedVersion < 1 {
 		return v1.IntentConversation{}, model.Invalid("message needs a valid ID, expectedVersion and text")

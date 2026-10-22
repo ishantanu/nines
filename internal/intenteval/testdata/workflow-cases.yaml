@@ -1,0 +1,15 @@
+apiVersion: nines.dev/v1alpha1
+kind: IntentWorkflowEvaluationSuite
+cases:
+  - {id: availability-reviewed-apply, draftCase: availability, telemetry: normal, expectedState: ready, apply: true}
+  - {id: latency-reviewed-apply, draftCase: latency, telemetry: normal, expectedState: ready, apply: true}
+  - {id: ambiguous-goal, draftCase: missing-target, telemetry: normal, expectedState: needs_input}
+  - {id: missing-population, draftCase: availability, telemetry: normal, unmatchedPopulation: true, expectedState: needs_input}
+  - {id: missing-metric, draftCase: availability, telemetry: missing, expectedState: failed, expectedCode: invalid_measurement}
+  - {id: sparse-traffic, draftCase: availability, telemetry: sparse, expectedState: ready, expectedUnknown: 2}
+  - {id: no-traffic, draftCase: availability, telemetry: no_traffic, expectedState: ready, expectedNoTraffic: 2}
+  - {id: conflicting-cuj, draftCase: latency, telemetry: normal, journeyConflict: true, expectedState: failed, expectedCode: invalid_measurement}
+  - {id: stale-binding-approval, draftCase: availability, telemetry: normal, expectedState: ready, interference: binding}
+  - {id: changed-mimir-dataset, draftCase: availability, telemetry: normal, expectedState: ready, interference: source}
+  - {id: ambiguous-apply-readback, draftCase: availability, telemetry: normal, expectedState: ready, apply: true, lostResponse: true}
+  - {id: reject-provider-routing-tool, draftCase: availability, telemetry: normal, expectedState: failed, expectedCode: unsafe_tool_call, attack: true, fixtureOnly: true}

@@ -9,6 +9,12 @@ export type AuthoringScope = {
   journey?: IntentDocument["spec"]["journey"];
 };
 export type FlowRun = {
+  progress?: {
+    modelCall: number;
+    state: "waiting" | "receiving" | "received";
+    bytes: number;
+    at: string;
+  };
   id: string;
   mode: "guided" | "model";
   status: string;

@@ -27,25 +27,35 @@ type IntentFlowStep struct {
 	Digest string          `json:"digest"`
 	Result json.RawMessage `json:"result"`
 }
+
+// IntentModelProgress contains aggregate transport progress only. It never
+// exposes provider text, arguments, hidden reasoning or native correlation data.
+type IntentModelProgress struct {
+	ModelCall int       `json:"modelCall"`
+	State     string    `json:"state"`
+	Bytes     int       `json:"bytes"`
+	At        time.Time `json:"at"`
+}
 type IntentFlowRun struct {
-	InputDigest     string             `json:"inputDigest"`
-	ModelConsent    bool               `json:"modelConsent"`
-	DraftModelID    string             `json:"draftModelId,omitempty"`
-	DraftRoute      *ReviewModelRoute  `json:"draftRoute,omitempty"`
-	ID              string             `json:"id"`
-	Mode            string             `json:"mode"`
-	Status          string             `json:"status"`
-	Actor           InvestigationActor `json:"actor"`
-	CreatedAt       time.Time          `json:"createdAt"`
-	UpdatedAt       time.Time          `json:"updatedAt"`
-	DeadlineAt      time.Time          `json:"deadlineAt"`
-	Attempts        int                `json:"attempts"`
-	ModelCalls      int                `json:"modelCalls"`
-	ModelInputBytes int                `json:"modelInputBytes"`
-	ModelRoute      *ReviewModelRoute  `json:"modelRoute,omitempty"`
-	Skill           ReviewSkillRef     `json:"skill"`
-	Steps           []IntentFlowStep   `json:"steps"`
-	ErrorCode       string             `json:"errorCode,omitempty"`
+	Progress        *IntentModelProgress `json:"progress,omitempty"`
+	InputDigest     string               `json:"inputDigest"`
+	ModelConsent    bool                 `json:"modelConsent"`
+	DraftModelID    string               `json:"draftModelId,omitempty"`
+	DraftRoute      *ReviewModelRoute    `json:"draftRoute,omitempty"`
+	ID              string               `json:"id"`
+	Mode            string               `json:"mode"`
+	Status          string               `json:"status"`
+	Actor           InvestigationActor   `json:"actor"`
+	CreatedAt       time.Time            `json:"createdAt"`
+	UpdatedAt       time.Time            `json:"updatedAt"`
+	DeadlineAt      time.Time            `json:"deadlineAt"`
+	Attempts        int                  `json:"attempts"`
+	ModelCalls      int                  `json:"modelCalls"`
+	ModelInputBytes int                  `json:"modelInputBytes"`
+	ModelRoute      *ReviewModelRoute    `json:"modelRoute,omitempty"`
+	Skill           ReviewSkillRef       `json:"skill"`
+	Steps           []IntentFlowStep     `json:"steps"`
+	ErrorCode       string               `json:"errorCode,omitempty"`
 }
 type IntentBindingConfirmation struct {
 	IntentDigest string             `json:"intentDigest"`

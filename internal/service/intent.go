@@ -129,6 +129,9 @@ func (s *Service) planIntent(ctx context.Context, in v1.PlanIntentInput, include
 			return out, model.ErrRevisionConflict
 		}
 	}
+	if s.SourceFingerprint(in.Intent.Spec.Source) != out.SourceDigest {
+		return out, model.ErrRevisionConflict
+	}
 	return out, nil
 }
 

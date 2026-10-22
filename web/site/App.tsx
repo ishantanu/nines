@@ -465,6 +465,25 @@ export function App() {
                   </p>
                 </div>
               </article>
+              <article>
+                <Check size={21} aria-hidden="true" />
+                <div>
+                  <h3>Reviewed intent proposals</h3>
+                  <p>
+                    Inspect the source, eligible population, success criteria
+                    and historical evidence. Applying an intent change set
+                    requires owner or editor approval of its exact digest; the
+                    agent role cannot approve or apply it.
+                  </p>
+                </div>
+              </article>
+              <a
+                className="text-link"
+                href={`${docs}/public/intent-evaluations.md`}
+              >
+                Evaluate intent workflows and model support{" "}
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
               <a
                 className="text-link"
                 href={`${docs}/cli.md#scripts-and-llm-skills`}
@@ -493,7 +512,10 @@ export function App() {
               </pre>
               <p>
                 Model-assisted intent and review workflows are experimental.
-                Providers are configurable, including local models.
+                Providers are configurable, including local models. Evaluate
+                your model before enabling the workflow. There is no automatic
+                post-apply rollback; restoring a definition cannot undo consumed
+                error budget.
               </p>
             </aside>
           </div>

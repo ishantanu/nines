@@ -122,4 +122,26 @@ ALERTS{alertname="NinesSLOBurnRate",alertstate="firing"}`,
     path: "docs/cli.md#scripts-and-llm-skills",
     link: "Agent and skill integration",
   },
+  {
+    id: "intent-checks",
+    label: "Intent checks",
+    title: "Evaluate intent workflows before enabling a model",
+    description:
+      "Run synthetic drafting and reviewed-apply scenarios from a source checkout. Check provider contracts, missing telemetry, stale approvals and recovery after a lost response.",
+    language: "Shell",
+    code: `# No server, model credentials or external telemetry required.
+make intent-eval                 # 75 drafting contract checks
+make intent-workflow-eval        # 60 workflow contract checks
+
+# Save a private JSON report to a new file.
+go run ./integration/intent-eval --suite workflow \\
+  --out intent-evaluation-workflow.json
+
+# Run one scenario across all five provider adapter profiles.
+go run ./integration/intent-eval --suite workflow \\
+  --case availability-reviewed-apply`,
+    note: "Fixtures use scripted model responses and disposable in-memory workspaces, including test-only approved writes. They do not prove real model quality. Live evaluation requires explicit --live and provider/model configuration.",
+    path: "docs/public/intent-evaluations.md",
+    link: "Evaluation guide and measured model limitations",
+  },
 ];
