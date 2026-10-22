@@ -1,0 +1,27 @@
+# Server-owned startup configuration. Set these environment variables first.
+# Select a connection in SLO YAML with spec.source: production or staging.
+tenants:
+  - id: commerce
+    name: Commerce
+    access:
+      - tokenEnv: COMMERCE_OWNER_TOKEN
+        role: owner
+      - tokenEnv: COMMERCE_VIEWER_TOKEN
+        role: viewer
+    connections:
+      - name: production
+        kind: mimir
+        url: https://mimir.example.com/prometheus
+        mimirOrgID: commerce-production
+        bearerTokenEnv: MIMIR_QUERY_TOKEN
+        rules:
+          namespace: nines
+          rulerURL: https://mimir-ruler.example.com/prometheus
+          bearerTokenEnv: MIMIR_RULES_TOKEN
+      - name: staging
+        kind: prometheus
+        url: https://prometheus-staging.example.com
+        rules:
+          namespace: nines
+          # Shared with the intended Prometheus server; rule_files/reload required.
+          directory: /etc/prometheus/nines-rules

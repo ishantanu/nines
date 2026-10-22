@@ -1,0 +1,53 @@
+# Disposable single-node verification only. No production credentials or data.
+multitenancy_enabled: true
+usage_stats:
+  enabled: false
+server:
+  http_listen_port: 9009
+  log_level: warn
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  bucket_store:
+    sync_dir: /data/sync
+  tsdb:
+    dir: /data/tsdb
+compactor:
+  data_dir: /data/compactor
+  sharding_ring:
+    kvstore:
+      store: inmemory
+distributor:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+ingester:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+    replication_factor: 1
+    min_ready_duration: 0s
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/rules
+ruler:
+  enable_api: true
+  rule_path: /data/rule-evaluation
+  poll_interval: 5s
+  evaluation_interval: 10s
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+    kvstore:
+      store: inmemory
+
+limits:
+  ruler_max_rules_per_rule_group: 128

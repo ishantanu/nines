@@ -1,0 +1,41 @@
+# Server-owned configuration. No OpenAI account, SDK or key is required.
+# With no intentModel override, a tenant inherits the deployment provider selected
+# by one recognized API key (e.g. ANTHROPIC_API_KEY or GEMINI_API_KEY).
+tenants:
+  - id: commerce
+    name: Commerce
+    access:
+      - tokenEnv: COMMERCE_API_TOKEN
+        role: owner
+    source:
+      kind: prometheus
+      url: https://metrics.example
+      bearerTokenEnv: COMMERCE_METRICS_TOKEN
+    intentModel:
+      provider: anthropic
+      # Optional model override; omit to use the provider preset.
+      model: claude-haiku-5-5
+      apiKeyEnv: COMMERCE_ANTHROPIC_API_KEY
+
+# Native Google alternative:
+# intentModel:
+#   provider: gemini
+#   apiKeyEnv: COMMERCE_GEMINI_API_KEY
+
+# Local Qwen alternative; no API key required by default:
+# intentModel:
+#   provider: ollama
+#   model: qwen3:8b
+
+# Other hosted service using portable chat completions:
+# intentModel:
+#   provider: custom
+#   apiStyle: chat-completions
+#   endpoint: https://models.example/v1/chat/completions
+#   model: your-model
+#   apiKeyEnv: YOUR_PROVIDER_API_KEY
+#   outputMode: json
+
+# Disable for one tenant even when deployment-level keys are present:
+# intentModel:
+#   provider: none

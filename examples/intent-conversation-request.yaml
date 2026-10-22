@@ -1,0 +1,13 @@
+id: checkout-intent-conversation
+title: Checkout reliability
+scope:
+  metadata:
+    name: checkout-availability
+    project: commerce
+  service: checkout
+  source: primary
+  population:
+    service: "checkout"
+    environment: "production"
+  noDataPolicy: unknown
+text: 99.9% of eligible checkout attempts should succeed over 28 days.

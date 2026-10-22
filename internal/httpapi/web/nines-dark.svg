@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="310" height="88" viewBox="0 0 310 88" role="img" aria-labelledby="title desc">
+  <title id="title">Nines</title>
+  <desc id="desc">Nines wordmark with a geometric number nine, the symbol of reliability measured in nines.</desc>
+  <g fill="none" stroke="#b5a1df" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"><circle cx="38" cy="30" r="21"/><path d="M59 30v22c0 15-10 25-25 25h-7"/></g>
+  <g fill="none" stroke="#f5f5f7" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M99 63V34m0 12c0-17 29-19 29 0v17"/>
+    <path d="M148 39v24"/>
+    <path d="M168 63V34m0 12c0-17 29-19 29 0v17"/>
+    <path d="M218 48h29c0-22-30-22-30 0 0 18 21 20 29 11"/>
+    <path d="M287 36c-10-8-29-4-28 7 1 10 29 3 29 14 0 12-22 14-31 5"/>
+  </g><circle cx="148" cy="23" r="4.2" fill="#f5f5f7"/>
+</svg>

@@ -1,0 +1,151 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.27.3'
+      - name: Install pinned development linters
+        run: |
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
+          python3 -m venv "$RUNNER_TEMP/nines-lint"
+          "$RUNNER_TEMP/nines-lint/bin/python" -m pip install -r requirements-lint.txt
+          echo "$RUNNER_TEMP/nines-lint/bin" >> "$GITHUB_PATH"
+      - run: make lint
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      VITE_OTEL_EXPORTER_OTLP_ENDPOINT: ''
+      VITE_POSTHOG_PROJECT_TOKEN: ''
+      VITE_POSTHOG_HOST: ''
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.27.3'
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Frontend tests and embedded build
+        run: |
+          npm ci --prefix web --no-audit --no-fund
+          npm test --prefix web
+          npm run build --prefix web
+          git diff --exit-code -- internal/httpapi/web
+      - name: Start disposable PostgreSQL with a generated password
+        shell: bash
+        run: |
+          set -euo pipefail
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          printf '::add-mask::%s\n' "$POSTGRES_PASSWORD"
+          container="nines-ci-database-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          printf 'NINES_CI_DATABASE_CONTAINER=%s\n' "$container" >> "$GITHUB_ENV"
+          docker run -d --name "$container" --publish 127.0.0.1::5432 \
+            --env POSTGRES_USER=nines_ci --env POSTGRES_DB=nines_ci \
+            --env POSTGRES_PASSWORD postgres:17-alpine
+          for i in $(seq 1 60); do
+            if docker exec "$container" pg_isready -h 127.0.0.1 -U nines_ci -d nines_ci >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          docker exec "$container" pg_isready -h 127.0.0.1 -U nines_ci -d nines_ci
+          port=$(docker inspect --format '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}' "$container")
+          printf 'TEST_DATABASE_URL=postgres://nines_ci:%s@127.0.0.1:%s/nines_ci?sslmode=disable\n' "$POSTGRES_PASSWORD" "$port" >> "$GITHUB_ENV"
+      - name: Dependency integrity, race tests and disposable PostgreSQL
+        run: |
+          go mod verify
+          make test-integration
+          make check build release-check
+      - name: Native demo and public source export
+        run: |
+          python3 scripts/release/smoke.py --binary bin/nines-server
+          make public-source
+          cd dist/public-source
+          go test ./cmd/nines ./internal/model
+      - name: Dependency vulnerability checks
+        run: |
+          npm audit --prefix web --audit-level=high
+          go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+      - name: Remove only this job's database
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${NINES_CI_DATABASE_CONTAINER:-}" ]]; then
+            docker rm -fv "$NINES_CI_DATABASE_CONTAINER" >/dev/null 2>&1 || true
+          fi
+  mimir:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version: '1.27.3'
+      - run: make test-mimir
+  container:
+    strategy:
+      fail-fast: false
+      matrix:
+        playground: [prometheus, mimir]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Container build and isolated demo
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --tag "nines-ci:${GITHUB_SHA}" .
+          container=$(docker run -d --publish 127.0.0.1::8080 \
+            --env API_TOKEN=synthetic-container-smoke-token-only \
+            "nines-ci:${GITHUB_SHA}" -demo)
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          port=$(docker inspect --format '{{(index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort}}' "$container")
+          for i in $(seq 1 60); do
+            if curl --fail --silent "http://127.0.0.1:${port}/healthz" >/dev/null; then break; fi
+            sleep 1
+          done
+          NINES_SMOKE_API_TOKEN=synthetic-container-smoke-token-only \
+            python3 scripts/release/smoke.py --url "http://127.0.0.1:${port}" --token-env NINES_SMOKE_API_TOKEN
+
+      - name: Playground lifecycle (${{ matrix.playground }})
+        shell: bash
+        env:
+          PLAYGROUND_BACKEND: ${{ matrix.playground }}
+        run: |
+          set -euo pipefail
+          export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
+          printf '::add-mask::%s\n' "$POSTGRES_PASSWORD"
+          compose=(docker compose -p nines-ci-playground -f compose.playground.yaml)
+          if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
+            compose+=(-f compose.playground.mimir.yaml --profile mimir)
+          fi
+          cleanup() {
+            "${compose[@]}" logs --no-color --tail 40 || true
+            "${compose[@]}" down -v || true
+          }
+          trap cleanup EXIT
+          "${compose[@]}" up --build -d
+          "${compose[@]}" run --rm verify

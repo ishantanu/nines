@@ -1,0 +1,59 @@
+apiVersion: nines.dev/v1alpha1
+kind: ReviewSkill
+metadata:
+  name: reliability-review
+  version: 1.0.0
+spec:
+  displayName: Reliability review
+  description: Interpret the captured assessment with bounded read-only model tools.
+  mode: model
+  scopeKinds:
+    - ServiceLevelObjective
+    - CriticalUserJourney
+  toolAllowlist:
+    - read_context
+    - read_objective
+    - read_assessment
+    - finish_review
+  requiredTools: []
+  evidenceObligations:
+    - captured_context
+    - deterministic_assessment
+    - exact_digest
+  inputSchema:
+    additionalProperties: false
+    properties:
+      question:
+        maxLength: 4000
+        minLength: 1
+        type: string
+    required:
+      - question
+    type: object
+  outputSchema:
+    additionalProperties: false
+    properties:
+      evidenceDigests:
+        items:
+          pattern: ^[a-f0-9]{64}$
+          type: string
+        maxItems: 1
+        minItems: 1
+        type: array
+      limitations:
+        items:
+          maxLength: 500
+          minLength: 1
+          type: string
+        maxItems: 8
+        type: array
+      summary:
+        maxLength: 4000
+        minLength: 1
+        type: string
+    required:
+      - summary
+      - evidenceDigests
+      - limitations
+    type: object
+  instructions: Answer the pinned question using captured evidence and the deterministic assessment. Distinguish observed facts, hypotheses and missing evidence. Cite the exact captured digest. Do not infer end-to-end journey success from linked objectives.

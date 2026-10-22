@@ -1,0 +1,14 @@
+publicURLEnv: NINES_PUBLIC_URL
+sessionHours: 12
+providers:
+  - id: local
+    name: Local account
+    type: local
+    allowDemoCredentials: true
+    bootstrapUsername: admin
+    bootstrapPasswordEnv: NINES_BOOTSTRAP_PASSWORD
+bootstrap:
+  - tenant: prometheus
+    provider: local
+    subject: admin
+    role: owner

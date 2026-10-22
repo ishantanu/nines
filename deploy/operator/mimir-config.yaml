@@ -1,0 +1,13 @@
+# Operator configuration file, not a Kubernetes resource.
+# Mount through the operator ConfigMap and provide the bearer token through a Secret volume.
+namespace: team-commerce
+tenant: commerce
+projects: [commerce]
+sources:
+  primary:
+    kind: mimir
+    queryURL: http://mimir.monitoring.svc:9009/prometheus
+    rulerURL: http://mimir.monitoring.svc:9009/prometheus
+    mimirOrgID: commerce
+    rulerNamespace: nines-commerce
+    bearerTokenFile: /var/run/nines-provider/bearer-token

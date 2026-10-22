@@ -1,0 +1,35 @@
+.env
+bin/
+coverage.out
+*.test
+.DS_Store
+
+web/node_modules/
+web/.vite/
+
+dist/
+*.log
+*-test-results.json
+.vscode/
+.idea/
+.env.*
+!.env.example
+
+# Public documentation is curated; historical lab evidence remains local.
+/docs/*
+!/docs/cli.md
+!/docs/public/
+/CHUNKS.md
+/integration/**/result-*.json
+
+__pycache__/
+*.pyc
+
+backups/
+
+# Local Prometheus query evidence, not a product configuration example.
+/prometheus-scrape-success.yaml
+
+# Local Python lint tooling and caches.
+.venv-lint/
+.ruff_cache/

@@ -1,0 +1,102 @@
+# Isolated, synthetic Prometheus playground. Mimir is an optional override/profile.
+# First set POSTGRES_PASSWORD through .env or your shell (no database default).
+# Web login: admin / admin, unless NINES_PLAYGROUND_PASSWORD is set.
+# docker compose -p nines-playground -f compose.playground.yaml up --build -d
+services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: nines
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or your shell}
+      POSTGRES_DB: nines
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U nines -d nines]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  rule-directory:
+    image: python:3.13.7-alpine
+    command: [python, -c, "import os; os.chown('/rules',65532,65532); os.chmod('/rules',0o755)"]
+    volumes:
+      - rules:/rules
+  sample:
+    image: python:3.13.7-alpine
+    command: [python, -u, /app/sample.py]
+    volumes:
+      - ./deploy/playground/sample.py:/app/sample.py:ro
+    ports:
+      - "127.0.0.1:${NINES_PLAYGROUND_SAMPLE_PORT:-19092}:8000"
+  prometheus:
+    image: prom/prometheus:v3.5.1
+    command: [--config.file=/etc/prometheus/prometheus.yml, --web.enable-lifecycle]
+    depends_on:
+      rule-directory:
+        condition: service_completed_successfully
+      sample:
+        condition: service_started
+    volumes:
+      - ./deploy/playground/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - rules:/etc/prometheus/nines:ro
+      - prometheus:/prometheus
+    ports:
+      - "127.0.0.1:${NINES_PLAYGROUND_PROMETHEUS_PORT:-19090}:9090"
+  rule-reloader:
+    image: python:3.13.7-alpine
+    command: [python, -u, /app/reloader.py]
+    depends_on:
+      prometheus:
+        condition: service_started
+    volumes:
+      - ./deploy/playground/reloader.py:/app/reloader.py:ro
+      - rules:/rules:ro
+  nines:
+    build: .
+    depends_on:
+      database:
+        condition: service_healthy
+      rule-directory:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://nines:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or your shell}@database:5432/nines?sslmode=disable
+      API_TOKEN: nines-local-playground-owner-token
+      TENANTS_FILE: /etc/nines/tenants.yaml
+      AUTH_CONFIG_FILE: /etc/nines/auth.yaml
+      NINES_PUBLIC_URL: http://127.0.0.1:${NINES_PLAYGROUND_PORT:-18080}
+      NINES_BOOTSTRAP_PASSWORD: ${NINES_PLAYGROUND_PASSWORD:-admin}
+      NINES_SOURCE_HOSTS: prometheus
+      NINES_SOURCE_ENCRYPTION_KEY: bmluZXMtcGxheWdyb3VuZC10ZXN0LWtleS0wMDAwMDA=
+      NINES_MANAGED_RULE_DIRECTORY: /rules
+    volumes:
+      - ./deploy/playground/tenants.yaml:/etc/nines/tenants.yaml:ro
+      - ./deploy/playground/auth.yaml:/etc/nines/auth.yaml:ro
+      - rules:/rules
+    ports:
+      - "127.0.0.1:${NINES_PLAYGROUND_PORT:-18080}:8080"
+  setup:
+    image: python:3.13.7-alpine
+    command: [python, -u, /app/flow.py, setup]
+    depends_on:
+      nines:
+        condition: service_started
+      prometheus:
+        condition: service_started
+    volumes:
+      - ./deploy/playground/flow.py:/app/flow.py:ro
+      - ./deploy/playground/management.py:/app/management.py:ro
+      - ./deploy/playground/sample.slo.yaml:/app/sample.slo.yaml:ro
+  verify:
+    image: python:3.13.7-alpine
+    profiles: [verify]
+    command: [python, -u, /app/flow.py, verify]
+    environment:
+      NINES_TEST_PASSWORD: ${NINES_PLAYGROUND_PASSWORD:-admin}
+    volumes:
+      - ./deploy/playground/flow.py:/app/flow.py:ro
+      - ./deploy/playground/management.py:/app/management.py:ro
+      - ./deploy/playground/sample.slo.yaml:/app/sample.slo.yaml:ro
+volumes:
+  database:
+  prometheus:
+  rules:

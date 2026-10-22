@@ -1,0 +1,29 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjectiveIntent
+metadata:
+  name: api-success-intent
+  project: production
+spec:
+  description: Production API request attempts should complete successfully.
+  service: api
+  source: primary
+  outcome: availability
+  population:
+    service: api
+    environment: production
+  target: 0.999
+  windowSeconds: 2419200 # Rolling 28 days
+  noDataPolicy: unknown
+  # Optional alert policy. These values are explicitly authored, not inferred.
+  policy:
+    shortWindowSeconds: 300
+    longWindowSeconds: 3600
+    burnRate: 14.4
+    forSeconds: 120
+    minCoverage: 1
+  # To propose a link to an existing CUJ, specify its current revision and step:
+  # journey:
+  #   name: checkout
+  #   step: payment
+  #   expectedRevision: 1
+  #   required: true

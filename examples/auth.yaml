@@ -1,0 +1,34 @@
+# Use an HTTPS origin outside loopback development. Register exactly
+# https://slo.example.com/auth/oidc/company/callback with your OIDC provider.
+publicURL: https://slo.example.com
+sessionHours: 12
+providers:
+  - id: company
+    name: Company SSO
+    type: oidc
+    issuerURL: https://identity.example.com/realms/platform
+    clientID: nines
+    clientSecretEnv: NINES_OIDC_SECRET
+  - id: directory
+    name: Company directory
+    type: ldap
+    url: ldaps://directory.example.com:636
+    caFile: /etc/nines/directory-ca.pem
+    bindDN: cn=nines-reader,ou=service-accounts,dc=example,dc=com
+    bindPasswordEnv: NINES_LDAP_BIND_PASSWORD
+    userBaseDN: ou=people,dc=example,dc=com
+    userFilter: (&(objectClass=person)(uid={username}))
+    subjectAttribute: entryUUID
+    nameAttribute: displayName
+    emailAttribute: mail
+    # Active Directory: userFilter: (sAMAccountName={username})
+    # subjectAttribute: objectGUID
+    # Alternatively use ldap://directory.example.com:389 with startTLS: true.
+    # Plain LDAP bind and certificate-verification bypasses are unsupported.
+bootstrap:
+  # Replace this with the exact OIDC sub, not a username or email address.
+  # Bootstrap runs once per tenant in this identity database.
+  - tenant: default
+    provider: company
+    subject: replace-with-exact-oidc-subject
+    role: owner

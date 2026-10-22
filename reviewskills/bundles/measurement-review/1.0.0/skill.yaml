@@ -1,0 +1,59 @@
+apiVersion: nines.dev/v1alpha1
+kind: ReviewSkill
+metadata:
+  name: measurement-review
+  version: 1.0.0
+spec:
+  displayName: Measurement review
+  description: Explain measurement coverage and contract limitations without reading additional objective context.
+  mode: model
+  scopeKinds:
+    - ServiceLevelObjective
+    - CriticalUserJourney
+  toolAllowlist:
+    - read_assessment
+    - finish_review
+  requiredTools:
+    - read_assessment
+  evidenceObligations:
+    - captured_context
+    - deterministic_assessment
+    - exact_digest
+  inputSchema:
+    additionalProperties: false
+    properties:
+      question:
+        maxLength: 4000
+        minLength: 1
+        type: string
+    required:
+      - question
+    type: object
+  outputSchema:
+    additionalProperties: false
+    properties:
+      evidenceDigests:
+        items:
+          pattern: ^[a-f0-9]{64}$
+          type: string
+        maxItems: 1
+        minItems: 1
+        type: array
+      limitations:
+        items:
+          maxLength: 500
+          minLength: 1
+          type: string
+        maxItems: 8
+        minItems: 1
+        type: array
+      summary:
+        maxLength: 4000
+        minLength: 1
+        type: string
+    required:
+      - summary
+      - evidenceDigests
+      - limitations
+    type: object
+  instructions: Read the deterministic assessment using read_assessment before finishing. Focus on data completeness, no traffic, coverage and measurement-contract limitations. Include at least one explicit limitation. Do not diagnose service causes or claim missing evidence proves success.

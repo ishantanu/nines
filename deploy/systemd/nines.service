@@ -1,0 +1,30 @@
+[Unit]
+Description=Nines SLO platform
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=nines
+Group=nines
+EnvironmentFile=/etc/nines/nines.env
+ExecStart=/opt/nines/nines-server -addr 127.0.0.1:8080
+StateDirectory=nines
+RuntimeDirectory=nines
+WorkingDirectory=/var/lib/nines
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/nines /run/nines
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

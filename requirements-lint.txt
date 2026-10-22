@@ -1,0 +1,2 @@
+# Development tooling only. No third-party Python runtime dependencies.
+ruff==0.9.6

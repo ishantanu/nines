@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nines-auth
+  labels:
+    app.kubernetes.io/name: nines
+data:
+  auth.yaml: |
+    publicURLEnv: NINES_PUBLIC_URL
+    sessionHours: 12
+    providers:
+      - id: local
+        name: Local account
+        type: local
+        bootstrapUsername: admin
+        bootstrapPasswordEnv: NINES_BOOTSTRAP_PASSWORD
+    bootstrap:
+      - tenant: default
+        provider: local
+        subject: admin
+        role: owner

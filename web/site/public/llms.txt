@@ -1,0 +1,28 @@
+# Nines
+
+> Open source SLO management connecting critical user journeys to measurable service objectives.
+
+Status: pre-release MVP under active development, Apache-2.0, self-hosted. Expect regular features and fixes; APIs may change before a stable release. This GitHub Pages site is product documentation, not the Nines API or an MCP endpoint.
+
+## Resource contracts
+
+SLOs and CriticalUserJourney resources use YAML with apiVersion nines.dev/v1alpha1. Journey steps explicitly refer to SLOs. Sources include configured Prometheus and Grafana Mimir connections. Metrics, windows, budgets and burn-rate calculations are deterministic.
+
+## Agent interfaces
+
+The Cobra CLI supports offline validation and recording-rule generation. Connected commands require an explicit server and tenant context. Use --agent for JSON output, plan before apply, and check the expected resource revision. The MCP adapter uses stdio and the same HTTP resource contracts. Model-assisted intent and review workflows are experimental. Models are optional, provider-configurable, and may run locally.
+
+## Community credits
+
+Nines takes inspiration from Sloth (https://github.com/slok/sloth) and Pyrra (https://github.com/pyrra-dev/pyrra) for SLOs as code, Prometheus rules, and approachable SLO workflows.
+
+## Documentation
+
+- [Source and setup](https://github.com/ishantanu/nines)
+- [Deployment guides](https://github.com/ishantanu/nines/blob/main/docs/public/deployment.md)
+- [Architecture](https://github.com/ishantanu/nines/blob/main/docs/public/architecture.md)
+- [CLI and deterministic skills](https://github.com/ishantanu/nines/blob/main/docs/cli.md)
+- [Configuration and tenant boundaries](https://github.com/ishantanu/nines/blob/main/docs/public/configuration.md)
+- [Operational limits](https://github.com/ishantanu/nines/blob/main/docs/public/operations.md)
+- [Experimental features](https://github.com/ishantanu/nines/blob/main/docs/public/experimental.md)
+- [Release checklist](https://github.com/ishantanu/nines/blob/main/docs/public/release.md)

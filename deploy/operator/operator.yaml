@@ -1,0 +1,113 @@
+# Example: one operator installation per namespace/tenant boundary.
+# Build and supply an image before applying. CRDs are installed separately by an administrator.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: team-commerce
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nines-operator
+  namespace: team-commerce
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nines-operator
+  namespace: team-commerce
+rules:
+  - apiGroups: [nines.dev]
+    resources: [servicelevelobjectives, servicelevelobjectiveintents, criticaluserjourneys, measurementbindings]
+    verbs: [get, list]
+  - apiGroups: [nines.dev]
+    resources: [servicelevelobjectives]
+    verbs: [create, update]
+  - apiGroups: [nines.dev]
+    resources: [servicelevelobjectives/status, servicelevelobjectiveintents/status, criticaluserjourneys/status, measurementbindings/status, servicelevelobjectives/finalizers]
+    verbs: [update]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [prometheusrules]
+    verbs: [get, create, update]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [create]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    resourceNames: [nines-operator]
+    verbs: [get, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nines-operator
+  namespace: team-commerce
+subjects:
+  - kind: ServiceAccount
+    name: nines-operator
+    namespace: team-commerce
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nines-operator
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nines-operator
+  namespace: team-commerce
+data:
+  operator.yaml: |
+    namespace: team-commerce
+    tenant: commerce
+    projects: [commerce]
+    sources:
+      primary:
+        kind: prometheus-operator
+        queryURL: http://prometheus.monitoring.svc:9090
+        prometheusLabels:
+          release: monitoring
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nines-operator
+  namespace: team-commerce
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: nines-operator}
+  template:
+    metadata:
+      labels: {app: nines-operator}
+    spec:
+      serviceAccountName: nines-operator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: operator
+          image: nines-operator:dev
+          imagePullPolicy: IfNotPresent
+          args: [-config, /etc/nines/operator.yaml, -health-addr, ':8081']
+          env:
+            - {name: OTEL_SERVICE_NAME, value: nines-operator}
+          ports:
+            - {name: health, containerPort: 8081}
+          readinessProbe:
+            httpGet: {path: /readyz, port: health}
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /etc/nines, readOnly: true}
+      volumes:
+        - name: config
+          configMap: {name: nines-operator}

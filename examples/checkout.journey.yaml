@@ -1,0 +1,35 @@
+apiVersion: nines.dev/v1alpha1
+kind: CriticalUserJourney
+metadata:
+  name: complete-checkout
+  project: demo
+spec:
+  displayName: Complete checkout
+  description: A customer can submit a cart, pay, and receive confirmation.
+  owner: team-commerce
+  criticality: critical
+  slos:
+    - id: api-availability
+      dimension: availability
+      required: true
+    - id: checkout-success
+      dimension: correctness
+      required: true
+    - id: background-jobs
+      dimension: latency
+      required: false
+  steps:
+    - id: submit-cart
+      name: Submit cart
+      actor: user
+      sloRefs: [api-availability]
+    - id: authorize-payment
+      name: Authorize payment
+      actor: service
+      dependsOn: [submit-cart]
+      sloRefs: [checkout-success]
+    - id: send-confirmation
+      name: Send confirmation
+      actor: service
+      dependsOn: [authorize-payment]
+      sloRefs: [background-jobs]

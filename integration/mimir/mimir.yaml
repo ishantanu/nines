@@ -1,0 +1,48 @@
+# Disposable single-node verification only. No production credentials or data.
+multitenancy_enabled: true
+usage_stats:
+  enabled: false
+server:
+  http_listen_port: 9009
+  log_level: warn
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /tmp/nines-mimir/blocks
+  bucket_store:
+    sync_dir: /tmp/nines-mimir/sync
+  tsdb:
+    dir: /tmp/nines-mimir/tsdb
+compactor:
+  data_dir: /tmp/nines-mimir/compactor
+  sharding_ring:
+    kvstore:
+      store: inmemory
+distributor:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+ingester:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+    replication_factor: 1
+    min_ready_duration: 0s
+ruler_storage:
+  backend: filesystem
+  filesystem:
+    dir: /tmp/nines-mimir/rules
+ruler:
+  enable_api: true
+  rule_path: /tmp/nines-mimir/rule-evaluation
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+store_gateway:
+  sharding_ring:
+    replication_factor: 1
+    kvstore:
+      store: inmemory

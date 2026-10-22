@@ -1,0 +1,9 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 10s
+rule_files:
+  - /etc/prometheus/nines/*.yaml
+scrape_configs:
+  - job_name: playground-checkout
+    static_configs:
+      - targets: [sample:8000]

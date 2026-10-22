@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "nines-demo": {
+      "command": "/absolute/path/to/platform/bin/nines-mcp",
+      "args": [
+        "--server",
+        "http://127.0.0.1:8080",
+        "--tenant",
+        "default"
+      ]
+    }
+  }
+}

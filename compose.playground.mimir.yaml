@@ -1,0 +1,32 @@
+# Optional dual-backend integration profile. Use with the base file and --profile mimir.
+# Keep the same file/profile selection for up, run, logs and down.
+services:
+  mimir:
+    profiles: [mimir]
+    image: grafana/mimir:3.2.2
+    command: [--config.file=/etc/mimir/config.yaml, --ingest-storage.enabled=false]
+    volumes:
+      - ./deploy/playground/mimir.yaml:/etc/mimir/config.yaml:ro
+      - mimir:/data
+    ports:
+      - "127.0.0.1:${NINES_PLAYGROUND_MIMIR_PORT:-19009}:9009"
+  prometheus:
+    depends_on:
+      mimir:
+        condition: service_started
+    volumes:
+      - ./deploy/playground/prometheus-mimir.yaml:/etc/prometheus/prometheus.yml:ro
+  nines:
+    environment:
+      NINES_SOURCE_HOSTS: prometheus,mimir
+    volumes:
+      - ./deploy/playground/tenants-mimir.yaml:/etc/nines/tenants.yaml:ro
+      - ./deploy/playground/auth-mimir.yaml:/etc/nines/auth.yaml:ro
+  setup:
+    environment:
+      NINES_PLAYGROUND_TENANTS: prometheus,mimir
+  verify:
+    environment:
+      NINES_PLAYGROUND_TENANTS: prometheus,mimir
+volumes:
+  mimir:

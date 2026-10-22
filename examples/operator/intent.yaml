@@ -1,0 +1,64 @@
+apiVersion: nines.dev/v1alpha1
+kind: MeasurementBinding
+metadata:
+  name: checkout-attempts
+  namespace: team-commerce
+  annotations:
+    nines.dev/project: commerce
+spec:
+  displayName: Checkout attempt completion
+  service: checkout
+  source: primary
+  measurement: availability
+  metric: checkout_attempts_total
+  countFrom: counter
+  labels: {service: checkout}
+  successLabels: {outcome: success}
+  stepSeconds: 60
+  scrapeIntervalSeconds: 15
+  observationPoint: Server result for each eligible checkout attempt, including failed attempts.
+---
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjectiveIntent
+metadata:
+  name: checkout-intent-availability
+  namespace: team-commerce
+  annotations:
+    nines.dev/project: commerce
+spec:
+  description: 99.9% of eligible checkout attempts succeed over 28 days.
+  service: checkout
+  source: primary
+  outcome: availability
+  population: {service: checkout}
+  target: 0.999
+  windowSeconds: 2419200
+  noDataPolicy: unknown
+  measurementSelection:
+    name: checkout-attempts
+    expectedGeneration: 1
+  journey:
+    name: checkout-intent-journey
+    step: checkout
+    expectedRevision: 1
+    required: true
+---
+apiVersion: nines.dev/v1alpha1
+kind: CriticalUserJourney
+metadata:
+  name: checkout-intent-journey
+  namespace: team-commerce
+  annotations:
+    nines.dev/project: commerce
+spec:
+  displayName: Complete checkout
+  description: A reviewed server-completion observation point, not an inferred end-to-end browser outcome.
+  owner: team-commerce
+  criticality: high
+  slos:
+    - {id: checkout-intent-availability, dimension: availability, required: true}
+  steps:
+    - id: checkout
+      name: Complete checkout
+      actor: user
+      sloRefs: [checkout-intent-availability]

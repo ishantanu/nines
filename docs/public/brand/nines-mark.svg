@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="88" viewBox="0 0 80 88" role="img" aria-labelledby="title desc">
+  <title id="title">Nines</title>
+  <desc id="desc">A geometric number nine, drawn as a continuous circular loop and descending tail.</desc>
+  <g fill="none" stroke="#65519b" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="38" cy="30" r="21"/>
+    <path d="M59 30v22c0 15-10 25-25 25h-7"/>
+  </g>
+</svg>

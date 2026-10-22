@@ -1,0 +1,17 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjectiveIntent
+metadata:
+  name: api-latency-intent
+  project: production
+spec:
+  description: Production API request attempts should complete within 300 milliseconds.
+  service: api
+  source: primary
+  outcome: latency
+  population:
+    service: api
+    environment: production
+  thresholdSeconds: 0.3
+  target: 0.99
+  windowSeconds: 604800 # Rolling 7 days
+  noDataPolicy: unknown

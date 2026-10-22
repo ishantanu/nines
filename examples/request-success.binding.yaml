@@ -1,0 +1,18 @@
+apiVersion: nines.dev/v1alpha1
+kind: MeasurementBinding
+metadata:
+  name: api-success
+  project: production
+spec:
+  displayName: API request success
+  service: api
+  source: primary
+  measurement: availability
+  metric: http_requests_total
+  labels:
+    service: api
+    environment: production
+  successLabels:
+    status: "200"
+  stepSeconds: 60
+  observationPoint: Completed server requests at the API boundary; request attempts, not unique users

@@ -1,0 +1,35 @@
+# Microsoft Entra workforce tenant, using the existing OIDC provider.
+# Replace the origin, Directory (tenant) ID and Application (client) ID.
+# Register the callback as a Web redirect URI, not SPA:
+# https://slo.example.com/auth/oidc/microsoft/callback
+publicURL: https://slo.example.com
+sessionHours: 12
+providers:
+  - id: microsoft
+    name: Microsoft Entra ID
+    type: oidc
+    issuerURL: https://login.microsoftonline.com/11111111-2222-3333-4444-555555555555/v2.0
+    clientID: aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+    clientSecretEnv: NINES_ENTRA_CLIENT_SECRET
+    # Mapped sessions require a fresh sign-in within this limit (1–60 minutes).
+    claimsMaxAgeMinutes: 15
+    roleMappings:
+      # Exact Entra app-role VALUE, not the role display name or Object ID.
+      - id: reliability-admins
+        tenant: default
+        claim: roles
+        value: Reliability.Admin
+        role: owner
+      # Replace with the exact group Object ID emitted in the signed ID token.
+      - id: payments-engineers
+        tenant: default
+        claim: groups
+        value: 77777777-8888-9999-aaaa-bbbbbbbbbbbb
+        role: editor
+bootstrap:
+  # Use the exact ID token sub for this application, NOT the user's Object ID,
+  # email or UPN. See docs/public/deployment/identity-and-tenants.md for first-owner provisioning.
+  - tenant: default
+    provider: microsoft
+    subject: replace-with-exact-application-specific-sub
+    role: owner

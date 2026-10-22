@@ -1,0 +1,29 @@
+[
+  {
+    "repository": "https://github.com/rrweb-io/rrweb",
+    "version": "2.1.7",
+    "file": "licenses/rrweb.LICENSE",
+    "sourceURL": "https://raw.githubusercontent.com/rrweb-io/rrweb/a9cb69272522e677522f9a2f2eb8ac43fbf9efcb/LICENSE",
+    "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c"
+  },
+  {
+    "package": "@posthog/browser-common",
+    "version": "0.9.5",
+    "file": "licenses/posthog-js.LICENSE",
+    "sourcePackage": "posthog-js@1.438.13",
+    "sourceIntegrity": "sha512-fcRhMZ/TKvpDjmDGTlf4KCBqqTnpLWLplZ76NfeLNEE1P6N6qCGGZzqZ6gEzJoOfYLNLgjd0sRM5fC8F/Ky9fA==",
+    "repository": "https://github.com/PostHog/posthog-js",
+    "sha256": "d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f",
+    "reviewNote": "Supplied MIT notice from the installed parent PostHog repository package; explicit maintainer review required."
+  },
+  {
+    "package": "react-remove-scroll-bar",
+    "repository": "https://github.com/theKashey/react-remove-scroll-bar",
+    "version": "2.3.8",
+    "file": "licenses/react-remove-scroll-bar.LICENSE",
+    "sourceURL": "https://raw.githubusercontent.com/theKashey/react-remove-scroll-bar/8ca9ba5ea52de03308fe8ced94f7b159a44d28ff/LICENSE",
+    "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84",
+    "reviewNote": "Fixed upstream repository notice; repository package.json is 2.3.7 and the npm 2.3.8 gitHead is not reachable. Maintainer review required.",
+    "sourceVersion": "2.3.7"
+  }
+]

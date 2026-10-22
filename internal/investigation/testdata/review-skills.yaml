@@ -1,0 +1,26 @@
+- name: no-traffic-remains-unknown
+  context:
+    resource: {id: checkout}
+    measurement: {dataStatus: no_traffic, coverage: 1, target: 0.99, reliability: 1}
+  want: insufficient_evidence
+- name: partial-coverage-remains-unknown
+  context:
+    resource: {id: checkout}
+    measurement: {dataStatus: partial, coverage: 0.5, target: 0.99, reliability: 1}
+  want: insufficient_evidence
+- name: complete-window-below-target
+  context:
+    resource: {id: checkout}
+    measurement: {dataStatus: complete, coverage: 1, target: 0.99, reliability: 0.98}
+  want: window_below_target
+- name: complete-window-meets-target
+  context:
+    resource: {id: checkout}
+    measurement: {dataStatus: complete, coverage: 1, target: 0.99, reliability: 0.995}
+  want: window_within_target
+- name: incompatible-contract-blocks-comparison
+  context:
+    resource: {id: checkout}
+    measurementHealth: {evaluationBlocked: true}
+    measurement: {dataStatus: complete, coverage: 1, target: 0.99, reliability: 1}
+  want: insufficient_evidence

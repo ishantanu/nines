@@ -1,0 +1,42 @@
+# Deterministic MCP/API contract evaluations; no external model is invoked.
+cases:
+  - id: missing-data
+    tool: slo_context
+    resource: checkout
+    expectedHealth: unknown
+    expectedWarning: missing_measurement_is_not_success
+  - id: zero-traffic
+    tool: slo_context
+    resource: empty-traffic
+    expectedHealth: unknown
+    expectedWarning: zero_traffic_is_not_success
+  - id: stale-revision
+    tool: slo_context
+    resource: checkout
+    expectedRevision: 99
+    expectedError: revision_conflict
+  - id: ambiguous-name
+    tool: search_resources
+    query: checkout
+    expectedMatches: 2
+  - id: hostile-title
+    tool: slo_context
+    resource: checkout
+    expectedHealth: unknown
+    expectedTextTrust: untrusted_resource_data
+  - id: wrong-tenant-input
+    tool: slo_context
+    resource: checkout
+    extraTenant: beta
+    expectRejected: true
+  - id: stale-samples
+    tool: slo_context
+    resource: stale-samples
+    expectedHealth: unknown
+    expectedFreshness: stale
+  - id: failed-collector
+    tool: slo_context
+    resource: failed-collector
+    expectedHealth: unknown
+    expectedCollection: failed
+    expectedWarning: latest_collection_failed

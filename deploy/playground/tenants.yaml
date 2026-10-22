@@ -1,0 +1,12 @@
+tenants:
+  - id: prometheus
+    name: Playground Prometheus
+    access:
+      - tokenEnv: API_TOKEN
+        role: owner
+    source:
+      kind: prometheus
+      url: http://prometheus:9090
+      rules:
+        namespace: playground
+        directory: /rules

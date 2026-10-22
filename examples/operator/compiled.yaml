@@ -1,0 +1,53 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: checkout-availability
+  namespace: team-commerce
+  annotations:
+    nines.dev/project: commerce
+spec:
+  displayName: Checkout availability
+  service: checkout
+  source: primary
+  target: 0.999
+  windowSeconds: 2419200
+  stepSeconds: 60
+  providerWindow:
+    goodSelector: checkout_attempts_total{service="checkout",outcome="success"}
+    totalSelector: checkout_attempts_total{service="checkout"}
+    scrapeIntervalSeconds: 15
+  policies:
+    - name: fast-burn
+      severity: critical
+      shortWindowSeconds: 300
+      longWindowSeconds: 3600
+      burnRate: 14.4
+      forSeconds: 120
+      minCoverage: 1
+    - name: sustained-burn
+      severity: warning
+      shortWindowSeconds: 1800
+      longWindowSeconds: 21600
+      burnRate: 6
+      forSeconds: 300
+      minCoverage: 1
+---
+apiVersion: nines.dev/v1alpha1
+kind: CriticalUserJourney
+metadata:
+  name: purchase
+  namespace: team-commerce
+  annotations:
+    nines.dev/project: commerce
+spec:
+  displayName: Complete a purchase
+  description: Observe server completion for eligible checkout attempts.
+  owner: team-commerce
+  criticality: high
+  slos:
+    - {id: checkout-availability, dimension: availability, required: true}
+  steps:
+    - id: checkout
+      name: Complete checkout
+      actor: user
+      sloRefs: [checkout-availability]

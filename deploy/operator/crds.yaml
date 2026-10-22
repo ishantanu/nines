@@ -1,0 +1,637 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: servicelevelobjectives.nines.dev
+spec:
+    group: nines.dev
+    names:
+        kind: ServiceLevelObjective
+        plural: servicelevelobjectives
+        shortNames:
+            - slo
+        singular: servicelevelobjective
+    scope: Namespaced
+    versions:
+        - additionalPrinterColumns:
+            - jsonPath: .status.conditions[?(@.type=='Ready')].status
+              name: Ready
+              type: string
+            - jsonPath: .status.conditions[?(@.type=='Ready')].reason
+              name: Reason
+              type: string
+          name: v1alpha1
+          schema:
+            openAPIV3Schema:
+                properties:
+                    apiVersion:
+                        type: string
+                    kind:
+                        type: string
+                    metadata:
+                        type: object
+                    spec:
+                        properties:
+                            displayName:
+                                type: string
+                            goodQuery:
+                                type: string
+                            intent:
+                                nullable: true
+                                properties:
+                                    description:
+                                        type: string
+                                    journey:
+                                        nullable: true
+                                        properties:
+                                            expectedRevision:
+                                                format: int64
+                                                type: integer
+                                            name:
+                                                type: string
+                                            required:
+                                                type: boolean
+                                            step:
+                                                type: string
+                                        required:
+                                            - name
+                                            - step
+                                            - expectedRevision
+                                            - required
+                                        type: object
+                                    noDataPolicy:
+                                        type: string
+                                    outcome:
+                                        type: string
+                                    policies:
+                                        items:
+                                            properties:
+                                                burnRate:
+                                                    type: number
+                                                forSeconds:
+                                                    format: int64
+                                                    type: integer
+                                                longWindowSeconds:
+                                                    format: int64
+                                                    type: integer
+                                                minCoverage:
+                                                    type: number
+                                                name:
+                                                    type: string
+                                                severity:
+                                                    type: string
+                                                shortWindowSeconds:
+                                                    format: int64
+                                                    type: integer
+                                            required:
+                                                - shortWindowSeconds
+                                                - longWindowSeconds
+                                                - burnRate
+                                                - forSeconds
+                                                - minCoverage
+                                            type: object
+                                        maxItems: 1000
+                                        type: array
+                                    policy:
+                                        nullable: true
+                                        properties:
+                                            burnRate:
+                                                type: number
+                                            forSeconds:
+                                                format: int64
+                                                type: integer
+                                            longWindowSeconds:
+                                                format: int64
+                                                type: integer
+                                            minCoverage:
+                                                type: number
+                                            name:
+                                                type: string
+                                            severity:
+                                                type: string
+                                            shortWindowSeconds:
+                                                format: int64
+                                                type: integer
+                                        required:
+                                            - shortWindowSeconds
+                                            - longWindowSeconds
+                                            - burnRate
+                                            - forSeconds
+                                            - minCoverage
+                                        type: object
+                                    population:
+                                        additionalProperties:
+                                            type: string
+                                        maxProperties: 1000
+                                        type: object
+                                    service:
+                                        type: string
+                                    source:
+                                        type: string
+                                    target:
+                                        type: number
+                                    thresholdSeconds:
+                                        nullable: true
+                                        type: number
+                                    windowSeconds:
+                                        format: int64
+                                        type: integer
+                                required:
+                                    - description
+                                    - service
+                                    - source
+                                    - outcome
+                                    - population
+                                    - target
+                                    - windowSeconds
+                                    - noDataPolicy
+                                type: object
+                            measurementBinding:
+                                nullable: true
+                                properties:
+                                    digest:
+                                        type: string
+                                    name:
+                                        type: string
+                                    revision:
+                                        format: int64
+                                        type: integer
+                                required:
+                                    - name
+                                    - revision
+                                    - digest
+                                type: object
+                            policies:
+                                items:
+                                    properties:
+                                        burnRate:
+                                            type: number
+                                        forSeconds:
+                                            format: int64
+                                            type: integer
+                                        longWindowSeconds:
+                                            format: int64
+                                            type: integer
+                                        minCoverage:
+                                            type: number
+                                        name:
+                                            type: string
+                                        severity:
+                                            type: string
+                                        shortWindowSeconds:
+                                            format: int64
+                                            type: integer
+                                    required:
+                                        - shortWindowSeconds
+                                        - longWindowSeconds
+                                        - burnRate
+                                        - forSeconds
+                                        - minCoverage
+                                    type: object
+                                maxItems: 1000
+                                type: array
+                            policy:
+                                nullable: true
+                                properties:
+                                    burnRate:
+                                        type: number
+                                    forSeconds:
+                                        format: int64
+                                        type: integer
+                                    longWindowSeconds:
+                                        format: int64
+                                        type: integer
+                                    minCoverage:
+                                        type: number
+                                    name:
+                                        type: string
+                                    severity:
+                                        type: string
+                                    shortWindowSeconds:
+                                        format: int64
+                                        type: integer
+                                required:
+                                    - shortWindowSeconds
+                                    - longWindowSeconds
+                                    - burnRate
+                                    - forSeconds
+                                    - minCoverage
+                                type: object
+                            providerWindow:
+                                nullable: true
+                                properties:
+                                    goodSelector:
+                                        type: string
+                                    scrapeIntervalSeconds:
+                                        format: int64
+                                        type: integer
+                                    totalSelector:
+                                        type: string
+                                required:
+                                    - goodSelector
+                                    - totalSelector
+                                    - scrapeIntervalSeconds
+                                type: object
+                            service:
+                                type: string
+                            source:
+                                type: string
+                            stepSeconds:
+                                format: int64
+                                type: integer
+                            target:
+                                type: number
+                            totalQuery:
+                                type: string
+                            windowSeconds:
+                                format: int64
+                                type: integer
+                        required:
+                            - displayName
+                            - service
+                            - target
+                            - windowSeconds
+                            - stepSeconds
+                        type: object
+                    status:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                required:
+                    - spec
+                type: object
+          served: true
+          storage: true
+          subresources:
+            status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: criticaluserjourneys.nines.dev
+spec:
+    group: nines.dev
+    names:
+        kind: CriticalUserJourney
+        plural: criticaluserjourneys
+        shortNames:
+            - cuj
+        singular: criticaluserjourney
+    scope: Namespaced
+    versions:
+        - additionalPrinterColumns:
+            - jsonPath: .status.conditions[?(@.type=='Ready')].status
+              name: Ready
+              type: string
+            - jsonPath: .status.conditions[?(@.type=='Ready')].reason
+              name: Reason
+              type: string
+          name: v1alpha1
+          schema:
+            openAPIV3Schema:
+                properties:
+                    apiVersion:
+                        type: string
+                    kind:
+                        type: string
+                    metadata:
+                        type: object
+                    spec:
+                        properties:
+                            agentic:
+                                nullable: true
+                                properties:
+                                    approvalRequired:
+                                        type: boolean
+                                    maxCostUSD:
+                                        nullable: true
+                                        type: number
+                                    maxDurationSeconds:
+                                        format: int64
+                                        type: integer
+                                    maxSteps:
+                                        format: int64
+                                        type: integer
+                                    successDefinition:
+                                        type: string
+                                required:
+                                    - successDefinition
+                                    - approvalRequired
+                                type: object
+                            criticality:
+                                type: string
+                            description:
+                                type: string
+                            displayName:
+                                type: string
+                            owner:
+                                type: string
+                            slos:
+                                items:
+                                    properties:
+                                        dimension:
+                                            type: string
+                                        id:
+                                            type: string
+                                        required:
+                                            type: boolean
+                                    required:
+                                        - id
+                                        - dimension
+                                        - required
+                                    type: object
+                                maxItems: 1000
+                                type: array
+                            steps:
+                                items:
+                                    properties:
+                                        actor:
+                                            type: string
+                                        dependsOn:
+                                            items:
+                                                type: string
+                                            maxItems: 1000
+                                            type: array
+                                        id:
+                                            type: string
+                                        name:
+                                            type: string
+                                        sloRefs:
+                                            items:
+                                                type: string
+                                            maxItems: 1000
+                                            type: array
+                                    required:
+                                        - id
+                                        - name
+                                        - actor
+                                        - sloRefs
+                                    type: object
+                                maxItems: 1000
+                                type: array
+                        required:
+                            - displayName
+                            - description
+                            - owner
+                            - criticality
+                            - slos
+                            - steps
+                        type: object
+                    status:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                required:
+                    - spec
+                type: object
+          served: true
+          storage: true
+          subresources:
+            status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: measurementbindings.nines.dev
+spec:
+    group: nines.dev
+    names:
+        kind: MeasurementBinding
+        plural: measurementbindings
+        shortNames:
+            - mb
+        singular: measurementbinding
+    scope: Namespaced
+    versions:
+        - additionalPrinterColumns:
+            - jsonPath: .status.conditions[?(@.type=='Ready')].status
+              name: Ready
+              type: string
+            - jsonPath: .status.conditions[?(@.type=='Ready')].reason
+              name: Reason
+              type: string
+          name: v1alpha1
+          schema:
+            openAPIV3Schema:
+                properties:
+                    apiVersion:
+                        type: string
+                    kind:
+                        type: string
+                    metadata:
+                        type: object
+                    spec:
+                        properties:
+                            countFrom:
+                                type: string
+                            displayName:
+                                type: string
+                            labels:
+                                additionalProperties:
+                                    type: string
+                                maxProperties: 1000
+                                type: object
+                            measurement:
+                                type: string
+                            metric:
+                                type: string
+                            observationPoint:
+                                type: string
+                            scrapeIntervalSeconds:
+                                format: int64
+                                type: integer
+                            service:
+                                type: string
+                            source:
+                                type: string
+                            stepSeconds:
+                                format: int64
+                                type: integer
+                            successLabels:
+                                additionalProperties:
+                                    type: string
+                                maxProperties: 1000
+                                type: object
+                            thresholdSeconds:
+                                nullable: true
+                                type: number
+                        required:
+                            - displayName
+                            - service
+                            - source
+                            - measurement
+                            - metric
+                            - labels
+                            - stepSeconds
+                            - observationPoint
+                        type: object
+                    status:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                required:
+                    - spec
+                type: object
+          served: true
+          storage: true
+          subresources:
+            status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: servicelevelobjectiveintents.nines.dev
+spec:
+    group: nines.dev
+    names:
+        kind: ServiceLevelObjectiveIntent
+        plural: servicelevelobjectiveintents
+        shortNames:
+            - sloi
+        singular: servicelevelobjectiveintent
+    scope: Namespaced
+    versions:
+        - additionalPrinterColumns:
+            - jsonPath: .status.conditions[?(@.type=='Ready')].status
+              name: Ready
+              type: string
+            - jsonPath: .status.conditions[?(@.type=='Ready')].reason
+              name: Reason
+              type: string
+          name: v1alpha1
+          schema:
+            openAPIV3Schema:
+                properties:
+                    apiVersion:
+                        type: string
+                    kind:
+                        type: string
+                    metadata:
+                        type: object
+                    spec:
+                        properties:
+                            description:
+                                type: string
+                            journey:
+                                nullable: true
+                                properties:
+                                    expectedRevision:
+                                        format: int64
+                                        type: integer
+                                    name:
+                                        type: string
+                                    required:
+                                        type: boolean
+                                    step:
+                                        type: string
+                                required:
+                                    - name
+                                    - step
+                                    - expectedRevision
+                                    - required
+                                type: object
+                            measurementSelection:
+                                properties:
+                                    expectedGeneration:
+                                        format: int64
+                                        type: integer
+                                    name:
+                                        type: string
+                                required:
+                                    - name
+                                    - expectedGeneration
+                                type: object
+                            noDataPolicy:
+                                type: string
+                            outcome:
+                                type: string
+                            policies:
+                                items:
+                                    properties:
+                                        burnRate:
+                                            type: number
+                                        forSeconds:
+                                            format: int64
+                                            type: integer
+                                        longWindowSeconds:
+                                            format: int64
+                                            type: integer
+                                        minCoverage:
+                                            type: number
+                                        name:
+                                            type: string
+                                        severity:
+                                            type: string
+                                        shortWindowSeconds:
+                                            format: int64
+                                            type: integer
+                                    required:
+                                        - shortWindowSeconds
+                                        - longWindowSeconds
+                                        - burnRate
+                                        - forSeconds
+                                        - minCoverage
+                                    type: object
+                                maxItems: 1000
+                                type: array
+                            policy:
+                                nullable: true
+                                properties:
+                                    burnRate:
+                                        type: number
+                                    forSeconds:
+                                        format: int64
+                                        type: integer
+                                    longWindowSeconds:
+                                        format: int64
+                                        type: integer
+                                    minCoverage:
+                                        type: number
+                                    name:
+                                        type: string
+                                    severity:
+                                        type: string
+                                    shortWindowSeconds:
+                                        format: int64
+                                        type: integer
+                                required:
+                                    - shortWindowSeconds
+                                    - longWindowSeconds
+                                    - burnRate
+                                    - forSeconds
+                                    - minCoverage
+                                type: object
+                            population:
+                                additionalProperties:
+                                    type: string
+                                maxProperties: 1000
+                                type: object
+                            service:
+                                type: string
+                            source:
+                                type: string
+                            target:
+                                type: number
+                            thresholdSeconds:
+                                nullable: true
+                                type: number
+                            windowSeconds:
+                                format: int64
+                                type: integer
+                        required:
+                            - description
+                            - service
+                            - source
+                            - outcome
+                            - population
+                            - target
+                            - windowSeconds
+                            - noDataPolicy
+                            - measurementSelection
+                        type: object
+                    status:
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                required:
+                    - spec
+                type: object
+          served: true
+          storage: true
+          subresources:
+            status: {}

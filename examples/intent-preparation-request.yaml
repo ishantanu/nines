@@ -1,0 +1,6 @@
+id: preparation-one
+expectedVersion: 1
+mode: guided
+# Set true only after authorizing the configured model to receive goal data.
+# A complete typed goal in guided mode needs no model or model consent.
+modelConsent: false

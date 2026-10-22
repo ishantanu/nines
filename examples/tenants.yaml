@@ -1,0 +1,34 @@
+# Server-owned configuration. Credentials are resolved from environment variables.
+tenants:
+  - id: default
+    name: Commerce
+    access:
+      - tokenEnv: PLATFORM_OWNER_TOKEN
+        role: owner
+      - tokenEnv: COMMERCE_AGENT_TOKEN
+        role: agent
+      - tokenEnv: COMMERCE_VIEWER_TOKEN
+        role: viewer
+    source:
+      kind: mimir
+      # Include the Mimir Prometheus API prefix (default /prometheus).
+      url: https://mimir.example.com/prometheus
+      mimirOrgID: commerce-production
+      bearerTokenEnv: COMMERCE_MIMIR_TOKEN
+    # Optional; value of this environment variable is the destination URL.
+    # alertWebhookEnv: COMMERCE_ALERT_WEBHOOK
+  - id: analytics
+    name: Analytics
+    access:
+      # Sharing this owner credential grants explicit access to both tenants.
+      - tokenEnv: PLATFORM_OWNER_TOKEN
+        role: owner
+      - tokenEnv: ANALYTICS_AGENT_TOKEN
+        role: agent
+    source:
+      kind: mimir
+      url: https://mimir.example.com/prometheus
+      mimirOrgID: analytics-production
+      # Basic auth is useful for Grafana Cloud / authenticating proxies.
+      basicUsername: analytics-metrics-account
+      basicPasswordEnv: ANALYTICS_MIMIR_PASSWORD

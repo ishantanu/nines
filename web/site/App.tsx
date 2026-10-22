@@ -1,0 +1,511 @@
+import { useState } from "react";
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  Github,
+  Terminal,
+  Waypoints,
+} from "lucide-react";
+import { Button } from "../src/components/ui/button";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../src/components/ui/tabs";
+import slo from "../../examples/api-availability.slo.yaml?raw";
+import journey from "../../examples/checkout.journey.yaml?raw";
+
+const logo = "./nines.svg";
+const repo = "https://github.com/ishantanu/nines";
+const docs = `${repo}/blob/main/docs`;
+const start =
+  "git clone https://github.com/ishantanu/nines.git\ncd nines\ngo run ./cmd/server -demo";
+
+function CopyCommand({ text }: { text: string }) {
+  const [status, setStatus] = useState("");
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setStatus("Copied");
+    } catch {
+      setStatus("Select the command to copy it.");
+    }
+  }
+  return (
+    <div className="copy-control">
+      <span role="status">{status}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={copy}
+        aria-label="Copy demo commands"
+      >
+        {status === "Copied" ? (
+          <Check aria-hidden="true" />
+        ) : (
+          <Copy aria-hidden="true" />
+        )}{" "}
+        Copy
+      </Button>
+    </div>
+  );
+}
+
+function WorkspacePreview() {
+  return (
+    <figure className="workspace-preview" aria-labelledby="preview-caption">
+      <div className="preview-top">
+        <span>
+          <span className="workspace-dot" /> Commerce
+        </span>
+        <span className="preview-label">SYNTHETIC PREVIEW</span>
+      </div>
+      <div className="preview-body">
+        <div className="objective-title">
+          <div>
+            <p className="mini-label">SERVICE LEVEL OBJECTIVE</p>
+            <h2>Checkout success</h2>
+          </div>
+          <span className="objective-status">
+            <span />
+            Within objective
+          </span>
+        </div>
+        <div className="metrics-row">
+          <div>
+            <span>Measured SLI</span>
+            <strong>
+              99.96<small>%</small>
+            </strong>
+          </div>
+          <div>
+            <span>SLO target</span>
+            <strong>
+              99.90<small>%</small>
+            </strong>
+          </div>
+          <div>
+            <span>Rolling window</span>
+            <strong>
+              28<small>days</small>
+            </strong>
+          </div>
+        </div>
+        <div className="chart-heading">
+          <span>
+            <i className="legend-sli" />
+            SLI
+          </span>
+          <span>
+            <i className="legend-target" />
+            SLO target
+          </span>
+          <span>Last 24 hours</span>
+        </div>
+        <svg
+          className="sli-chart"
+          viewBox="0 0 520 164"
+          role="img"
+          aria-labelledby="chart-title chart-desc"
+        >
+          <title id="chart-title">
+            Illustrative SLI compared with its SLO target
+          </title>
+          <desc id="chart-desc">
+            Synthetic availability fluctuates around 99.96 percent, with a brief
+            dip below the 99.90 percent target. This is an illustration, not
+            live telemetry.
+          </desc>
+          <g stroke="#e9e6ef" strokeWidth="1">
+            <path d="M0 26H520M0 65H520M0 104H520M0 143H520" />
+          </g>
+          <path
+            d="M0 104H520"
+            stroke="#a494c1"
+            strokeWidth="1.5"
+            strokeDasharray="5 5"
+          />
+          <path
+            d="M0 45L20 39L40 43L60 32L80 37L100 34L120 42L140 35L160 43L180 39L200 51L220 40L240 46L260 39L280 61L300 125L320 88L340 43L360 38L380 42L400 28L420 36L440 32L460 38L480 27L500 37L520 32"
+            fill="none"
+            stroke="#65519b"
+            strokeWidth="2.7"
+            strokeLinejoin="round"
+          />
+          <g fill="#777180" fontSize="10" fontFamily="ui-monospace,monospace">
+            <text x="0" y="160">
+              00:00
+            </text>
+            <text x="244" y="160">
+              12:00
+            </text>
+            <text x="487" y="160">
+              24:00
+            </text>
+          </g>
+        </svg>
+        <div className="budget-row">
+          <span>Error budget remaining</span>
+          <strong>60.0%</strong>
+        </div>
+        <div className="budget-track">
+          <span />
+        </div>
+        <div className="journey-link">
+          <Waypoints size={17} aria-hidden="true" />
+          <span>
+            Critical user journey<strong>Complete checkout</strong>
+          </span>
+          <span>3 linked SLOs</span>
+        </div>
+      </div>
+      <figcaption id="preview-caption">
+        Illustrative workspace with synthetic values.
+      </figcaption>
+    </figure>
+  );
+}
+
+export function App() {
+  return (
+    <>
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
+      <header className="site-header">
+        <div className="container nav-row">
+          <a className="brand" href="#" aria-label="Nines home">
+            <img src={logo} width="124" height="35" alt="Nines" />
+          </a>
+          <nav aria-label="Main navigation">
+            <a href="#product">Product</a>
+            <a href="#as-code">As code</a>
+            <a href="#agents">For agents</a>
+            <a href={`${docs}/public/deployment.md`}>Docs</a>
+          </nav>
+          <Button asChild variant="outline" size="sm">
+            <a href={repo}>
+              <Github aria-hidden="true" /> GitHub
+            </a>
+          </Button>
+        </div>
+      </header>
+      <main id="main">
+        <section
+          className="hero container"
+          id="product"
+          aria-labelledby="hero-title"
+        >
+          <div className="hero-copy">
+            <p className="eyebrow">
+              <span /> OPEN SOURCE SLO MANAGEMENT
+            </p>
+            <h1 id="hero-title">
+              Reliability, tied to the <em>user journey.</em>
+            </h1>
+            <p className="hero-description">
+              Define what good looks like. Connect service level objectives to
+              critical user journeys, then track the signals and error budgets
+              that matter.
+            </p>
+            <div className="hero-actions">
+              <Button asChild size="lg">
+                <a href="#quickstart">
+                  Try Nines locally <ArrowRight aria-hidden="true" />
+                </a>
+              </Button>
+              <a className="text-link" href={repo}>
+                Explore the source <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            </div>
+            <p className="release-note">
+              Pre-release MVP <span>·</span> Apache-2.0 <span>·</span>{" "}
+              Self-hosted
+            </p>
+          </div>
+          <WorkspacePreview />
+        </section>
+        <div className="stack-bar">
+          <div className="container">
+            <span>Built around your observability stack</span>
+            <ul aria-label="Supported foundations">
+              <li>Prometheus</li>
+              <li>Grafana Mimir</li>
+              <li>OpenTelemetry</li>
+              <li>PostgreSQL</li>
+              <li>Go</li>
+            </ul>
+          </div>
+        </div>
+        <section
+          className="container product-section"
+          aria-labelledby="product-title"
+        >
+          <div className="section-heading">
+            <p className="eyebrow">FROM USER EXPERIENCE TO SERVICE SIGNAL</p>
+            <h2 id="product-title">Give every objective a reason.</h2>
+            <p>
+              Service metrics describe a system. Critical user journeys explain
+              why its reliability matters. Nines connects the two explicitly.
+            </p>
+          </div>
+          <ol className="reliability-path">
+            <li>
+              <span>01</span>
+              <h3>Map the journey</h3>
+              <p>
+                Define the steps a user depends on, their owners and the SLOs
+                that protect them.
+              </p>
+            </li>
+            <li>
+              <span>02</span>
+              <h3>Measure the objective</h3>
+              <p>
+                Compare observed SLI with a target, rolling window and error
+                budget using configured Prometheus or Mimir sources.
+              </p>
+            </li>
+            <li>
+              <span>03</span>
+              <h3>Act on budget burn</h3>
+              <p>
+                Generate recording and two-window burn-rate rules. Review
+                deployment to the intended tenant and ruler destination.
+              </p>
+            </li>
+          </ol>
+        </section>
+        <section
+          className="code-section"
+          id="as-code"
+          aria-labelledby="code-title"
+        >
+          <div className="container code-layout">
+            <div className="code-copy">
+              <p className="eyebrow">ONE VERSIONED CONTRACT</p>
+              <h2 id="code-title">
+                Reliability belongs
+                <br />
+                in version control.
+              </h2>
+              <p>
+                SLOs and critical user journeys share a YAML API. Review changes
+                in Git, validate offline, and apply against an explicit resource
+                revision.
+              </p>
+              <dl className="contract-list">
+                <div>
+                  <dt>Versioned YAML</dt>
+                  <dd>
+                    A shared <code>nines.dev/v1alpha1</code> contract.
+                  </dd>
+                </div>
+                <div>
+                  <dt>Explicit links</dt>
+                  <dd>Journey steps refer to the SLOs they depend on.</dd>
+                </div>
+                <div>
+                  <dt>Reviewed changes</dt>
+                  <dd>Plan before applying. Check the expected revision.</dd>
+                </div>
+              </dl>
+              <a className="text-link" href={`${repo}/tree/main/examples`}>
+                Browse example definitions{" "}
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            </div>
+            <Tabs defaultValue="slo" className="definition-panel">
+              <div className="definition-toolbar">
+                <TabsList aria-label="Definition examples">
+                  <TabsTrigger value="slo">SLO</TabsTrigger>
+                  <TabsTrigger value="journey">
+                    Critical user journey
+                  </TabsTrigger>
+                </TabsList>
+                <span>YAML</span>
+              </div>
+              <TabsContent value="slo">
+                <div className="file-name">api-availability.slo.yaml</div>
+                <pre tabIndex={0} aria-label="Complete SLO YAML example">
+                  <code>{slo}</code>
+                </pre>
+              </TabsContent>
+              <TabsContent value="journey">
+                <div className="file-name">checkout.journey.yaml</div>
+                <pre
+                  tabIndex={0}
+                  aria-label="Complete critical user journey YAML example"
+                >
+                  <code>{journey}</code>
+                </pre>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </section>
+        <section
+          className="container agent-section"
+          id="agents"
+          aria-labelledby="agent-title"
+        >
+          <div className="section-heading">
+            <p className="eyebrow">CLI, SDK AND MCP</p>
+            <h2 id="agent-title">
+              Give agents context.
+              <br />
+              Keep changes reviewable.
+            </h2>
+            <p>
+              The same resource contracts sit behind the UI, CLI, Go client and
+              MCP adapter. Model assistance is optional; measurement and
+              validation remain deterministic.
+            </p>
+          </div>
+          <div className="agent-layout">
+            <div className="agent-interfaces">
+              <article>
+                <Terminal size={21} aria-hidden="true" />
+                <div>
+                  <h3>A CLI that works offline</h3>
+                  <p>
+                    Validate definitions and generate rules without a server.
+                    Use structured JSON output in scripts and deterministic
+                    skills.
+                  </p>
+                </div>
+              </article>
+              <article>
+                <Waypoints size={21} aria-hidden="true" />
+                <div>
+                  <h3>Tenant-scoped MCP tools</h3>
+                  <p>
+                    Expose the HTTP resource contracts through a stdio MCP
+                    adapter, using explicit server and tenant contexts.
+                  </p>
+                </div>
+              </article>
+              <a
+                className="text-link"
+                href={`${docs}/cli.md#scripts-and-llm-skills`}
+              >
+                Read the CLI and skills guide{" "}
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            </div>
+            <aside
+              className="agent-terminal"
+              aria-label="Example deterministic CLI workflow"
+            >
+              <div className="terminal-heading">
+                <Terminal size={15} aria-hidden="true" />
+                <span>Inspect → validate → plan → apply</span>
+              </div>
+              <pre tabIndex={0}>
+                <code>
+                  <span># Discover contracts without a server</span>
+                  {"\n"}nines capabilities --offline --agent{"\n\n"}
+                  <span># Validate a reviewed definition</span>
+                  {"\n"}nines validate --offline -f slo.yaml --agent{"\n\n"}
+                  <span># Review a tenant-scoped change</span>
+                  {"\n"}nines plan --context production -f slo.yaml --agent
+                </code>
+              </pre>
+              <p>
+                Model-assisted intent and review workflows are experimental.
+                Providers are configurable, including local models.
+              </p>
+            </aside>
+          </div>
+        </section>
+        <section
+          className="quickstart-section"
+          id="quickstart"
+          aria-labelledby="start-title"
+        >
+          <div className="container quickstart-layout">
+            <div>
+              <p className="eyebrow">START WITH THE LOCAL DEMO</p>
+              <h2 id="start-title">
+                Start with a
+                <br />
+                working workspace.
+              </h2>
+              <p>
+                Run Nines with synthetic SLOs and critical user journeys. No
+                provider credentials or model account needed.
+              </p>
+              <p className="requirements">Requires Go 1.27.3 or later.</p>
+            </div>
+            <div className="quickstart-panel">
+              <div className="quickstart-toolbar">
+                <span>Terminal</span>
+                <CopyCommand text={start} />
+              </div>
+              <pre tabIndex={0}>
+                <code>{start}</code>
+              </pre>
+              <p>
+                Open <code>http://127.0.0.1:8080</code> and sign in with{" "}
+                <code>admin</code> / <code>admin</code>. Demo data resets on
+                restart. Keep the demo on loopback.
+              </p>
+              <a
+                className="text-link"
+                href={`${repo}#run-a-persistent-workspace`}
+              >
+                Set up a persistent workspace{" "}
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            </div>
+          </div>
+        </section>
+        <section
+          className="container release-section"
+          aria-labelledby="release-title"
+        >
+          <div>
+            <p className="eyebrow">BUILT IN THE OPEN</p>
+            <h2 id="release-title">Release status and scope.</h2>
+            <p>
+              Nines is a pre-release MVP under active development. Expect regular
+              features and fixes. Core SLO and critical user journey management
+              is the release focus. Intent workflows, session replay and the
+              Kubernetes reconciler are experimental.
+            </p>
+          </div>
+          <div className="release-links">
+            <a href={`${docs}/public/release.md`}>
+              Release checklist <ArrowRight size={16} aria-hidden="true" />
+            </a>
+            <a href={`${docs}/public/operations.md`}>
+              Operational limits <ArrowRight size={16} aria-hidden="true" />
+            </a>
+            <a href={`${docs}/public/experimental.md`}>
+              Experimental features <ArrowRight size={16} aria-hidden="true" />
+            </a>
+          </div>
+        </section>
+      </main>
+      <footer className="site-footer">
+        <div className="container footer-row">
+          <a className="brand" href="#" aria-label="Back to top">
+            <img src={logo} width="106" height="30" alt="Nines" />
+          </a>
+          <p>
+            Inspired by Sloth and Pyrra. Built around critical user journeys.
+          </p>
+          <nav aria-label="Footer navigation">
+            <a href={repo}>Source</a>
+            <a href={`${repo}/blob/main/LICENSE`}>Apache-2.0</a>
+            <a href={`${repo}/blob/main/SECURITY.md`}>Security</a>
+            <a href="https://github.com/slok/sloth">Sloth</a>
+            <a href="https://github.com/pyrra-dev/pyrra">Pyrra</a>
+            <a href="./third-party-notices.txt">Notices</a>
+          </nav>
+        </div>
+      </footer>
+    </>
+  );
+}

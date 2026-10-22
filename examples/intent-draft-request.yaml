@@ -1,0 +1,11 @@
+# A draft request, not an executable resource. The response is versioned intent YAML.
+text: 99.9% of production API attempts should complete successfully over a rolling 28 days.
+metadata:
+  name: api-success-intent
+  project: production
+service: api
+source: primary
+population:
+  service: api
+  environment: production
+noDataPolicy: unknown

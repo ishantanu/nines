@@ -1,0 +1,103 @@
+import { api, type RequestScope } from "./api";
+import type { ReplayEvent } from "./replay-capture";
+export type ReplayRef = {
+  kind: string;
+  id: string;
+  revision: number;
+  sloId?: string;
+  at?: string;
+};
+export type SessionReplay = {
+  apiVersion: string;
+  tenant: string;
+  id: string;
+  title: string;
+  version: number;
+  createdAt: string;
+  expiresAt: string;
+  startedAt: string;
+  finishedAt: string;
+  durationMillis: number;
+  eventCount: number;
+  sizeBytes: number;
+  digest: string;
+  policy: string;
+  recordedBy: { name: string };
+  references: ReplayRef[];
+  archived: boolean;
+};
+export type ReplayList = {
+  apiVersion: string;
+  tenant: string;
+  items: SessionReplay[];
+  retentionDays: number;
+  maxSessions: number;
+};
+export type ReplayEventSet = {
+  apiVersion: string;
+  tenant: string;
+  id: string;
+  digest: string;
+  events: ReplayEvent[];
+};
+export const listReplays = (s: RequestScope, archived = false) =>
+  api<ReplayList>(
+    "/api/session-replays" + (archived ? "?archived=true" : ""),
+    s,
+  );
+export const replayEvents = (s: RequestScope, id: string) =>
+  api<ReplayEventSet>(
+    `/api/session-replays/${encodeURIComponent(id)}/events`,
+    s,
+  );
+export const createReplay = (
+  s: RequestScope,
+  incoming: {
+    id: string;
+    title: string;
+    consent: boolean;
+    policy: string;
+    references: ReplayRef[];
+    events: ReplayEvent[];
+  },
+) =>
+  api<SessionReplay>("/api/session-replays", s, {
+    method: "POST",
+    body: JSON.stringify(incoming),
+  });
+export const linkReplay = (
+  s: RequestScope,
+  replay: SessionReplay,
+  references: ReplayRef[],
+) =>
+  api<SessionReplay>(
+    `/api/session-replays/${encodeURIComponent(replay.id)}/links`,
+    s,
+    {
+      method: "POST",
+      body: JSON.stringify({ expectedVersion: replay.version, references }),
+    },
+  );
+export const archiveReplay = (s: RequestScope, replay: SessionReplay) =>
+  api<SessionReplay>(
+    `/api/session-replays/${encodeURIComponent(replay.id)}/archive`,
+    s,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        expectedVersion: replay.version,
+        archived: !replay.archived,
+      }),
+    },
+  );
+
+export function replayLink(tenant: string, id = "") {
+  return `#/tenants/${encodeURIComponent(tenant)}/replays${id ? "/" + encodeURIComponent(id) : ""}`;
+}
+export function replayFromHash(hash: string, tenant: string): string | null {
+  const base = replayLink(tenant);
+  if (hash === base) return "";
+  if (!hash.startsWith(base + "/")) return null;
+  const id = hash.slice(base.length + 1);
+  return /^[a-z0-9][a-z0-9-]{0,62}$/.test(id) ? id : null;
+}

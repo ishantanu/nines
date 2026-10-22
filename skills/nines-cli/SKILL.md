@@ -1,0 +1,16 @@
+---
+name: nines-cli
+description: Validate SLO and critical user journey YAML, generate recording rules offline, and use tenant-scoped Nines commands with explicit revision and digest checks.
+---
+
+Use the installed `nines` binary as the deterministic executor. No model inference is needed for validation, rule generation, revision checks or application. Discover supported operations with `nines capabilities --agent` and use leaf-command `--help` for input flags. Capability effects describe possible side effects, not authorization to perform them.
+
+For local work, use `--offline`. `init slo`, `validate`, `rules generate`, and `operator crds|render` do not contact Nines or load credentials. These commands validate declared measurements; they cannot prove that telemetry exists or that the measurement captures a business outcome. Generated manifest/rule commands emit YAML even in agent mode; with `--out`, agent mode returns a JSON artifact receipt containing the created path, byte count and digest.
+
+For connected work, select an explicit `--context NAME` or `--server URL --tenant ID`. Authenticate through `NINES_API_KEY` (or the legacy `API_TOKEN`) supplied by the caller, or a previously authenticated browser context. Never ask a model to read, print or paste a key. `--agent` never starts browser login. Use `nines auth status --agent` to verify the selected tenant and effective role before connected work.
+
+Use `--agent` for JSON results and JSON errors on stderr. Successful data goes to stdout. Exit codes: 0 success; 1 local execution/validation failure; 2 invalid invocation; 3 unauthenticated/expired; 4 forbidden; 5 revision/digest/configuration conflict; 6 unavailable/timeout. Do not parse human tables. Canonical artifact exports remain YAML. Results that include timestamps, live telemetry or model output are not byte-reproducible.
+
+Prepare exact YAML and review plans before authorized changes. `apply` requires `--expected-revision` (zero means create). Rule deployment requires the exact `--expected-digest` from `rules plan`. For intent conversations, operational YAML pins `expectedVersion`, digest and confirmation; approve/apply only the exact reviewed change. A changed definition, source, binding or conflict requires a fresh review. An agent role cannot confirm measurements, approve changes or deploy rules. Do not substitute an owner credential to bypass that boundary.
+
+After a timeout on a write, inspect current revisions or the conversation apply receipt before retrying. Retry only with the same reviewed input and preconditions, within the user's authorized scope. Never weaken a target, broaden a population or change a destination to make validation pass. Record unknown health as unknown. Report rule acceptance separately from provider evaluation and SLO health. Use `nines integration SLO_ID --agent` to inspect definition, collection, rule deployment and external evaluation independently; this read performs no deployment or reload.

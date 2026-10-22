@@ -1,0 +1,65 @@
+apiVersion: nines.dev/v1alpha1
+kind: ReviewSkill
+metadata:
+  name: evidence-check
+  version: 1.0.0
+spec:
+  displayName: Evidence check
+  description: Compare the captured SLI window with its target using deterministic calculations.
+  mode: deterministic
+  scopeKinds:
+    - ServiceLevelObjective
+    - CriticalUserJourney
+  toolAllowlist:
+    - read_context
+    - assess_evidence
+  requiredTools:
+    - read_context
+    - assess_evidence
+  evidenceObligations:
+    - captured_context
+    - deterministic_assessment
+    - exact_digest
+  inputSchema:
+    additionalProperties: false
+    properties: {}
+    type: object
+  outputSchema:
+    additionalProperties: false
+    properties:
+      evidenceDigest:
+        pattern: ^[a-f0-9]{64}$
+        type: string
+      findings:
+        items:
+          additionalProperties: false
+          properties:
+            message:
+              type: string
+            resourceId:
+              type: string
+            state:
+              type: string
+          required:
+            - resourceId
+            - state
+            - message
+          type: object
+        type: array
+      limitations:
+        items:
+          type: string
+        type: array
+      state:
+        enum:
+          - insufficient_evidence
+          - window_within_target
+          - window_below_target
+          - linked_objectives_assessed
+    required:
+      - evidenceDigest
+      - state
+      - findings
+      - limitations
+    type: object
+  instructions: Capture the pinned scope and assess its saved evidence. Missing data, incompatible contracts and zero traffic do not establish success. Linked objectives do not measure end-to-end journey success.

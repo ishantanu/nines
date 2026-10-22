@@ -1,0 +1,49 @@
+# Persistent workspace: web login admin / NINES_BOOTSTRAP_PASSWORD from .env.
+# POSTGRES_PASSWORD is the separate database credential; there is no default.
+services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: platform
+    volumes:
+      - platform-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U platform -d platform"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  platform:
+    build:
+      context: .
+      args:
+        VITE_POSTHOG_PROJECT_TOKEN: ${VITE_POSTHOG_PROJECT_TOKEN:-}
+        VITE_OTEL_EXPORTER_OTLP_ENDPOINT: ${VITE_OTEL_EXPORTER_OTLP_ENDPOINT:-}
+        VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-}
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${NINES_PORT:-8080}:8080"
+    environment:
+      DATABASE_URL: postgres://platform:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@database:5432/platform?sslmode=disable
+      API_TOKEN: ${API_TOKEN:?Set API_TOKEN (at least 24 characters)}
+      AUTH_CONFIG_FILE: /etc/nines/local-auth.yaml
+      NINES_PUBLIC_URL: ${NINES_PUBLIC_URL:-http://127.0.0.1:8080}
+      NINES_BOOTSTRAP_PASSWORD: ${NINES_BOOTSTRAP_PASSWORD:-}
+      NINES_SOURCE_HOSTS: ${NINES_SOURCE_HOSTS:-}
+      NINES_SOURCE_ENCRYPTION_KEY: ${NINES_SOURCE_ENCRYPTION_KEY:-}
+      NINES_MANAGED_RULE_DIRECTORY: ${NINES_MANAGED_RULE_DIRECTORY:-}
+      PROMETHEUS_URL: ${PROMETHEUS_URL:-}
+      PROMETHEUS_BEARER_TOKEN: ${PROMETHEUS_BEARER_TOKEN:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+      MIMIR_URL: ${MIMIR_URL:-}
+      MIMIR_TENANT_ID: ${MIMIR_TENANT_ID:-}
+      MIMIR_BEARER_TOKEN: ${MIMIR_BEARER_TOKEN:-}
+      MIMIR_USERNAME: ${MIMIR_USERNAME:-}
+      MIMIR_PASSWORD: ${MIMIR_PASSWORD:-}
+    volumes:
+      - ./examples/auth-local.yaml:/etc/nines/local-auth.yaml:ro
+volumes:
+  platform-data:
