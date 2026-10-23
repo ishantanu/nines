@@ -46,6 +46,7 @@ type Access struct {
 	Role     string `json:"role" yaml:"role"`
 }
 type RuleDestination struct {
+	AutoDeploy       bool   `json:"autoDeploy,omitempty" yaml:"autoDeploy,omitempty"`
 	Mode             string `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Publisher        string `json:"publisher,omitempty" yaml:"publisher,omitempty"`
 	Reload           bool   `json:"reload,omitempty" yaml:"reload,omitempty"`
@@ -244,6 +245,9 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 					return nil, fmt.Errorf("mimir rules require an explicit rulerURL with Prometheus prefix, and no directory")
 				}
 			case s.Kind == "prometheus":
+				if rules.AutoDeploy && !rules.Reload {
+					return nil, fmt.Errorf("automatic Prometheus rule deployment requires reload: true, a shared rule_files directory and lifecycle enablement")
+				}
 				if !filepath.IsAbs(rules.Directory) || rules.RulerURL != "" {
 					return nil, fmt.Errorf("prometheus rules require an absolute directory, not a rulerURL")
 				}

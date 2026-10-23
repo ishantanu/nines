@@ -76,7 +76,7 @@ def setup():
             flush=True,
         )
     print(
-        "Definitions ready. Rule deployment is separate; review the Rules tab or run the verify service.",
+        "Definitions ready. Automatic rule deployment is queued; inspect Integration status or run the verify service.",
         flush=True,
     )
 
@@ -127,14 +127,13 @@ def verify():
         )
         revisions[tenant] = api(tenant, f"/api/slos/{SLO}")["slo"]["revision"]
         plan = api(tenant, f"/api/slos/{SLO}/rules/plan", b"{}")
-        result = api(
-            tenant,
-            f"/api/slos/{SLO}/rules/apply",
-            json.dumps({"expectedDigest": plan["digest"]}).encode(),
+        assert plan["target"]["autoDeploy"], plan["target"]
+        wait(
+            tenant + " automatic rule deployment",
+            lambda t=tenant: integration(t).get("automation", {}).get("state")
+            == "configured",
         )
-        assert result["state"] in ("written", "accepted", "unchanged"), result
-        assert result["activation"]["state"] in ("accepted", "verified"), result
-        print(tenant + " reviewed rules: " + result["state"], flush=True)
+        print(tenant + " rules deployed automatically after SLO save", flush=True)
         wait(
             tenant + " external evaluation",
             lambda t=tenant: integration(t)["evaluation"]["state"] == "evaluating",
@@ -218,7 +217,7 @@ def verify():
                 "tenants": list(TENANTS),
                 "checks": [
                     "collection",
-                    "reviewed deployment",
+                    "automatic deployment",
                     "external evaluation",
                     "recorded SLI",
                     "burn alert firing",

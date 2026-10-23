@@ -12,7 +12,7 @@ There is no separate measurement to name, save or version in the default flow. M
 4. Set the target percentage, rolling window and any burn-rate alert policies. Each policy has its own severity, short and long windows, threshold and pending duration.
 5. Select **Verify telemetry and review SLO**. Nines checks recent metric metadata and observed series and generates one SLO YAML definition. Nothing is saved by this preview.
 6. Review the exact definition, telemetry interval and warnings, acknowledge the measurement semantics, then select **Save reviewed SLO**.
-7. Open the SLO's **Rules** tab to review recording and alert rules and deploy to the configured destination. Saving an SLO and deploying rules remain separate actions.
+7. The data source policy controls delivery: with **automatic deployment** enabled, saving queues its rules without another apply action. Otherwise use **Rules → Apply reviewed rules**. Inspect configuration and runtime evidence separately. See [automatic deployment](deployment/automatic-rules.md).
 
 Edit an existing structured measurement in the same **Measurement** tab. The reviewed update keeps `metadata.name`, increments its revision and resets active measurement evidence when semantics change. A manual edit through this form omits earlier intent provenance; earlier revisions retain it. Use an intent conversation for a new agent-assisted proposal with fresh confirmation and approval.
 

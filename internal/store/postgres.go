@@ -82,18 +82,23 @@ func (p *Postgres) List(ctx context.Context) ([]model.SLO, error) {
 	return out, rows.Err()
 }
 func load(ctx context.Context, tx pgx.Tx, id string, lock bool) (model.Record, error) {
-	query := "SELECT config,alert_state,collection_health,operator_route FROM slos WHERE id=$1"
+	query := "SELECT config,alert_state,collection_health,operator_route,rule_automation FROM slos WHERE id=$1"
 	if lock {
 		query += " FOR UPDATE"
 	}
-	var config, state, collection []byte
+	var config, state, collection, automation []byte
 	r := model.Record{Points: map[int64]model.Point{}, Windows: map[string]model.WindowObservation{}}
-	err := tx.QueryRow(ctx, query, id).Scan(&config, &state, &collection, &r.OperatorRoute)
+	err := tx.QueryRow(ctx, query, id).Scan(&config, &state, &collection, &r.OperatorRoute, &automation)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, model.ErrNotFound
 	}
 	if err != nil {
 		return r, err
+	}
+	if len(automation) > 0 {
+		if err = json.Unmarshal(automation, &r.RuleAutomation); err != nil {
+			return r, err
+		}
 	}
 	if err = json.Unmarshal(config, &r.SLO); err != nil {
 		return r, err
@@ -223,7 +228,11 @@ func (p *Postgres) Update(ctx context.Context, id string, fn func(*model.Record)
 	if err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, "UPDATE slos SET alert_state=$2,config=$3,collection_health=$4,operator_route=$5 WHERE id=$1", id, state, config, collection, r.OperatorRoute); err != nil {
+	automation, err := json.Marshal(r.RuleAutomation)
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, "UPDATE slos SET alert_state=$2,config=$3,collection_health=$4,operator_route=$5,rule_automation=$6 WHERE id=$1", id, state, config, collection, r.OperatorRoute, automation); err != nil {
 		return err
 	}
 	for _, e := range r.Events {

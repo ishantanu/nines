@@ -144,7 +144,7 @@ func (p *Publisher) Apply(ctx context.Context, s model.SLO, plan rules.Plan) (ru
 		if model.ConfigRevision(record.SLO) != model.ConfigRevision(s) {
 			return model.ErrRevisionConflict
 		}
-		route := model.DefinitionDigest(plan.Target)
+		route := rules.RouteDigest(plan.Target)
 		if record.OperatorRoute != "" && record.OperatorRoute != route {
 			return model.Invalid("operator destination is pinned; withdraw its owned resource before changing routes")
 		}
@@ -343,7 +343,7 @@ func (p *Publisher) CheckRoute(ctx context.Context, s model.SLO, target rules.Ta
 	if err != nil {
 		return err
 	}
-	if route != "" && route != model.DefinitionDigest(target) {
+	if route != "" && route != rules.RouteDigest(target) {
 		return model.Invalid("operator destination is pinned; withdraw its owned resource before changing routes")
 	}
 	return nil
@@ -391,7 +391,7 @@ func (p *Publisher) Withdraw(ctx context.Context, s model.SLO, plan rules.Plan) 
 				if model.ConfigRevision(record.SLO) != model.ConfigRevision(s) {
 					return model.ErrRevisionConflict
 				}
-				if record.OperatorRoute != "" && record.OperatorRoute != model.DefinitionDigest(plan.Target) {
+				if record.OperatorRoute != "" && record.OperatorRoute != rules.RouteDigest(plan.Target) {
 					return model.ErrRevisionConflict
 				}
 				record.OperatorRoute = ""

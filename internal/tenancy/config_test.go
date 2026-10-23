@@ -110,11 +110,15 @@ func TestStaticRuleReloadIsPrometheusOnly(t *testing.T) {
       namespace: nines
       directory: /rules
       reload: true
+      autoDeploy: true
 `
 	lookup := func(string) string { return "synthetic-token-at-least-24-characters" }
 	resolved, err := Parse([]byte(base), lookup)
-	if err != nil || !resolved[0].Config.Source.Rules.Reload {
+	if err != nil || !resolved[0].Config.Source.Rules.Reload || !resolved[0].Config.Source.Rules.AutoDeploy {
 		t.Fatal(resolved, err)
+	}
+	if _, err := Parse([]byte(strings.Replace(base, "reload: true", "reload: false", 1)), lookup); err == nil {
+		t.Fatal("automatic Prometheus deployment without reload accepted")
 	}
 	mimir := strings.Replace(base, "kind: prometheus", "kind: mimir\n    mimirOrgID: alpha", 1)
 	mimir = strings.Replace(mimir, "directory: /rules", "rulerURL: https://metrics.test/prometheus", 1)
@@ -131,11 +135,11 @@ func TestOperatorDestinationRequiresTrustedNamespaceAndPublisher(t *testing.T) {
   source:
     kind: prometheus
     url: https://metrics.test
-    rules: {mode: operator, namespace: team-commerce, publisher: portal}
+    rules: {mode: operator, namespace: team-commerce, publisher: portal, autoDeploy: true}
 `
 	lookup := func(string) string { return "synthetic-token-at-least-24-characters" }
 	resolved, err := Parse([]byte(base), lookup)
-	if err != nil || resolved[0].Config.Source.Rules.Mode != "operator" {
+	if err != nil || resolved[0].Config.Source.Rules.Mode != "operator" || !resolved[0].Config.Source.Rules.AutoDeploy {
 		t.Fatal(resolved, err)
 	}
 	for _, replacement := range []string{"publisher: ''", "publisher: portal, directory: /rules", "publisher: portal, reload: true", "publisher: portal, rulerURL: https://ruler.test", "publisher: portal, bearerTokenEnv: TOKEN"} {

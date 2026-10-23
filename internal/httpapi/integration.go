@@ -66,6 +66,7 @@ func (a *Server) integrationStatus(w http.ResponseWriter, r *http.Request) {
 			output = v1.IntegrationStage{State: "unknown", Code: "rule_output_source_changed", Message: "The query source changed during verification.", NextAction: "Refresh integration status against the current source before relying on the evidence."}
 		}
 	}
+	out.Automation = a.Service.RuleAutomationStatus(record, a.Workspace.Rules)
 	out.RuleOutput = &output
 	write(w, 200, out)
 }

@@ -422,6 +422,14 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			path = "/api/slos/" + id + "/collect"
 			body, _ = json.Marshal(map[string]string{"from": *from, "to": *to})
 			media = "application/json"
+		case "rules-pause", "rules-resume":
+			if id == "" || *expected < 1 {
+				return fmt.Errorf("provide --id and a positive --expected-revision")
+			}
+			method = http.MethodPost
+			path = "/api/slos/" + id + "/rules/automation"
+			media = "application/json"
+			body, _ = json.Marshal(map[string]any{"expectedRevision": *expected, "paused": action == "rules-pause"})
 		case "rules-plan", "rules-apply", "rules-withdraw":
 			if id == "" {
 				return fmt.Errorf("rules plan/apply requires -id")

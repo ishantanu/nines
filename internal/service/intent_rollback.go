@@ -14,6 +14,8 @@ import (
 // RestoreIntentDefinitions appends revisions; it neither deletes resources nor
 // rewinds observation history. Network operations never run inside this batch.
 func (s *Service) RestoreIntentDefinitions(ctx context.Context, key, digest string, commit bool, plans []v1.IntentDefinitionChange, expected []v1.IntentAppliedResource, source, sourceDigest string, evidence v1.IntentOperationEvidence) (v1.IntentApplyReceipt, error) {
+	s.DefinitionMu.Lock()
+	defer s.DefinitionMu.Unlock()
 	st, ok := s.Store.(store.DefinitionBatchStore)
 	if !ok {
 		return v1.IntentApplyReceipt{}, model.ErrUnavailable
@@ -28,6 +30,7 @@ func (s *Service) RestoreIntentDefinitions(ctx context.Context, key, digest stri
 			return nil, model.ErrRevisionConflict
 		}
 		scope := New(st, s.Collector)
+		scope.RuleManager = s.RuleManager
 		scope.TenantID = s.TenantID
 		scope.Sources = s.Sources
 		scope.DynamicSource = s.DynamicSource

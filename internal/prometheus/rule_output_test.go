@@ -21,6 +21,7 @@ func TestRuleOutputUsesQueryIdentityAndStoredTimestamp(t *testing.T) {
 		count                                      int
 	}{
 		{"current", identity.DefinitionDigest, "2", strconv.FormatInt(now.Add(-time.Second).Unix(), 10), "verified", "rule_output_verified", 1},
+		{"mimir-default-delay", identity.DefinitionDigest, "2", strconv.FormatInt(now.Add(-85*time.Second).Unix(), 10), "verified", "rule_output_verified", 1},
 		{"missing", identity.DefinitionDigest, "2", "0", "not_observed", "rule_output_missing", 0},
 		{"other-definition", strings.Repeat("b", 64), "2", "0", "out_of_date", "rule_output_out_of_date", 1},
 		{"other-revision", identity.DefinitionDigest, "1", "0", "out_of_date", "rule_output_out_of_date", 1},
@@ -53,9 +54,35 @@ func TestRuleOutputUsesQueryIdentityAndStoredTimestamp(t *testing.T) {
 			if out.State != test.state || out.Code != test.code || out.NextAction == "" {
 				t.Fatal(out)
 			}
-			if out.State == "verified" && (out.ObservedAt == nil || !out.ObservedAt.Equal(now.Add(-time.Second))) {
+			if out.State == "verified" && (out.ObservedAt == nil || out.ObservedAt.Unix() != mustStoredTime(t, test.value)) {
 				t.Fatal("query time substituted for sample time", out)
 			}
 		})
+	}
+}
+
+func mustStoredTime(t *testing.T, text string) int64 {
+	t.Helper()
+	value, err := strconv.ParseInt(text, 10, 64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return value
+}
+
+func TestPrometheusOutputDoesNotAssumeMimirDelay(t *testing.T) {
+	now := time.Unix(1800000000, 0).UTC()
+	digest := strings.Repeat("a", 64)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "data": map[string]any{"resultType": "vector", "result": []any{map[string]any{"metric": map[string]string{"nines_managed": "true", "nines_tenant": "commerce", "nines_source": "production", "nines_slo": "availability", "nines_revision": "2", "nines_definition_digest": digest}, "value": []any{now.Unix(), strconv.FormatInt(now.Add(-85*time.Second).Unix(), 10)}}}}})
+	}))
+	defer server.Close()
+	client, err := New(server.URL, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := client.RuleOutput(context.Background(), model.RuleOutputIdentity{Tenant: "commerce", Source: "production", SLO: "availability", DefinitionDigest: digest, Revision: 2, StepSeconds: 10}, now)
+	if status.State != "stale" {
+		t.Fatal(status)
 	}
 }

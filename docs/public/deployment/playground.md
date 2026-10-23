@@ -37,9 +37,9 @@ Sign in with username `admin` and password `admin`. Set `NINES_PLAYGROUND_PASSWO
 ## Follow the four states
 
 1. Open **SLOs**, then **Checkout success** in **Playground Prometheus**. **SLO saved** confirms the stored definition. **Measurements collected** confirms recent provider intervals for that revision; expect a brief initial wait for scrapes and the collector.
-2. **Rules deployed** initially reads **Not deployed**. Creating the SLO and collecting measurements do not create external metrics.
-3. Open the SLO's **Rules** tab. Review the generated group and destination, then select **Apply reviewed rules**. Nines writes the owned file to a shared volume and requests its configured Prometheus to reload using the native `rules.reload: true` setting. Configuration, activation and runtime evaluation have separate results. Production deployments can explicitly enable the same trusted reload path, arrange their own reload, or use the Kubernetes operator.
-4. The Integration status panel refreshes every 15 seconds, or use **Check status**. **Rules deployed** reports whether the destination matches the current definition. **Rules evaluating** requires the expected loaded group and recent successful evaluations of every rule. Failed, stale, missing, changed and unavailable evidence stay distinct.
+2. **Automatic rule deployment** initially reads **Pending**, then **Applying**. The playground enables `rules.autoDeploy: true`; the reconciler deploys recording and alert rules after the SLO is saved. Metrics still require provider evaluation and source data.
+3. Open the SLO's **Rules** tab to inspect the generated group and destination. A separate apply is not required in the playground. **Apply reviewed rules** remains an owner retry/override. Nines writes the owned file to a shared volume and requests its configured Prometheus to reload using the native `rules.reload: true` setting. Configuration, activation and runtime evaluation have separate results. Production deployments can explicitly enable the same trusted reload path, arrange their own reload, or use the Kubernetes operator.
+4. The Integration status panel refreshes every 15 seconds, or use **Check status**. **Rule configuration** reports whether the destination matches the current definition. **Rules evaluating** requires the expected loaded group and recent successful evaluations of every rule. Failed, stale, missing, changed and unavailable evidence stay distinct.
 
 Prometheus scrapes a synthetic checkout service every five seconds and evaluates its own Nines recording and alert rules. The default stack has no remote-write destination, Mimir container or Mimir workspace. No telemetry or model account is required.
 
@@ -68,7 +68,7 @@ The equivalent authenticated endpoint is `GET /api/slos/checkout-success/integra
 
 ## Exercise burn alerts and recovery
 
-This command explicitly deploys the current sample rules, waits for collection/evaluation/recorded series, checks local user CRUD, session revocation, RBAC and encrypted source management, injects 10% synthetic failures, checks critical and warning alert policies in Nines and Prometheus, restores successful traffic and checks recovery. It exits nonzero on timeout or failed assertions. Allow several minutes:
+This command verifies that saving the sample SLO automatically deploys its rules without calling rule apply, waits for collection/evaluation/recorded series, checks local user CRUD, session revocation, RBAC and encrypted source management, injects 10% synthetic failures, checks critical and warning alert policies in Nines and Prometheus, restores successful traffic and checks recovery. It exits nonzero on timeout or failed assertions. Allow several minutes:
 
 ```sh
 docker compose -p nines-playground -f compose.playground.yaml run --rm verify
@@ -98,7 +98,7 @@ docker compose -p nines-playground \
   --profile mimir run --rm verify
 ```
 
-The override adds a **Playground Mimir** workspace and owner membership, enables Prometheus remote write to Mimir, and tells setup/verification to exercise both backends. Prometheus sends only source metrics; its Nines recording rules are excluded so Mimir evaluates its own group. Each workspace has its own PostgreSQL schema. Select **Playground Mimir** to review and deploy its rules to ruler namespace `playground`, pinned to organization `playground`.
+The override adds a **Playground Mimir** workspace and owner membership, enables Prometheus remote write to Mimir, and tells setup/verification to exercise both backends. Prometheus sends only source metrics; its Nines recording rules are excluded so Mimir evaluates its own group. Each workspace has its own PostgreSQL schema. Select **Playground Mimir** to inspect its automatically deployed rules in ruler namespace `playground`, pinned to organization `playground`.
 
 Mimir listens on `http://127.0.0.1:19009`; override that port with `NINES_PLAYGROUND_MIMIR_PORT` if needed. Query it with the organization header:
 

@@ -309,8 +309,9 @@ export function App() {
             </div>
             <figcaption>
               <span>
-                Saving an SLO does not deploy rules. Stored configuration,
-                runtime evaluation and SLO health have separate status checks.
+                Saved SLOs deploy rules automatically when enabled on the data
+                source. Stored configuration, runtime evaluation and SLO health
+                have separate status checks.
               </span>
               <a className="text-link" href="./nines-architecture.svg" download>
                 Download SVG <ArrowRight size={15} aria-hidden="true" />

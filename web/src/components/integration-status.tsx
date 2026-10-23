@@ -19,6 +19,12 @@ export interface IntegrationStatus {
   deployment: Stage;
   evaluation: Stage;
   ruleOutput?: Stage;
+  automation?: Stage & {
+    enabled: boolean;
+    paused?: boolean;
+    revision: number;
+    nextAttemptAt?: string;
+  };
 }
 const stages = [
   ["definition", "SLO saved"],
@@ -27,6 +33,10 @@ const stages = [
   ["evaluation", "Rules evaluating"],
 ] as const;
 const labels: Record<string, string> = {
+  manual: "Manual",
+  applying: "Applying",
+  paused: "Paused",
+  accepted: "Accepted",
   saved: "Saved",
   collected: "Collected",
   deployed: "Configured",
@@ -84,6 +94,29 @@ export function IntegrationEvidence({ status }: { status: IntegrationStatus }) {
           </div>
         );
       })}
+      {status.automation ? (
+        <div className="col-span-full min-w-0 space-y-2 border-t p-4">
+          <h3 className="text-sm font-medium">Automatic rule deployment</h3>
+          <Badge
+            variant={
+              status.automation.state === "failed" ||
+              status.automation.state === "blocked"
+                ? "destructive"
+                : "outline"
+            }
+          >
+            {status.automation.state === "configured"
+              ? "Applied"
+              : (labels[status.automation.state] ?? status.automation.state)}
+          </Badge>
+          <p className="text-xs leading-5 text-muted-foreground">
+            {status.automation.message}
+          </p>
+          {status.automation.nextAction ? (
+            <p className="text-xs leading-5">{status.automation.nextAction}</p>
+          ) : null}
+        </div>
+      ) : null}
       {status.ruleOutput ? (
         <div className="col-span-full min-w-0 space-y-2 border-t p-4">
           <h3 className="text-sm font-medium">Rule output in query dataset</h3>
@@ -136,6 +169,26 @@ export function SLOIntegrationStatus({
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(true);
+  const [changing, setChanging] = useState(false);
+  async function toggleAutomation() {
+    if (!status?.automation) return;
+    setChanging(true);
+    setError("");
+    try {
+      await api(`/api/slos/${id}/rules/automation`, scope, {
+        method: "POST",
+        body: JSON.stringify({
+          expectedRevision: status.revision,
+          paused: !status.automation.paused,
+        }),
+      });
+      if (!scope.signal.aborted) setRefresh((n) => n + 1);
+    } catch (e) {
+      if (!scope.signal.aborted) setError(message(e));
+    } finally {
+      setChanging(false);
+    }
+  }
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -190,7 +243,23 @@ export function SLOIntegrationStatus({
           </p>
         ) : null}
         {status ? (
-          <IntegrationEvidence status={status} />
+          <div className="space-y-3">
+            <IntegrationEvidence status={status} />
+            {scope.role === "owner" && status.automation?.enabled ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={busy || changing}
+                onClick={() => void toggleAutomation()}
+              >
+                {changing
+                  ? "Updating..."
+                  : status.automation.paused
+                    ? "Resume automatic deployment"
+                    : "Pause automatic deployment"}
+              </Button>
+            ) : null}
+          </div>
         ) : !error ? (
           <p className="text-sm text-muted-foreground">
             Checking saved definition, collection, deployment and external

@@ -104,3 +104,30 @@ test("a matching file is labelled written while evaluation remains unloaded", ()
   expect(html).not.toContain(">Deployed<");
   expect(html).not.toContain(">Evaluating<");
 });
+
+test("automatic reload failure stays separate from a written file and runtime evidence", () => {
+  const html = renderToStaticMarkup(
+    <IntegrationEvidence
+      status={{
+        revision: 1,
+        checkedAt: "now",
+        definition: { state: "saved", message: "Saved" },
+        collection: { state: "unknown", message: "Unknown" },
+        deployment: { state: "written", message: "File exists" },
+        evaluation: { state: "not_loaded", message: "Not loaded" },
+        automation: {
+          enabled: true,
+          revision: 1,
+          state: "failed",
+          message: "Reload failed; retry scheduled",
+          nextAction: "Enable lifecycle and check the mount",
+        },
+      }}
+    />,
+  );
+  expect(html).toContain("Automatic rule deployment");
+  expect(html).toContain("Reload failed; retry scheduled");
+  expect(html).toContain(">File written<");
+  expect(html).toContain(">Not loaded<");
+  expect(html).not.toContain(">Evaluating<");
+});

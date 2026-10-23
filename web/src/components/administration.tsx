@@ -38,6 +38,7 @@ interface Connections {
     authentication: string;
     rules?: {
       namespace: string;
+      autoDeploy?: boolean;
       rulerURL?: string;
       directory?: string;
       mode?: string;
@@ -264,6 +265,12 @@ export function Connections({ scope }: { scope: RequestScope }) {
                     ...(c.rules
                       ? [
                           { label: "Rule namespace", value: c.rules.namespace },
+                          {
+                            label: "Rule deployment",
+                            value: c.rules.autoDeploy
+                              ? "Automatic after SLO saves"
+                              : "Manual reviewed apply",
+                          },
                           {
                             label: "Rule destination",
                             value:

@@ -122,6 +122,7 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 	api.HandleFunc("GET /api/slos/{id}/rules", a.rulePlan)
 	api.HandleFunc("POST /api/slos/{id}/rules/plan", a.rulePlan)
 	api.HandleFunc("POST /api/slos/{id}/rules/apply", a.ruleApply)
+	api.HandleFunc("POST /api/slos/{id}/rules/automation", a.ruleAutomation)
 	api.HandleFunc("POST /api/slos/{id}/rules/withdraw", a.ruleWithdraw)
 
 	api.HandleFunc("GET /api/resources/search", a.resourceSearch)

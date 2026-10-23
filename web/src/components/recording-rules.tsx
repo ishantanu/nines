@@ -38,6 +38,7 @@ interface Plan {
     namespace: string;
     directory?: string;
     reload?: boolean;
+    autoDeploy?: boolean;
     publisher?: string;
     providerKind?: string;
   };
@@ -172,7 +173,10 @@ export function RecordingRules({
             <p className="text-xs leading-5 text-muted-foreground">
               The SLO's source selects the dataset and server-configured rule
               destination. Recording and alerting rules are deployed together in
-              one owned rule group.
+              one owned rule group.{" "}
+              {plan?.target.autoDeploy
+                ? "Automatic deployment is enabled. Saved SLO revisions reconcile in the background, with retries and periodic drift checks. See Integration status for progress and pause controls."
+                : "Manual deployment is configured. Review and apply this plan explicitly."}
               {plan
                 ? plan.target.kind === "operator"
                   ? " Reviewed apply publishes a Kubernetes SLO; the operator owns provider rule reconciliation. The namespace, publisher and service account are configured by the administrator."
@@ -423,7 +427,9 @@ export function RecordingRules({
               </p>
               {scope.role !== "owner" ? (
                 <p className="text-xs text-muted-foreground">
-                  An owner role is required to deploy rules.
+                  An owner role is required for manual deployment and automation
+                  controls. Automatic deployment follows the data source policy
+                  for saved definitions.
                 </p>
               ) : null}
             </>

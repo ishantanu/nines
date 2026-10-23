@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 )
@@ -51,6 +52,15 @@ func (a *Server) ruleMutation(w http.ResponseWriter, r *http.Request, withdraw b
 	defer cancel()
 	var result rules.Deployment
 	if withdraw {
+		target, _ := a.Workspace.Rules.TargetFor(record.SLO)
+		if target.Kind != "operator" {
+			a.fail(w, r, model.Invalid("withdraw is supported only for operator publications; pause automation before manual provider cleanup"))
+			return
+		}
+		if err = a.Service.PauseAutomaticRules(ctx, record, a.Workspace.Rules, body.ExpectedDigest); err != nil {
+			a.fail(w, r, err)
+			return
+		}
 		result, err = a.Workspace.Rules.Withdraw(ctx, record.SLO, body.ExpectedDigest)
 	} else {
 		result, err = a.Workspace.Rules.Deploy(ctx, record.SLO, body.ExpectedDigest)
@@ -59,5 +69,32 @@ func (a *Server) ruleMutation(w http.ResponseWriter, r *http.Request, withdraw b
 		a.fail(w, r, err)
 		return
 	}
+	if !withdraw {
+		if err = a.Service.ResumeAutomaticRules(ctx, record, a.Workspace.Rules); err != nil {
+			a.fail(w, r, err)
+			return
+		}
+	}
 	write(w, 200, result)
+}
+
+func (a *Server) ruleAutomation(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		ExpectedRevision int64 `json:"expectedRevision"`
+		Paused           *bool `json:"paused"`
+	}
+	if e := decode(w, r, &in); e != nil {
+		a.fail(w, r, e)
+		return
+	}
+	if in.Paused == nil {
+		a.fail(w, r, model.Invalid("paused must be explicitly true or false"))
+		return
+	}
+	result, e := a.Service.SetRuleAutomation(r.Context(), r.PathValue("id"), in.ExpectedRevision, *in.Paused, a.Workspace.Rules)
+	if e != nil {
+		a.fail(w, r, e)
+		return
+	}
+	write(w, 200, v1.RuleAutomationResult{APIVersion: v1.APIVersion, Tenant: a.Service.TenantID, SLOID: r.PathValue("id"), Automation: *result})
 }

@@ -320,7 +320,7 @@ export function ObjectiveCreate({
           </DialogTitle>
           <DialogDescription>
             {resource
-              ? "Edit the objective, measurement and burn-rate policies, then review the new revision. Measurement changes archive existing evidence and require fresh coverage and separate rule deployment."
+              ? "Edit the objective, measurement and burn-rate policies, then review the new revision. Measurement changes archive existing evidence and require fresh coverage. Rule delivery follows the data source policy."
               : "Define what counts as success, choose a target and window, then review before applying. Use advanced queries or YAML for custom measurements."}
           </DialogDescription>
         </DialogHeader>

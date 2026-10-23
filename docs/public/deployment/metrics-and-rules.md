@@ -2,7 +2,7 @@
 
 Nines queries your configured metrics backend and calculates SLO state. It does not replace application instrumentation, a Prometheus scraper, a remote-write pipeline or a full metrics store. The live Mimir integration fixture uses synthetic ingestion for testing; it is not a production ingestion gateway.
 
-For a complete synthetic local flow, use the [self-contained Compose playground](playground.md). It uses Prometheus by default, with an optional Mimir profile, explicit rule deployment, Prometheus reload handling and a burn-alert/recovery verifier.
+For a complete synthetic local flow, use the [self-contained Compose playground](playground.md). It uses Prometheus by default, with an optional Mimir profile, automatic rule deployment after SLO saves, Prometheus reload handling and a burn-alert/recovery verifier.
 
 ## Choose a source and its tenant
 
@@ -30,6 +30,10 @@ tenants:
 Set every referenced credential through the server environment and mount this configuration as `TENANTS_FILE`. Select the connection with `spec.source: production` in the SLO. The administrator fixes URLs, credentials, Mimir organization and rule namespace. Neither a caller's tenant header nor model output can choose a different provider organization.
 
 Include the deployment's Prometheus HTTP prefix in both the query and ruler URLs. The example uses `/prometheus`; the manager appends `/config/v1/rules/...` to the configured ruler base. Verify the actual gateway routes in your Mimir installation. Use a query credential and a separate scoped ruler-write credential where your gateway supports that separation.
+
+## Automatic or manual delivery
+
+Enable `rules.autoDeploy: true` per source to reconcile saved SLOs automatically. Direct Prometheus deployment also requires `rules.reload: true` and a shared rule directory. Mimir uses its ruler API; operator mode publishes owned CRs. The playground enables automatic mode by default. Existing sources remain manual until an owner opts in. See [automatic deployment, status and pause/resume](automatic-rules.md).
 
 ## Recording and burn-rate rules
 
@@ -62,7 +66,7 @@ For Prometheus Operator output, review generated `PrometheusRule` resources and 
 
 ## Automatic backend activation
 
-Rule generation and plan review do not contact a deployment endpoint. An owner applies the exact reviewed digest. The apply response separates `state` (configuration persistence), `activation` (reload/ruler acknowledgement) and `evaluation` (current runtime evidence). Integration status labels matching Prometheus content **File written**, matching Mimir content **Stored in ruler**, and an operator child **Resource configured**. None of these labels means the SLO is healthy.
+Rule generation and plan review do not write to a deployment endpoint. Manual deployment requires an owner to apply the exact reviewed digest. When the owner enables `rules.autoDeploy`, the background reconciler plans and applies the current saved revision instead; approved intent changes retain their review requirements. The apply response separates `state` (configuration persistence), `activation` (reload/ruler acknowledgement) and `evaluation` (current runtime evidence). Integration status labels matching Prometheus content **File written**, matching Mimir content **Stored in ruler**, and an operator child **Resource configured**. None of these labels means the SLO is healthy.
 
 For standalone Prometheus, opt into native reload on the trusted connection:
 
@@ -124,7 +128,7 @@ Mimir inspection scopes the runtime request to the configured group and namespac
 
 A reviewed apply rechecks the configured destination immediately before writing and respects an optional caller-provided lease/authorization guard. Prometheus replacement uses an atomic rename and the same tenant/SLO/resource ownership checks as Mimir. The supported deployment still uses a single collecting server; a local mutex is not distributed locking or a compare-and-swap guarantee against another independent rule writer.
 
-If a Mimir POST times out, loses its response or returns a server error, Nines performs one bounded GET from the exact reviewed organization, namespace and group when the request context still permits it. An exact match returns `state: verified`: destination content is verified, not evaluation or notification delivery. It never blindly repeats that POST. If readback is unavailable or does not match, the API returns an actionable unavailable error; the outcome remains unverified. A cancelled request may have committed remotely. Inspect before retrying, retain the reviewed digest, and obtain a fresh plan if the definition or destination changed. A new process can recognize an already matching group and return `unchanged` without another write. Recovery does not overwrite foreign content or silently repair drift. Unsupported stored options, such as Mimir `source_tenants`, are rejected instead of being silently dropped from comparisons or overwritten.
+If a Mimir POST times out, loses its response or returns a server error, Nines performs one bounded GET from the exact reviewed organization, namespace and group when the request context still permits it. An exact match returns `state: verified`: destination content is verified, not evaluation or notification delivery. It never blindly repeats that POST. If readback is unavailable or does not match, the API returns an actionable unavailable error; the outcome remains unverified. A cancelled request may have committed remotely. Inspect before retrying, retain the reviewed digest, and obtain a fresh plan if the definition or destination changed. A new process can recognize an already matching group and return `unchanged` without another write. An individual manual recovery does not overwrite foreign content or silently repair drift. With automatic deployment enabled, later attempts take a fresh plan and inspect ownership/current destination again; they may repair drift in the owned group. Unsupported stored options, such as Mimir `source_tenants`, are rejected instead of being silently dropped from comparisons or overwritten.
 
 These APIs follow the [Prometheus rules API](https://prometheus.io/docs/prometheus/latest/querying/api/#rules) and [Mimir ruler API](https://grafana.com/docs/mimir/latest/references/http-api/#ruler). Backend responses and capabilities must still be verified for the deployed version.
 
@@ -149,9 +153,9 @@ This matters when the ruler API is healthy but its recordings are written to a d
 | `rule_output_ambiguous` | Multiple current outputs match, potentially from duplicate rule owners or extra label dimensions. Resolve the duplicate route before relying on the evidence. |
 | `rule_output_unavailable` / `rule_output_source_changed` | The query evidence is unavailable, incomplete, unsupported or changed during inspection. Retry against the current trusted source. |
 
-The read-only query uses `timestamp(marker) and (marker == 1)`, not the instant response's evaluation timestamp. A backend can return an old sample with a new query timestamp. Current freshness requires a stored sample within the greater of three SLO steps or one minute, allowing at most five seconds of future clock skew. A backend's intentional evaluation offset or ingestion delay can exceed that bound and leave output stale even when runtime evaluations are healthy. Inspect that offset rather than weakening the SLO or assuming a routing failure. The response is bounded to eight series; warnings, truncation, malformed data or extra matches leave evidence unverified.
+The read-only query uses `timestamp(marker) and (marker == 1)`, not the instant response's evaluation timestamp. A backend can return an old sample with a new query timestamp. Current freshness requires a stored sample within the greater of three SLO steps or one minute, plus one minute for Mimir's default ruler evaluation delay, allowing at most five seconds of future clock skew. A longer custom evaluation offset or ingestion delay can exceed that bound and leave output stale even when runtime evaluations are healthy. Inspect that offset rather than weakening the SLO or assuming a routing failure. The response is bounded to eight series; warnings, truncation, malformed data or extra matches leave evidence unverified.
 
-Adding the marker changes generated group content and the reviewed deployment digest. Nines does not redeploy existing rules automatically. Offline generation, server deployment and operator rendering share this rule. Budget one additional recording rule per group and review backend group limits.
+Adding the marker changes generated group content and the reviewed deployment digest. Existing rules follow the configured automatic or manual deployment policy; offline generation alone performs no deployment. Offline generation, server deployment and operator rendering share this marker. Budget one additional recording rule per group and review backend group limits.
 
 ## Repeatable acceptance checks
 

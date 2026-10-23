@@ -144,6 +144,8 @@ func run(log *slog.Logger) error {
 		tenantLog := log.With("tenant", runtime.Workspace.ID)
 		workers.Go(func() { svc.Run(ctx, tenantLog) })
 		workers.Go(func() { svc.RunMeasurementMonitor(ctx, tenantLog) })
+		ruleManager := runtime.Workspace.Rules
+		workers.Go(func() { svc.RunRuleReconciler(ctx, ruleManager, tenantLog) })
 		intentConversations := runtime.Workspace.IntentConversations
 		workers.Go(func() { intentConversations.RunWorker(ctx, tenantLog) })
 		replays := runtime.Workspace.Replays

@@ -167,7 +167,7 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 					basicPassword = rulesPassword
 					username = cfg.BasicUsername
 				}
-				ruleTargets[name] = rules.Target{Connection: name, Kind: source.Kind, QueryURL: source.URL, RulerURL: cfg.RulerURL, MimirOrgID: source.MimirOrgID, Namespace: cfg.Namespace, Directory: cfg.Directory, Reload: cfg.Reload, Publisher: cfg.Publisher, BearerToken: bearer, BasicUsername: username, BasicPassword: basicPassword}
+				ruleTargets[name] = rules.Target{Connection: name, Kind: source.Kind, QueryURL: source.URL, RulerURL: cfg.RulerURL, MimirOrgID: source.MimirOrgID, Namespace: cfg.Namespace, Directory: cfg.Directory, Reload: cfg.Reload, AutoDeploy: cfg.AutoDeploy, Publisher: cfg.Publisher, BearerToken: bearer, BasicUsername: username, BasicPassword: basicPassword}
 				if cfg.Mode == "operator" {
 					target := ruleTargets[name]
 					target.ProviderKind = source.Kind
@@ -324,6 +324,7 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 		}
 
 		runtime := tenantRuntime{ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !identityEnabled, Workflows: wf}, Repository: repository, Webhook: t.Webhook}
+		svc.RuleManager = runtime.Workspace.Rules
 		if managed != nil {
 			runtime.Workspace.Rules.DynamicTarget = managed.Target
 		}

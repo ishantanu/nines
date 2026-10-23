@@ -13,7 +13,7 @@ export const examples = [
   docker compose -p nines-playground -f compose.playground.yaml up --build -d
 
 # Open http://127.0.0.1:18080 and sign in with admin / admin.
-# Review and deploy the sample SLO's rules in its Rules tab.
+# Saving the sample SLO automatically deploys its rules.
 
 # Optional: exercise collection, deployment, RBAC and alert recovery.
 docker compose -p nines-playground -f compose.playground.yaml run --rm verify`,
@@ -68,7 +68,7 @@ nines login --context production --method sso`,
     label: "SLI and alerts",
     title: "Inspect the recorded SLI and budget burn",
     description:
-      "After deploying reviewed rules, open the playground Prometheus query page. Compare observed reliability with the target across the configured windows.",
+      "After automatic rule deployment, open the playground Prometheus query page. Compare observed reliability with the target across the configured windows.",
     language: "PromQL",
     code: `# SLO target
 nines:slo_target:ratio{nines_tenant="prometheus",nines_slo="checkout-success"}
@@ -84,7 +84,7 @@ nines:rule_definition:info{nines_tenant="prometheus",nines_slo="checkout-success
 
 # Active critical or warning burn alerts
 ALERTS{alertname="NinesSLOBurnRate",alertstate="firing"}`,
-    note: "Use localhost:19090/query and /rules. Prometheus's /metrics endpoint exposes its own instrumentation, not recording-rule results. Use nines integration SLO_ID --agent for stage-specific diagnostics, query-dataset output verification and next steps. The playground enables native Prometheus reload after reviewed apply. File written, activation and runtime evaluation are separate results. The configuration marker does not verify traffic coverage or alert delivery. Configured alerts can be inactive while traffic is healthy.",
+    note: "Use localhost:19090/query and /rules. Prometheus's /metrics endpoint exposes its own instrumentation, not recording-rule results. Use nines integration SLO_ID --agent for stage-specific diagnostics, query-dataset output verification and next steps. The playground automatically reconciles saved SLO rules and reloads Prometheus. Other data sources opt in with rules.autoDeploy: true. File written, activation and runtime evaluation are separate results. The configuration marker does not verify traffic coverage or alert delivery. Configured alerts can be inactive while traffic is healthy.",
     path: "docs/public/deployment/metrics-and-rules.md",
     link: "Metrics and rule destinations",
   },

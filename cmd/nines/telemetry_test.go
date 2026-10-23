@@ -13,6 +13,10 @@ import (
 	"testing"
 
 	"github.com/ishantanu/nines/internal/model"
+	"github.com/ishantanu/nines/internal/rules"
+	"github.com/ishantanu/nines/internal/service"
+	"github.com/ishantanu/nines/internal/store"
+	"github.com/ishantanu/nines/internal/tenancy"
 
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/testtelemetry"
@@ -74,5 +78,32 @@ spec:
 	}
 	if err = run(args, io.Discard); err == nil {
 		t.Fatal("overwrote existing output file")
+	}
+}
+
+func TestRuleAutomationCLIControls(t *testing.T) {
+	cliEnv(t)
+	s := service.New(store.NewMemory(), nil)
+	if e := s.Create(context.Background(), model.SLO{ID: "api", Project: "test", Name: "API", Service: "api", Target: .99, WindowSeconds: 3600, StepSeconds: 60, GoodQuery: "vector(99)", TotalQuery: "vector(100)"}); e != nil {
+		t.Fatal(e)
+	}
+	m := &rules.Manager{Tenant: "alpha", Targets: map[string]rules.Target{"primary": {Connection: "primary", Kind: "prometheus", QueryURL: "http://127.0.0.1:1", Directory: t.TempDir(), Namespace: "nines", Reload: true, AutoDeploy: true}}}
+	h, e := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Service: s, Rules: m, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if e != nil {
+		t.Fatal(e)
+	}
+	server := httptest.NewServer(h)
+	defer server.Close()
+	t.Setenv("NINES_URL", server.URL)
+	t.Setenv("NINES_TENANT", "alpha")
+	t.Setenv("API_TOKEN", "owner")
+	for _, action := range []string{"pause", "resume"} {
+		var out bytes.Buffer
+		if e = run([]string{"rules", action, "--id", "api", "--expected-revision", "1", "--agent"}, &out); e != nil || !strings.Contains(out.String(), `"tenant": "alpha"`) {
+			t.Fatal(action, out.String(), e)
+		}
+	}
+	if e = run([]string{"rules", "resume", "--id", "api", "--agent"}, io.Discard); e == nil {
+		t.Fatal("missing revision accepted")
 	}
 }
