@@ -17,12 +17,12 @@ func TestCLIIntegrationIsReadOnlyAndOfflineRefusesIt(t *testing.T) {
 		if r.Method != "GET" || r.URL.Path != "/api/slos/checkout/integration" || r.Header.Get("X-Nines-Tenant") != "alpha" || r.Header.Get("Authorization") != "Bearer viewer" {
 			t.Error("incorrect scoped integration request", r)
 		}
-		_, _ = fmt.Fprint(w, `{"apiVersion":"nines.dev/v1alpha1","tenant":"alpha","sloId":"checkout","deployment":{"state":"not_deployed"}}`)
+		_, _ = fmt.Fprint(w, `{"apiVersion":"nines.dev/v1alpha1","tenant":"alpha","sloId":"checkout","deployment":{"state":"not_deployed","code":"rule_file_missing","nextAction":"Review a current plan before deploying"},"ruleOutput":{"state":"not_observed","code":"rule_output_missing","nextAction":"Check query routing"}}`)
 	}))
 	defer server.Close()
 	var out bytes.Buffer
 	args := []string{"integration", "checkout", "--server", server.URL, "--tenant", "alpha", "--agent"}
-	if err := run(args, &out); err != nil || !strings.Contains(out.String(), "not_deployed") {
+	if err := run(args, &out); err != nil || (!strings.Contains(out.String(), "not_deployed") || !strings.Contains(out.String(), "rule_file_missing") || !strings.Contains(out.String(), "rule_output_missing") || !strings.Contains(out.String(), "Check query routing") || !strings.Contains(out.String(), "Review a current plan before deploying")) {
 		t.Fatal(err, out.String())
 	}
 	if err := run(append(args, "--offline"), &out); err == nil || calls != 1 {

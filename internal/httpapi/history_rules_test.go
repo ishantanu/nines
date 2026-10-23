@@ -70,7 +70,13 @@ func TestHistoryAndRuleDeploymentRoleAndRevisionBoundaries(t *testing.T) {
 	request("agent", "POST", "/api/slos/availability/rules/apply", string(body), 403)
 	request("viewer", "POST", "/api/slos/availability/rules/apply", string(body), 403)
 	request("owner", "POST", "/api/slos/availability/rules/apply", `{"expectedDigest":"wrong"}`, 409)
-	request("owner", "POST", "/api/slos/availability/rules/apply", string(body), 200)
+	var applied rules.Deployment
+	if err := json.Unmarshal(request("owner", "POST", "/api/slos/availability/rules/apply", string(body), 200).Body.Bytes(), &applied); err != nil {
+		t.Fatal(err)
+	}
+	if applied.State != "written" || applied.Activation == nil || applied.Activation.State != "manual" || applied.Evaluation == nil || applied.Evaluation.State != "unknown" {
+		t.Fatal("API implied file persistence proves activation", applied)
+	}
 	definition := model.DefinitionFromSLO(slo)
 	definition.Spec.WindowSeconds = 7200
 	if _, err := svc.ApplyDefinition(context.Background(), model.Definition{SLO: &definition}, 1); err != nil {

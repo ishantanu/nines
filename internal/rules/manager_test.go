@@ -119,7 +119,7 @@ func TestGeneratedRulesDurationsAndNoTrafficGuards(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(g.Rules) != 16 {
+	if len(g.Rules) != 17 {
 		t.Fatal("unexpected recording/alert count", len(g.Rules))
 	}
 	for _, r := range g.Rules {

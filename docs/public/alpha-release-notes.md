@@ -4,7 +4,7 @@ An early-access release of the self-hosted SLO and critical user journey platfor
 
 ## Downloads
 
-Choose the archive matching your operating system and CPU. Each archive contains `nines`, `nines-server` and `nines-mcp`, plus configuration examples, reference documentation and dependency licenses.
+Choose the archive matching your operating system and CPU. Each archive contains `nines`, `nines-server`, `nines-mcp` and `nines-operator`, plus configuration examples, reference documentation and dependency licenses.
 
 | Platform | Archive suffix |
 | --- | --- |
@@ -32,4 +32,4 @@ The CLI can validate YAML and generate recording rules without a server. Connect
 
 SLOs and critical user journeys as versioned YAML, Prometheus/Mimir collection and recording rules, configurable severity-based burn alerts, tenant-aware views, local accounts, configured SSO/LDAP, RBAC, the Go client and stdio MCP adapter.
 
-Intent workflows, session replay and the Kubernetes operator remain experimental. This alpha does not establish production-scale readiness or stable API compatibility. Windows binaries and a hosted service are not included.
+The standalone Kubernetes operator is included, with namespaced RBAC, leader failover and Prometheus Operator/Mimir reconciliation. See the operator guide before installing CRDs or deploying its image. Intent workflows and session replay remain experimental. This alpha does not establish production-scale readiness or stable API compatibility. Windows binaries and a hosted service are not included.

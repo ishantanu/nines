@@ -19,6 +19,7 @@ import (
 	"golang.org/x/time/rate"
 
 	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
+	"github.com/ishantanu/nines/internal/buildinfo"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/observability"
 )
@@ -88,7 +89,7 @@ func (a *API) request(ctx context.Context, method, path string, input, output an
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("User-Agent", "nines-operator/0.1")
+	req.Header.Set("User-Agent", "nines-operator/"+buildinfo.Version)
 	if input != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -274,5 +275,14 @@ func (a *API) Status(ctx context.Context, r k.Resource, status k.Status) error {
 }
 
 func (a *API) Probe(ctx context.Context) error {
-	return a.request(ctx, "GET", a.path("ServiceLevelObjective")+"?limit=1", nil, nil)
+	for _, kind := range []string{"MeasurementBinding", "ServiceLevelObjectiveIntent", "ServiceLevelObjective", "CriticalUserJourney"} {
+		if err := a.request(ctx, "GET", a.path(kind)+"?limit=1", nil, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *API) ProbePrometheusRules(ctx context.Context) error {
+	return a.request(ctx, "GET", a.path("PrometheusRule")+"?limit=1", nil, nil)
 }

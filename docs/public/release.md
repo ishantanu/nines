@@ -30,7 +30,7 @@ The existing Nines checkout can be committed directly after reviewing its staged
 
 ## Candidate assets
 
-`make release VERSION=v0.1.0-alpha.1` prepares archives for the selected build targets; it does not publish anything. Override `RELEASE_TARGETS` for a smaller local proof. The builder requires a version, collects dependency notices, includes CLI/server/MCP binaries and emits SHA-256 checksums and build metadata. The Kubernetes reconciler is excluded from first-release binary assets. The server container includes application and dependency notices under `/licenses/`.
+`make release VERSION=v0.1.0-alpha.1` prepares archives for the selected build targets; it does not publish anything. Override `RELEASE_TARGETS` for a smaller local proof. The builder requires a version, collects dependency notices, includes CLI/server/MCP/operator binaries and emits SHA-256 checksums and build metadata. The operator is included, with executable/archive checks and a container recipe for extracted Linux archives. Operator CRDs, namespaced deployment and Kustomize resources ship alongside the binaries. The server container includes application and dependency notices under `/licenses/`.
 
 The manual GitHub candidate workflow builds and uploads reviewable artifacts with read-only repository permissions. It neither creates a tag nor publishes a GitHub release. A maintainer reviews the exact commit, all release gates and assets before taking the final publication step. Public SDK installation requires the selected repository and version to be published.
 

@@ -1,0 +1,10 @@
+# Optional strategic merge patch for the server Deployment in namespace nines.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nines
+spec:
+  template:
+    spec:
+      serviceAccountName: nines-publisher
+      automountServiceAccountToken: true

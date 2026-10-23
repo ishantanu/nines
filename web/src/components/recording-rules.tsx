@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, message, percent, type RequestScope, type SLO } from "@/lib/api";
 import { duration } from "@/lib/history";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { type Stage } from "./integration-status";
+
 interface Rule {
   record?: string;
   alert?: string;
@@ -24,6 +26,7 @@ interface Rule {
 interface Plan {
   digest: string;
   yaml: string;
+  resourceYAML?: string;
   sloRevision: number;
   group: { name: string; interval: string; rules: Rule[] };
   target: {
@@ -34,29 +37,37 @@ interface Plan {
     mimirOrgID?: string;
     namespace: string;
     directory?: string;
+    reload?: boolean;
+    publisher?: string;
+    providerKind?: string;
   };
 }
 export function RecordingRules({
   slo,
   scope,
   onConnections,
+  onApplied,
 }: {
   slo: SLO;
   scope: RequestScope;
   onConnections: () => void;
+  onApplied?: () => void;
 }) {
+  const applyRequest = useRef<AbortController | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [deploying, setDeploying] = useState(false);
   const [error, setError] = useState("");
-  const [result, setResult] = useState("");
+  const [result, setResult] = useState<RuleApplyResult | null>(null);
   const [refresh, setRefresh] = useState(0);
   const [stale, setStale] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
+    applyRequest.current?.abort();
+    setDeploying(false);
     setLoading(true);
     setError("");
-    setResult("");
+    setResult(null);
     setPlan(null);
     setStale(false);
     api<Plan>(`/api/slos/${slo.id}/rules/plan`, scope, {
@@ -72,39 +83,52 @@ export function RecordingRules({
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      applyRequest.current?.abort();
+    };
   }, [slo.id, slo.revision, scope, refresh]);
-  async function deploy() {
+  async function deploy(withdraw = false) {
     if (!plan || stale) return;
+    const request = new AbortController();
+    applyRequest.current = request;
     setDeploying(true);
     setError("");
-    setResult("");
+    setResult(null);
     try {
-      const response = await api<{ state: string; message: string }>(
-        `/api/slos/${slo.id}/rules/apply`,
+      const response = await api<RuleApplyResult>(
+        `/api/slos/${slo.id}/rules/${withdraw ? "withdraw" : "apply"}`,
         scope,
         {
           method: "POST",
           body: JSON.stringify({ expectedDigest: plan.digest }),
+          signal: request.signal,
         },
       );
-      setResult(`${response.state}: ${response.message}`);
+      if (!request.signal.aborted) {
+        setResult(response);
+        if (withdraw) setStale(true);
+        onApplied?.();
+      }
     } catch (e) {
+      if (request.signal.aborted) return;
       setError(message(e));
       setStale(true);
     } finally {
-      setDeploying(false);
+      if (!request.signal.aborted) setDeploying(false);
     }
   }
   const recordings = plan?.group.rules.filter((r) => r.record) ?? [];
   const alerts = plan?.group.rules.filter((r) => r.alert) ?? [];
   const policies = slo.policies ?? (slo.policy ? [slo.policy] : []);
   const destination =
-    plan?.target.kind === "prometheus"
-      ? `${plan.target.directory?.replace(/\/$/, "")}/${plan.target.namespace}-${plan.group.name}.yaml`
-      : plan
-        ? `${plan.target.rulerURL?.replace(/\/$/, "")}/config/v1/rules/${encodeURIComponent(plan.target.namespace)}`
-        : "";
+    plan?.target.kind === "operator"
+      ? `${plan.target.namespace}/ServiceLevelObjective/${slo.id}`
+      : plan?.target.kind === "prometheus"
+        ? `${plan.target.directory?.replace(/\/$/, "")}/${plan.target.namespace}-${plan.group.name}.yaml`
+        : plan
+          ? `${plan.target.rulerURL?.replace(/\/$/, "")}/config/v1/rules/${encodeURIComponent(plan.target.namespace)}`
+          : "";
   return (
     <div className="space-y-4">
       <div className="panel-grid">
@@ -120,18 +144,24 @@ export function RecordingRules({
               {Object.entries({
                 Connection: plan?.target.connection ?? slo.source ?? "primary",
                 Engine:
-                  plan?.target.kind ??
+                  (plan?.target.kind === "operator"
+                    ? `Kubernetes operator (${plan.target.providerKind})`
+                    : plan?.target.kind) ??
                   (loading ? "Preparing plan" : "Unavailable"),
                 Namespace:
                   plan?.target.namespace ??
                   (loading ? "Preparing plan" : "Unavailable"),
-                "Mimir tenant":
-                  plan?.target.mimirOrgID ??
-                  (plan
-                    ? "Not applicable"
-                    : loading
-                      ? "Preparing plan"
-                      : "Unavailable"),
+                ...(plan?.target.kind === "operator"
+                  ? { Publisher: plan.target.publisher ?? "Unavailable" }
+                  : {
+                      "Mimir tenant":
+                        plan?.target.mimirOrgID ??
+                        (plan
+                          ? "Not applicable"
+                          : loading
+                            ? "Preparing plan"
+                            : "Unavailable"),
+                    }),
               }).map(([label, value]) => (
                 <div key={label}>
                   <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -143,6 +173,15 @@ export function RecordingRules({
               The SLO's source selects the dataset and server-configured rule
               destination. Recording and alerting rules are deployed together in
               one owned rule group.
+              {plan
+                ? plan.target.kind === "operator"
+                  ? " Reviewed apply publishes a Kubernetes SLO; the operator owns provider rule reconciliation. The namespace, publisher and service account are configured by the administrator."
+                  : plan.target.kind === "mimir"
+                    ? " Mimir activates the stored group through its ruler."
+                    : plan.target.reload
+                      ? " Automatic Prometheus reload is enabled after reviewed apply."
+                      : " Automatic reload is disabled. Arrange a Prometheus reload after writing the file."
+                : ""}
             </p>
           </CardContent>
         </Card>
@@ -217,9 +256,21 @@ export function RecordingRules({
                 disabled={
                   loading || deploying || stale || scope.role !== "owner"
                 }
-                onClick={deploy}
+                onClick={() => void deploy()}
               >
-                {deploying ? "Deploying…" : "Deploy reviewed rules"}
+                {deploying ? "Applying..." : "Apply reviewed rules"}
+              </Button>
+            ) : null}
+            {plan?.target.kind === "operator" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={
+                  loading || deploying || stale || scope.role !== "owner"
+                }
+                onClick={() => void deploy(true)}
+              >
+                Withdraw reviewed publication
               </Button>
             ) : null}
           </div>
@@ -236,14 +287,7 @@ export function RecordingRules({
                 : " Review the selected connection and SLO queries in Data sources and Configuration."}
             </p>
           ) : null}
-          {result ? (
-            <p
-              role="status"
-              className="rounded-md border bg-slate-50 p-3 text-sm"
-            >
-              {result}
-            </p>
-          ) : null}
+          {result ? <RuleApplyEvidence result={result} /> : null}
           {loading ? (
             <p role="status" className="empty-state">
               Preparing rule definitions and destination…
@@ -272,9 +316,11 @@ export function RecordingRules({
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-muted-foreground">
-                    {plan.target.kind === "mimir"
-                      ? "Ruler namespace endpoint"
-                      : "Prometheus rule file"}
+                    {plan.target.kind === "operator"
+                      ? "Kubernetes SLO resource"
+                      : plan.target.kind === "mimir"
+                        ? "Ruler namespace endpoint"
+                        : "Prometheus rule file"}
                   </dt>
                   <dd className="mt-1 break-all font-mono">{destination}</dd>
                 </div>
@@ -287,7 +333,12 @@ export function RecordingRules({
                   <TabsTrigger value="alerting">
                     Alerting rules ({alerts.length})
                   </TabsTrigger>
-                  <TabsTrigger value="yaml">YAML</TabsTrigger>
+                  {plan.resourceYAML ? (
+                    <TabsTrigger value="resource">Kubernetes YAML</TabsTrigger>
+                  ) : null}
+                  <TabsTrigger value="yaml">
+                    {plan.resourceYAML ? "Rule preview YAML" : "YAML"}
+                  </TabsTrigger>
                 </TabsList>
                 <TabsContent value="recording" className="h-96 overflow-auto">
                   <div className="h-full overflow-auto rounded-md border">
@@ -346,12 +397,26 @@ export function RecordingRules({
                     </p>
                   )}
                 </TabsContent>
+                {plan.resourceYAML ? (
+                  <TabsContent value="resource" className="h-96 overflow-auto">
+                    <pre className="code-block h-full max-h-full">
+                      {plan.resourceYAML}
+                    </pre>
+                  </TabsContent>
+                ) : null}
                 <TabsContent value="yaml" className="h-96 overflow-auto">
                   <pre className="code-block h-full max-h-full">
                     {plan.yaml}
                   </pre>
                 </TabsContent>
               </Tabs>
+              {plan.resourceYAML ? (
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Publish the Kubernetes resource through Nines so the reviewed
+                  destination is recorded. A new resource receives its owner UID
+                  at publication; generated rules are a preview until then.
+                </p>
+              ) : null}
               <p className="break-all text-xs text-muted-foreground">
                 SLO revision {plan.sloRevision} · plan digest{" "}
                 <span className="font-mono">{plan.digest}</span>
@@ -392,6 +457,88 @@ export function RecordingRules({
           </p>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+interface RuleApplyResult {
+  state: string;
+  message: string;
+  activation?: Stage;
+  evaluation?: Stage;
+}
+export function RuleApplyEvidence({ result }: { result: RuleApplyResult }) {
+  const saved =
+    result.state === "submitted"
+      ? "Published to Kubernetes"
+      : result.state === "withdrawing"
+        ? "Withdrawal pending"
+        : result.state === "withdrawn"
+          ? "Publication withdrawn"
+          : result.state === "written"
+            ? "File written"
+            : result.state === "accepted" || result.state === "verified"
+              ? "Stored in ruler"
+              : result.state === "unchanged"
+                ? "Configuration unchanged"
+                : "Configuration result";
+  const stateLabels: Record<string, string> = {
+    accepted: "Accepted",
+    verified: "Verified",
+    failed: "Failed",
+    blocked: "Blocked",
+    manual: "Manual reload required",
+    unknown: "Unverified",
+    not_loaded: "Not loaded",
+    evaluating: "Evaluating",
+    pending: "Pending",
+    out_of_date: "Out of date",
+    stale: "Stale",
+  };
+  return (
+    <div
+      role="status"
+      className="grid gap-4 rounded-md border p-4 text-sm md:grid-cols-3"
+    >
+      {[
+        {
+          title: "Configuration",
+          state: result.state,
+          message: result.message,
+          label: saved,
+        },
+        {
+          ...result.activation,
+          title: "Backend activation",
+          label:
+            stateLabels[result.activation?.state ?? "unknown"] ?? "Unverified",
+        },
+        {
+          ...result.evaluation,
+          title: "Runtime evaluation",
+          label:
+            stateLabels[result.evaluation?.state ?? "unknown"] ?? "Unverified",
+        },
+      ].map((stage) => (
+        <div key={stage.title} className="min-w-0 space-y-2">
+          <h3 className="font-medium">{stage.title}</h3>
+          <Badge
+            variant={
+              stage.state === "failed" || stage.state === "blocked"
+                ? "destructive"
+                : "outline"
+            }
+          >
+            {stage.label}
+          </Badge>
+          <p className="break-words text-xs leading-5 text-muted-foreground">
+            {stage.message ?? "Check integration status for current evidence."}
+          </p>
+          {"nextAction" in stage && stage.nextAction ? (
+            <p className="text-xs leading-5">Next step: {stage.nextAction}</p>
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }

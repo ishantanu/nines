@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Publish owner-reviewed portal SLOs through the Kubernetes operator, with persistent route pins, distinct portal/Kubernetes revisions, status readback, least-privilege RBAC and guarded withdrawal.
+
+- Add opt-in native Prometheus reload after reviewed rule apply, separate configuration/activation/runtime results, truthful file-written status and a real shared-mount acceptance test. The playground uses this path without a separate watcher.
+
+- First-class alpha Kubernetes operator: release binaries, Kustomize installation, separate credentials, generation-scoped provider evidence, visible blocked cleanup, real API/RBAC/GC/failover acceptance and packaged container smoke checks.
+
+- Rule deployment ownership/write guards, bounded Mimir readback recovery, namespace-aware runtime inspection and actionable UI/CLI diagnostics.
+- Revision/digest-scoped recording markers and independent query-dataset output evidence, plus real operator selector and critical/warning alert timing/recovery acceptance fixtures.
+
 - Tag-triggered alpha release drafts for Linux/macOS on amd64/arm64, with archive verification, build metadata and binary smoke checks.
 - Practical site examples for the Prometheus playground, CLI, tenant access, SLI queries, Go client and MCP, plus measurement-binding and experimental intent YAML.
 
@@ -30,7 +39,7 @@
 - Deployment guides and single-instance Linux/Kubernetes reference configuration.
 - Community acknowledgements for Sloth and Pyrra.
 
-First public MVP candidate. No public version or release tag has been published.
+Initial MVP feature baseline:
 
 - Versioned SLO and critical user journey YAML, explicit links, review and revision checks.
 - Prometheus/Mimir measurements, rolling objectives, budgets, charts and burn-rate rule generation.

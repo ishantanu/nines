@@ -82,13 +82,13 @@ func (p *Postgres) List(ctx context.Context) ([]model.SLO, error) {
 	return out, rows.Err()
 }
 func load(ctx context.Context, tx pgx.Tx, id string, lock bool) (model.Record, error) {
-	query := "SELECT config,alert_state,collection_health FROM slos WHERE id=$1"
+	query := "SELECT config,alert_state,collection_health,operator_route FROM slos WHERE id=$1"
 	if lock {
 		query += " FOR UPDATE"
 	}
 	var config, state, collection []byte
 	r := model.Record{Points: map[int64]model.Point{}, Windows: map[string]model.WindowObservation{}}
-	err := tx.QueryRow(ctx, query, id).Scan(&config, &state, &collection)
+	err := tx.QueryRow(ctx, query, id).Scan(&config, &state, &collection, &r.OperatorRoute)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return r, model.ErrNotFound
 	}
@@ -209,7 +209,7 @@ func (p *Postgres) Update(ctx context.Context, id string, fn func(*model.Record)
 	if err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, "UPDATE slos SET alert_state=$2,config=$3,collection_health=$4 WHERE id=$1", id, state, config, collection); err != nil {
+	if _, err = tx.Exec(ctx, "UPDATE slos SET alert_state=$2,config=$3,collection_health=$4,operator_route=$5 WHERE id=$1", id, state, config, collection, r.OperatorRoute); err != nil {
 		return err
 	}
 	for _, e := range r.Events {
@@ -270,3 +270,13 @@ func (p *Postgres) Finish(ctx context.Context, id string, attempt int, next time
 }
 func (p *Postgres) Ping(ctx context.Context) error { return p.pool.Ping(ctx) }
 func (p *Postgres) Close()                         { p.pool.Close() }
+
+// OperatorRoute reads only the durable deployment fence, not measurement rows.
+func (p *Postgres) OperatorRoute(ctx context.Context, id string) (string, error) {
+	var route string
+	err := p.pool.QueryRow(ctx, "SELECT operator_route FROM slos WHERE id=$1", id).Scan(&route)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", model.ErrNotFound
+	}
+	return route, err
+}

@@ -142,6 +142,7 @@ def verify(tenants=("prometheus",)):
         "mimirOrgID": "",
         "bearerToken": "synthetic-provider-token",
         "rulesEnabled": True,
+        "reload": True,
         "rulerURL": "",
         "expectedVersion": 0,
         "clearCredentials": False,

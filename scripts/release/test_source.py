@@ -103,14 +103,34 @@ class RequiredIntegrationTests(unittest.TestCase):
         )
         self.assertNotEqual(self.run_gate(rows, "database"), 0)
 
-    def test_mimir_requires_both_real_destination_and_collection_cases(self):
+    def test_mimir_requires_collection_destinations_and_alert_lifecycle(self):
         rows = [
             {"Action": "pass", "Test": n, "Package": "app/integration/mimir"}
-            for n in ["TestRealMimirTenantCollection", "TestRealMimirRuleDestinations"]
+            for n in [
+                "TestRealMimirTenantCollection",
+                "TestRealMimirRuleDestinations",
+                "TestRealMimirIndependentAlertLifecycle",
+            ]
         ]
         self.assertEqual(self.run_gate(rows, "mimir"), 0)
+        self.assertNotEqual(self.run_gate(rows[:2], "mimir"), 0)
         rows[0]["Action"] = "skip"
         self.assertNotEqual(self.run_gate(rows, "mimir"), 0)
+
+    def test_operator_requires_real_selector_case(self):
+        rows = [
+            {"Action": "pass", "Test": name, "Package": "app/integration/operator"}
+            for name in [
+                "TestRealOperatorRuleSelectors",
+                "TestRealOperatorControllerConformance",
+                "TestRealOperatorLeaseFailover",
+                "TestRealOperatorPortalPublication",
+            ]
+        ]
+        self.assertEqual(self.run_gate(rows, "operator"), 0)
+        self.assertNotEqual(self.run_gate([], "operator"), 0)
+        rows[0]["Action"] = "skip"
+        self.assertNotEqual(self.run_gate(rows, "operator"), 0)
 
 
 if __name__ == "__main__":

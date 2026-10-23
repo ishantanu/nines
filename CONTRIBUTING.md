@@ -32,10 +32,11 @@ make test
 make check
 make test-integration  # requires TEST_DATABASE_URL for a disposable database
 make test-mimir       # starts/removes only its own loopback Mimir fixture
+make test-operator    # private Docker API/controller; never uses your kubecontext
 make release-check
 ```
 
-The CI Go job supplies a disposable PostgreSQL service and fails if PostgreSQL checks are skipped. The Mimir job uses a digest-pinned disposable image and exercises collection and rule destinations. Unit tests use local HTTP/identity fixtures; they do not need real provider credentials. Do not point integration tests at production data.
+The CI Go job supplies a disposable PostgreSQL service and fails if PostgreSQL checks are skipped. The Mimir job uses a digest-pinned disposable image and exercises collection, rule destinations, query-output identity and independent alert lifecycle timing. The operator job uses an agentless disposable API, real upstream controller, shipped RBAC, actual Nines reconciliation/failover/cleanup and a packaged container smoke check. It does not schedule workload pods. Its runner requires kubectl, curl, base64 and shasum in addition to Docker/Go. Unit tests use local HTTP/identity fixtures; they do not need real provider credentials. Do not point integration tests at production data.
 
 Format Go with `golangci-lint fmt`. Run frontend tests and `npm run build --prefix web` when changing the UI. Add regression tests for calculation, tenant/role boundaries, revision/digest checks and recovery behavior. Keep `nines.dev/v1alpha1` definitions shared between clients and the server. Treat missing data as unknown. Model output must not directly redefine a measurement, lower a target or choose a credential-bearing destination.
 

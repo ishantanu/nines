@@ -31,11 +31,13 @@ type Input struct {
 	MimirOrgID       string `json:"mimirOrgID"`
 	BearerToken      string `json:"bearerToken"`
 	ClearCredentials bool   `json:"clearCredentials"`
+	Reload           bool   `json:"reload"`
 	RulesEnabled     bool   `json:"rulesEnabled"`
 	RulerURL         string `json:"rulerURL"`
 	ExpectedVersion  int64  `json:"expectedVersion"`
 }
 type record struct {
+	Reload       bool   `json:"reload,omitempty"`
 	Name         string `json:"name"`
 	Kind         string `json:"kind"`
 	URL          string `json:"url"`
@@ -124,7 +126,7 @@ func (r *Registry) public(e entry) map[string]any {
 	}
 	var destination *tenancy.RuleDestination
 	if e.target != nil {
-		destination = &tenancy.RuleDestination{Namespace: e.target.Namespace, Directory: e.target.Directory, RulerURL: e.target.RulerURL}
+		destination = &tenancy.RuleDestination{Namespace: e.target.Namespace, Directory: e.target.Directory, RulerURL: e.target.RulerURL, Reload: e.target.Reload}
 	}
 	return map[string]any{"id": e.Name, "kind": e.Kind, "endpoint": e.URL, "mimirOrgID": e.MimirOrgID, "authentication": auth, "configuration": "managed", "version": e.Version, "rules": destination}
 }
@@ -178,6 +180,9 @@ func (r *Registry) prepare(v record) (entry, error) {
 		return entry{}, err
 	}
 	result := entry{record: v, client: c}
+	if v.Reload && (!v.RulesEnabled || v.Kind != "prometheus") {
+		return entry{}, model.Invalid("automatic reload requires enabled Prometheus rule deployment")
+	}
 	if v.RulesEnabled {
 		t := rules.Target{Connection: v.Name, Kind: v.Kind, QueryURL: v.URL, Namespace: r.tenant + "-" + v.Name, MimirOrgID: v.MimirOrgID, BearerToken: token}
 		if v.Kind == "mimir" {
@@ -193,6 +198,7 @@ func (r *Registry) prepare(v record) (entry, error) {
 				return entry{}, model.Invalid("server has no managed Prometheus rule directory")
 			}
 			t.Directory = r.directory
+			t.Reload = v.Reload
 		}
 		result.target = &t
 	}
@@ -252,7 +258,7 @@ func (r *Registry) Save(ctx context.Context, in Input) (map[string]any, error) {
 	if !exists && len(r.entries)+len(r.reserved) >= 21 {
 		return nil, model.Invalid("tenant connection limit reached")
 	}
-	v := record{Name: in.Name, Kind: in.Kind, URL: strings.TrimRight(in.URL, "/"), MimirOrgID: in.MimirOrgID, RulesEnabled: in.RulesEnabled, RulerURL: strings.TrimRight(in.RulerURL, "/"), Version: in.ExpectedVersion + 1, Secret: old.Secret}
+	v := record{Name: in.Name, Kind: in.Kind, URL: strings.TrimRight(in.URL, "/"), MimirOrgID: in.MimirOrgID, RulesEnabled: in.RulesEnabled, Reload: in.Reload, RulerURL: strings.TrimRight(in.RulerURL, "/"), Version: in.ExpectedVersion + 1, Secret: old.Secret}
 	if exists && (old.URL != v.URL || old.Kind != v.Kind || old.MimirOrgID != v.MimirOrgID || old.RulesEnabled != v.RulesEnabled || old.RulerURL != v.RulerURL) && r.referenced(ctx, in.Name) {
 		return nil, model.Invalid("source is referenced by an SLO or measurement binding; create a new connection and review definition changes")
 	}

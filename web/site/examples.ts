@@ -79,9 +79,12 @@ nines:sli:ratio{nines_tenant="prometheus",nines_slo="checkout-success",window="6
 # Error-budget consumption rate
 nines:slo_burn_rate:ratio{nines_tenant="prometheus",nines_slo="checkout-success"}
 
+# Recorded configuration identity in this query dataset
+nines:rule_definition:info{nines_tenant="prometheus",nines_slo="checkout-success"}
+
 # Active critical or warning burn alerts
 ALERTS{alertname="NinesSLOBurnRate",alertstate="firing"}`,
-    note: "Use localhost:19090/query and /rules. Prometheus's /metrics endpoint exposes its own instrumentation, not recording-rule results. Configured alerts can be inactive while traffic is healthy.",
+    note: "Use localhost:19090/query and /rules. Prometheus's /metrics endpoint exposes its own instrumentation, not recording-rule results. Use nines integration SLO_ID --agent for stage-specific diagnostics, query-dataset output verification and next steps. The playground enables native Prometheus reload after reviewed apply. File written, activation and runtime evaluation are separate results. The configuration marker does not verify traffic coverage or alert delivery. Configured alerts can be inactive while traffic is healthy.",
     path: "docs/public/deployment/metrics-and-rules.md",
     link: "Metrics and rule destinations",
   },
@@ -121,6 +124,27 @@ ALERTS{alertname="NinesSLOBurnRate",alertstate="firing"}`,
     note: "The adapter needs a running Nines server. Store the real token in your client's private configuration or secret mechanism, outside source control.",
     path: "docs/cli.md#scripts-and-llm-skills",
     link: "Agent and skill integration",
+  },
+  {
+    id: "operator",
+    label: "Kubernetes operator",
+    title: "Manage SLOs with Kubernetes and Git",
+    description:
+      "Run the standalone controller with namespace RBAC, pinned provider routes and one lease-elected writer. No Nines server or database is required.",
+    language: "Shell",
+    code: `# Source checkout: inspect the installation bundle before applying.
+make operator
+bin/nines-operator -version
+kubectl kustomize deploy/operator
+
+# Set your namespace, tenant, sources, selectors and versioned image.
+# Apply your reviewed installation, then the SLO/CUJ example.
+kubectl apply -f examples/operator/compiled.yaml
+kubectl -n team-commerce get slo,cuj,prometheusrules
+kubectl -n team-commerce get slo checkout-availability -o yaml`,
+    note: "The installation guide includes source/archive image builds, credentials, selectors, upgrades and rollback. Portal-owned SLOs can use rules.mode: operator with a trusted namespace/publisher and dedicated service account. Reviewed apply publishes a Kubernetes SLO; rules withdraw preserves the portal definition and waits for cleanup. Configuration readiness, rule evaluation and query output are separate evidence; a configured resource does not establish alert delivery.",
+    path: "docs/public/deployment/operator.md",
+    link: "Operator installation and operations",
   },
   {
     id: "intent-checks",

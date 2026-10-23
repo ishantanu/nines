@@ -133,12 +133,15 @@ def verify():
             json.dumps({"expectedDigest": plan["digest"]}).encode(),
         )
         assert result["state"] in ("written", "accepted", "unchanged"), result
+        assert result["activation"]["state"] in ("accepted", "verified"), result
         print(tenant + " reviewed rules: " + result["state"], flush=True)
         wait(
             tenant + " external evaluation",
             lambda t=tenant: integration(t)["evaluation"]["state"] == "evaluating",
         )
-        assert integration(tenant)["deployment"]["state"] == "deployed"
+        assert integration(tenant)["deployment"]["state"] == (
+            "stored" if tenant == "mimir" else "written"
+        )
         wait(
             tenant + " recorded SLI",
             lambda t=tenant: query(

@@ -27,6 +27,7 @@ type Config struct {
 	Token               string
 	AllowWrites         bool
 	AllowRuleDeployment bool
+	AllowRuleWithdrawal bool
 }
 
 type yamlResource struct {
@@ -49,6 +50,9 @@ type apiClient struct {
 }
 
 func newAPI(c Config) (*apiClient, error) {
+	if c.AllowRuleWithdrawal && (!c.AllowWrites || !c.AllowRuleDeployment) {
+		return nil, errors.New("rule withdrawal requires allow-writes, allow-rule-deployment and allow-rule-withdrawal")
+	}
 	if c.AllowRuleDeployment && !c.AllowWrites {
 		return nil, errors.New("rule deployment requires allow-writes as well as allow-rule-deployment")
 	}

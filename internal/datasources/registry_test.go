@@ -77,3 +77,34 @@ func TestManagedSourcesEncryptPersistAndEnforceDatasetBounds(t *testing.T) {
 		t.Fatal("credential rotation rejected", e)
 	}
 }
+
+func TestManagedPrometheusReloadPersistsAndRequiresRules(t *testing.T) {
+	ctx := context.Background()
+	repo := identity.NewMemory()
+	key := base64.StdEncoding.EncodeToString(make([]byte, 32))
+	directory := t.TempDir()
+	create := func() *Registry {
+		r, err := New(ctx, repo, "alpha", nil, map[string]bool{"metrics.test": true}, map[string]bool{"alpha-org": true}, key, directory, store.NewMemory())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	registry := create()
+	input := Input{Name: "prod", Kind: "prometheus", URL: "https://metrics.test", RulesEnabled: true, Reload: true}
+	if _, err := registry.Save(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	target, ok := create().Target("prod")
+	if !ok || !target.Reload {
+		t.Fatal("reload lost on restart", target)
+	}
+	for _, bad := range []Input{
+		{Name: "disabled", Kind: "prometheus", URL: input.URL, Reload: true},
+		{Name: "mimir", Kind: "mimir", URL: input.URL, MimirOrgID: "alpha-org", RulesEnabled: true, Reload: true},
+	} {
+		if _, err := registry.Save(ctx, bad); err == nil {
+			t.Fatal("invalid activation accepted", bad)
+		}
+	}
+}

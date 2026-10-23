@@ -22,7 +22,7 @@ def json_stream(raw):
         raw = raw[end:]
 
 
-def collect(root, dest, targets=None):
+def collect(root, dest, targets=None, go_only=False, packages=None):
     if dest.exists():
         raise ValueError("license output must be a new directory")
     dest.mkdir(parents=True)
@@ -90,9 +90,10 @@ def collect(root, dest, targets=None):
                 "list",
                 "-deps",
                 "-json",
-                "./cmd/nines",
-                "./cmd/server",
-                "./cmd/mcp",
+                *(
+                    packages
+                    or ["./cmd/nines", "./cmd/server", "./cmd/mcp", "./cmd/operator"]
+                ),
             ],
             cwd=root,
             text=True,
@@ -118,7 +119,11 @@ def collect(root, dest, targets=None):
     record(
         "go-toolchain", "Go standard library", goversion, toolchain_dir, "BSD-3-Clause"
     )
-    lock = json.loads((root / "web/package-lock.json").read_text())
+    lock = (
+        {"packages": {}}
+        if go_only
+        else json.loads((root / "web/package-lock.json").read_text())
+    )
     installed = []
     for path, package in sorted(lock["packages"].items()):
         if not path:
@@ -217,8 +222,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument(
+        "--go-only",
+        action="store_true",
+        help="omit web dependencies for binaries without an embedded UI",
+    )
+    parser.add_argument(
+        "--package",
+        action="append",
+        dest="packages",
+        help="Go main package to inspect; may be repeated",
+    )
     args = parser.parse_args()
-    items = collect(args.root.resolve(), args.out.resolve())
+    items = collect(
+        args.root.resolve(),
+        args.out.resolve(),
+        go_only=args.go_only,
+        packages=args.packages,
+    )
     print(
         json.dumps(
             {

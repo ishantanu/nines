@@ -178,6 +178,7 @@ export function App() {
           </a>
           <nav aria-label="Main navigation">
             <a href="#product">Product</a>
+            <a href="#architecture">Architecture</a>
             <a href="#as-code">As code</a>
             <a href="#examples">Examples</a>
             <a href="#agents">For agents</a>
@@ -268,11 +269,74 @@ export function App() {
               <span>03</span>
               <h3>Act on budget burn</h3>
               <p>
-                Generate recording and two-window burn-rate rules. Review
-                deployment to the intended tenant and ruler destination.
+                Generate recording and two-window burn-rate rules. Review the
+                destination, then activate through native Prometheus reload, the
+                Mimir ruler or the Kubernetes operator. Verify runtime
+                evaluation and recorded output separately.
               </p>
             </li>
           </ol>
+        </section>
+        <section
+          className="container architecture-section"
+          id="architecture"
+          aria-labelledby="architecture-title"
+        >
+          <div className="section-heading">
+            <p className="eyebrow">ARCHITECTURE</p>
+            <h2 id="architecture-title">From telemetry to reviewed rules.</h2>
+            <p>
+              Keep metrics in Prometheus or Mimir. Nines connects objectives and
+              critical user journeys to those signals, then delivers rules to
+              your configured destination after review.
+            </p>
+          </div>
+          <figure className="architecture-figure">
+            <div
+              className="architecture-viewport"
+              role="region"
+              aria-label="Architecture diagram, scroll horizontally on smaller screens"
+              tabIndex={0}
+            >
+              <img
+                src="./nines-architecture.svg"
+                width="1200"
+                height="870"
+                loading="lazy"
+                decoding="async"
+                alt="Applications send metrics through scraping or an OpenTelemetry Collector to Prometheus or Mimir. Portal, CLI and MCP clients use Nines for tenant-scoped SLO plans. Reviewed rules deploy through shared Prometheus files and reload, the Mimir ruler API, or the Nines Kubernetes operator. Nines queries measurements and recorded output to verify results. GitOps can also use the operator independently of the server."
+              />
+            </div>
+            <figcaption>
+              <span>
+                Saving an SLO does not deploy rules. Stored configuration,
+                runtime evaluation and SLO health have separate status checks.
+              </span>
+              <a className="text-link" href="./nines-architecture.svg" download>
+                Download SVG <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            </figcaption>
+          </figure>
+          <div className="architecture-notes">
+            <p>
+              <strong>Reviewed delivery.</strong> The server can write a shared
+              Prometheus rule file and request reload, store a Mimir ruler
+              group, or publish an SLO resource for our Kubernetes operator to
+              reconcile. Each route requires a configured destination.
+            </p>
+            <p>
+              <strong>Independent operator.</strong> Apply GitOps resources
+              directly without the Nines server, database or a model. Standalone
+              operator resources are not imported into the portal.{" "}
+              <a
+                className="text-link"
+                href={`${docs}/public/deployment/operator.md`}
+              >
+                Read the operator guide{" "}
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
+            </p>
+          </div>
         </section>
         <section
           className="code-section"
@@ -572,8 +636,8 @@ export function App() {
             <p>
               Nines is a pre-release MVP under active development. Expect
               regular features and fixes. Core SLO and critical user journey
-              management is the release focus. Intent workflows, session replay
-              and the Kubernetes reconciler are experimental.
+              management and the standalone Kubernetes operator are supported
+              alpha paths. Intent workflows and session replay are experimental.
             </p>
           </div>
           <div className="release-links">

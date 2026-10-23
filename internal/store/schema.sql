@@ -71,3 +71,5 @@ CREATE TABLE IF NOT EXISTS definition_batch_receipts (
  operation_id text PRIMARY KEY,
  document jsonb NOT NULL
 );
+
+ALTER TABLE slos ADD COLUMN IF NOT EXISTS operator_route text NOT NULL DEFAULT '';

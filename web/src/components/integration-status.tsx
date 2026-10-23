@@ -4,9 +4,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-interface Stage {
+export interface Stage {
   state: string;
   message: string;
+  code?: string;
+  nextAction?: string;
   observedAt?: string;
 }
 export interface IntegrationStatus {
@@ -16,17 +18,23 @@ export interface IntegrationStatus {
   collection: Stage;
   deployment: Stage;
   evaluation: Stage;
+  ruleOutput?: Stage;
 }
 const stages = [
   ["definition", "SLO saved"],
   ["collection", "Measurements collected"],
-  ["deployment", "Rules deployed"],
+  ["deployment", "Rule configuration"],
   ["evaluation", "Rules evaluating"],
 ] as const;
 const labels: Record<string, string> = {
   saved: "Saved",
   collected: "Collected",
-  deployed: "Deployed",
+  deployed: "Configured",
+  written: "File written",
+  stored: "Stored in ruler",
+  configured: "Resource configured",
+  submitted: "Awaiting operator",
+  withdrawing: "Withdrawal pending",
   evaluating: "Evaluating",
   not_collected: "Not collected",
   not_configured: "Not configured",
@@ -38,6 +46,9 @@ const labels: Record<string, string> = {
   failed: "Failed",
   stale: "Stale",
   pending: "Pending",
+  blocked: "Blocked",
+  verified: "Verified",
+  not_observed: "Not observed",
 };
 export function IntegrationEvidence({ status }: { status: IntegrationStatus }) {
   return (
@@ -48,13 +59,23 @@ export function IntegrationEvidence({ status }: { status: IntegrationStatus }) {
           <div key={key} className="min-w-0 space-y-2 p-4">
             <h3 className="text-sm font-medium">{title}</h3>
             <Badge
-              variant={stage.state === "failed" ? "destructive" : "outline"}
+              variant={
+                stage.state === "failed" || stage.state === "blocked"
+                  ? "destructive"
+                  : "outline"
+              }
             >
               {labels[stage.state] ?? "Unverified"}
             </Badge>
             <p className="break-words text-xs leading-5 text-muted-foreground">
               {stage.message}
             </p>
+            {stage.nextAction ? (
+              <p className="break-words text-xs leading-5">
+                <span className="font-medium">Next step: </span>
+                {stage.nextAction}
+              </p>
+            ) : null}
             {stage.observedAt ? (
               <p className="text-xs text-muted-foreground">
                 Observed {new Date(stage.observedAt).toLocaleString()}
@@ -63,6 +84,29 @@ export function IntegrationEvidence({ status }: { status: IntegrationStatus }) {
           </div>
         );
       })}
+      {status.ruleOutput ? (
+        <div className="col-span-full min-w-0 space-y-2 border-t p-4">
+          <h3 className="text-sm font-medium">Rule output in query dataset</h3>
+          <Badge variant="outline">
+            {labels[status.ruleOutput.state] ?? "Unverified"}
+          </Badge>
+          <p className="break-words text-xs leading-5 text-muted-foreground">
+            {status.ruleOutput.message}
+          </p>
+          {status.ruleOutput.nextAction ? (
+            <p className="break-words text-xs leading-5">
+              <span className="font-medium">Next step: </span>
+              {status.ruleOutput.nextAction}
+            </p>
+          ) : null}
+          {status.ruleOutput.observedAt ? (
+            <p className="text-xs text-muted-foreground">
+              Stored sample observed{" "}
+              {new Date(status.ruleOutput.observedAt).toLocaleString()}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

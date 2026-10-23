@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/ishantanu/nines/internal/prometheus"
 )
 
 func TestRealMimirRuleDestinations(t *testing.T) {
@@ -32,6 +34,7 @@ func TestRealMimirRuleDestinations(t *testing.T) {
 	defer cancel()
 	namespace := fmt.Sprintf("nines-test-%d", time.Now().UnixNano())
 	groups := []string{}
+	inspections := []func() error{}
 	sloID := "rules-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	for i, org := range []string{"nines-rules-a", "nines-rules-b"} {
 		slo := fixture()
@@ -52,11 +55,42 @@ func TestRealMimirRuleDestinations(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		result, err := manager.Apply(ctx, slo, plan.Digest)
-		if err != nil || result.State != "accepted" {
+		result, err := manager.Deploy(ctx, slo, plan.Digest)
+		if err != nil || result.State != "accepted" || result.Activation == nil || result.Activation.State != "accepted" {
 			t.Fatal(result, err)
 		}
 		groups = append(groups, plan.Group.Name)
+		inspections = append(inspections, func() error {
+			deployment, evaluation := manager.Inspect(ctx, slo, time.Now().UTC())
+			if deployment.State != "stored" || evaluation.State != "evaluating" {
+				return fmt.Errorf("real Mimir inspection not current: %s/%s (%s/%s)", deployment.State, evaluation.State, deployment.Code, evaluation.Code)
+			}
+			identity := OutputIdentity(slo, manager.Tenant, manager.OwnerUID)
+			collector, err := prometheus.NewMimir(base+"/prometheus", org, "")
+			if err != nil {
+				return err
+			}
+			output := collector.RuleOutput(ctx, identity, time.Now().UTC())
+			if output.State != "verified" {
+				return fmt.Errorf("current output is %s/%s", output.State, output.Code)
+			}
+			// The ruler remains healthy when a query gateway selects another
+			// dataset. Never infer query visibility from runtime evaluation.
+			wrong, err := prometheus.NewMimir(base+"/prometheus", "nines-query-dataset-without-rules", "")
+			if err != nil {
+				return err
+			}
+			missing := wrong.RuleOutput(ctx, identity, time.Now().UTC())
+			if missing.Code != "rule_output_missing" {
+				return fmt.Errorf("wrong dataset output: %s", missing.Code)
+			}
+			identity.Revision++
+			old := collector.RuleOutput(ctx, identity, time.Now().UTC())
+			if old.Code != "rule_output_out_of_date" {
+				return fmt.Errorf("other revision output: %s", old.Code)
+			}
+			return nil
+		})
 		code, _, err := rulerRequest(ctx, manager.Targets["production"], http.MethodGet, "/config/v1/rules/"+namespace+"/"+plan.Group.Name, nil)
 		if err != nil || code != 200 {
 			t.Fatal("rule group not stored in selected org", code, err)
@@ -116,13 +150,20 @@ func TestRealMimirRuleDestinations(t *testing.T) {
 		burnB, bb := query("nines-rules-b", `nines:slo_burn_rate:ratio{`+scope+`,window="2s"}`)
 		alertA, aa := query("nines-rules-a", `ALERTS{`+scope+`,alertname="NinesSLOBurnRate",alertstate="firing"}`)
 		alertB, ab := query("nines-rules-b", `ALERTS{`+scope+`,alertname="NinesSLOBurnRate",alertstate="firing"}`)
-		if ea == nil && eb == nil && ba == nil && bb == nil && aa == nil && ab == nil && len(a) == 1 && len(b) == 1 && a[0] == .99 && b[0] == .999 && len(burnA) == 1 && len(burnB) == 1 && math.Abs(burnA[0]-1) < 1e-8 && math.Abs(burnB[0]-10) < 1e-8 && len(alertA) == 0 && len(alertB) == 1 && alertB[0] == 1 {
+		var inspectionErr error
+		for _, inspect := range inspections {
+			if err := inspect(); err != nil {
+				inspectionErr = err
+				break
+			}
+		}
+		if inspectionErr == nil && ea == nil && eb == nil && ba == nil && bb == nil && aa == nil && ab == nil && len(a) == 1 && len(b) == 1 && a[0] == .99 && b[0] == .999 && len(burnA) == 1 && len(burnB) == 1 && math.Abs(burnA[0]-1) < 1e-8 && math.Abs(burnB[0]-10) < 1e-8 && len(alertA) == 0 && len(alertB) == 1 && alertB[0] == 1 {
 			t.Log("Separate Mimir datasets: targets .99/.999, burn 1x/10x, only the second tenant firing after both windows and pending duration")
 			break
 		}
 		select {
 		case <-ctx.Done():
-			t.Fatal("ruler did not evaluate isolated target series", a, b, ea, eb)
+			t.Fatal("ruler did not evaluate isolated target series", a, b, ea, eb, inspectionErr)
 		case <-time.After(time.Second):
 		}
 	}

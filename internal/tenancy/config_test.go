@@ -95,3 +95,76 @@ func TestTenantIntentModelCredentialsStayServerOwned(t *testing.T) {
 		t.Fatal("missing model credential accepted")
 	}
 }
+
+func TestStaticRuleReloadIsPrometheusOnly(t *testing.T) {
+	base := `tenants:
+- id: test
+  name: Test
+  access:
+  - tokenEnv: TEST_TOKEN
+    role: owner
+  source:
+    kind: prometheus
+    url: https://metrics.test
+    rules:
+      namespace: nines
+      directory: /rules
+      reload: true
+`
+	lookup := func(string) string { return "synthetic-token-at-least-24-characters" }
+	resolved, err := Parse([]byte(base), lookup)
+	if err != nil || !resolved[0].Config.Source.Rules.Reload {
+		t.Fatal(resolved, err)
+	}
+	mimir := strings.Replace(base, "kind: prometheus", "kind: mimir\n    mimirOrgID: alpha", 1)
+	mimir = strings.Replace(mimir, "directory: /rules", "rulerURL: https://metrics.test/prometheus", 1)
+	if _, err := Parse([]byte(mimir), lookup); err == nil {
+		t.Fatal("Mimir reload accepted")
+	}
+}
+
+func TestOperatorDestinationRequiresTrustedNamespaceAndPublisher(t *testing.T) {
+	base := `tenants:
+- id: commerce
+  name: Commerce
+  access: [{tokenEnv: TOKEN, role: owner}]
+  source:
+    kind: prometheus
+    url: https://metrics.test
+    rules: {mode: operator, namespace: team-commerce, publisher: portal}
+`
+	lookup := func(string) string { return "synthetic-token-at-least-24-characters" }
+	resolved, err := Parse([]byte(base), lookup)
+	if err != nil || resolved[0].Config.Source.Rules.Mode != "operator" {
+		t.Fatal(resolved, err)
+	}
+	for _, replacement := range []string{"publisher: ''", "publisher: portal, directory: /rules", "publisher: portal, reload: true", "publisher: portal, rulerURL: https://ruler.test", "publisher: portal, bearerTokenEnv: TOKEN"} {
+		if _, err := Parse([]byte(strings.Replace(base, "publisher: portal", replacement, 1)), lookup); err == nil {
+			t.Fatal("invalid operator destination accepted", replacement)
+		}
+	}
+	duplicate := base + strings.Replace(strings.TrimPrefix(base, "tenants:\n"), "id: commerce", "id: another", 1)
+	if _, err := Parse([]byte(duplicate), lookup); err == nil {
+		t.Fatal("cross-tenant namespace reuse accepted")
+	}
+}
+
+func TestSSOOnlyTenantCanUseNamedOperatorConnection(t *testing.T) {
+	body := []byte(`tenants:
+- id: commerce
+  name: Commerce
+  source: {kind: manual}
+  connections:
+  - name: production
+    kind: prometheus
+    url: https://metrics.test
+    rules: {mode: operator, namespace: team-commerce, publisher: portal}
+`)
+	if _, err := Parse(body, func(string) string { return "" }); err == nil {
+		t.Fatal("identity-disabled tokenless tenant accepted")
+	}
+	resolved, err := parse(body, func(string) string { return "" }, true)
+	if err != nil || len(resolved[0].Connections) != 1 || resolved[0].Connections[0].Config.Rules.Mode != "operator" {
+		t.Fatal(resolved, err)
+	}
+}

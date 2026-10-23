@@ -31,6 +31,7 @@ import {
 } from "@/lib/api";
 import { Status } from "./status";
 import { SLOIntegrationStatus } from "./integration-status";
+import { SLOHealthNotice } from "./slo-health-notice";
 import { PageHeader } from "./workspace-chrome";
 const SLOPerformance = lazy(() =>
   import("./slo-performance").then((m) => ({ default: m.SLOPerformance })),
@@ -333,6 +334,7 @@ export function ObjectiveDetail({
         <SLOIntegrationStatus
           id={objective.slo.id}
           revision={objective.slo.revision}
+          refreshKey={refresh + refreshKey}
           scope={scope}
         />
       ) : null}
@@ -404,6 +406,7 @@ export function ObjectiveDetail({
           ))}
         </dl>
       ) : null}
+      {status ? <SLOHealthNotice status={status} /> : null}
       <Tabs value={tab} onValueChange={setTab} className="detail-tabs">
         <TabsList className="detail-tab-list">
           <TabsTrigger value="performance">Performance</TabsTrigger>
@@ -448,6 +451,7 @@ export function ObjectiveDetail({
                 slo={objective.slo}
                 scope={scope}
                 onConnections={onConnections}
+                onApplied={() => setRefresh((n) => n + 1)}
               />
             </Suspense>
           ) : null}

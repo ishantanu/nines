@@ -10,7 +10,7 @@ Provider-window measurements evaluate configured selectors over complete windows
 
 One burn policy per SLO compares both short and long windows against the threshold and minimum coverage. Pending duration requires consecutive observations. Missing data resets pending and does not resolve a firing alert. Historical evaluations do not emit historical notifications. Rule generation, provider acceptance, actual rule evaluation and observed SLO health are separate states.
 
-Review `rules plan` and its destination before `rules apply --expected-digest ...`. Prometheus file output, Prometheus Operator resources and Mimir ruler datasets have different ownership and loading requirements. Deploying a YAML file does not prove a Prometheus server selected it. Do not let both the platform and experimental operator own the same rule group.
+Review `rules plan` and its destination before `rules apply --expected-digest ...`. Prometheus file output, Prometheus Operator resources and Mimir ruler datasets have different ownership and loading requirements. Deploying a YAML file does not prove a Prometheus server selected it. Do not let both the platform and Kubernetes operator own the same rule group.
 
 The MVP targets one collecting server process. Reads and transactional writes are bounded, but high-cardinality scale, distributed scheduling, queued large backfills and HA operation are not release claims. No SLO deletion API, calendar windows or silences are offered. Up to eight named severity policies have independent alert lifecycles; notification grouping and inhibition remain external Alertmanager configuration. PostgreSQL is required for durable normal deployments. Back up storage and validate restore procedures before retaining important data.
 

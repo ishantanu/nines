@@ -8,7 +8,9 @@ from pathlib import Path
 
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("result", type=Path)
-p.add_argument("--required", choices=["database", "mimir"], required=True)
+p.add_argument(
+    "--required", choices=["database", "mimir", "operator", "prometheus"], required=True
+)
 a = p.parse_args()
 rows = [
     json.loads(line)
@@ -31,7 +33,15 @@ for row in rows:
             and "Postgres" in test
         )
         if a.required == "database"
-        else ("TestRealMimir" in test)
+        else (
+            "TestRealOperator" in test
+            if a.required == "operator"
+            else (
+                "TestRealPrometheus" in test
+                if a.required == "prometheus"
+                else "TestRealMimir" in test
+            )
+        )
     )
     if required:
         seen = True
@@ -42,7 +52,18 @@ anchors = {
         "TestPostgresIdentitySessionSurvivesRestart",
         "TestPostgresRestartPreservesSamplesStateAndOutbox",
     ],
-    "mimir": ["TestRealMimirTenantCollection", "TestRealMimirRuleDestinations"],
+    "mimir": [
+        "TestRealMimirTenantCollection",
+        "TestRealMimirRuleDestinations",
+        "TestRealMimirIndependentAlertLifecycle",
+    ],
+    "prometheus": ["TestRealPrometheusReviewedActivation"],
+    "operator": [
+        "TestRealOperatorRuleSelectors",
+        "TestRealOperatorControllerConformance",
+        "TestRealOperatorLeaseFailover",
+        "TestRealOperatorPortalPublication",
+    ],
 }[a.required]
 passed = {r.get("Test") for r in rows if r.get("Action") == "pass"}
 missing = [name for name in anchors if name not in passed]

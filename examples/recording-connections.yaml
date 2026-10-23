@@ -25,3 +25,5 @@ tenants:
           namespace: nines
           # Shared with the intended Prometheus server; rule_files/reload required.
           directory: /etc/prometheus/nines-rules
+          # Opt in only with a shared mount and --web.enable-lifecycle.
+          reload: false

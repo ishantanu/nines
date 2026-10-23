@@ -243,3 +243,28 @@ func TestSLOConfigurationCASPersistsWithoutReinterpretingSamples(t *testing.T) {
 		})
 	}
 }
+
+func TestPostgresOperatorRouteSurvivesRestartAndDefinitionUpdates(t *testing.T) {
+	st, dsn := postgres(t)
+	ctx := context.Background()
+	slo := model.SLO{ID: "operator-route", Project: "commerce", Service: "checkout", Name: "Checkout", Target: .99, WindowSeconds: 60, StepSeconds: 1}
+	if err := st.Create(ctx, slo); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Update(ctx, slo.ID, func(r *model.Record) error { r.OperatorRoute = "reviewed-route-digest"; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	st.Close()
+	reopened, err := store.NewPostgres(ctx, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	if err := reopened.Update(ctx, slo.ID, func(r *model.Record) error { r.SLO.Revision = 2; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	record, err := reopened.Read(ctx, slo.ID)
+	if err != nil || record.OperatorRoute != "reviewed-route-digest" || record.SLO.Revision != 2 {
+		t.Fatal(record.OperatorRoute, err)
+	}
+}

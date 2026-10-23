@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ishantanu/nines/internal/buildinfo"
 	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/operator"
 )
@@ -23,9 +24,14 @@ func main() {
 	}
 }
 func run() error {
+	version := flag.Bool("version", false, "print release version, commit and build date")
 	path := flag.String("config", "", "administrator-owned operator configuration YAML")
 	health := flag.String("health-addr", "127.0.0.1:8081", "health probe address; use :8081 inside a pod")
 	flag.Parse()
+	if *version {
+		fmt.Printf("nines-operator %s commit=%s built=%s\n", buildinfo.Version, buildinfo.Commit, buildinfo.Date)
+		return nil
+	}
 	if *path == "" || flag.NArg() != 0 {
 		return fmt.Errorf("use nines-operator -config operator.yaml [-health-addr :8081]")
 	}
@@ -61,6 +67,14 @@ func run() error {
 		probe, end := context.WithTimeout(r.Context(), 2*time.Second)
 		defer end()
 		e := api.Probe(probe)
+		if e == nil {
+			for _, source := range config.Sources {
+				if source.Kind == "prometheus-operator" {
+					e = api.ProbePrometheusRules(probe)
+					break
+				}
+			}
+		}
 		if e != nil {
 			http.Error(w, "Kubernetes resources unavailable", http.StatusServiceUnavailable)
 			return

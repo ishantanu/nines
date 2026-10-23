@@ -1,5 +1,7 @@
 # Architecture
 
+![Nines telemetry, reviewed rule delivery and standalone operator architecture](brand/nines-architecture.svg)
+
 Nines is a Go server with a React/shadcn/ui frontend embedded in the executable. PostgreSQL stores normal deployment data. The explicit demo uses isolated memory stores and synthetic data. Deploy one collecting server process for the MVP; distributed collector scheduling is not implemented.
 
 The CLI shares validation, deterministic measurement compilation and recording-rule generation with the server. Offline commands do not start a server or load credentials. Connected operations use a fixed server and tenant, with exact revisions or digests for writes. The Go client and stdio MCP adapter use the same HTTP contracts.
@@ -16,7 +18,7 @@ The CLI shares validation, deterministic measurement compilation and recording-r
 | `client`, `skills` | Go API client and bundled agent guidance |
 | `web` | UI source, tests and build configuration |
 | `internal/intentflow`, `internal/investigation`, `reviewskills` | Experimental bounded agent workflows |
-| `internal/operator`, `cmd/operator` | Experimental Kubernetes adapter |
+| `internal/operator`, `cmd/operator` | Standalone Kubernetes controller and GitOps adapter |
 
 Each tenant selects an independently bound store, source map and rule destination. User input does not select database schemas, arbitrary provider URLs, credentials or Mimir organizations. Projects are metadata within a tenant, not independent security boundaries. Models cannot change the deterministic arithmetic.
 

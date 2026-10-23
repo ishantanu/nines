@@ -98,7 +98,7 @@ func PrometheusRule(d model.SLODefinition, tenant, namespace, ownerUID string, l
 		r.Metadata.Labels[key] = v
 	}
 	if ownerUID != "" {
-		r.Metadata.OwnerReferences = []k.OwnerReference{{APIVersion: domain.APIVersion, Kind: domain.SLOKind, Name: d.Metadata.Name, UID: ownerUID, Controller: true}}
+		r.Metadata.OwnerReferences = []k.OwnerReference{{APIVersion: domain.APIVersion, Kind: domain.SLOKind, Name: d.Metadata.Name, UID: ownerUID, Controller: true, BlockOwnerDeletion: func() *bool { value := true; return &value }()}}
 	}
 	return r, nil
 }

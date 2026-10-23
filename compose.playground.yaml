@@ -42,15 +42,6 @@ services:
       - prometheus:/prometheus
     ports:
       - "127.0.0.1:${NINES_PLAYGROUND_PROMETHEUS_PORT:-19090}:9090"
-  rule-reloader:
-    image: python:3.13.7-alpine
-    command: [python, -u, /app/reloader.py]
-    depends_on:
-      prometheus:
-        condition: service_started
-    volumes:
-      - ./deploy/playground/reloader.py:/app/reloader.py:ro
-      - rules:/rules:ro
   nines:
     build: .
     depends_on:
