@@ -83,3 +83,5 @@ CREATE TABLE IF NOT EXISTS slo_revision_archives (
  document jsonb NOT NULL,
  PRIMARY KEY(slo_id, revision)
 );
+
+ALTER TABLE slos ADD COLUMN IF NOT EXISTS rule_automation jsonb;

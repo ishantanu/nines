@@ -74,7 +74,14 @@ func (c *Client) RuleOutput(ctx context.Context, identity model.RuleOutputIdenti
 		return stage("unknown", "rule_output_ambiguous", "Multiple outputs match this definition identity.", "Check duplicate rule owners, extra label dimensions and query aggregation before relying on this evidence.")
 	}
 	age := now.Sub(observed)
-	if age < -5*time.Second || age > max(3*time.Duration(identity.StepSeconds)*time.Second, time.Minute) {
+	freshness := max(3*time.Duration(identity.StepSeconds)*time.Second, time.Minute)
+	// Mimir delays ruler evaluation by one minute by default. Keep the normal
+	// evaluation/ingestion allowance in addition to that deliberate offset.
+	// Nonstandard longer delays remain stale rather than claiming freshness.
+	if c.orgID != "" {
+		freshness += time.Minute
+	}
+	if age < -5*time.Second || age > freshness {
 		return stage("stale", "rule_output_stale", "The matching configuration marker is not recent.", "Check evaluation, ingestion delay and clock synchronization. Instant-query success does not make an old stored sample current.")
 	}
 	out := stage("verified", "rule_output_verified", "A fresh marker for this definition and revision is visible through the configured query source.", "Verify SLI traffic coverage and alert delivery separately. This marker verifies output visibility, not physical dataset topology or business semantics.")

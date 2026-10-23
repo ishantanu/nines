@@ -8,6 +8,7 @@ tenants:
       kind: prometheus
       url: http://prometheus:9090
       rules:
+        autoDeploy: true
         namespace: playground
         directory: /rules
         reload: true

@@ -36,6 +36,7 @@ func (a *Server) access(w http.ResponseWriter, r *http.Request) {
 		{"testConnection", "Test a configured data source", "POST", "/api/connections/primary/test"},
 		{"planRules", "Preview recording-rule destination", "POST", "/api/slos/example/rules/plan"},
 		{"deployRules", "Deploy recording and alerting rules", "POST", "/api/slos/example/rules/apply"},
+		{"ruleAutomation", "Pause or resume automatic rule deployment", "POST", "/api/slos/example/rules/automation"},
 	} {
 		grants := map[string]bool{}
 		for _, role := range []string{"owner", "editor", "agent", "viewer"} {

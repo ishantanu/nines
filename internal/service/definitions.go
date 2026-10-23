@@ -55,6 +55,11 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	if err := s.validateBindingReference(ctx, d.SLO.SLO()); err != nil {
 		return p, err
 	}
+	if s.RuleManager != nil {
+		if target, ok := s.RuleManager.TargetFor(d.SLO.SLO()); ok && target.AutoDeploy {
+			p.Warnings = append(p.Warnings, "Saving this definition queues automatic recording and alert rule deployment under the data source policy. Activation and runtime evaluation are reported separately.")
+		}
+	}
 	old, err := s.Store.Read(ctx, d.SLO.Metadata.Name)
 	if errors.Is(err, model.ErrNotFound) {
 		return p, nil
@@ -68,7 +73,7 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	if model.DefinitionDigest(manifest) != p.Digest {
 		p.MeasurementChanged = MeasurementDigest(old.SLO) != MeasurementDigest(d.SLO.SLO())
 		if p.MeasurementChanged {
-			p.Warnings = []string{"This edit changes the measurement. The previous definition and retained evidence will be archived; active samples, coverage and measurement health start fresh. Review and redeploy rules separately. Operator destination changes still require withdrawal from the original route."}
+			p.Warnings = append(p.Warnings, "This edit changes the measurement. The previous definition and retained evidence will be archived; active samples, coverage and measurement health start fresh. Review the rule destination and its automatic or manual delivery policy. Operator destination changes still require withdrawal from the original route.")
 		}
 		p.Action = "update"
 		return p, nil

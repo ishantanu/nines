@@ -49,7 +49,7 @@ docker compose -p nines-playground -f compose.playground.yaml up --build -d
 docker compose -p nines-playground -f compose.playground.yaml run --rm verify
 ```
 
-Open [localhost:18080](http://127.0.0.1:18080) and sign in as `admin` with password `admin`. API-token access remains available with the local-only token `nines-local-playground-owner-token`. The **Playground Prometheus** workspace uses synthetic checkout metrics. Mimir is available through an [optional profile](docs/public/deployment/playground.md#optional-mimir-profile). The SLO detail shows separate saved, collected, deployed and evaluating states. Definitions are created automatically; rule deployment remains explicit. The verifier deploys reviewed rules, exercises users/data sources/RBAC, and checks critical/warning alert firing and recovery in Prometheus. See the [playground guide](docs/public/deployment/playground.md) for the complete flow and automated burn-alert/recovery test.
+Open [localhost:18080](http://127.0.0.1:18080) and sign in as `admin` with password `admin`. API-token access remains available with the local-only token `nines-local-playground-owner-token`. The **Playground Prometheus** workspace uses synthetic checkout metrics. Mimir is available through an [optional profile](docs/public/deployment/playground.md#optional-mimir-profile). The SLO detail shows separate saved, collected, deployed and evaluating states. Definitions and their rules are reconciled automatically in the playground. The verifier checks automatic deployment, exercises users/data sources/RBAC, and checks critical/warning alert firing and recovery in Prometheus. See the [playground guide](docs/public/deployment/playground.md) for the complete flow and automated burn-alert/recovery test.
 
 ## Use the CLI without a server
 
@@ -110,6 +110,7 @@ See [site setup](docs/public/site.md) for GitHub Pages configuration and local p
 - [Deployment guides](docs/public/deployment.md)
 - [Kubernetes operator and GitOps deployment](docs/public/deployment/operator.md)
 - [Measurement definitions and guided SLO creation](docs/public/measurements.md)
+- [Automatic rule deployment](docs/public/deployment/automatic-rules.md)
 - [Configuration and tenant boundaries](docs/public/configuration.md)
 - [Calculation and operational limits](docs/public/operations.md)
 - [CLI, authentication and deterministic skills](docs/cli.md)
@@ -144,6 +145,6 @@ Nines takes inspiration from [Sloth](https://github.com/slok/sloth) for SLOs as 
 
 [Apache-2.0](LICENSE). Third-party software retains its own terms; see [NOTICE](NOTICE) and [dependency notices](THIRD_PARTY_NOTICES.md).
 
-Rule activation is explicit: standalone Prometheus supports opt-in native reload after reviewed apply; Mimir activates through its ruler; Kubernetes uses the Nines operator. File persistence, runtime evaluation and recorded output have separate status evidence. See [backend activation](docs/public/deployment/metrics-and-rules.md#automatic-backend-activation).
+Rule delivery follows the owner-configured source policy: automatic reconciliation after SLO saves, or a separate reviewed apply. Standalone Prometheus uses a shared rule directory and native reload; Mimir activates through its ruler; Kubernetes uses the Nines operator. File persistence, runtime evaluation and recorded output have separate status evidence. See [backend activation](docs/public/deployment/metrics-and-rules.md#automatic-backend-activation).
 
 Portal SLOs can also deploy through the Kubernetes operator: configure an operator destination, review its resource plan and apply from the Rules tab or CLI. The operator reconciles provider rules and returns revision-scoped evidence. See [portal-to-operator setup](docs/public/deployment/operator.md#publish-portal-slos-through-the-operator).

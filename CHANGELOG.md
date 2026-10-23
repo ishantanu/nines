@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Automatically reconcile saved SLO recording and alert rules through owner-enabled Prometheus, Mimir or operator destinations, with persistent retry/pause controls and separate runtime evidence. The playground enables this flow without manual rule apply.
+
 - SLOs now own structured measurements directly. Portal authoring, intent review, offline rule generation, connected telemetry verification and Kubernetes reconciliation work without creating a separate measurement binding. Measurement edits follow the SLO revision and review lifecycle.
 
 - Allow same-name SLO measurement edits with atomic revision archives, fresh active coverage, explicit review warnings and revision-isolated Prometheus/Mimir recording rules.

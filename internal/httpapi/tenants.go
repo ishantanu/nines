@@ -189,6 +189,7 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 			workspace.Anonymous = false
 		}
 		services[workspace.Service] = true
+		workspace.Service.RuleManager = workspace.Rules
 		workspace.Service.TenantID = workspace.ID
 		workspace.Service.TenantName = workspace.Name
 		mounted[workspace.ID] = mountedTenant{workspace, newSingle(workspace.Service, log, workspace.Workflows, workspace)}

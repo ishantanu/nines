@@ -331,3 +331,24 @@ func TestPortalPublisherAcceptsSameNameMeasurementEdit(t *testing.T) {
 		}
 	}
 }
+
+func TestAutomaticPolicyToggleDoesNotChangePinnedOperatorRoute(t *testing.T) {
+	p, m, _, s := publisherFixture(t)
+	ctx := context.Background()
+	plan, e := m.PlanContext(ctx, s)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = m.Deploy(ctx, s, plan.Digest); e != nil {
+		t.Fatal(e)
+	}
+	target := m.Targets["primary"]
+	target.AutoDeploy = true
+	m.Targets["primary"] = target
+	if e = p.CheckRoute(ctx, s, target); e != nil {
+		t.Fatal("automation toggle transferred route identity", e)
+	}
+	if _, e = m.PlanContext(ctx, s); e != nil {
+		t.Fatal(e)
+	}
+}

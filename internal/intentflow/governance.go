@@ -159,7 +159,7 @@ func recommendation(r *record, c v1.IntentChangeSet) *v1.IntentRecommendation {
 		MeasurementDigest: p.Compiled.MeasurementDigest, RequestedBy: r.Session.CreatedBy, CompilerVersion: p.Compiled.CompilerVersion, RollbackStatus: "no_definition_change",
 		Summary:     fmt.Sprintf("%s: %g%% good events over %s", goal.Metadata.Name, goal.Spec.Target*100, time.Duration(goal.Spec.WindowSeconds)*time.Second),
 		Basis:       []string{"The target, rolling window and alert policies come from the reviewed user goal; the model does not choose deployment permissions.", "The eligible population and success criteria come from the measurement explicitly confirmed by the reviewer."},
-		Limitations: []string{"The recommendation summarizes the reviewed goal and recorded evidence; it does not guarantee production reliability.", "Metric presence cannot establish business correctness or end-to-end journey success; review the observation point and excluded traffic.", "Applying definitions does not deploy external rules. Rule activation requires a separate reviewed operation.", "Restoring configuration cannot undo consumed error budget or erase historical incidents."},
+		Limitations: []string{"The recommendation summarizes the reviewed goal and recorded evidence; it does not guarantee production reliability.", "Metric presence cannot establish business correctness or end-to-end journey success; review the observation point and excluded traffic.", "Definition application is atomic and performs no provider writes. After commit, rule deployment follows the owner-configured data source policy: automatic reconciliation or explicit reviewed apply.", "Restoring configuration cannot undo consumed error budget or erase historical incidents."},
 		Mode:        "guided", Binding: p.Compiled.Binding, SourceDigest: p.SourceDigest, EvidenceDigest: p.Compiled.Evidence.Fingerprint, ObservedFrom: p.Compiled.Evidence.From, ObservedTo: p.Compiled.Evidence.To,
 		Fields: []v1.IntentFieldChange{},
 	}
@@ -213,7 +213,7 @@ func recommendation(r *record, c v1.IntentChangeSet) *v1.IntentRecommendation {
 			{"totalQuery", "Changing the total-event query changes the eligible population. Previous observations are archived instead of reinterpreted."},
 			{"target", "A higher target leaves a smaller error budget for the same traffic."},
 			{"windowSeconds", "Changing the rolling window changes the evaluation horizon and required coverage."},
-			{"policy", "Alert policy changes require separate reviewed rule deployment to affect an external evaluator."},
+			{"policy", "After an approved save, alert policy changes reach the external evaluator through the source's automatic or manual rule delivery policy."},
 			{"policies", "Each severity and burn window has independent alert behavior; no notification routing is changed."},
 			{"slos", "Journey links describe dependencies; they do not prove end-to-end journey success."},
 			{"steps", "Review the exact journey step and required SLO links."},

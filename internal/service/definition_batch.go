@@ -15,6 +15,8 @@ import (
 // or telemetry provider, and never deploys rules. The SLO and its CUJ link commit
 // together or neither does. expected revisions are checked inside that transaction.
 func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string, commit bool, goal v1.SLOIntent, binding v1.IntentSelection, plans []v1.IntentDefinitionChange, expectedSource string, evidence ...v1.IntentOperationEvidence) (v1.IntentApplyReceipt, error) {
+	s.DefinitionMu.Lock()
+	defer s.DefinitionMu.Unlock()
 	if len(plans) < 1 || len(plans) > 2 {
 		return v1.IntentApplyReceipt{}, model.Invalid("an intent change set requires one SLO and at most one CUJ")
 	}
@@ -29,6 +31,7 @@ func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string,
 			return nil, model.ErrRevisionConflict
 		}
 		scope := New(st, s.Collector)
+		scope.RuleManager = s.RuleManager
 		scope.TenantID = s.TenantID
 		scope.Sources = s.Sources
 		scope.DynamicSource = s.DynamicSource

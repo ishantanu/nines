@@ -204,9 +204,10 @@ type Delivery struct {
 	LastError   string     `json:"lastError,omitempty"`
 }
 type Record struct {
-	OperatorRoute string // Pinned before a reviewed operator publication; not user-authored config.
-	Windows       map[string]WindowObservation
-	Collection    v1alpha1.CollectionHealth
+	RuleAutomation *v1alpha1.RuleAutomationStatus `json:"ruleAutomation,omitempty"`
+	OperatorRoute  string                         // Pinned before a reviewed operator publication; not user-authored config.
+	Windows        map[string]WindowObservation
+	Collection     v1alpha1.CollectionHealth
 
 	SLO    SLO
 	Points map[int64]Point

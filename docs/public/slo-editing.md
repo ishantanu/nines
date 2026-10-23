@@ -8,7 +8,7 @@ An SLO's name is its stable identity for critical user journey links and clients
 2. Edit its structured measurement in **Measurement**, use **Settings** for custom queries, or edit **YAML**. Keep the same `metadata.name`.
 3. Select **Validate and plan**. The plan shows the expected/current revision and the resulting definition.
 4. If the measurement changes, review the reset warning and acknowledge that coverage starts fresh, then select **Apply definition**.
-5. Open **Rules**, review the destination and current rule plan, and apply it separately. Saving a definition does not change an evaluator's running rules.
+5. Check the data source deployment policy. Automatic mode queues the new revision after save; manual mode requires **Rules → Apply reviewed rules**. Check runtime evaluation separately.
 
 The API/CLI uses the same revision checks. A stale editor or client receives a conflict instead of overwriting another change. A matching definition is a no-op and does not create an archive or reset coverage.
 
@@ -45,6 +45,6 @@ An archived-revision read does not query a provider, collect data, apply a defin
 
 Both interval-count and provider-window recording outputs carry `nines_revision`. Interval aggregate and burn-alert selectors pin the revision as well as tenant, source, SLO and operator resource UID. New rules cannot sum recordings produced by a different measurement revision. Historical series remain in Prometheus/Mimir according to the provider's retention.
 
-After a definition edit, existing rule deployment/evaluation evidence is out of date until the new revision is explicitly deployed and verified. Deployment, successful rule evaluation and measured attainment remain distinct states.
+After a definition edit, existing rule deployment/evaluation evidence is out of date until the new revision is deployed and verified. An automatic source queues that deployment after save; a manual source requires reviewed apply. Deployment, successful rule evaluation and measured attainment remain distinct states.
 
 The Kubernetes operator accepts same-name measurement edits and reconciles rules using the new generation (or the portal's explicit configuration revision). Kubernetes/GitOps remains the definition history for standalone operator resources; server-side archives cover portal/server-managed definitions. Resource ownership checks remain enforced. Moving an operator resource between source/destination routes still requires withdrawal/cleanup on the original route before recreation; an edit does not transfer ownership or leave unmanaged rules behind.

@@ -153,15 +153,15 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	core(g, "connections-list", "", "list", "server", "read", "List configured sources", 0, 0)
 	core(g, "connections-test", "", "test [NAME]", "server", "provider-read", "Test a configured source", 0, 1)
 	g = group(r, "rules", "Generate and review recording and burn-rate rules")
-	for _, a := range []string{"generate", "plan", "apply", "withdraw"} {
+	for _, a := range []string{"generate", "plan", "apply", "withdraw", "pause", "resume"} {
 		mode, effect := "server", "read"
 		if a == "generate" {
 			mode, effect = "offline", "local-write"
 		}
-		if a == "apply" || a == "withdraw" {
+		if a == "apply" || a == "withdraw" || a == "pause" || a == "resume" {
 			effect = "deploy"
 		}
-		core(g, "rules-"+a, "", a, mode, effect, map[string]string{"generate": "Generate rules from local YAML", "plan": "Review rule digest and destination dataset", "apply": "Deploy an exact reviewed rule digest", "withdraw": "Withdraw a reviewed operator publication and retain its definition"}[a], 0, 0)
+		core(g, "rules-"+a, "", a, mode, effect, map[string]string{"generate": "Generate rules from local YAML", "plan": "Review rule digest and destination dataset", "apply": "Deploy an exact reviewed rule digest", "pause": "Pause automatic deployment without removing loaded rules", "resume": "Resume automatic deployment of the saved SLO revision", "withdraw": "Withdraw a reviewed operator publication and retain its definition"}[a], 0, 0)
 	}
 	intent := group(r, "intent", "Prepare and review intent-based SLOs")
 	for _, a := range []string{"draft", "plan", "backtest"} {
@@ -240,7 +240,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 }
 func exposeCoreFlags(c *cobra.Command, fs *pflag.FlagSet, a string) {
 	def := "file window step target source short-window long-window burn-rate for min-coverage good-query total-query no-policy"
-	allowed := map[string]string{"init": "out name project service display-name " + strings.ReplaceAll(def, "file ", ""), "validate": def, "plan": def, "apply": def + " expected-revision", "get": "", "export": "out", "describe": "", "context": "expected-revision at limit cursor", "search": "kind query project limit cursor linked-slo", "status": "", "integration": "", "history": "from to range resolution revision", "collect": "from to", "events": "id", "connections-list": "", "connections-test": "", "rules-generate": "out " + def, "rules-plan": "id", "rules-apply": "id expected-digest", "rules-withdraw": "id expected-digest"}[a]
+	allowed := map[string]string{"init": "out name project service display-name " + strings.ReplaceAll(def, "file ", ""), "validate": def, "plan": def, "apply": def + " expected-revision", "get": "", "export": "out", "describe": "", "context": "expected-revision at limit cursor", "search": "kind query project limit cursor linked-slo", "status": "", "integration": "", "history": "from to range resolution revision", "collect": "from to", "events": "id", "connections-list": "", "connections-test": "", "rules-generate": "out " + def, "rules-plan": "id", "rules-apply": "id expected-digest", "rules-pause": "id expected-revision", "rules-resume": "id expected-revision", "rules-withdraw": "id expected-digest"}[a]
 	for _, name := range strings.Fields(allowed) {
 		c.Flags().AddFlag(fs.Lookup(name))
 	}

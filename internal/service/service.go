@@ -11,6 +11,7 @@ import (
 	"github.com/ishantanu/nines/internal/engine"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/observability"
+	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/store"
 )
 
@@ -25,6 +26,7 @@ type MetricSource struct {
 }
 
 type Service struct {
+	RuleManager   *rules.Manager
 	DynamicSource func(string) (MetricSource, bool)
 	IntentDrafter IntentDrafter
 	DefinitionMu  sync.Mutex

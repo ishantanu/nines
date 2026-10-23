@@ -2,7 +2,7 @@
 
 The Kubernetes operator is a first-class Nines deployment mode for GitOps-managed SLOs and critical user journeys. It reconciles shared `nines.dev/v1alpha1` definitions into Prometheus Operator `PrometheusRule` resources or a pinned Mimir ruler namespace. It uses the same deterministic compiler, validation, recording windows, configuration markers and severity policies as the CLI and server. No Nines server, PostgreSQL or LLM is required.
 
-Choose the operator when Kubernetes and Git are your configuration source of truth. Choose the [server deployment](kubernetes.md) when you need the portal, database history, tenant users and interactive review workflows. Standalone GitOps resources are not imported into the portal. For portal-owned SLOs, the reviewed publishing bridge below connects the server to this operator. Kubernetes ServiceAccounts/RBAC and the configured namespace/tenant boundary authorize reconciliation; portal publication additionally requires the server owner role and an exact reviewed deployment digest. Both modes are part of the alpha release; neither declares stable API compatibility or production-scale certification.
+Choose the operator when Kubernetes and Git are your configuration source of truth. Choose the [server deployment](kubernetes.md) when you need the portal, database history, tenant users and interactive review workflows. Standalone GitOps resources are not imported into the portal. For portal-owned SLOs, the reviewed publishing bridge below connects the server to this operator. Kubernetes ServiceAccounts/RBAC and the configured namespace/tenant boundary authorize reconciliation; manual portal publication additionally requires the server owner role and an exact reviewed deployment digest. Owners can instead enable `rules.autoDeploy: true` so approved saved definitions publish automatically under the data source policy; agent approval restrictions remain unchanged. Both modes are part of the alpha release; neither declares stable API compatibility or production-scale certification.
 
 ## Render rules without running a controller
 
@@ -109,7 +109,7 @@ kubectl -n nines rollout status deployment/nines
 
 The server service account can get/create/update/delete SLO CRs only in the configured target namespace. It cannot write `PrometheusRule`, read provider Secrets or update operator status. The normal server deployment keeps service-account token mounting disabled; the optional patch enables its mounted token and verified Kubernetes CA for this bridge. The operator retains its separate service account, provider credentials and lease. These examples grant no cluster-wide runtime access.
 
-In the portal, create or edit an SLO using that source, open **Rules**, review the namespace, publisher, Kubernetes YAML and generated rule preview, then choose **Apply reviewed rules**. Saving an SLO or accepting an intent change set does not publish it. The CLI uses the same endpoints:
+With `rules.autoDeploy: true`, saving an SLO or applying an approved intent change set queues publication automatically. In manual mode, create or edit an SLO using that source, open **Rules**, review the namespace, publisher, Kubernetes YAML and generated rule preview, then choose **Apply reviewed rules**. The CLI uses the same manual endpoints:
 
 ```sh
 nines rules plan --context commerce --id checkout-availability --agent

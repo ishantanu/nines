@@ -125,3 +125,14 @@ nines telemetry verify -f examples/request-success.slo.yaml --context production
 ```
 
 It returns the SLO manifest and digests with recent source metadata/series evidence; it creates no binding or SLO and deploys no rules. Use `plan` and the existing revision-fenced `apply` afterward. MCP `verify_slo_measurement` and Go `CompileMeasurement` use the same endpoint. For an inline intent conversation, confirmation YAML uses `measurementDigest`, `intentDigest`, `expectedVersion` and `confirm: true`, with no `binding`. Only owner/editor roles can confirm. See [measurements](public/measurements.md).
+
+## Automatic rule deployment controls
+
+For an owner-configured automatic source, saved SLO revisions reconcile without `rules apply`. The playground enables this by default; other deployments opt in with `rules.autoDeploy: true`. `integration` includes durable automation progress and failure evidence. Owners can pause/resume one SLO using an exact revision:
+
+```sh
+nines rules pause --id checkout-success --expected-revision 2 --agent
+nines rules resume --id checkout-success --expected-revision 2 --agent
+```
+
+Pause retains loaded rules and survives PostgreSQL-backed restarts and SLO edits. Resume queues the current saved definition. These owner controls neither edit nor approve an SLO. See [automatic rule delivery](public/deployment/automatic-rules.md).

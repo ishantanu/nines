@@ -45,3 +45,7 @@ Mimir organization IDs must already be authorized by the tenant's trusted YAML s
 YAML-configured sources remain read-only through HTTP. Managed identity edits/deletions are refused while referenced by SLOs or measurement bindings. Credential rotation is allowed without changing dataset identity. Run one collecting server; this registry does not implement cross-replica configuration invalidation. Keep the host/org policy and encryption key available across restarts; changing them can prevent persisted connections from loading.
 
 Changing or deleting a connection does not retire previously deployed external rule groups. Before moving an SLO to another connection, retire its old rules using the configured backend and verify they are no longer evaluating. Connection deletion is blocked while an SLO or measurement binding still references it.
+
+## Automatic rule delivery
+
+`rules.autoDeploy: true` is an owner opt-in per static or managed source. Direct Prometheus sources additionally require `rules.reload: true`, a writable/shared `rules.directory`, a matching Prometheus `rule_files` mount and lifecycle enablement. Mimir uses its pinned ruler URL/namespace/organization. Portal operator mode can publish automatically too. The managed source API accepts `autoDeploy`; the portal exposes the same setting. Existing non-playground sources default to manual. Read [automatic rules](deployment/automatic-rules.md) for retries, pause/resume, status and deployment limits.

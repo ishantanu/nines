@@ -108,7 +108,7 @@ This target rejects skipped required database tests. Memory-backed contract resu
 
 Known configured model keys are rejected if echoed into drafting responses, tool calls or conversation inputs. This is a narrow guard, not general secret detection or anonymization of arbitrary user text. Provider error codes are allowlisted; raw provider errors do not enter the public transcript.
 
-Atomic transaction failure rolls back that transaction. Existing definitions can be restored through an explicit, separately approved configuration rollback, with current revision/digest checks and an immutable transaction receipt. Newly created resources have no previous definition and show a blocked rollback; resource retirement is separate and not implemented. External rules require their own reviewed deployment. There is no automatic error-budget-triggered rollback, and restoring configuration cannot undo consumed error budget. See [recommendation review, audit and rollback](intent-governance.md).
+Atomic transaction failure rolls back that transaction. Existing definitions can be restored through an explicit, separately approved configuration rollback, with current revision/digest checks and an immutable transaction receipt. Newly created resources have no previous definition and show a blocked rollback; resource retirement is separate and not implemented. External rules follow the owner-configured automatic or manual source policy after the restored definition commits. There is no automatic error-budget-triggered rollback, and restoring configuration cannot undo consumed error budget. See [recommendation review, audit and rollback](intent-governance.md).
 
 ## Reports and interpretation
 

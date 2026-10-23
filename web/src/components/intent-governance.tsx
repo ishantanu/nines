@@ -561,8 +561,8 @@ export function IntentRollbackPanel({
                     onChange={(e) => setAck(e.target.checked)}
                   />
                   <span>
-                    I reviewed the restore diff and understand that external
-                    rule deployment is separate.
+                    I reviewed the restore diff and the data source rule
+                    delivery policy.
                   </span>
                 </Label>
               )}
@@ -626,8 +626,9 @@ export function IntentRollbackPanel({
                 </p>
               ))}
               <p className="text-muted-foreground">
-                Review and deploy the restored SLO rules to update the external
-                evaluator. Recollect coverage for the restored configuration.
+                Check rule deployment under the data source policy: automatic
+                reconciliation when enabled, otherwise reviewed apply. Recollect
+                coverage for the restored configuration.
               </p>
             </div>
           ) : null}

@@ -16,7 +16,7 @@ interface Connection {
   endpoint: string;
   mimirOrgID?: string;
   version?: number;
-  rules?: { rulerURL?: string; reload?: boolean };
+  rules?: { rulerURL?: string; reload?: boolean; autoDeploy?: boolean };
 }
 interface Draft {
   name: string;
@@ -26,6 +26,7 @@ interface Draft {
   bearerToken: string;
   clearCredentials: boolean;
   rulesEnabled: boolean;
+  autoDeploy: boolean;
   reload: boolean;
   rulerURL: string;
   expectedVersion: number;
@@ -55,6 +56,7 @@ export function DataSourceForm({
       bearerToken: "",
       clearCredentials: false,
       rulesEnabled: !!connection?.rules,
+      autoDeploy: connection?.rules?.autoDeploy ?? false,
       reload: connection?.rules?.reload ?? false,
       rulerURL: connection?.rules?.rulerURL ?? "",
       expectedVersion: connection?.version ?? 0,
@@ -166,7 +168,7 @@ export function DataSourceForm({
                     kind: e.target.value,
                     mimirOrgID: "",
                     rulerURL: "",
-                    reload: false,
+                    reload: e.target.value === "prometheus" && draft.autoDeploy,
                   })
                 }
               >
@@ -234,23 +236,51 @@ export function DataSourceForm({
                     setDraft({
                       ...draft,
                       rulesEnabled: e.target.checked,
-                      reload: e.target.checked && draft.reload,
+                      autoDeploy: e.target.checked,
+                      reload: e.target.checked && draft.kind === "prometheus",
                     })
                   }
                 />
                 Enable recording and alert rule deployment
               </Label>
+              {draft.rulesEnabled ? (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={draft.autoDeploy}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          autoDeploy: e.target.checked,
+                          reload:
+                            draft.kind === "prometheus" &&
+                            (e.target.checked || draft.reload),
+                        })
+                      }
+                    />
+                    Deploy rules automatically after SLO saves
+                  </Label>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    Enables reconciliation for existing and future SLOs using
+                    this source, including approved intent changes and
+                    rollbacks. A model cannot approve an SLO. Owners can pause
+                    individual SLOs; runtime failures remain visible.
+                  </p>
+                </div>
+              ) : null}
               {draft.rulesEnabled && draft.kind === "prometheus" ? (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={draft.reload}
+                      disabled={draft.autoDeploy}
                       onChange={(e) =>
                         setDraft({ ...draft, reload: e.target.checked })
                       }
                     />
-                    Reload Prometheus after reviewed rule apply
+                    Reload Prometheus after rule deployment
                   </Label>
                   <p className="text-xs leading-5 text-muted-foreground">
                     Requires a shared rule_files mount and
@@ -279,8 +309,9 @@ export function DataSourceForm({
               <p className="text-xs text-muted-foreground">
                 Prometheus uses the server's managed rule directory; Mimir uses
                 its pinned organization. Rule namespaces are assigned by the
-                server. Save the source, test it, then review SLO definitions
-                and rule deployment separately.
+                server. Review SLO definitions before saving. With automatic
+                deployment enabled, saved revisions reconcile without a separate
+                rule apply.
               </p>
               {error ? (
                 <p role="alert" className="text-sm text-destructive">

@@ -30,7 +30,7 @@ The API's optional `reason` field preserves older approval clients. The portal r
 
 Permissions come from the authenticated server role. CLI `--agent` selects deterministic machine output; it does not downgrade an owner credential. Give automated assistants the server's `agent` role rather than an owner/editor credential.
 
-Applying definitions does not deploy external recording or alert rules. Review and apply the destination separately in the SLO's **Rules** tab or with the rules CLI. A stored definition or receipt does not prove rule evaluation, SLO attainment or notification delivery.
+Definition application performs no provider writes inside its transaction. After commit, an owner-configured automatic data source reconciles its recording/alert rules in the background, including after reviewed rollback. A manual data source still requires separate reviewed apply in **Rules** or the CLI. This policy does not authorize the agent to confirm or approve changes. See [automatic rule deployment](deployment/automatic-rules.md). A stored definition or receipt does not prove rule evaluation, SLO attainment or notification delivery.
 
 ## Audit records
 
@@ -53,7 +53,7 @@ Rollback restores existing SLO/CUJ definitions as **new revisions**. It checks t
 Limits are explicit:
 
 - **New resources:** creation has no previous definition. A rollback containing a newly created resource is blocked as a whole, with an explanation. It does not delete the SLO or partially unlink its journey. Resource retirement/deletion is not implemented by this feature.
-- **External rules:** rollback restores Nines definitions only. Existing Prometheus/Mimir rules continue until a separate reviewed deployment updates them. Their integration status can show an out-of-date definition until then.
+- **External rules:** rollback restores Nines definitions only. Existing Prometheus/Mimir rules continue until deployment updates them: automatic sources queue the restored revision after commit; manual sources require separate reviewed apply. Their integration status can show an out-of-date definition until then.
 - **Measurements:** a restored definition follows normal revision-scoped measurement behavior. Fresh collection/coverage is required; cached observations are not reinterpreted as evidence for a different revision.
 - **Error budgets:** restoring configuration cannot undo consumed budget, restore lost requests or erase an incident. There is no automatic rollback triggered by budget burn.
 - **Intervening edits:** a conflict requires investigation and a new deliberate configuration change. Rollback does not rebase over another engineer's work.

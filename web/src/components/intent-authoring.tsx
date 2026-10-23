@@ -477,7 +477,8 @@ export function IntentAuthoring({
             ) : (
               <p className="text-xs text-muted-foreground">
                 No alert policy will be added. Recording and alert rules are
-                deployed through the separate rule review.
+                deployed according to the data source policy after the SLO is
+                saved.
               </p>
             )}
             <div className="space-y-2 border-t pt-4">

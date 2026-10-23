@@ -23,6 +23,7 @@ import (
 )
 
 type Target struct {
+	AutoDeploy    bool   `json:"autoDeploy,omitempty"`
 	Publisher     string `json:"publisher,omitempty"`
 	ProviderKind  string `json:"providerKind,omitempty"`
 	Reload        bool   `json:"reload,omitempty"`
@@ -427,4 +428,13 @@ func (m *Manager) Withdraw(ctx context.Context, s model.SLO, expected string) (D
 		return Deployment{}, err
 	}
 	return external.Withdraw(ctx, s, plan)
+}
+
+// TargetFor returns the trusted connection configuration, never a user URL.
+func (m *Manager) TargetFor(s model.SLO) (Target, bool) { return m.target(ConnectionID(s)) }
+
+// RouteDigest pins provider identity/ownership independently of automation policy.
+func RouteDigest(target Target) string {
+	target.AutoDeploy = false
+	return model.DefinitionDigest(target)
 }

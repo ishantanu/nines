@@ -8,6 +8,7 @@ tenants:
       kind: prometheus
       url: http://prometheus:9090
       rules:
+        autoDeploy: true
         namespace: playground
         directory: /rules
         reload: true
@@ -21,5 +22,6 @@ tenants:
       url: http://mimir:9009/prometheus
       mimirOrgID: playground
       rules:
+        autoDeploy: true
         namespace: playground
         rulerURL: http://mimir:9009/prometheus

@@ -108,3 +108,43 @@ func TestManagedPrometheusReloadPersistsAndRequiresRules(t *testing.T) {
 		}
 	}
 }
+
+func TestAutomaticSourcePolicyPersistsAndCanBeDisabledWhileReferenced(t *testing.T) {
+	ctx := context.Background()
+	repo := identity.NewMemory()
+	st := store.NewMemory()
+	directory := t.TempDir()
+	create := func() *Registry {
+		r, e := New(ctx, repo, "alpha", nil, map[string]bool{"metrics.test": true}, map[string]bool{"alpha-org": true}, "", directory, st)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return r
+	}
+	r := create()
+	in := Input{Name: "prod", Kind: "prometheus", URL: "https://metrics.test", RulesEnabled: true, Reload: true, AutoDeploy: true}
+	if _, e := r.Save(ctx, in); e != nil {
+		t.Fatal(e)
+	}
+	target, ok := create().Target("prod")
+	if !ok || !target.AutoDeploy || !target.Reload {
+		t.Fatal(target)
+	}
+	if e := st.Create(ctx, model.SLO{ID: "api", Source: "prod"}); e != nil {
+		t.Fatal(e)
+	}
+	in.AutoDeploy = false
+	in.ExpectedVersion = 1
+	if _, e := r.Save(ctx, in); e != nil {
+		t.Fatal("could not disable automation on active source", e)
+	}
+	target, _ = r.Target("prod")
+	if target.AutoDeploy {
+		t.Fatal("automation remained enabled")
+	}
+	for _, bad := range []Input{{Name: "missing-reload", Kind: "prometheus", URL: in.URL, RulesEnabled: true, AutoDeploy: true}, {Name: "missing-rules", Kind: "mimir", URL: in.URL, MimirOrgID: "alpha-org", AutoDeploy: true}} {
+		if _, e := r.Save(ctx, bad); e == nil {
+			t.Fatal("invalid automation accepted", bad)
+		}
+	}
+}
