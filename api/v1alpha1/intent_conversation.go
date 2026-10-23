@@ -58,10 +58,11 @@ type IntentFlowRun struct {
 	ErrorCode       string               `json:"errorCode,omitempty"`
 }
 type IntentBindingConfirmation struct {
-	IntentDigest string             `json:"intentDigest"`
-	Binding      IntentSelection    `json:"binding"`
-	Actor        InvestigationActor `json:"actor"`
-	At           time.Time          `json:"at"`
+	MeasurementDigest string             `json:"measurementDigest,omitempty"`
+	IntentDigest      string             `json:"intentDigest"`
+	Binding           IntentSelection    `json:"binding"`
+	Actor             InvestigationActor `json:"actor"`
+	At                time.Time          `json:"at"`
 }
 type IntentConversationSummary struct {
 	ID        string               `json:"id"`
@@ -73,10 +74,11 @@ type IntentConversationSummary struct {
 	Scope     IntentAuthoringScope `json:"scope"`
 }
 type IntentConversation struct {
-	ChangeSetHistory []IntentChangeSet `json:"changeSetHistory,omitempty"`
-	ChangeSet        *IntentChangeSet  `json:"changeSet,omitempty"`
-	APIVersion       string            `json:"apiVersion"`
-	Tenant           string            `json:"tenant"`
+	Audit            []IntentAuditEvent `json:"audit,omitempty"`
+	ChangeSetHistory []IntentChangeSet  `json:"changeSetHistory,omitempty"`
+	ChangeSet        *IntentChangeSet   `json:"changeSet,omitempty"`
+	APIVersion       string             `json:"apiVersion"`
+	Tenant           string             `json:"tenant"`
 	IntentConversationSummary
 	CreatedBy InvestigationActor          `json:"createdBy"`
 	Messages  []IntentConversationMessage `json:"messages"`
@@ -100,10 +102,11 @@ type AppendIntentConversation struct {
 	Goal            *SLOIntent `json:"goal,omitempty"`
 }
 type ConfirmIntentBinding struct {
-	ExpectedVersion int64           `json:"expectedVersion"`
-	IntentDigest    string          `json:"intentDigest"`
-	Binding         IntentSelection `json:"binding"`
-	Confirm         bool            `json:"confirm"`
+	MeasurementDigest string          `json:"measurementDigest,omitempty"`
+	ExpectedVersion   int64           `json:"expectedVersion"`
+	IntentDigest      string          `json:"intentDigest"`
+	Binding           IntentSelection `json:"binding"`
+	Confirm           bool            `json:"confirm"`
 }
 type CreateIntentFlowRun struct {
 	ID              string                    `json:"id"`

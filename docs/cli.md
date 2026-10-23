@@ -100,3 +100,28 @@ For the controller image, CRD installation, provider prerequisites and ownership
 See [PromQL validation](public/promql-validation.md) for examples, shared API/operator behavior and the limits of offline checks.
 
 Operator-backed connections use the same `rules plan` and `rules apply` commands. Their plans include Kubernetes resource YAML and ownership/generation preconditions. `rules withdraw --id SLO_ID --expected-digest REVIEWED_DIGEST` removes only an owned operator publication while preserving the portal definition and data. Pending cleanup retains the route pin; refresh/review and repeat withdrawal after cleanup to release it. See [portal publishing](public/deployment/operator.md#publish-portal-slos-through-the-operator).
+
+## Intent decision audit and rollback
+
+`intent conversations audit ID` reads the tenant-scoped decision log and frozen recommendation evidence. `reject ID -f request.yaml` rejects a proposal or withdraws approval with an exact digest, current conversation version, `confirm: true` and a reason.
+
+`rollback-plan`, `rollback-approve`, `rollback-apply` and `rollback-reject` use explicit operational YAML through the same context/authentication contract. Rollback appends configuration revisions, rejects intervening edits and does not deploy external rules. Newly created resources have no previous revision and produce a blocked rollback. `rollback-kubernetes ID --namespace NAME --digest SHA256` exports exact restore definitions for a separate GitOps review.
+
+See [recommendation review, audit and rollback](public/intent-governance.md) for request sequencing, approval notes, permission boundaries and production limitations. Machine output mode does not reduce the privileges of the configured credential; assistants should use the server's agent role.
+
+
+### Archived SLO revisions
+
+Measurement selectors, service, source, sampling interval and binding references can be edited under the same SLO name. `plan` reports `measurementChanged` and reset/deployment warnings. Apply with the current expected revision; old measurement evidence is archived atomically and is not reused by the new measurement. Binding provenance must still match the declared query contract.
+
+`nines history SLO --revision 1 --range 1h --resolution 1m --agent` reads a replaced revision's original definition and retained observations. Omit `--revision` for current history. Inspect definition history through `GET /api/slos/SLO/revisions` and `GET /api/slos/SLO/revisions/1`. See [SLO editing](public/slo-editing.md).
+
+## Verify an SLO-owned measurement
+
+Prefer one self-contained [SLO YAML](../examples/request-success.slo.yaml) with `spec.measurement`. Offline validation and rule generation derive selectors deterministically. Connected telemetry verification is read-only:
+
+```sh
+nines telemetry verify -f examples/request-success.slo.yaml --context production --agent
+```
+
+It returns the SLO manifest and digests with recent source metadata/series evidence; it creates no binding or SLO and deploys no rules. Use `plan` and the existing revision-fenced `apply` afterward. MCP `verify_slo_measurement` and Go `CompileMeasurement` use the same endpoint. For an inline intent conversation, confirmation YAML uses `measurementDigest`, `intentDigest`, `expectedVersion` and `confirm: true`, with no `binding`. Only owner/editor roles can confirm. See [measurements](public/measurements.md).

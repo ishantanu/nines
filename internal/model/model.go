@@ -31,6 +31,7 @@ func Invalid(format string, args ...any) error { return &ValidationError{fmt.Spr
 type Policy = v1alpha1.BurnRatePolicy
 
 type SLO struct {
+	Measurement        *v1alpha1.MeasurementSpec  `json:"measurement,omitempty"`
 	Intent             *v1alpha1.IntentSpec       `json:"intent,omitempty"`
 	ProviderWindow     *v1alpha1.ProviderWindow   `json:"providerWindow,omitempty"`
 	MeasurementBinding *v1alpha1.BindingReference `json:"measurementBinding,omitempty"`
@@ -56,6 +57,11 @@ var identifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 func (s SLO) HasQueries() bool { return s.ProviderWindow != nil || s.GoodQuery != "" }
 func (s SLO) Validate() error {
+	if s.Measurement != nil {
+		if err := ValidateInlineSLO(s); err != nil {
+			return err
+		}
+	}
 	if err := validateSLOIntent(s); err != nil {
 		return err
 	}
@@ -102,7 +108,7 @@ func (s SLO) Validate() error {
 		return Invalid("windowSeconds must be a multiple of stepSeconds, at most 31 days")
 	}
 	if s.WindowSeconds/s.StepSeconds > 100000 {
-		return Invalid("window contains too many intervals (maximum 100000)")
+		return Invalid("window contains %d intervals at stepSeconds=%d (maximum 100000); shorten windowSeconds or increase the measurement interval", s.WindowSeconds/s.StepSeconds, s.StepSeconds)
 	}
 	if (s.GoodQuery == "") != (s.TotalQuery == "") || len(s.GoodQuery) > 16000 || len(s.TotalQuery) > 16000 {
 		return Invalid("provide both goodQuery and totalQuery, each at most 16000 bytes")

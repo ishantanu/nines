@@ -1,9 +1,36 @@
 package v1alpha1
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 const BindingKind = "MeasurementBinding"
 const DependencyMapKind = "ServiceDependencyMap"
+
+// MeasurementSpec is owned and versioned by its SLO. It has no independent
+// resource name, revision or lifecycle.
+type MeasurementSpec struct {
+	Type                  string            `json:"type" yaml:"type"`
+	Metric                string            `json:"metric" yaml:"metric"`
+	Labels                map[string]string `json:"labels" yaml:"labels"`
+	SuccessLabels         map[string]string `json:"successLabels,omitempty" yaml:"successLabels,omitempty"`
+	CountFrom             string            `json:"countFrom,omitempty" yaml:"countFrom,omitempty"`
+	ThresholdSeconds      *float64          `json:"thresholdSeconds,omitempty" yaml:"thresholdSeconds,omitempty"`
+	ScrapeIntervalSeconds int64             `json:"scrapeIntervalSeconds" yaml:"scrapeIntervalSeconds"`
+	ObservationPoint      string            `json:"observationPoint" yaml:"observationPoint"`
+}
+type CompiledMeasurement struct {
+	APIVersion        string                `json:"apiVersion"`
+	Tenant            string                `json:"tenant"`
+	CompilerVersion   string                `json:"compilerVersion"`
+	MeasurementDigest string                `json:"measurementDigest"`
+	Evidence          TelemetryDiscovery    `json:"evidence"`
+	Manifest          ServiceLevelObjective `json:"manifest"`
+	YAML              string                `json:"yaml"`
+	Digest            string                `json:"digest"`
+	Warnings          []string              `json:"warnings"`
+}
 
 type MeasurementBinding struct {
 	APIVersion string      `json:"apiVersion" yaml:"apiVersion"`
@@ -98,16 +125,17 @@ type CompileBindingInput struct {
 	Policy           *BurnRatePolicy  `json:"policy,omitempty"`
 }
 type CompiledBinding struct {
-	Definition      MeasurementBinding    `json:"definition"`
-	APIVersion      string                `json:"apiVersion"`
-	Tenant          string                `json:"tenant"`
-	CompilerVersion string                `json:"compilerVersion"`
-	Binding         BindingReference      `json:"binding"`
-	Evidence        TelemetryDiscovery    `json:"evidence"`
-	Manifest        ServiceLevelObjective `json:"manifest"`
-	YAML            string                `json:"yaml"`
-	Digest          string                `json:"digest"`
-	Warnings        []string              `json:"warnings"`
+	MeasurementDigest string                `json:"measurementDigest,omitempty"`
+	Definition        MeasurementBinding    `json:"definition"`
+	APIVersion        string                `json:"apiVersion"`
+	Tenant            string                `json:"tenant"`
+	CompilerVersion   string                `json:"compilerVersion"`
+	Binding           BindingReference      `json:"binding"`
+	Evidence          TelemetryDiscovery    `json:"evidence"`
+	Manifest          ServiceLevelObjective `json:"manifest"`
+	YAML              string                `json:"yaml"`
+	Digest            string                `json:"digest"`
+	Warnings          []string              `json:"warnings"`
 }
 type TopologyResource struct {
 	Kind        string    `json:"kind"`
@@ -181,6 +209,7 @@ type DependencyView struct {
 
 // BindingHealth verifies the measurement contract, not observed reliability.
 type BindingHealth struct {
+	MeasurementDigest string           `json:"measurementDigest,omitempty"`
 	SourceDigest      string           `json:"sourceDigest"`
 	SLORevision       int64            `json:"sloRevision,omitempty"`
 	APIVersion        string           `json:"apiVersion"`
@@ -192,4 +221,28 @@ type BindingHealth struct {
 	CheckedAt         time.Time        `json:"checkedAt"`
 	Fingerprint       string           `json:"fingerprint,omitempty"`
 	EvaluationBlocked bool             `json:"evaluationBlocked"`
+}
+
+// MarshalJSON keeps the legacy response unchanged and omits inapplicable shared
+// binding fields for a measurement owned by an SLO.
+func (c CompiledBinding) MarshalJSON() ([]byte, error) {
+	type plain CompiledBinding
+	if c.MeasurementDigest == "" {
+		return json.Marshal(plain(c))
+	}
+	return json.Marshal(struct {
+		*plain
+		Definition *MeasurementBinding `json:"definition,omitempty"`
+		Binding    *BindingReference   `json:"binding,omitempty"`
+	}{plain: (*plain)(&c)})
+}
+func (c BindingHealth) MarshalJSON() ([]byte, error) {
+	type plain BindingHealth
+	if c.MeasurementDigest == "" {
+		return json.Marshal(plain(c))
+	}
+	return json.Marshal(struct {
+		*plain
+		Binding *BindingReference `json:"binding,omitempty"`
+	}{plain: (*plain)(&c)})
 }

@@ -23,6 +23,10 @@ type Store interface {
 
 func clone(r model.Record) model.Record {
 	c := r
+	if r.SLO.Measurement != nil {
+		measured := copyJSON(*r.SLO.Measurement)
+		c.SLO.Measurement = &measured
+	}
 	if r.Collection.Measurement != nil {
 		health := *r.Collection.Measurement
 		c.Collection.Measurement = &health

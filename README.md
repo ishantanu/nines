@@ -61,6 +61,8 @@ bin/nines rules generate --offline -f examples/api-availability.slo.yaml --tenan
 bin/nines capabilities --offline --agent
 ```
 
+Create one SLO with its measurement, target, rolling window and alert policies together. The [guided SLO workflow](docs/public/measurements.md) generates queries from `spec.measurement`; no separate binding resource is needed. See [availability](examples/request-success.slo.yaml) and [latency](examples/request-latency.slo.yaml) YAML examples. Intents and the Kubernetes operator use the same inline contract.
+
 Local validation checks the declared contract. It does not establish that a metric exists or that a measurement captures the intended user outcome. Recording-rule generation emits YAML without deploying it. `-f -` reads stdin; `--out` creates a new file without overwriting one.
 
 ## Run a persistent workspace
@@ -107,11 +109,14 @@ See [site setup](docs/public/site.md) for GitHub Pages configuration and local p
 
 - [Deployment guides](docs/public/deployment.md)
 - [Kubernetes operator and GitOps deployment](docs/public/deployment/operator.md)
+- [Measurement definitions and guided SLO creation](docs/public/measurements.md)
 - [Configuration and tenant boundaries](docs/public/configuration.md)
 - [Calculation and operational limits](docs/public/operations.md)
 - [CLI, authentication and deterministic skills](docs/cli.md)
 - [Architecture and source layout](docs/public/architecture.md)
 - [Testing and release checks](docs/public/testing.md)
+- [Editing SLOs and reading previous revisions](docs/public/slo-editing.md)
+- [Recommendation review, audit and configuration rollback](docs/public/intent-governance.md)
 - [Intent evaluations for hosted and local models](docs/public/intent-evaluations.md)
 - [Contribution guide](CONTRIBUTING.md) and [security reporting](SECURITY.md)
 

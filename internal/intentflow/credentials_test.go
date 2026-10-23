@@ -67,3 +67,44 @@ func TestModelFailureCodesAreUsefulAndNeverEchoArbitraryProviderText(t *testing.
 		}
 	}
 }
+
+type credentialEchoModel struct {
+	*scriptedModel
+	key string
+}
+
+func (m credentialEchoModel) ContainsCredential(data []byte) bool {
+	return strings.Contains(string(data), m.key)
+}
+func TestModelCredentialEchoCannotEnterRecommendationOrAudit(t *testing.T) {
+	s, ctx, _ := fixture(t, false)
+	const key = "private-provider-key-fixture-0123456789"
+	s.Model = credentialEchoModel{key: key, scriptedModel: &scriptedModel{route: "credential-echo", turn: func(context.Context, rm.Request) (rm.Response, error) {
+		return response("ask_user", map[string]string{"question": "Use " + key}), nil
+	}}}
+	session, e := s.Create(ctx, input())
+	if e != nil {
+		t.Fatal(e)
+	}
+	session, e = s.Start(ctx, session.ID, v1.CreateIntentFlowRun{ID: "echo", ExpectedVersion: session.Version, Mode: "model", ModelConsent: true})
+	if e != nil {
+		t.Fatal(e)
+	}
+	work(t, s, ctx, 1)
+	session, e = s.Read(ctx, session.ID)
+	if e != nil || session.Runs[0].ErrorCode != "unsafe_model_response" {
+		t.Fatal(session, e)
+	}
+	raw, _ := json.Marshal(session)
+	if strings.Contains(string(raw), key) {
+		t.Fatal("credential in public conversation")
+	}
+	private, e := s.Repository.Read(ctx, session.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	raw, _ = json.Marshal(private)
+	if strings.Contains(string(raw), key) {
+		t.Fatal("credential persisted in native state")
+	}
+}

@@ -144,9 +144,6 @@ func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, err
 		return status, err
 	}
 	measurement := service.MeasurementDigest(d.SLO.SLO())
-	if status.MeasurementDigest != "" && status.MeasurementDigest != measurement {
-		return status, model.Invalid("measurement identity changed; create a new metadata.name instead of reusing interval history")
-	}
 	status.MeasurementDigest = measurement
 	source := rules.ConnectionID(d.SLO.SLO())
 	target, ok := c.Config.Sources[source]
@@ -171,12 +168,9 @@ func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, err
 		if e != nil {
 			return status, e
 		}
-		existing, inspection := c.API.Get(ctx, "PrometheusRule", rendered.Metadata.Name)
+		_, inspection := c.API.Get(ctx, "PrometheusRule", rendered.Metadata.Name)
 		if inspection != nil && !code(inspection, 404) {
 			return status, inspection
-		}
-		if inspection == nil && owned(existing, r.Metadata.UID) && existing.Metadata.Annotations["nines.dev/measurement-digest"] != measurement {
-			return status, model.Invalid("existing rule measurement differs; create a new SLO identity")
 		}
 		if e = c.API.ApplyOwned(ctx, rendered, r.Metadata.UID); e != nil {
 			return status, e
@@ -267,19 +261,28 @@ func (c *Controller) intent(ctx context.Context, r k.Resource, status k.Status) 
 	if e := model.ValidateIntent(goal); e != nil {
 		return status, e
 	}
-	binding, e := c.API.Get(ctx, v1.BindingKind, spec.MeasurementSelection.Name)
-	if e != nil {
-		return status, fmt.Errorf("selected measurement binding is unavailable")
+	if goal.Spec.Measurement != nil && (spec.MeasurementSelection.Name != "" || spec.MeasurementSelection.ExpectedGeneration != 0) {
+		return status, model.Invalid("inline measurement cannot be combined with a binding selection")
 	}
-	if spec.MeasurementSelection.ExpectedGeneration < 1 || binding.Metadata.Generation != spec.MeasurementSelection.ExpectedGeneration {
-		return status, model.Invalid("select the binding's exact Kubernetes generation")
-	}
-	bd, e := Native(binding)
-	if e != nil {
-		return status, e
-	}
-	if bd.Binding == nil || !model.IntentMatchesBinding(goal, *bd.Binding) {
-		return status, model.Invalid("measurement does not match the exact intent population and semantics")
+	var binding k.Resource
+	var bd model.Definition
+	var e error
+	if goal.Spec.Measurement == nil {
+		binding, e = c.API.Get(ctx, v1.BindingKind, spec.MeasurementSelection.Name)
+		if e != nil {
+			return status, fmt.Errorf("selected measurement binding is unavailable")
+		}
+		if spec.MeasurementSelection.ExpectedGeneration < 1 || binding.Metadata.Generation != spec.MeasurementSelection.ExpectedGeneration {
+			return status, model.Invalid("select the binding's exact Kubernetes generation")
+		}
+		bd, e = Native(binding)
+		if e != nil {
+			return status, e
+		}
+		if bd.Binding == nil || !model.IntentMatchesBinding(goal, *bd.Binding) {
+			return status, model.Invalid("measurement does not match the exact intent population and semantics")
+		}
+
 	}
 	if ref := goal.Spec.Journey; ref != nil {
 		j, e := c.API.Get(ctx, v1.JourneyKind, ref.Name)
@@ -318,10 +321,10 @@ func (c *Controller) intent(ctx context.Context, r k.Resource, status k.Status) 
 	input := model.DefinitionDigest(struct {
 		Version    string
 		Goal       v1.SLOIntent
-		Binding    model.MeasurementBinding
+		Binding    *model.MeasurementBinding
 		Generation int64
 		Route      string
-	}{"operator/1", goal, *bd.Binding, binding.Metadata.Generation, source.Digest()})
+	}{"operator/1", goal, bd.Binding, binding.Metadata.Generation, source.Digest()})
 	child, childErr := c.API.Get(ctx, v1.SLOKind, r.Metadata.Name)
 	if childErr == nil && !owned(child, r.Metadata.UID) {
 		return status, ErrOwnership
@@ -339,14 +342,23 @@ func (c *Controller) intent(ctx context.Context, r k.Resource, status k.Status) 
 		if e != nil {
 			return status, e
 		}
-		manifest, _ := json.Marshal(bd.Binding)
-		// The immutable compiler snapshot exposes the Kubernetes generation as
-		// the binding revision without manufacturing intermediate revisions.
-		st := &bindingSnapshot{Memory: store.NewMemory(), row: model.TopologyRevision{Kind: v1.BindingKind, ID: binding.Metadata.Name, Revision: binding.Metadata.Generation, Manifest: manifest, Digest: model.DefinitionDigest(*bd.Binding)}}
+		var st store.Store = store.NewMemory()
+		if goal.Spec.Measurement == nil {
+			manifest, _ := json.Marshal(bd.Binding)
+			st = &bindingSnapshot{Memory: store.NewMemory(), row: model.TopologyRevision{Kind: v1.BindingKind, ID: binding.Metadata.Name, Revision: binding.Metadata.Generation, Manifest: manifest, Digest: model.DefinitionDigest(*bd.Binding)}}
+		}
 		platform := service.New(st, collector)
 		platform.TenantID = c.Config.Tenant
 		platform.Sources = map[string]service.MetricSource{goal.Spec.Source: {Kind: source.Kind, Collector: collector}}
-		compiled, e := platform.CompileBinding(ctx, binding.Metadata.Name, v1.CompileBindingInput{ExpectedRevision: binding.Metadata.Generation, Name: goal.Metadata.Name, DisplayName: goal.Metadata.Name, Target: goal.Spec.Target, WindowSeconds: goal.Spec.WindowSeconds, Policies: goal.Spec.Policies, Policy: goal.Spec.Policy})
+		var compiled v1.CompiledBinding
+		if goal.Spec.Measurement != nil {
+			manifest := v1.NewSLO(goal.Metadata.Name, goal.Metadata.Project, v1.SLOSpec{Measurement: goal.Spec.Measurement, Intent: &goal.Spec, DisplayName: goal.Metadata.Name, Service: goal.Spec.Service, Source: goal.Spec.Source, Target: goal.Spec.Target, WindowSeconds: goal.Spec.WindowSeconds, StepSeconds: goal.Spec.StepSeconds, Policies: goal.Spec.Policies, Policy: goal.Spec.Policy})
+			inline, err := platform.CompileMeasurement(ctx, manifest)
+			e = err
+			compiled.Manifest = inline.Manifest
+		} else {
+			compiled, e = platform.CompileBinding(ctx, binding.Metadata.Name, v1.CompileBindingInput{ExpectedRevision: binding.Metadata.Generation, Name: goal.Metadata.Name, DisplayName: goal.Metadata.Name, Target: goal.Spec.Target, WindowSeconds: goal.Spec.WindowSeconds, Policies: goal.Spec.Policies, Policy: goal.Spec.Policy})
+		}
 		if e != nil {
 			return status, e
 		}
@@ -354,15 +366,6 @@ func (c *Controller) intent(ctx context.Context, r k.Resource, status k.Status) 
 		definition := model.SLODefinition(compiled.Manifest)
 		if e = definition.Validate(); e != nil {
 			return status, e
-		}
-		if childErr == nil {
-			previous, err := Native(child)
-			if err != nil {
-				return status, err
-			}
-			if previous.SLO == nil || service.MeasurementDigest(previous.SLO.SLO()) != service.MeasurementDigest(definition.SLO()) {
-				return status, model.Invalid("measurement changed; start a new intent and SLO identity")
-			}
 		}
 		desired, e := FromDefinition(model.Definition{SLO: &definition}, c.Config.Namespace)
 		if e != nil {

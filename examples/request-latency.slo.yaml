@@ -1,0 +1,36 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: request-latency
+  project: production
+spec:
+  displayName: API request latency
+  service: api
+  source: primary
+  target: 0.999
+  windowSeconds: 2419200 # Rolling 28 days
+  stepSeconds: 60
+  measurement:
+    type: latency
+    metric: http_request_duration_seconds
+    labels:
+      service: api
+      environment: production
+    thresholdSeconds: 0.3
+    scrapeIntervalSeconds: 15
+    observationPoint: Completed API request duration at the server. Excludes requests never reaching this server.
+  policies:
+    - name: fast-burn
+      severity: critical
+      shortWindowSeconds: 300
+      longWindowSeconds: 3600
+      burnRate: 14.4
+      forSeconds: 120
+      minCoverage: 1
+    - name: sustained-burn
+      severity: warning
+      shortWindowSeconds: 1800
+      longWindowSeconds: 21600
+      burnRate: 6
+      forSeconds: 300
+      minCoverage: 1

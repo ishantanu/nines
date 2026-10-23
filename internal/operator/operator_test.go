@@ -520,7 +520,7 @@ func TestNamespaceLeaseExcludesAnotherControllerAndAllowsExpiry(t *testing.T) {
 	}
 }
 
-func TestMeasurementHistoryCannotBeReinterpretedAndAlertRevisionAdvances(t *testing.T) {
+func TestMeasurementEditsUseNewRuleRevisionAndAlertIdentity(t *testing.T) {
 	c, f := controller(t)
 	ctx := context.Background()
 	r := sloResource(t)
@@ -562,15 +562,26 @@ func TestMeasurementHistoryCannotBeReinterpretedAndAlertRevisionAdvances(t *test
 	spec.GoodQuery = "sum(increase(other_requests_total[1m]))"
 	r.Spec, _ = json.Marshal(spec)
 	r.Metadata.Generation = 3
-	// Even a lost status write cannot allow a different measurement to adopt the
-	// already-created rule's interval history: the rule carries the same fence.
+	// A lost status write still uses the new generation's revision labels.
 	r.Status = nil
 	f.put(r)
-	if e := c.Reconcile(ctx, r); e == nil {
-		t.Fatal("measurement reinterpretation accepted")
+	if e := c.Reconcile(ctx, r); e != nil {
+		t.Fatal("measurement edit failed", e)
 	}
-	if CanonicalDigest(f.get("PrometheusRule", RuleName(r.Metadata.Name)).Spec) != before {
-		t.Fatal("failed measurement change modified rules")
+	updated := f.get("PrometheusRule", RuleName(r.Metadata.Name))
+	if CanonicalDigest(updated.Spec) == before {
+		t.Fatal("measurement rules unchanged")
+	}
+	if e := json.Unmarshal(updated.Spec, &file); e != nil {
+		t.Fatal(e)
+	}
+	for _, generated := range file.Groups[0].Rules {
+		if generated.Labels["nines_revision"] != "3" {
+			t.Fatal("old history reused", generated.Labels)
+		}
+	}
+	if !strings.Contains(string(updated.Spec), "other_requests_total") {
+		t.Fatal("corrected query missing")
 	}
 }
 
@@ -630,5 +641,52 @@ func TestCheckedInCRDsMatchSharedSchema(t *testing.T) {
 	}
 	if !bytes.Equal(got, want.Bytes()) {
 		t.Fatal("checked-in CRDs differ from shared API types; regenerate with nines operator crds --offline")
+	}
+}
+
+func TestInlineIntentOperatorNeedsNoBindingCR(t *testing.T) {
+	c, f := controller(t)
+	telemetry := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data any
+		switch r.URL.Path {
+		case "/api/v1/metadata":
+			data = map[string]any{"http_requests_total": []any{map[string]string{"type": "counter"}}}
+		case "/api/v1/series":
+			data = []map[string]string{{"__name__": "http_requests_total", "service": "api", "status": "200"}, {"__name__": "http_requests_total", "service": "api", "status": "500"}}
+		default:
+			http.NotFound(w, r)
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "data": data})
+	}))
+	defer telemetry.Close()
+	c.Config.Projects = []string{"test"}
+	c.Config.Sources["primary"] = Source{Kind: "prometheus-operator", QueryURL: telemetry.URL}
+	goal := v1.SLOIntent{APIVersion: v1.APIVersion, Kind: v1.IntentKind, Metadata: v1.Metadata{Name: "inline-operator", Project: "test"}, Spec: v1.IntentSpec{Description: "API requests should succeed", Service: "api", Source: "primary", Outcome: "availability", Population: map[string]string{"service": "api"}, Target: .999, WindowSeconds: 3600, StepSeconds: 60, NoDataPolicy: "unknown", Measurement: &v1.MeasurementSpec{Type: "availability", Metric: "http_requests_total", Labels: map[string]string{"service": "api"}, SuccessLabels: map[string]string{"status": "200"}, ScrapeIntervalSeconds: 10, ObservationPoint: "API completions"}}}
+	r, e := FromIntent(goal, c.Config.Namespace, k.MeasurementSelection{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if strings.Contains(string(r.Spec), "measurementSelection") {
+		t.Fatal("emitted a phantom binding", string(r.Spec))
+	}
+	r.Metadata.UID = "inline-intent-uid"
+	r.Metadata.Generation = 1
+	r.Metadata.ResourceVersion = "inline-intent"
+	f.put(r)
+	if e = c.Reconcile(context.Background(), r); e != nil {
+		t.Fatal(e)
+	}
+	child := f.get(v1.SLOKind, r.Metadata.Name)
+	d, e := Native(child)
+	if e != nil || d.SLO.Spec.Measurement == nil || d.SLO.Spec.MeasurementBinding != nil || !owned(child, r.Metadata.UID) {
+		t.Fatal(child, e)
+	}
+	if e = c.Reconcile(context.Background(), child); e != nil {
+		t.Fatal(e)
+	}
+	rule := f.get("PrometheusRule", RuleName(r.Metadata.Name))
+	if !owned(rule, child.Metadata.UID) {
+		t.Fatal("rules not owned by inline SLO", rule)
 	}
 }

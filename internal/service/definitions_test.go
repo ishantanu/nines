@@ -60,9 +60,9 @@ func TestSLODefinitionCreateCASAndConfigurationUpdates(t *testing.T) {
 	if _, err = s.ApplyDefinition(ctx, d, 1); !errors.Is(err, model.ErrRevisionConflict) {
 		t.Fatal("stale config accepted", err)
 	}
-	d.SLO.Spec.StepSeconds = 120
-	if _, err = s.PlanDefinition(ctx, d); err == nil {
-		t.Fatal("measurement changed")
+	d.SLO.Spec.StepSeconds = 30
+	if plan, err := s.PlanDefinition(ctx, d); err != nil || !plan.MeasurementChanged || plan.Action != "update" || len(plan.Warnings) == 0 {
+		t.Fatal("measurement edit cannot be reviewed", plan, err)
 	}
 	rec, err := s.Store.Read(ctx, d.SLO.Metadata.Name)
 	if err != nil || rec.SLO.Target != .95 || rec.SLO.Revision != 2 {

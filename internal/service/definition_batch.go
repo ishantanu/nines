@@ -14,7 +14,7 @@ import (
 // IntentDefinitionBatch validates/applies a frozen proposal, never calls a model
 // or telemetry provider, and never deploys rules. The SLO and its CUJ link commit
 // together or neither does. expected revisions are checked inside that transaction.
-func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string, commit bool, goal v1.SLOIntent, binding v1.IntentSelection, plans []v1.IntentDefinitionChange, expectedSource string) (v1.IntentApplyReceipt, error) {
+func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string, commit bool, goal v1.SLOIntent, binding v1.IntentSelection, plans []v1.IntentDefinitionChange, expectedSource string, evidence ...v1.IntentOperationEvidence) (v1.IntentApplyReceipt, error) {
 	if len(plans) < 1 || len(plans) > 2 {
 		return v1.IntentApplyReceipt{}, model.Invalid("an intent change set requires one SLO and at most one CUJ")
 	}
@@ -31,20 +31,26 @@ func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string,
 		scope := New(st, s.Collector)
 		scope.TenantID = s.TenantID
 		scope.Sources = s.Sources
+		scope.DynamicSource = s.DynamicSource
 		scope.Now = s.Now
-		row, e := scope.ReadTopology(ctx, v1.BindingKind, binding.Name, 0)
-		if e != nil {
-			return nil, e
-		}
-		if row.Revision != binding.ExpectedRevision {
-			return nil, model.ErrRevisionConflict
-		}
-		var measured model.MeasurementBinding
-		if e = json.Unmarshal(row.Manifest, &measured); e != nil {
-			return nil, e
-		}
-		if !model.IntentMatchesBinding(goal, measured) {
-			return nil, model.Invalid("selected measurement no longer matches the intent")
+		var row model.TopologyRevision
+		var e error
+		if goal.Spec.Measurement == nil {
+			row, e = scope.ReadTopology(ctx, v1.BindingKind, binding.Name, 0)
+			if e != nil {
+				return nil, e
+			}
+			if row.Revision != binding.ExpectedRevision {
+				return nil, model.ErrRevisionConflict
+			}
+			var measured model.MeasurementBinding
+			if e = json.Unmarshal(row.Manifest, &measured); e != nil {
+				return nil, e
+			}
+			if !model.IntentMatchesBinding(goal, measured) {
+				return nil, model.Invalid("selected measurement no longer matches the intent")
+			}
+
 		}
 		out := []v1.IntentAppliedResource{}
 		if goal.Spec.Journey != nil && len(plans) != 2 {
@@ -63,7 +69,11 @@ func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string,
 			}
 			if i == 0 {
 				ref := def.SLO.Spec.MeasurementBinding
-				if ref == nil || ref.Name != row.ID || ref.Revision != row.Revision || ref.Digest != row.Digest || def.SLO.Spec.Target != goal.Spec.Target || def.SLO.Spec.WindowSeconds != goal.Spec.WindowSeconds || (model.DefinitionDigest(def.SLO.Spec.Policy) != model.DefinitionDigest(goal.Spec.Policy) || model.DefinitionDigest(def.SLO.Spec.Policies) != model.DefinitionDigest(goal.Spec.Policies)) {
+				bindingInvalid := ref == nil || ref.Name != row.ID || ref.Revision != row.Revision || ref.Digest != row.Digest
+				if goal.Spec.Measurement != nil {
+					bindingInvalid = ref != nil || model.DefinitionDigest(def.SLO.Spec.Measurement) != model.DefinitionDigest(goal.Spec.Measurement) || def.SLO.Spec.StepSeconds != goal.Spec.StepSeconds
+				}
+				if bindingInvalid || def.SLO.Spec.Target != goal.Spec.Target || def.SLO.Spec.WindowSeconds != goal.Spec.WindowSeconds || (model.DefinitionDigest(def.SLO.Spec.Policy) != model.DefinitionDigest(goal.Spec.Policy) || model.DefinitionDigest(def.SLO.Spec.Policies) != model.DefinitionDigest(goal.Spec.Policies)) {
 					return nil, model.Invalid("compiled SLO differs from the reviewed intent or measurement")
 				}
 			}
@@ -81,7 +91,11 @@ func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string,
 			out = append(out, v1.IntentAppliedResource{Kind: def.Kind(), Name: def.Metadata().Name, Revision: applied.Revision, Digest: applied.Digest})
 		}
 		principal, _ := tenancy.FromContext(ctx)
-		return json.Marshal(v1.IntentApplyReceipt{Resources: out, Actor: v1.InvestigationActor{Subject: principal.Subject, Name: principal.Name, Kind: principal.Kind}, At: s.Now().UTC()})
+		receipt := v1.IntentApplyReceipt{Resources: out, Actor: v1.InvestigationActor{Subject: principal.Subject, Name: principal.Name, Kind: principal.Kind}, At: s.Now().UTC()}
+		if len(evidence) > 0 {
+			receipt.Evidence = &evidence[0]
+		}
+		return json.Marshal(receipt)
 	})
 	if err != nil {
 		return v1.IntentApplyReceipt{}, err

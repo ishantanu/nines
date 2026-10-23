@@ -1,12 +1,16 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/ishantanu/nines/examples"
 	"github.com/ishantanu/nines/internal/model"
@@ -79,4 +83,47 @@ func TestYAMLResourcesTenantAuthorizationAndRoundTrip(t *testing.T) {
 		}
 	}
 	request("viewer", "beta", "POST", "/api/resources/validate", examples.APIAvailability, "application/yaml", "", 403)
+
+	at := time.Now().UTC().Truncate(time.Minute)
+	if err := a.Ingest(context.Background(), "api-availability", []model.Point{{Time: at, Good: 99, Total: 100}}); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := model.ParseDefinition([]byte(examples.APIAvailability))
+	if err != nil {
+		t.Fatal(err)
+	}
+	updated.SLO.Spec.GoodQuery = "vector(95)"
+	updated.SLO.Spec.TotalQuery = "vector(100)"
+	updated.SLO.Spec.StepSeconds = 30
+	body, err := yaml.Marshal(updated.Manifest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	planned := request("owner", "alpha", "POST", "/api/resources/plan", string(body), "application/yaml", "", 200)
+	var editPlan service.ResourcePlan
+	if err = json.Unmarshal(planned.Body.Bytes(), &editPlan); err != nil || !editPlan.MeasurementChanged || len(editPlan.Warnings) == 0 {
+		t.Fatal(editPlan, err)
+	}
+	request("agent", "alpha", "POST", "/api/resources/apply", string(body), "application/yaml", `"1"`, 403)
+	request("owner", "alpha", "POST", "/api/resources/apply", string(body), "application/yaml", `"1"`, 200)
+	request("owner", "alpha", "POST", "/api/resources/apply", string(body), "application/yaml", `"1"`, 409)
+	archived := request("viewer", "alpha", "GET", "/api/slos/api-availability/revisions/1", "", "", "", 200)
+	var archivedRevision struct {
+		Revision        int64
+		IntervalSamples int
+		ArchivedBy      struct{ Subject string }
+	}
+	if err = json.Unmarshal(archived.Body.Bytes(), &archivedRevision); err != nil || archivedRevision.Revision != 1 || archivedRevision.IntervalSamples != 1 || archivedRevision.ArchivedBy.Subject == "" {
+		t.Fatal(archived.Body.String(), err)
+	}
+	request("viewer", "alpha", "GET", "/api/slos/api-availability/revisions?limit=1", "", "", "", 200)
+	history := request("viewer", "alpha", "GET", "/api/slos/api-availability/history?revision=1&rangeSeconds=3600", "", "", "", 200)
+	if !strings.Contains(history.Body.String(), `"configRevision":1`) {
+		t.Fatal(history.Body.String())
+	}
+	request("owner", "beta", "GET", "/api/slos/api-availability/revisions", "", "", "", 404)
+	request("owner", "beta", "GET", "/api/slos/api-availability/revisions/1", "", "", "", 404)
+	request("owner", "alpha", "GET", "/api/slos/api-availability/revisions?limit=101", "", "", "", 400)
+	request("owner", "alpha", "GET", "/api/slos/api-availability/revisions/0", "", "", "", 400)
+	request("owner", "alpha", "GET", "/api/slos/api-availability/history?revision=-1", "", "", "", 400)
 }

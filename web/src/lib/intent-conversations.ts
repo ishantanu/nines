@@ -46,6 +46,7 @@ export type IntentConversation = ConversationSummary & {
   goal?: IntentDocument;
   selection?: {
     intentDigest: string;
+    measurementDigest?: string;
     binding: { name: string; expectedRevision: number };
     actor: { name: string };
     at: string;
@@ -53,6 +54,7 @@ export type IntentConversation = ConversationSummary & {
   plan?: IntentPlan;
   backtest?: IntentBacktest;
   runs: FlowRun[];
+  audit?: IntentAuditEvent[];
   changeSet?: IntentChangeSet;
   changeSetHistory?: IntentChangeSet[];
 };
@@ -100,7 +102,14 @@ export function authoringScope(goal: IntentDocument): AuthoringScope {
 export type IntentChangeSet = {
   id: string;
   digest: string;
-  state: "proposed" | "approved" | "applied";
+  state: "proposed" | "approved" | "applied" | "rejected" | "superseded";
+  recommendation?: IntentRecommendation;
+  approvalReason?: string;
+  rejectedBy?: { name: string };
+  rejectionReason?: string;
+  rejectedAt?: string;
+  rollback?: IntentRollback;
+  rollbackHistory?: IntentRollback[];
   createdAt: string;
   approvedAt?: string;
   appliedAt?: string;
@@ -118,6 +127,8 @@ export type IntentChangeSet = {
   applied?: { kind: string; name: string; revision: number; digest: string }[];
 };
 export type IntentVerification = {
+  operation?: "apply" | "rollback";
+  rollbackDigest?: string;
   sourceState: string;
   tenant: string;
   conversation: string;
@@ -130,4 +141,85 @@ export type IntentVerification = {
     state: string;
     health: string;
   }[];
+};
+
+export type IntentRecommendation = {
+  measurementDigest?: string;
+  requestedBy?: { subject: string; name: string; kind: string };
+  compilerVersion?: string;
+  rollbackStatus?:
+    "no_definition_change" | "creation_has_no_baseline" | "restorable_updates";
+  summary: string;
+  explanation?: string;
+  basis: string[];
+  limitations: string[];
+  runId?: string;
+  mode: string;
+  modelRoute?: {
+    provider: string;
+    model: string;
+    protocol: string;
+    routeDigest: string;
+    local: boolean;
+  };
+  draftRoute?: {
+    provider: string;
+    model: string;
+    protocol: string;
+    routeDigest: string;
+    local: boolean;
+  };
+  skill?: { id: string; version: string; digest: string };
+  binding: { name: string; revision: number; digest: string };
+  sourceDigest: string;
+  evidenceDigest: string;
+  observedFrom: string;
+  observedTo: string;
+  fields: {
+    resource: string;
+    field: string;
+    before?: unknown;
+    after?: unknown;
+    impact: string;
+  }[];
+  backtest?: {
+    from: string;
+    to: string;
+    resolutionSeconds: number;
+    complete: number;
+    unknown: number;
+    noTraffic: number;
+    targetViolations: number;
+    burnBreaches: number;
+    digest: string;
+  };
+};
+export type IntentAuditEvent = {
+  sequence: number;
+  at: string;
+  actor: { subject: string; name: string; kind: string };
+  action: string;
+  outcome: string;
+  reason: string;
+  changeSetDigest?: string;
+  version: number;
+  previousHash?: string;
+  hash: string;
+};
+export type IntentRollback = {
+  id: string;
+  digest: string;
+  originalDigest: string;
+  state: "proposed" | "approved" | "applied" | "blocked" | "rejected";
+  reason: string;
+  createdAt: string;
+  createdBy: { name: string };
+  changes: IntentChangeSet["changes"];
+  blockers?: string[];
+  approvedBy?: { name: string };
+  approvedAt?: string;
+  approvalReason?: string;
+  appliedBy?: { name: string };
+  appliedAt?: string;
+  applied?: { name: string; revision: number; digest: string }[];
 };

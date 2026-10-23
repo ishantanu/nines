@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http/httptest"
@@ -9,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/ishantanu/nines/internal/model"
 
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/testtelemetry"
@@ -29,6 +33,35 @@ func TestTelemetryCLICommandsAgainstAPI(t *testing.T) {
 		if err = run(command, &out); err != nil || !strings.Contains(out.String(), `"tenant": "default"`) {
 			t.Fatal(command, out.String(), err)
 		}
+	}
+	inlinePath := filepath.Join(t.TempDir(), "inline.yaml")
+	body := `apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata: {name: inline-cli, project: test}
+spec:
+  displayName: API success
+  service: api
+  source: primary
+  target: 0.999
+  windowSeconds: 3600
+  stepSeconds: 60
+  measurement:
+    type: availability
+    metric: http_requests_total
+    labels: {service: api}
+    successLabels: {status: "200"}
+    scrapeIntervalSeconds: 10
+    observationPoint: Completed API requests
+`
+	if err = os.WriteFile(inlinePath, []byte(body), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var verified bytes.Buffer
+	if err = run([]string{"telemetry", "verify", "-f", inlinePath, "--agent"}, &verified); err != nil || !strings.Contains(verified.String(), "measurementDigest") {
+		t.Fatal(verified.String(), err)
+	}
+	if _, err = s.Store.Read(context.Background(), "inline-cli"); !errors.Is(err, model.ErrNotFound) {
+		t.Fatal("CLI verification saved SLO", err)
 	}
 	path := filepath.Join(t.TempDir(), "slo.yaml")
 	args := []string{"bindings", "compile", "requests", "-expected-revision", "1", "-name", "compiled", "-out", path}

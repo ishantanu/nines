@@ -17,13 +17,32 @@ func changeDigest(tenant, id string, c v1.IntentChangeSet) string {
 		Tenant, Conversation, ID, Intent, Source string
 		Binding                                  v1.IntentSelection
 		Changes                                  []v1.IntentDefinitionChange
-	}{tenant, id, c.ID, c.IntentDigest, c.SourceDigest, c.Binding, c.Changes})
+		Recommendation                           *v1.IntentRecommendation `json:"Recommendation,omitempty"`
+	}{tenant, id, c.ID, c.IntentDigest, c.SourceDigest, c.Binding, c.Changes, c.Recommendation})
 }
-func invalidateChangeSet(r *record) {
-	if r.Session.ChangeSet != nil {
-		r.Session.ChangeSetHistory = append(r.Session.ChangeSetHistory, clone(*r.Session.ChangeSet))
-		r.Session.ChangeSet = nil
+func invalidateChangeSet(r *record, a v1.InvestigationActor, reason string, now time.Time) error {
+	if r.Session.ChangeSet == nil {
+		return nil
 	}
+	if len(r.Session.ChangeSetHistory) >= 8 {
+		return ErrLimit
+	}
+	if e := auditRoom(r); e != nil {
+		return e
+	}
+	c := r.Session.ChangeSet
+	action := "change_set.replaced"
+	switch c.State {
+	case "proposed", "approved":
+		c.State = "superseded"
+		action = "change_set.superseded"
+	case "applied":
+		action = "change_set.retained"
+	}
+	audit(r, a, action, "succeeded", c.Digest, reason, now)
+	r.Session.ChangeSetHistory = append(r.Session.ChangeSetHistory, clone(*c))
+	r.Session.ChangeSet = nil
+	return nil
 }
 func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64) (v1.IntentConversation, error) {
 	a, e := actor(ctx, s.Platform.TenantID)
@@ -40,8 +59,16 @@ func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64
 		if active(*r) || r.Session.Version != version {
 			return ErrConflict
 		}
+		if r.Session.ChangeSet != nil && r.Session.ChangeSet.State == "rejected" {
+			if e := invalidateChangeSet(r, a, "Rejected proposal replaced by a new review.", now); e != nil {
+				return e
+			}
+		}
 		if r.Session.ChangeSet != nil {
 			return nil
+		}
+		if err := auditRoom(r); err != nil {
+			return err
 		}
 		if len(r.Session.ChangeSetHistory) >= 8 {
 			return ErrLimit
@@ -65,8 +92,11 @@ func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64
 		manifest, _ := json.Marshal(p.Compiled.Manifest)
 		change := v1.IntentDefinitionChange{Kind: v1.SLOKind, Name: def.Metadata.Name, Action: before.Action, ExpectedRevision: p.ExpectedRevision, Digest: p.Compiled.Digest, Manifest: manifest}
 		if before.Previous != nil {
-			previous, _ := json.Marshal(before.Previous)
-			change.Previous = previous
+			previous := before.Previous
+			if revision, ok := previous.(service.ResourceRevision); ok {
+				previous = revision.Manifest
+			}
+			change.Previous, _ = json.Marshal(previous)
 		}
 		c.Changes = append(c.Changes, change)
 		if p.Journey != nil {
@@ -85,6 +115,10 @@ func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64
 			}
 			c.Changes = append(c.Changes, v1.IntentDefinitionChange{Kind: v1.JourneyKind, Name: p.Journey.Manifest.Metadata.Name, Action: action, ExpectedRevision: p.Journey.ExpectedRevision, Digest: p.Journey.Digest, Manifest: manifest, Previous: previous})
 		}
+		c.Recommendation = recommendation(r, c)
+		if s.sensitiveInput(c.Recommendation) {
+			return model.Invalid("recommendation evidence contains configured credentials")
+		}
 		c.Digest = changeDigest(s.Platform.TenantID, id, c)
 		if _, err := s.Platform.IntentDefinitionBatch(ctx, id+"/"+c.ID, c.Digest, false, *r.Session.Goal, c.Binding, c.Changes, c.SourceDigest); err != nil {
 			return err
@@ -95,6 +129,7 @@ func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64
 			return ErrLimit
 		}
 		touch(r, now)
+		audit(r, a, "change_set.proposed", "succeeded", c.Digest, "Frozen recommendation, measurement provenance and exact resource changes for review.", now)
 		return nil
 	})
 	return r.Session, e
@@ -110,7 +145,11 @@ func human(ctx context.Context, tenant string) (v1.InvestigationActor, error) {
 	}
 	return a, nil
 }
-func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (v1.IntentConversation, error) {
+func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (out v1.IntentConversation, e error) {
+	defer func() { s.auditFailure(ctx, id, "change_set.approved", in.Digest, e) }()
+	if e = s.reviewReason(in, false); e != nil {
+		return out, e
+	}
 	a, e := human(ctx, s.Platform.TenantID)
 	if e != nil {
 		return v1.IntentConversation{}, e
@@ -135,16 +174,22 @@ func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewI
 		if _, err := s.Platform.IntentDefinitionBatch(ctx, id+"/"+c.ID, c.Digest, false, *r.Session.Goal, c.Binding, c.Changes, c.SourceDigest); err != nil {
 			return err
 		}
+		if err := auditRoom(r); err != nil {
+			return err
+		}
 		c.ApprovedBy = &a
+		c.ApprovalReason = reasonOrDefault(in.Reason)
 		c.ApprovedAt = &now
 		c.State = "approved"
 		touch(r, now)
+		audit(r, a, "change_set.approved", "succeeded", c.Digest, c.ApprovalReason, now)
 		return nil
 	})
 	return r.Session, e
 }
-func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (v1.IntentConversation, error) {
-	_, e := human(ctx, s.Platform.TenantID)
+func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (out v1.IntentConversation, e error) {
+	defer func() { s.auditFailure(ctx, id, "change_set.applied", in.Digest, e) }()
+	_, e = human(ctx, s.Platform.TenantID)
 	if e != nil {
 		return v1.IntentConversation{}, e
 	}
@@ -167,7 +212,14 @@ func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewInt
 		if active(*r) || r.Session.Version != in.ExpectedVersion || c.State != "approved" || c.ApprovedBy == nil || c.ApprovedAt == nil || r.Session.Goal == nil || hash(*r.Session.Goal) != c.IntentDigest {
 			return ErrConflict
 		}
-		applied, err := s.Platform.IntentDefinitionBatch(ctx, id+"/"+c.ID, c.Digest, true, *r.Session.Goal, c.Binding, c.Changes, c.SourceDigest)
+		if err := auditRoom(r); err != nil {
+			return err
+		}
+		evidence := v1.IntentOperationEvidence{Operation: "apply", ChangeSetDigest: c.Digest, ApprovedBy: *c.ApprovedBy, ApprovedAt: *c.ApprovedAt, Reason: c.ApprovalReason}
+		if c.Recommendation != nil {
+			evidence.RecommendationDigest = hash(c.Recommendation)
+		}
+		applied, err := s.Platform.IntentDefinitionBatch(ctx, id+"/"+c.ID, c.Digest, true, *r.Session.Goal, c.Binding, c.Changes, c.SourceDigest, evidence)
 		if err != nil {
 			return err
 		}
@@ -176,6 +228,7 @@ func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewInt
 		c.AppliedBy = &applied.Actor
 		c.State = "applied"
 		touch(r, now)
+		audit(r, applied.Actor, "change_set.applied", "succeeded", c.Digest, "Approved definitions committed atomically. External rules were not deployed.", now)
 		return nil
 	})
 	return r.Session, e
@@ -195,7 +248,20 @@ func (s *Service) VerifyChangeSet(ctx context.Context, id string) (v1.IntentChan
 	if c.SourceDigest != s.Platform.SourceFingerprint(r.Scope.Source) {
 		out.SourceState = "changed"
 	}
-	for _, expected := range c.Applied {
+	out.Operation = "apply"
+	appliedResources := clone(c.Applied)
+	if rollback := c.Rollback; rollback != nil && rollback.State == "applied" {
+		out.Operation = "rollback"
+		out.RollbackDigest = rollback.Digest
+		for _, restored := range rollback.Applied {
+			for i, original := range appliedResources {
+				if original.Kind == restored.Kind && original.Name == restored.Name {
+					appliedResources[i] = restored
+				}
+			}
+		}
+	}
+	for _, expected := range appliedResources {
 		v := v1.IntentResourceVerification{IntentAppliedResource: expected, State: "matches", Health: "unknown"}
 		if expected.Kind == v1.SLOKind {
 			actual, err := s.Platform.ReadSLO(ctx, expected.Name)

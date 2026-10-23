@@ -246,24 +246,7 @@ func BindingQueries(b model.MeasurementBinding) (good, total string) {
 // the duration to the evaluator instead of embedding a short interval.
 func BindingWindow(b model.MeasurementBinding) *v1.ProviderWindow {
 	s := b.Spec
-	population := map[string]string{}
-	for k, v := range s.Labels {
-		population[k] = v
-	}
-	metric := s.Metric
-	if s.Measurement == "latency" || s.CountFrom == "histogram" {
-		metric += "_count"
-	}
-	total := prometheus.Selector(metric, population)
-	if s.Measurement == "latency" {
-		population["le"] = strconv.FormatFloat(*s.ThresholdSeconds, 'g', -1, 64)
-		metric = s.Metric + "_bucket"
-	} else {
-		for k, v := range s.SuccessLabels {
-			population[k] = v
-		}
-	}
-	return &v1.ProviderWindow{GoodSelector: prometheus.Selector(metric, population), TotalSelector: total, ScrapeIntervalSeconds: s.ScrapeIntervalSeconds}
+	return model.MeasurementWindow(v1.MeasurementSpec{Type: s.Measurement, Metric: s.Metric, Labels: s.Labels, SuccessLabels: s.SuccessLabels, CountFrom: s.CountFrom, ThresholdSeconds: s.ThresholdSeconds, ScrapeIntervalSeconds: s.ScrapeIntervalSeconds, ObservationPoint: s.ObservationPoint})
 }
 func verifyBindingEvidence(b model.MeasurementBinding, d v1.TelemetryDiscovery) error {
 	if d.Truncated || len(d.Series) == 0 || len(d.Metadata) != 1 {
@@ -385,7 +368,7 @@ func (s *Service) CompileBinding(ctx context.Context, id string, in v1.CompileBi
 	}
 	out.YAML = string(encoded)
 	out.Digest = model.DefinitionDigest(out.Manifest)
-	out.Warnings = []string{"Review observation point, population and success semantics before applying the SLO YAML.", "Full-window counter increases remain scrape-based estimates; they are not exact event logs.", "Coverage measures the least-observed population's scrape density and freshness; sparse/new/retired series can reduce coverage. Uninstrumented populations cannot be inferred.", "A provider-window measurement requires a new SLO identity; existing interval data is never reinterpreted."}
+	out.Warnings = []string{"Review observation point, population and success semantics before applying the SLO YAML.", "Full-window counter increases remain scrape-based estimates; they are not exact event logs.", "Coverage measures the least-observed population's scrape density and freshness; sparse/new/retired series can reduce coverage. Uninstrumented populations cannot be inferred.", "Changing a measurement keeps the SLO name and creates a new revision. Previous definitions and retained evidence are archived; active measurement coverage starts fresh."}
 	return out, nil
 }
 func (s *Service) validateBindingReference(ctx context.Context, c model.SLO) error {

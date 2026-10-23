@@ -13,5 +13,6 @@ spec:
     service: api
     environment: production
   thresholdSeconds: 0.3
+  scrapeIntervalSeconds: 15 # Match your telemetry source configuration
   stepSeconds: 60
   observationPoint: Completed request durations at the API server; includes all status codes

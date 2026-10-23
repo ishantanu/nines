@@ -58,6 +58,40 @@ spec:
                                             - expectedRevision
                                             - required
                                         type: object
+                                    measurement:
+                                        nullable: true
+                                        properties:
+                                            countFrom:
+                                                type: string
+                                            labels:
+                                                additionalProperties:
+                                                    type: string
+                                                maxProperties: 1000
+                                                type: object
+                                            metric:
+                                                type: string
+                                            observationPoint:
+                                                type: string
+                                            scrapeIntervalSeconds:
+                                                format: int64
+                                                type: integer
+                                            successLabels:
+                                                additionalProperties:
+                                                    type: string
+                                                maxProperties: 1000
+                                                type: object
+                                            thresholdSeconds:
+                                                nullable: true
+                                                type: number
+                                            type:
+                                                type: string
+                                        required:
+                                            - type
+                                            - metric
+                                            - labels
+                                            - scrapeIntervalSeconds
+                                            - observationPoint
+                                        type: object
                                     noDataPolicy:
                                         type: string
                                     outcome:
@@ -127,6 +161,9 @@ spec:
                                         type: string
                                     source:
                                         type: string
+                                    stepSeconds:
+                                        format: int64
+                                        type: integer
                                     target:
                                         type: number
                                     thresholdSeconds:
@@ -144,6 +181,40 @@ spec:
                                     - target
                                     - windowSeconds
                                     - noDataPolicy
+                                type: object
+                            measurement:
+                                nullable: true
+                                properties:
+                                    countFrom:
+                                        type: string
+                                    labels:
+                                        additionalProperties:
+                                            type: string
+                                        maxProperties: 1000
+                                        type: object
+                                    metric:
+                                        type: string
+                                    observationPoint:
+                                        type: string
+                                    scrapeIntervalSeconds:
+                                        format: int64
+                                        type: integer
+                                    successLabels:
+                                        additionalProperties:
+                                            type: string
+                                        maxProperties: 1000
+                                        type: object
+                                    thresholdSeconds:
+                                        nullable: true
+                                        type: number
+                                    type:
+                                        type: string
+                                required:
+                                    - type
+                                    - metric
+                                    - labels
+                                    - scrapeIntervalSeconds
+                                    - observationPoint
                                 type: object
                             measurementBinding:
                                 nullable: true
@@ -252,6 +323,9 @@ spec:
                             - windowSeconds
                             - stepSeconds
                         type: object
+                        x-kubernetes-validations:
+                            - message: inline measurement cannot be combined with binding references or explicit queries
+                              rule: '!has(self.measurement) || (!has(self.measurementBinding) && !has(self.providerWindow) && !has(self.goodQuery) && !has(self.totalQuery))'
                     status:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
@@ -526,6 +600,40 @@ spec:
                                     - expectedRevision
                                     - required
                                 type: object
+                            measurement:
+                                nullable: true
+                                properties:
+                                    countFrom:
+                                        type: string
+                                    labels:
+                                        additionalProperties:
+                                            type: string
+                                        maxProperties: 1000
+                                        type: object
+                                    metric:
+                                        type: string
+                                    observationPoint:
+                                        type: string
+                                    scrapeIntervalSeconds:
+                                        format: int64
+                                        type: integer
+                                    successLabels:
+                                        additionalProperties:
+                                            type: string
+                                        maxProperties: 1000
+                                        type: object
+                                    thresholdSeconds:
+                                        nullable: true
+                                        type: number
+                                    type:
+                                        type: string
+                                required:
+                                    - type
+                                    - metric
+                                    - labels
+                                    - scrapeIntervalSeconds
+                                    - observationPoint
+                                type: object
                             measurementSelection:
                                 properties:
                                     expectedGeneration:
@@ -606,6 +714,9 @@ spec:
                                 type: string
                             source:
                                 type: string
+                            stepSeconds:
+                                format: int64
+                                type: integer
                             target:
                                 type: number
                             thresholdSeconds:
@@ -623,8 +734,12 @@ spec:
                             - target
                             - windowSeconds
                             - noDataPolicy
-                            - measurementSelection
                         type: object
+                        x-kubernetes-validations:
+                            - message: define spec.measurement; a legacy measurementSelection is an alternative, never an additional input
+                              rule: has(self.measurement) != has(self.measurementSelection)
+                            - message: inline measurement requires stepSeconds from 1 to 3600
+                              rule: '!has(self.measurement) || (has(self.stepSeconds) && self.stepSeconds >= 1 && self.stepSeconds <= 3600)'
                     status:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true

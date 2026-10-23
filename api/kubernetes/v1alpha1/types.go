@@ -52,7 +52,7 @@ type Resource struct {
 }
 type IntentSpec struct {
 	domain.IntentSpec
-	MeasurementSelection MeasurementSelection `json:"measurementSelection"`
+	MeasurementSelection MeasurementSelection `json:"measurementSelection,omitempty"`
 }
 type Condition struct {
 	Type               string    `json:"type"`
@@ -83,4 +83,15 @@ type Status struct {
 type MeasurementSelection struct {
 	Name               string `json:"name"`
 	ExpectedGeneration int64  `json:"expectedGeneration"`
+}
+
+func (s IntentSpec) MarshalJSON() ([]byte, error) {
+	type plain IntentSpec
+	if s.Measurement == nil {
+		return json.Marshal(plain(s))
+	}
+	return json.Marshal(struct {
+		*plain
+		MeasurementSelection *MeasurementSelection `json:"measurementSelection,omitempty"`
+	}{plain: (*plain)(&s)})
 }

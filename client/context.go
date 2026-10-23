@@ -78,13 +78,16 @@ func (c *Client) contextRead(ctx context.Context, path string, out any) error {
 	return c.scopedRequest(ctx, http.MethodGet, path, nil, 256<<10, out)
 }
 func (c *Client) scopedRequest(ctx context.Context, method, path string, body []byte, limit int64, out any) error {
+	return c.scopedMediaRequest(ctx, method, path, body, limit, "application/json", out)
+}
+func (c *Client) scopedMediaRequest(ctx context.Context, method, path string, body []byte, limit int64, media string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, method, c.origin+path, bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
 	req.Header.Set("Accept", "application/json")
 	if len(body) > 0 {
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", media)
 	}
 	req.Header.Set("X-Nines-Tenant", c.tenant)
 	if c.token != "" {

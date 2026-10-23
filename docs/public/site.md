@@ -4,7 +4,7 @@ The product site is a static React page using the same shadcn/ui button and tabs
 
 ## Examples
 
-The site shows complete, source-backed YAML for an SLO, a critical user journey, a latency measurement binding and an experimental SLO intent. The practical examples cover the Prometheus playground, offline rule generation, connected tenant access, recorded SLI and burn metrics, the typed Go client, a read-only MCP client and synthetic intent workflow evaluations. Code can be copied from each example; links lead to the full guides. Workflow panels retain their dimensions when switching tabs, and inactive examples remain in prerendered HTML for readers and crawlers.
+The site shows complete, source-backed YAML for an SLO, a critical user journey, a self-contained latency SLO and an experimental SLO intent. The practical examples cover the Prometheus playground, offline rule generation, connected tenant access, recorded SLI and burn metrics, the typed Go client, a read-only MCP client and synthetic intent workflow evaluations. Code can be copied from each example; links lead to the full guides. Workflow panels retain their dimensions when switching tabs, and inactive examples remain in prerendered HTML for readers and crawlers.
 
 ## Local preview
 

@@ -289,3 +289,45 @@ func TestPortalAmbiguousWriteUsesExactReadbackWithoutRepeatingMutation(t *testin
 		})
 	}
 }
+
+func TestPortalPublisherAcceptsSameNameMeasurementEdit(t *testing.T) {
+	ctx := context.Background()
+	p, manager, kube, s := publisherFixture(t)
+	plan, err := manager.PlanContext(ctx, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = manager.Deploy(ctx, s, plan.Digest); err != nil {
+		t.Fatal(err)
+	}
+	prior := kube.get(v1.SLOKind, s.ID)
+	if err = p.Store.Update(ctx, s.ID, func(r *model.Record) error {
+		r.SLO.Revision++
+		r.SLO.GoodQuery = "sum(increase(corrected_requests_total[1m]))"
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	record, _ := p.Store.Read(ctx, s.ID)
+	s = record.SLO
+	plan, err = manager.PlanContext(ctx, s)
+	if err != nil || plan.Resource == nil || plan.PriorUID != prior.Metadata.UID {
+		t.Fatal(plan, err)
+	}
+	if _, err = manager.Deploy(ctx, s, plan.Digest); err != nil {
+		t.Fatal(err)
+	}
+	updated := kube.get(v1.SLOKind, s.ID)
+	if updated.Metadata.UID != prior.Metadata.UID || updated.Metadata.Generation != prior.Metadata.Generation+1 {
+		t.Fatal("SLO identity replaced", updated)
+	}
+	revision, err := RuleRevision(updated, p.Tenant)
+	if err != nil || revision != 8 {
+		t.Fatal(revision, err)
+	}
+	for _, rule := range plan.Group.Rules {
+		if rule.Labels["nines_revision"] != "8" {
+			t.Fatal("old external evidence selected", rule)
+		}
+	}
+}

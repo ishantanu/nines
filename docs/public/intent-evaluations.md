@@ -82,7 +82,7 @@ The live drafting suite runs ten semantic cases and excludes five scripted-respo
 
 ## Evidence, progress and recovery
 
-The authoring UI shows the selected source, metric, binding revision, observation point, measurement population, success condition, discovery interval and assumptions. Expand the fingerprint details to inspect source, discovery and binding identities. Backtest evidence includes its sampled interval, resolution and definition provenance. Source changes during compilation or backtesting invalidate the result. A changed source fingerprint also invalidates cached measurement health until it is rechecked.
+The authoring UI shows the selected source, metric, SLO-owned measurement digest (or explicit legacy binding revision), observation point, measurement population, success condition, discovery interval and assumptions. Expand the fingerprint details to inspect source, discovery and binding identities. Backtest evidence includes its sampled interval, resolution and definition provenance. Source changes during compilation or backtesting invalidate the result. A changed source fingerprint also invalidates cached measurement health until it is rechecked.
 
 Provider stream progress is persisted as a phase and bounded byte count under the worker lease. The browser reads it through the existing conversation polling endpoint. Raw model tokens, reasoning and private tool correlations are not exposed. Progress updates do not change the conversation revision used for reviewed actions. Cancellation fences late progress, and persisted progress survives a repository restart.
 
@@ -108,7 +108,7 @@ This target rejects skipped required database tests. Memory-backed contract resu
 
 Known configured model keys are rejected if echoed into drafting responses, tool calls or conversation inputs. This is a narrow guard, not general secret detection or anonymization of arbitrary user text. Provider error codes are allowlisted; raw provider errors do not enter the public transcript.
 
-Atomic transaction failure rolls back that transaction. There is no automatic error-budget-triggered rollback or dedicated rollback command for an already applied configuration. Previous definitions support a reviewed reapply as a new revision. Reverting configuration cannot undo consumed error budget.
+Atomic transaction failure rolls back that transaction. Existing definitions can be restored through an explicit, separately approved configuration rollback, with current revision/digest checks and an immutable transaction receipt. Newly created resources have no previous definition and show a blocked rollback; resource retirement is separate and not implemented. External rules require their own reviewed deployment. There is no automatic error-budget-triggered rollback, and restoring configuration cannot undo consumed error budget. See [recommendation review, audit and rollback](intent-governance.md).
 
 ## Reports and interpretation
 

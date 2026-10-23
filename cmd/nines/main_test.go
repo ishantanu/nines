@@ -94,7 +94,7 @@ func TestCLIInitDurationsRuleGenerationAndReadCommands(t *testing.T) {
 			w.Header().Set("Content-Type", "application/yaml")
 			_, _ = w.Write(definition.Bytes())
 		case "/api/slos/checkout/history":
-			if r.URL.Query().Get("rangeSeconds") != "21600" || r.URL.Query().Get("resolutionSeconds") != "300" {
+			if r.URL.Query().Get("rangeSeconds") != "21600" || r.URL.Query().Get("resolutionSeconds") != "300" || r.URL.Query().Get("revision") != "1" {
 				t.Error("history duration conversion failed")
 			}
 			_, _ = w.Write([]byte(`{"target":0.999,"points":[{"at":"2026-10-19T00:00:00Z","coverage":0,"intervalReliability":null,"reliability":null}]}`))
@@ -115,7 +115,7 @@ func TestCLIInitDurationsRuleGenerationAndReadCommands(t *testing.T) {
 		t.Fatal(err, export.String())
 	}
 	export.Reset()
-	if err := run([]string{"history", "checkout", "-range", "6h", "-resolution", "5m", "-o", "csv", "-tenant", "commerce", "-server", server.URL}, &export); err != nil {
+	if err := run([]string{"history", "checkout", "-range", "6h", "-resolution", "5m", "--revision", "1", "-o", "csv", "-tenant", "commerce", "-server", server.URL}, &export); err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Contains(export.Bytes(), []byte("interval_sli,rolling_sli")) {

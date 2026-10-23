@@ -20,6 +20,8 @@ The CLI shares validation, deterministic measurement compilation and recording-r
 | `internal/intentflow`, `internal/investigation`, `reviewskills` | Experimental bounded agent workflows |
 | `internal/operator`, `cmd/operator` | Standalone Kubernetes controller and GitOps adapter |
 
+The default resource is one self-contained SLO: `spec.measurement` owns its metric, population, success criteria, scrape cadence and observation point alongside the target, window and policies. Deterministic compilation derives provider selectors without creating another resource. The same contract works in portal, CLI, MCP and operator; intent workflows add human confirmation and reviewed changes. Explicit shared bindings and custom queries remain advanced alternatives.
+
 Each tenant selects an independently bound store, source map and rule destination. User input does not select database schemas, arbitrary provider URLs, credentials or Mimir organizations. Projects are metadata within a tenant, not independent security boundaries. Models cannot change the deterministic arithmetic.
 
 The Go module path is `github.com/ishantanu/nines`. Public SDK installation becomes available after the repository and version are published. The public source export is rooted in the platform alone; parent analysis files and other projects are excluded.

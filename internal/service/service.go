@@ -49,6 +49,9 @@ func New(st store.Store, c Collector) *Service {
 	return &Service{Store: st, Journeys: journeys, Collector: c, Now: time.Now, TenantID: "default", TenantName: "Default workspace", SourceKind: kind}
 }
 func (s *Service) Create(ctx context.Context, c model.SLO) error {
+	if c.Measurement != nil && c.ProviderWindow == nil {
+		c.ProviderWindow = model.MeasurementWindow(*c.Measurement)
+	}
 	if err := c.Validate(); err != nil {
 		return err
 	}
@@ -283,6 +286,9 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 		persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		if e := s.Store.Update(persist, id, func(r *model.Record) error {
+			if model.ConfigRevision(r.SLO) != model.ConfigRevision(c) {
+				return nil // A late failure belongs to the old definition, not the new measurement.
+			}
 			if !r.Collection.AttemptedAt.After(health.AttemptedAt) {
 				health.LastSuccessAt = r.Collection.LastSuccessAt
 				health.Measurement = r.Collection.Measurement

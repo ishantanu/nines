@@ -62,6 +62,7 @@ func decode(w http.ResponseWriter, r *http.Request, out any) error {
 }
 func Mount(m *http.ServeMux, s *Service) {
 	mountKubernetesExport(m, s)
+	mountGovernance(m, s)
 	m.HandleFunc("POST /api/intent-conversations/{id}/change-set", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			ExpectedVersion int64 `json:"expectedVersion"`

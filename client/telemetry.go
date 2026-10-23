@@ -63,3 +63,14 @@ func (c *Client) TopologyResources(ctx context.Context, kind, cursor string, lim
 	err := c.scopedRequest(ctx, http.MethodGet, "/api/topology/resources?"+q.Encode(), nil, 1<<20, &out)
 	return out, err
 }
+
+// CompileMeasurement verifies the SLO-owned measurement without saving resources
+// or deploying rules. Native versioned SLO YAML or JSON is accepted.
+func (c *Client) CompileMeasurement(ctx context.Context, definition []byte) (v1.CompiledMeasurement, error) {
+	var out v1.CompiledMeasurement
+	if len(definition) == 0 || len(definition) > 1<<20 {
+		return out, errors.New("provide an SLO definition of at most 1 MiB")
+	}
+	err := c.scopedMediaRequest(ctx, http.MethodPost, "/api/slos/compile", definition, 1<<20, "application/yaml", &out)
+	return out, err
+}

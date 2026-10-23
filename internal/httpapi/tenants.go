@@ -321,6 +321,10 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 			return
 		}
 		if !allowed(role, r) {
+			if governance := mounted[id].workspace.IntentConversations; governance != nil && r.Method == http.MethodPost {
+				principal := tenancy.Principal{TenantID: id, Role: role, Subject: actor.ID, Kind: actor.Kind, Name: actor.Name}
+				governance.RecordDenied(tenancy.WithPrincipal(r.Context(), principal), r.URL.Path)
+			}
 			write(w, 403, map[string]string{"error": "this operation is not permitted for your role; an owner can review workspace access"})
 			return
 		}
@@ -377,14 +381,14 @@ func allowed(role string, r *http.Request) bool {
 	if strings.HasPrefix(r.URL.Path, "/api/bindings/") && strings.HasSuffix(r.URL.Path, "/compile") {
 		return true
 	}
-	if r.URL.Path == "/api/intents/backtest" || r.URL.Path == "/api/intents/plan" || r.URL.Path == "/api/journeys/plan" || r.URL.Path == "/api/resources/plan" || r.URL.Path == "/api/resources/validate" {
+	if r.URL.Path == "/api/slos/compile" || r.URL.Path == "/api/intents/backtest" || r.URL.Path == "/api/intents/plan" || r.URL.Path == "/api/journeys/plan" || r.URL.Path == "/api/resources/plan" || r.URL.Path == "/api/resources/validate" {
 		return true
 	}
 	if r.URL.Path == "/api/session-replays" || strings.HasPrefix(r.URL.Path, "/api/session-replays/") && strings.HasSuffix(r.URL.Path, "/links") {
 		return role == "editor" || role == "agent"
 	}
 	if r.URL.Path == "/api/intent-conversations" || strings.HasPrefix(r.URL.Path, "/api/intent-conversations/") {
-		if strings.HasSuffix(r.URL.Path, "/selection") || strings.HasSuffix(r.URL.Path, "/change-set/approve") || strings.HasSuffix(r.URL.Path, "/change-set/apply") {
+		if strings.HasSuffix(r.URL.Path, "/selection") || strings.HasSuffix(r.URL.Path, "/change-set/approve") || strings.HasSuffix(r.URL.Path, "/change-set/apply") || strings.HasSuffix(r.URL.Path, "/change-set/reject") || strings.Contains(r.URL.Path, "/change-set/rollback") {
 			return role == "editor"
 		}
 		return role == "editor" || role == "agent"

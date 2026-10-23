@@ -52,3 +52,36 @@ func mountKubernetesExport(m *http.ServeMux, s *Service) {
 		reply(w, out, e, 200)
 	})
 }
+
+func (s *Service) ExportRollbackKubernetes(ctx context.Context, id, namespace, digest string) (v1.IntentKubernetesExport, error) {
+	out := v1.IntentKubernetesExport{APIVersion: v1.APIVersion, Tenant: s.Platform.TenantID, Namespace: namespace, ChangeSetDigest: digest}
+	if !tenancy.ValidID(namespace) || len(digest) != 64 {
+		return out, model.Invalid("provide a namespace and exact rollback digest")
+	}
+	session, e := s.Read(ctx, id)
+	if e != nil {
+		return out, e
+	}
+	r := record{Session: session}
+	c := findChangeSet(&r, digest, true)
+	if c == nil || c.Rollback.State == "blocked" || c.Rollback.State == "rejected" || rollbackDigest(s.Platform.TenantID, id, *c.Rollback) != digest {
+		return out, ErrConflict
+	}
+	items := []any{}
+	for _, change := range c.Rollback.Changes {
+		d, e := model.ParseDefinition(change.Manifest)
+		if e != nil {
+			return out, e
+		}
+		resource, e := operator.FromDefinition(d, namespace)
+		if e != nil {
+			return out, e
+		}
+		resource.Metadata.Annotations["nines.dev/change-set-digest"] = digest
+		resource.Metadata.Annotations["nines.dev/rollback-of"] = c.Digest
+		items = append(items, resource)
+	}
+	body, e := operator.YAML(map[string]any{"apiVersion": "v1", "kind": "List", "items": items})
+	out.YAML = string(body)
+	return out, e
+}

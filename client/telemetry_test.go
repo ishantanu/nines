@@ -2,10 +2,15 @@ package client_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"github.com/ishantanu/nines/internal/model"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/client"
@@ -25,6 +30,21 @@ func TestTelemetrySDKVerticalSlice(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx := context.Background()
+	inline := v1.NewSLO("inline-sdk", "test", v1.SLOSpec{DisplayName: "API success", Service: "api", Source: "primary", Target: .999, WindowSeconds: 3600, StepSeconds: 60, Measurement: &v1.MeasurementSpec{Type: "availability", Metric: "http_requests_total", Labels: map[string]string{"service": "api"}, SuccessLabels: map[string]string{"status": "200"}, ScrapeIntervalSeconds: 10, ObservationPoint: "API completions"}})
+	body, _ := json.Marshal(inline)
+	verified, e := c.CompileMeasurement(ctx, body)
+	if e != nil || verified.Manifest.Spec.Measurement == nil || verified.MeasurementDigest == "" || strings.Contains(verified.YAML, "measurementBinding:") {
+		t.Fatal(verified, e)
+	}
+	if _, e = s.Store.Read(ctx, "inline-sdk"); !errors.Is(e, model.ErrNotFound) {
+		t.Fatal("verification saved resource", e)
+	}
+	if _, e = c.Plan(ctx, verified.Manifest); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = c.Apply(ctx, verified.Manifest, 0); e != nil {
+		t.Fatal(e)
+	}
 	if names, err := c.DiscoverMetricNames(ctx, "primary", "http_"); err != nil || len(names.Names) != 2 {
 		t.Fatal(names, err)
 	}

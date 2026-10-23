@@ -4,7 +4,7 @@ These features exist in source and demos, but are outside the initial supported 
 
 | Feature | Present | Remaining release boundary |
 | --- | --- | --- |
-| Intent/model workflows | Provider-configurable drafting, bounded tools, explicit bindings, reviewed SLO/CUJ changes, apply receipts and a [drafting and workflow evaluation harness](intent-evaluations.md) | [Real-provider acceptance (#34)](https://github.com/ishantanu/nines/issues/34), model behavior tests, cost/scale and operator experience |
+| Intent/model workflows | Provider-configurable drafting, bounded tools, SLO-owned measurements, reviewed SLO/CUJ changes, apply receipts and a [drafting and workflow evaluation harness](intent-evaluations.md) | [Real-provider acceptance (#34)](https://github.com/ishantanu/nines/issues/34), model behavior tests, cost/scale and operator experience |
 | Session replay | Consented masked app-tab capture, linked revisions, playback and portable HTML export | Browser/platform compatibility, masking/privacy review and offline-player acceptance |
 | Observed dependency maps | Declared links and configured service-graph evidence | Instrumentation coverage and production-scale validation |
 

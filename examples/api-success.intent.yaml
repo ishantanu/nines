@@ -14,6 +14,14 @@ spec:
   target: 0.999
   windowSeconds: 2419200 # Rolling 28 days
   noDataPolicy: unknown
+  stepSeconds: 60
+  measurement:
+    type: availability
+    metric: http_requests_total
+    labels: {service: api, environment: production}
+    successLabels: {status: "200"}
+    scrapeIntervalSeconds: 15
+    observationPoint: Completed API requests, including failures. Requests never reaching the server are excluded.
   # Optional alert policy. These values are explicitly authored, not inferred.
   policy:
     shortWindowSeconds: 300

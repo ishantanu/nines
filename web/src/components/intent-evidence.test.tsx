@@ -4,6 +4,19 @@ import { IntentEvidence, IntentProgress } from "./intent-evidence";
 import type { IntentPlan } from "@/lib/intent";
 
 const compiled: NonNullable<IntentPlan["compiled"]> = {
+  manifest: {
+    apiVersion: "nines.dev/v1alpha1",
+    kind: "ServiceLevelObjective",
+    metadata: { name: "api", project: "commerce" },
+    spec: {
+      displayName: "API",
+      service: "api",
+      source: "production",
+      target: 0.999,
+      windowSeconds: 3600,
+      stepSeconds: 60,
+    },
+  },
   binding: { name: "requests", revision: 3, digest: "binding-digest" },
   definition: {
     apiVersion: "nines.dev/v1alpha1",
@@ -66,4 +79,33 @@ test("stream progress shows aggregate bytes and never model response content", (
   );
   expect(waiting).toContain("Waiting for model response");
   expect(waiting).not.toContain("0 bytes");
+});
+
+test("inline evidence describes the SLO measurement without a shared binding", () => {
+  const inline = {
+    ...compiled,
+    definition: undefined,
+    binding: undefined,
+    measurementDigest: "slo-contract",
+    manifest: {
+      ...compiled.manifest,
+      spec: {
+        ...compiled.manifest.spec,
+        measurement: {
+          type: "availability" as const,
+          metric: "requests_total",
+          labels: { service: "api" },
+          successLabels: { status: "200" },
+          scrapeIntervalSeconds: 15,
+          observationPoint: "API completion",
+        },
+      },
+    },
+  };
+  const html = renderToStaticMarkup(<IntentEvidence compiled={inline} />);
+  expect(html).toContain("Owned by this SLO");
+  expect(html).toContain("slo-contract");
+  expect(html).toContain("API completion");
+  expect(html).not.toContain("Shared measurement");
+  expect(html).not.toContain("binding-digest");
 });

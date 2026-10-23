@@ -19,8 +19,8 @@ type WindowPreviewer interface {
 func (s *Service) BacktestIntent(ctx context.Context, in v1.IntentBacktestInput) (out v1.IntentBacktest, err error) {
 	ctx, finish := observability.Operation(ctx, "intent.backtest", s.TenantID)
 	defer func() { finish(err) }()
-	out = v1.IntentBacktest{APIVersion: v1.APIVersion, Tenant: s.TenantID, Points: []v1.IntentBacktestPoint{}, Warnings: []string{"Each point evaluates a full rolling window independently. Overlapping event counts are never summed.", "Sampled burn threshold crossings do not simulate pending duration, notification delivery or every intervening cutoff.", "Historical queries use current binding metadata. Retention, scrape estimates and missing instrumentation limit the evidence; this is not a proof of business semantics."}}
-	if in.Plan.Binding == nil {
+	out = v1.IntentBacktest{APIVersion: v1.APIVersion, Tenant: s.TenantID, Points: []v1.IntentBacktestPoint{}, Warnings: []string{"Each point evaluates a full rolling window independently. Overlapping event counts are never summed.", "Sampled burn threshold crossings do not simulate pending duration, notification delivery or every intervening cutoff.", "Historical queries use the reviewed measurement contract. Retention, scrape estimates and missing instrumentation limit the evidence; this is not a proof of business semantics."}}
+	if in.Plan.Binding == nil && in.Plan.Intent.Spec.Measurement == nil {
 		return out, model.Invalid("backtesting requires an explicitly selected binding revision")
 	}
 	if in.From.IsZero() || in.To.IsZero() || !in.To.After(in.From) || in.To.Sub(in.From) > 72*time.Hour {
@@ -112,11 +112,16 @@ func (s *Service) BacktestIntent(ctx context.Context, in v1.IntentBacktestInput)
 		}
 		out.Points = append(out.Points, p)
 	}
-	latest, e := s.ReadTopology(ctx, v1.BindingKind, in.Plan.Binding.Name, 0)
-	if e != nil {
-		return out, e
+	if in.Plan.Binding != nil {
+		latest, e := s.ReadTopology(ctx, v1.BindingKind, in.Plan.Binding.Name, 0)
+		if e != nil {
+			return out, e
+		}
+		if latest.Revision != in.Plan.Binding.ExpectedRevision {
+			return out, model.ErrRevisionConflict
+		}
 	}
-	if latest.Revision != in.Plan.Binding.ExpectedRevision || s.SourceFingerprint(in.Plan.Intent.Spec.Source) != plan.SourceDigest {
+	if s.SourceFingerprint(in.Plan.Intent.Spec.Source) != plan.SourceDigest {
 		return out, model.ErrRevisionConflict
 	}
 	return out, nil

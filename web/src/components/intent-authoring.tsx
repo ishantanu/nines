@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import { stringify } from "yaml";
-import {
-  api,
-  canEdit,
-  message,
-  type Journey,
-  type RequestScope,
-} from "@/lib/api";
+import { api, message, type Journey, type RequestScope } from "@/lib/api";
 import { RESOURCE_API_VERSION } from "@/lib/definitions";
 import {
   intentGoal,
@@ -14,6 +8,12 @@ import {
   type IntentDocument,
   type IntentPlan,
 } from "@/lib/intent";
+import {
+  IntentMeasurementFields,
+  goalWithMeasurement,
+} from "./intent-measurement";
+import { measurementDraft, type MeasurementDraft } from "@/lib/measurement";
+import { IntentEvidence } from "./intent-evidence";
 import { IntentBacktestPanel } from "./intent-backtest";
 import { duration, durationSeconds } from "@/lib/history";
 import { Button } from "@/components/ui/button";
@@ -66,15 +66,21 @@ const initial: Draft = {
 export function IntentAuthoring({
   scope,
   journeys,
-  onApplied,
   onStartConversation,
 }: {
   scope: RequestScope;
   journeys: Journey[];
-  onApplied: () => void;
   onStartConversation?: (goal: IntentDocument) => void;
 }) {
   const [draft, setDraft] = useState(initial);
+  const [measurement, setMeasurement] = useState<MeasurementDraft>(() => ({
+    ...measurementDraft(),
+    metric: "",
+    observationPoint: "",
+    success: [],
+    step: "60",
+    scrape: "15",
+  }));
   const [modelEnabled, setModelEnabled] = useState(false);
   const [clarifications, setClarifications] = useState<string[]>([]);
   const [sources, setSources] = useState<{ id: string; kind: string }[]>([]);
@@ -86,8 +92,6 @@ export function IntentAuthoring({
     [document, setDocument] = useState<IntentDocument | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
-  const [sloApplied, setSLOApplied] = useState(false),
-    [journeyApplied, setJourneyApplied] = useState(false);
   useEffect(() => {
     const c = new AbortController();
     api<{ connections: { id: string; kind: string }[] }>(
@@ -111,8 +115,6 @@ export function IntentAuthoring({
   function invalidate() {
     setPlan(null);
     setDocument(null);
-    setSLOApplied(false);
-    setJourneyApplied(false);
     setError("");
     setClarifications([]);
   }
@@ -126,44 +128,47 @@ export function IntentAuthoring({
   function build(): IntentDocument {
     if (journey !== "none" && !selectedJourney)
       throw new Error("Select a current journey.");
-    return {
-      apiVersion: RESOURCE_API_VERSION,
-      kind: "ServiceLevelObjectiveIntent",
-      metadata: { name: draft.name, project: draft.project },
-      spec: {
-        description: draft.description,
-        service: draft.service,
-        source: draft.source,
-        outcome: draft.outcome,
-        population: intentPopulation(draft.population),
-        ...intentGoal(draft.target, draft.window),
-        noDataPolicy: "unknown",
-        ...(draft.outcome === "latency"
-          ? { thresholdSeconds: Number(draft.threshold) }
-          : {}),
-        ...(alerts
-          ? {
-              policy: {
-                shortWindowSeconds: durationSeconds(draft.short),
-                longWindowSeconds: durationSeconds(draft.long),
-                burnRate: Number(draft.burn),
-                forSeconds: durationSeconds(draft.pending),
-                minCoverage: Number(draft.coverage),
-              },
-            }
-          : {}),
-        ...(selectedJourney
-          ? {
-              journey: {
-                name: journey,
-                step,
-                expectedRevision: selectedJourney.resource.revision,
-                required,
-              },
-            }
-          : {}),
+    return goalWithMeasurement(
+      {
+        apiVersion: RESOURCE_API_VERSION,
+        kind: "ServiceLevelObjectiveIntent",
+        metadata: { name: draft.name, project: draft.project },
+        spec: {
+          description: draft.description,
+          service: draft.service,
+          source: draft.source,
+          outcome: draft.outcome,
+          population: intentPopulation(draft.population),
+          ...intentGoal(draft.target, draft.window),
+          noDataPolicy: "unknown",
+          ...(draft.outcome === "latency"
+            ? { thresholdSeconds: Number(draft.threshold) }
+            : {}),
+          ...(alerts
+            ? {
+                policy: {
+                  shortWindowSeconds: durationSeconds(draft.short),
+                  longWindowSeconds: durationSeconds(draft.long),
+                  burnRate: Number(draft.burn),
+                  forSeconds: durationSeconds(draft.pending),
+                  minCoverage: Number(draft.coverage),
+                },
+              }
+            : {}),
+          ...(selectedJourney
+            ? {
+                journey: {
+                  name: journey,
+                  step,
+                  expectedRevision: selectedJourney.resource.revision,
+                  required,
+                },
+              }
+            : {}),
+        },
       },
-    };
+      measurement,
+    );
   }
   async function draftLanguage() {
     setBusy(true);
@@ -188,7 +193,7 @@ export function IntentAuthoring({
       setClarifications(
         r.intent
           ? [
-              `Draft prepared with ${r.model}. Review the typed fields before selecting a measurement.`,
+              `Draft prepared with ${r.model}. Review the typed fields before verifying the measurement.`,
               ...r.clarifications,
             ]
           : r.clarifications,
@@ -247,29 +252,6 @@ export function IntentAuthoring({
       setBusy(false);
     }
   }
-  async function apply(kind: "slo" | "journey") {
-    const text = kind === "slo" ? plan?.compiled?.yaml : plan?.journey?.yaml;
-    if (!text || !plan) return;
-    setBusy(true);
-    setError("");
-    try {
-      await api("/api/resources/apply", scope, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/yaml",
-          "If-Match": `"${kind === "slo" ? plan.expectedRevision : plan.journey!.expectedRevision}"`,
-        },
-        body: text,
-      });
-      if (kind === "slo") setSLOApplied(true);
-      else setJourneyApplied(true);
-      onApplied();
-    } catch (e) {
-      if (!scope.signal.aborted) setError(message(e));
-    } finally {
-      setBusy(false);
-    }
-  }
   const input = (key: keyof Draft, label: string, placeholder?: string) => (
     <div className="grid gap-2" key={key}>
       <Label htmlFor={`intent-${key}`}>{label}</Label>
@@ -287,8 +269,9 @@ export function IntentAuthoring({
         <CardHeader>
           <CardTitle>Reliability goal</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Define the outcome and eligible traffic. Select a verified
-            measurement before creating the SLO.
+            Preview the outcome and eligible traffic, then continue in the
+            approval workflow to confirm a measurement and review changes. This
+            form does not apply definitions.
           </p>
         </CardHeader>
         <CardContent>
@@ -355,7 +338,7 @@ export function IntentAuthoring({
                 input("threshold", "Maximum duration (seconds)", "0.3")
               ) : (
                 <p className="self-end text-sm text-muted-foreground">
-                  Success criteria come from the selected measurement binding.
+                  Define the metric and success labels below.
                 </p>
               )}
             </div>
@@ -371,10 +354,31 @@ export function IntentAuthoring({
                 placeholder={'environment: "production"\nservice: "checkout"'}
               />
               <p className="text-xs text-muted-foreground">
-                Use the entire binding population. Environment, retries and
+                These labels select eligible events. Environment, retries and
                 transaction identity are never inferred.
               </p>
             </div>
+            <section
+              className="space-y-4 rounded-md border p-4"
+              aria-label="SLO measurement"
+            >
+              <h3 className="font-medium">How to measure this outcome</h3>
+              <p className="text-sm text-muted-foreground">
+                The measurement belongs to this SLO. Verify the metric, success
+                criteria and observation point before preparing a proposal.
+              </p>
+              <IntentMeasurementFields
+                draft={{
+                  ...measurement,
+                  measurement: draft.outcome as "availability" | "latency",
+                }}
+                disabled={busy}
+                onChange={(d) => {
+                  setMeasurement(d);
+                  invalidate();
+                }}
+              />
+            </section>
             <div className="grid gap-4 md:grid-cols-3">
               {input("target", "Target (%)")}
               {input("window", "Rolling window", "28d")}
@@ -489,7 +493,7 @@ export function IntentAuthoring({
                   <p className="text-xs text-muted-foreground">
                     Sends only this description to the configured model. Include
                     a percentage and rolling duration; review the resulting
-                    fields before finding measurements.
+                    fields before verifying telemetry.
                   </p>
                 </>
               ) : (
@@ -520,7 +524,7 @@ export function IntentAuthoring({
               </Button>
             ) : null}
             <Button onClick={discover} disabled={busy}>
-              {busy ? "Checking…" : "Find measurements"}
+              {busy ? "Checking…" : "Verify measurement"}
             </Button>
           </fieldset>
         </CardContent>
@@ -589,6 +593,10 @@ export function IntentAuthoring({
             ))}
             {plan.compiled ? (
               <>
+                <IntentEvidence
+                  compiled={plan.compiled}
+                  sourceDigest={plan.sourceDigest}
+                />
                 <p className="text-sm">
                   Metadata and series checked at{" "}
                   {new Date(plan.compiled.evidence.to).toLocaleString()}. This
@@ -612,15 +620,23 @@ export function IntentAuthoring({
                 <p className="break-all font-mono text-xs text-muted-foreground">
                   SHA-256 {plan.compiled.digest}
                 </p>
+                <p className="text-sm text-muted-foreground">
+                  This preview is read-only. Continue in the conversation to
+                  confirm the measurement and record recommendation evidence,
+                  approval and audit history.
+                </p>
                 <Button
-                  disabled={busy || !canEdit(scope) || sloApplied}
-                  onClick={() => apply("slo")}
+                  disabled={
+                    busy ||
+                    scope.role === "viewer" ||
+                    !document ||
+                    !onStartConversation
+                  }
+                  onClick={() => {
+                    if (document) onStartConversation?.(document);
+                  }}
                 >
-                  {sloApplied
-                    ? "SLO applied"
-                    : canEdit(scope)
-                      ? "Apply reviewed SLO"
-                      : "Owner or editor required to apply"}
+                  Continue to review and approval
                 </Button>
                 {plan.journey ? (
                   <>
@@ -634,21 +650,9 @@ export function IntentAuthoring({
                       className="h-64 font-mono text-xs"
                     />
                     <p className="text-sm text-muted-foreground">
-                      Apply after the SLO. These are separate changes; a
-                      conflict leaves the SLO available and the journey
-                      unchanged.
+                      The approved change set applies the SLO and this journey
+                      link atomically.
                     </p>
-                    <Button
-                      variant="outline"
-                      disabled={
-                        busy || !canEdit(scope) || !sloApplied || journeyApplied
-                      }
-                      onClick={() => apply("journey")}
-                    >
-                      {journeyApplied
-                        ? "Journey linked"
-                        : "Apply reviewed journey link"}
-                    </Button>
                   </>
                 ) : null}
                 {[
@@ -680,7 +684,11 @@ export function IntentAuthoring({
           scope={scope}
           intent={document}
           binding={plan.compiled.binding}
-          step={plan.compiled.definition.spec.stepSeconds}
+          step={
+            plan.compiled.manifest?.spec.stepSeconds ??
+            plan.compiled.definition?.spec.stepSeconds ??
+            60
+          }
         />
       ) : null}
     </div>

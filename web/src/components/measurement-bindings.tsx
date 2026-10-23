@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { MeasurementEditor } from "./measurement-editor";
 import { TopologyEditor } from "./topology-editor";
 interface Compiled {
   yaml: string;
@@ -234,12 +235,13 @@ export function MeasurementBindings({ scope }: { scope: RequestScope }) {
       <Card className="min-w-0 gap-0 py-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
           <h2 className="text-sm font-semibold">Discover provider telemetry</h2>
-          <TopologyEditor
+          <MeasurementEditor
             scope={scope}
-            kind={bindingKind}
-            initial={stringify(starter)}
-            label="Define measurement binding"
-            onApplied={() => setRefresh((v) => v + 1)}
+            initial={starter}
+            onSaved={(name) => {
+              setID(name);
+              setRefresh((v) => v + 1);
+            }}
           />
         </div>
         <CardContent className="space-y-4 p-5">
@@ -395,20 +397,20 @@ export function MeasurementBindings({ scope }: { scope: RequestScope }) {
       <Card className="gap-0 py-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b px-5 py-4">
           <h2 className="text-sm font-semibold">
-            Compile an SLO from a binding
+            Compile an SLO from a measurement
           </h2>
           {cursor ? (
             <Button size="sm" variant="outline" disabled={busy} onClick={more}>
-              Load more bindings
+              Load more measurements
             </Button>
           ) : null}
         </div>
         <CardContent className="space-y-4 p-5">
           <div>
-            <Label htmlFor="measurement-binding">Measurement binding</Label>
+            <Label htmlFor="measurement-binding">Measurement definition</Label>
             <Select value={id} onValueChange={setID}>
               <SelectTrigger id="measurement-binding" className="mt-2 w-full">
-                <SelectValue placeholder="Select a saved binding" />
+                <SelectValue placeholder="Select a saved measurement" />
               </SelectTrigger>
               <SelectContent>
                 {items.map((i) => (
@@ -436,12 +438,12 @@ export function MeasurementBindings({ scope }: { scope: RequestScope }) {
                     {binding.spec.observationPoint}
                   </p>
                 </div>
-                <TopologyEditor
+                <MeasurementEditor
                   scope={scope}
-                  kind={bindingKind}
-                  initial={stringify(binding)}
-                  label="Edit binding YAML"
-                  onApplied={() => setRefresh((v) => v + 1)}
+                  initial={binding}
+                  existing
+                  label="Edit measurement"
+                  onSaved={() => setRefresh((v) => v + 1)}
                 />
               </div>
               <div className="space-y-2">
@@ -514,8 +516,8 @@ export function MeasurementBindings({ scope }: { scope: RequestScope }) {
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Save a binding to compile availability or classic histogram
-              latency measurements.
+              Save a measurement definition to compile availability or classic
+              histogram latency measurements.
             </p>
           )}
           {compiled ? (

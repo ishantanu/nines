@@ -30,6 +30,7 @@ func telemetryCommand(group, action string, o *options) *cobra.Command {
 	target := f.Float64("target", .999, "target fraction")
 	window := f.String("window", "28d", "rolling window")
 	format := new(string)
+	file := f.StringP("file", "f", "", "self-contained SLO YAML to verify")
 	dest := f.String("out", "", "write compiled SLO YAML to a new file")
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
@@ -47,6 +48,27 @@ func telemetryCommand(group, action string, o *options) *cobra.Command {
 		defer cancel()
 		var result any
 		switch {
+		case group == "telemetry" && action == "verify":
+			if *file == "" {
+				return fmt.Errorf("provide -f slo.yaml")
+			}
+			input, e := openInput(*file)
+			if e != nil {
+				return e
+			}
+			body, e := io.ReadAll(io.LimitReader(input, (1<<20)+1))
+			_ = input.Close()
+			if e != nil {
+				return e
+			}
+			compiled, e := c.CompileMeasurement(ctx, body)
+			if e != nil {
+				return e
+			}
+			if *dest != "" {
+				return o.generated(out, *dest, []byte(compiled.YAML))
+			}
+			result = compiled
 		case group == "telemetry" && action == "names":
 			result, err = c.DiscoverMetricNames(ctx, id, *prefix)
 		case group == "telemetry" && action == "inspect":

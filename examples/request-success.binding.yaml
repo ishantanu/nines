@@ -14,5 +14,6 @@ spec:
     environment: production
   successLabels:
     status: "200"
+  scrapeIntervalSeconds: 15 # Match your telemetry source configuration
   stepSeconds: 60
   observationPoint: Completed server requests at the API boundary; request attempts, not unique users
