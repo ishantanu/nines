@@ -17,13 +17,15 @@ import (
 )
 
 type Source struct {
-	Kind             string            `yaml:"kind" json:"kind"`
-	QueryURL         string            `yaml:"queryURL" json:"queryURL"`
-	RulerURL         string            `yaml:"rulerURL,omitempty" json:"rulerURL,omitempty"`
-	MimirOrgID       string            `yaml:"mimirOrgID,omitempty" json:"mimirOrgID,omitempty"`
-	RulerNamespace   string            `yaml:"rulerNamespace,omitempty" json:"rulerNamespace,omitempty"`
-	BearerTokenFile  string            `yaml:"bearerTokenFile,omitempty" json:"-"`
-	PrometheusLabels map[string]string `yaml:"prometheusLabels,omitempty" json:"prometheusLabels,omitempty"`
+	Kind                 string            `yaml:"kind" json:"kind"`
+	QueryURL             string            `yaml:"queryURL" json:"queryURL"`
+	RulerURL             string            `yaml:"rulerURL,omitempty" json:"rulerURL,omitempty"`
+	MimirOrgID           string            `yaml:"mimirOrgID,omitempty" json:"mimirOrgID,omitempty"`
+	RulerNamespace       string            `yaml:"rulerNamespace,omitempty" json:"rulerNamespace,omitempty"`
+	QueryBearerTokenFile string            `yaml:"queryBearerTokenFile,omitempty" json:"-"`
+	RulerBearerTokenFile string            `yaml:"rulerBearerTokenFile,omitempty" json:"-"`
+	BearerTokenFile      string            `yaml:"bearerTokenFile,omitempty" json:"-"`
+	PrometheusLabels     map[string]string `yaml:"prometheusLabels,omitempty" json:"prometheusLabels,omitempty"`
 }
 type Config struct {
 	Namespace string            `yaml:"namespace" json:"namespace"`
@@ -113,7 +115,11 @@ func secret(path string) (string, error) {
 	return v, nil
 }
 func (s Source) Collector() (*prometheus.Client, error) {
-	token, e := secret(s.BearerTokenFile)
+	path := s.QueryBearerTokenFile
+	if path == "" {
+		path = s.BearerTokenFile
+	}
+	token, e := secret(path)
 	if e != nil {
 		return nil, e
 	}
@@ -123,6 +129,10 @@ func (s Source) Collector() (*prometheus.Client, error) {
 	return prometheus.New(s.QueryURL, token)
 }
 func (s Source) Target(name string) (rules.Target, error) {
-	token, e := secret(s.BearerTokenFile)
+	path := s.RulerBearerTokenFile
+	if path == "" {
+		path = s.BearerTokenFile
+	}
+	token, e := secret(path)
 	return rules.Target{Connection: name, Kind: "mimir", QueryURL: s.QueryURL, RulerURL: s.RulerURL, MimirOrgID: s.MimirOrgID, Namespace: s.RulerNamespace, BearerToken: token}, e
 }

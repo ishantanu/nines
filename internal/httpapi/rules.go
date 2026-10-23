@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ishantanu/nines/internal/model"
+	"github.com/ishantanu/nines/internal/rules"
 )
 
 func (a *Server) rulePlan(w http.ResponseWriter, r *http.Request) {
@@ -18,14 +19,16 @@ func (a *Server) rulePlan(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	plan, err := a.Workspace.Rules.Plan(record.SLO)
+	plan, err := a.Workspace.Rules.PlanContext(r.Context(), record.SLO)
 	if err != nil {
 		a.fail(w, r, err)
 		return
 	}
 	write(w, 200, plan)
 }
-func (a *Server) ruleApply(w http.ResponseWriter, r *http.Request) {
+func (a *Server) ruleApply(w http.ResponseWriter, r *http.Request)    { a.ruleMutation(w, r, false) }
+func (a *Server) ruleWithdraw(w http.ResponseWriter, r *http.Request) { a.ruleMutation(w, r, true) }
+func (a *Server) ruleMutation(w http.ResponseWriter, r *http.Request, withdraw bool) {
 	if a.Workspace.Rules == nil {
 		a.fail(w, r, model.ErrUnavailable)
 		return
@@ -46,7 +49,12 @@ func (a *Server) ruleApply(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	result, err := a.Workspace.Rules.Apply(ctx, record.SLO, body.ExpectedDigest)
+	var result rules.Deployment
+	if withdraw {
+		result, err = a.Workspace.Rules.Withdraw(ctx, record.SLO, body.ExpectedDigest)
+	} else {
+		result, err = a.Workspace.Rules.Deploy(ctx, record.SLO, body.ExpectedDigest)
+	}
 	if err != nil {
 		a.fail(w, r, err)
 		return

@@ -108,7 +108,7 @@ func addOperations(s *mcp.Server, a *apiClient, c Config) {
 		})
 	}
 	if c.AllowRuleDeployment {
-		register(s, a, "deploy_slo_rules", "Deploy a reviewed rule plan to its server-owned destination using the exact digest. Requires API owner role and both operator write flags. Mimir accepted does not mean active; Prometheus written requires reload. Reconcile before retrying a timed-out write.", false, func(ctx context.Context, in deployRulesInput) (any, error) {
+		register(s, a, "deploy_slo_rules", "Deploy a reviewed rule plan to its server-owned destination using the exact digest. Requires API owner role and both operator write flags. Persistence is separate from activation/evaluation in the returned fields; even HTTP success can include failed reload. Prometheus optionally reloads when the trusted connection enables it. Mimir activates through its ruler. Operator destinations publish a Kubernetes SLO and reconcile asynchronously; submitted is not provider activation. Reconcile before retrying a timed-out write.", false, func(ctx context.Context, in deployRulesInput) (any, error) {
 			if err := validID(in.ID); err != nil {
 				return nil, err
 			}
@@ -117,6 +117,17 @@ func addOperations(s *mcp.Server, a *apiClient, c Config) {
 			}
 			return a.request(ctx, http.MethodPost, "/api/slos/"+in.ID+"/rules/apply", map[string]string{"expectedDigest": in.ExpectedDigest})
 		})
+		if c.AllowRuleWithdrawal {
+			register(s, a, "withdraw_slo_rules", "Withdraw an exact reviewed operator publication while retaining the portal SLO and history. Requires explicit allow-rule-withdrawal, both write/deployment flags and API owner role. Pending finalizer cleanup keeps the destination pinned; inspect, refresh and review before retrying. Direct provider destinations are unsupported.", false, func(ctx context.Context, in deployRulesInput) (any, error) {
+				if err := validID(in.ID); err != nil {
+					return nil, err
+				}
+				if !ruleDigest.MatchString(in.ExpectedDigest) {
+					return nil, errors.New("expectedDigest must come from the exact reviewed rule plan")
+				}
+				return a.request(ctx, http.MethodPost, "/api/slos/"+in.ID+"/rules/withdraw", map[string]string{"expectedDigest": in.ExpectedDigest})
+			})
+		}
 	}
 }
 func historyPath(in historyInput) (string, error) {

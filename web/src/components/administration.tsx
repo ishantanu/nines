@@ -36,7 +36,13 @@ interface Connections {
     endpoint: string;
     mimirOrgID: string;
     authentication: string;
-    rules?: { namespace: string; rulerURL?: string; directory?: string };
+    rules?: {
+      namespace: string;
+      rulerURL?: string;
+      directory?: string;
+      mode?: string;
+      publisher?: string;
+    };
   }[];
 }
 function useSettings<T>(path: string, scope: RequestScope, refresh = 0) {
@@ -261,9 +267,11 @@ export function Connections({ scope }: { scope: RequestScope }) {
                           {
                             label: "Rule destination",
                             value:
-                              c.rules.rulerURL ??
-                              c.rules.directory ??
-                              "Not configured",
+                              c.rules.mode === "operator"
+                                ? `Kubernetes operator (${c.rules.publisher})`
+                                : (c.rules.rulerURL ??
+                                  c.rules.directory ??
+                                  "Not configured"),
                           },
                         ]
                       : []),

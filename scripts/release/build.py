@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare reviewable CLI/server/MCP archives. Never publishes or tags."""
+"""Prepare reviewable CLI/server/MCP/operator archives. Never publishes or tags."""
 
 import argparse
 import gzip
@@ -109,6 +109,7 @@ def main():
                 ("nines", "./cmd/nines"),
                 ("nines-server", "./cmd/server"),
                 ("nines-mcp", "./cmd/mcp"),
+                ("nines-operator", "./cmd/operator"),
             ]:
                 subprocess.run(
                     [
@@ -150,9 +151,17 @@ Open http://127.0.0.1:8080 and use `admin` / `admin`. This sign-in is a local de
 ./nines rules generate --offline -f examples/api-availability.slo.yaml --tenant commerce
 ```
 
+## Kubernetes operator
+
+```sh
+./nines-operator -version
+```
+
+The operator uses in-cluster service-account authentication; it needs no Nines server or PostgreSQL. Install the included CRDs and reviewed namespaced deployment from `deploy/operator/`. For a container built from this extracted archive, choose the Linux archive matching the cluster nodes and use `docker build -f deploy/operator/Dockerfile.binary -t YOUR_REGISTRY/nines-operator:VERSION .`. See [operator deployment](docs/public/deployment/operator.md) for installation, credentials, selectors, upgrades and recovery.
+
 ## Source-based deployments
 
-The Compose playground, container builds, Kubernetes operator image and development/site commands require a source checkout from `https://github.com/ishantanu/nines`. This archive contains native CLI/server/MCP binaries, configuration examples and reference documentation; it is not the full source tree. Do not run source-build commands from the extracted archive. For the native Linux service guide, install the archive's `nines-server` binary in place of the source-built `nines-server-linux-amd64`, after confirming the archive matches the host architecture.
+The Compose playground, container builds, source-based operator image and development/site commands require a source checkout from `https://github.com/ishantanu/nines`. This archive contains native CLI/server/MCP/operator binaries, configuration examples and reference documentation; it is not the full source tree. Do not run source-build commands from the extracted archive. For the native Linux service guide, install the archive's `nines-server` binary in place of the source-built `nines-server-linux-amd64`, after confirming the archive matches the host architecture.
 
 For persistence, supply a PostgreSQL `DATABASE_URL` and random `API_TOKEN` in the server environment, then run `./nines-server`. Configure providers and identity explicitly; binary execution does not load `.env`. The collecting server is single-process for this MVP.
 
@@ -180,7 +189,8 @@ The source module is `github.com/ishantanu/nines`. Local previews are unpublishe
             sources += [
                 ("deploy/" + f.relative_to(ROOT / "deploy").as_posix(), f)
                 for f in sorted((ROOT / "deploy").rglob("*"))
-                if f.is_file() and f.suffix in {".yaml", ".service"}
+                if f.is_file()
+                and (f.suffix in {".yaml", ".service"} or f.name == "Dockerfile.binary")
             ]
             sources += [
                 ("LICENSES/" + f.relative_to(notices).as_posix(), f)
@@ -208,7 +218,8 @@ The source module is `github.com/ishantanu/nines`. Local previews are unpublishe
                     entry.mtime = epoch
                     entry.mode = (
                         0o755
-                        if relative in {"nines", "nines-server", "nines-mcp"}
+                        if relative
+                        in {"nines", "nines-server", "nines-mcp", "nines-operator"}
                         else 0o644
                     )
                     tar.addfile(entry, io.BytesIO(body))

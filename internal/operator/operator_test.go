@@ -147,6 +147,28 @@ func (f *kubeFixture) serve(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(current)
 		return
 	}
+	if r.Method == http.MethodDelete {
+		var options struct {
+			Preconditions struct {
+				UID             string `json:"uid"`
+				ResourceVersion string `json:"resourceVersion"`
+			} `json:"preconditions"`
+		}
+		if json.NewDecoder(r.Body).Decode(&options) != nil || !exists || options.Preconditions.UID != current.Metadata.UID || options.Preconditions.ResourceVersion != current.Metadata.ResourceVersion {
+			w.WriteHeader(http.StatusConflict)
+			return
+		}
+		f.writes++
+		if len(current.Metadata.Finalizers) > 0 {
+			now := time.Now().UTC()
+			current.Metadata.DeletionTimestamp = &now
+			f.objects[key] = current
+		} else {
+			delete(f.objects, key)
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	var incoming k.Resource
 	if json.NewDecoder(r.Body).Decode(&incoming) != nil {
 		http.Error(w, "bad JSON", 400)
@@ -198,7 +220,9 @@ func (f *kubeFixture) serve(w http.ResponseWriter, r *http.Request) {
 }
 func controller(t *testing.T) (*Controller, *kubeFixture) {
 	api, f := newKube(t)
-	return &Controller{API: api, Config: Config{Namespace: "team-commerce", Tenant: "commerce", Projects: []string{"commerce"}, Sources: map[string]Source{"primary": {Kind: "prometheus-operator", QueryURL: "http://127.0.0.1:9090", PrometheusLabels: map[string]string{"prometheus": "primary"}}}}}, f
+	backend := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(backend.Close)
+	return &Controller{API: api, Config: Config{Namespace: "team-commerce", Tenant: "commerce", Projects: []string{"commerce"}, Sources: map[string]Source{"primary": {Kind: "prometheus-operator", QueryURL: backend.URL, PrometheusLabels: map[string]string{"prometheus": "primary"}}}}}, f
 }
 func sloResource(t *testing.T) k.Resource {
 	t.Helper()
@@ -486,7 +510,7 @@ func TestNamespaceLeaseExcludesAnotherControllerAndAllowsExpiry(t *testing.T) {
 		t.Fatal(e)
 	}
 	mu.Lock()
-	saved.Spec.RenewTime = time.Now().Add(-31 * time.Second)
+	saved.Spec.RenewTime = leaseTime{Time: time.Now().Add(-31 * time.Second)}
 	mu.Unlock()
 	if e := api.renew(ctx, "second"); e != nil {
 		t.Fatal(e)

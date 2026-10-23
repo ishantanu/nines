@@ -16,11 +16,16 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/observability"
 )
 
 type Target struct {
+	Publisher     string `json:"publisher,omitempty"`
+	ProviderKind  string `json:"providerKind,omitempty"`
+	Reload        bool   `json:"reload,omitempty"`
 	Connection    string `json:"connection"`
 	Kind          string `json:"kind"`
 	QueryURL      string `json:"queryURL"`
@@ -33,20 +38,39 @@ type Target struct {
 	BasicPassword string `json:"-"`
 }
 type Plan struct {
-	Target      Target `json:"target"`
-	Group       Group  `json:"group"`
-	Digest      string `json:"digest"`
-	YAML        string `json:"yaml"`
-	SLORevision int64  `json:"sloRevision"`
+	Resource        *k.Resource `json:"resource,omitempty"`
+	ResourceYAML    string      `json:"resourceYAML,omitempty"`
+	PriorUID        string      `json:"priorUID,omitempty"`
+	PriorGeneration int64       `json:"priorGeneration,omitempty"`
+	PriorSpecDigest string      `json:"priorSpecDigest,omitempty"`
+	PriorRevision   string      `json:"priorRevision,omitempty"`
+	Target          Target      `json:"target"`
+	Group           Group       `json:"group"`
+	Digest          string      `json:"digest"`
+	YAML            string      `json:"yaml"`
+	SLORevision     int64       `json:"sloRevision"`
 }
 type Deployment struct {
-	State   string `json:"state"`
-	Digest  string `json:"digest"`
-	Target  Target `json:"target"`
-	Group   string `json:"group"`
-	Message string `json:"message"`
+	Activation *v1.IntegrationStage `json:"activation,omitempty"`
+	Evaluation *v1.IntegrationStage `json:"evaluation,omitempty"`
+	State      string               `json:"state"`
+	Digest     string               `json:"digest"`
+	Target     Target               `json:"target"`
+	Group      string               `json:"group"`
+	Message    string               `json:"message"`
+}
+
+// ExternalDestination publishes desired resources rather than writing provider
+// rules itself. Implementations must fence ownership and reviewed preconditions.
+type ExternalDestination interface {
+	Plan(context.Context, model.SLO, Target) (Plan, error)
+	Apply(context.Context, model.SLO, Plan) (Deployment, error)
+	Inspect(context.Context, model.SLO, Target, time.Time) (v1.IntegrationStage, v1.IntegrationStage)
+	Identity(context.Context, model.SLO, Target) (model.RuleOutputIdentity, error)
 }
 type Manager struct {
+	External ExternalDestination
+
 	DynamicTarget func(string) (Target, bool)
 	BeforeWrite   func() error // Optional lease/authorization guard immediately before external writes.
 	OwnerUID      string       // Optional Kubernetes resource ownership fence. Empty preserves API/CLI behavior.
@@ -56,9 +80,27 @@ type Manager struct {
 }
 
 func (m *Manager) Plan(s model.SLO) (Plan, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	return m.PlanContext(ctx, s)
+}
+func (m *Manager) PlanContext(ctx context.Context, s model.SLO) (Plan, error) {
 	target, ok := m.target(ConnectionID(s))
 	if !ok {
 		return Plan{}, model.Invalid("connection %s has no recording-rule destination configured", ConnectionID(s))
+	}
+	if guard, ok := m.External.(interface {
+		CheckRoute(context.Context, model.SLO, Target) error
+	}); ok {
+		if err := guard.CheckRoute(ctx, s, target); err != nil {
+			return Plan{}, err
+		}
+	}
+	if target.Kind == "operator" {
+		if m.External == nil {
+			return Plan{}, model.ErrUnavailable
+		}
+		return m.External.Plan(ctx, s, target)
 	}
 	group, err := Generate(s, m.Tenant)
 	if m.OwnerUID != "" {
@@ -84,35 +126,40 @@ func (m *Manager) Plan(s model.SLO) (Plan, error) {
 func (m *Manager) Apply(ctx context.Context, s model.SLO, expected string) (Deployment, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	p, err := m.Plan(s)
+	if err := ctx.Err(); err != nil {
+		return Deployment{}, err
+	}
+	p, err := m.PlanContext(ctx, s)
 	if err != nil {
 		return Deployment{}, err
 	}
 	if expected == "" || expected != p.Digest {
 		return Deployment{}, model.ErrRevisionConflict
 	}
+	if p.Target.Kind == "operator" {
+		if err := m.authorizeWrite(ctx, s, expected); err != nil {
+			return Deployment{}, err
+		}
+		return m.External.Apply(ctx, s, p)
+	}
 	result := Deployment{Digest: p.Digest, Target: p.Target, Group: p.Group.Name}
 	if p.Target.Kind == "prometheus" {
 		file := filepath.Join(p.Target.Directory, p.Target.Namespace+"-"+p.Group.Name+".yaml")
-		if stat, err := os.Lstat(file); err == nil {
-			if !stat.Mode().IsRegular() {
-				return result, model.Invalid("rule destination is not a regular file")
-			}
-			old, err := os.ReadFile(file)
-			if err != nil {
-				return result, errors.New("cannot read configured rule file")
-			}
-			var existing File
-			if yaml.Unmarshal(old, &existing) != nil || len(existing.Groups) != 1 || !Owned(existing.Groups[0], m.Tenant, p.Target.Connection, s.ID) {
-				return result, model.Invalid("refusing to replace a rule file not owned by this SLO and tenant")
+		existing, err := readRuleFile(file)
+		if err == nil {
+			if !Owned(existing.Groups[0], m.Tenant, p.Target.Connection, s.ID) || !ownedUID(existing.Groups[0], m.OwnerUID) {
+				return result, model.Invalid("refusing to replace a rule file not owned by this SLO, tenant and resource owner")
 			}
 			if sameGroup(existing.Groups[0], p.Group) {
 				result.State = "unchanged"
-				result.Message = "Rule file already matches. Prometheus must load this file through rule_files."
+				result.Message = "Rule file already matches the reviewed definition. Runtime loading is checked separately."
 				return result, nil
 			}
 		} else if !errors.Is(err, os.ErrNotExist) {
-			return result, errors.New("cannot inspect configured rule file")
+			return result, model.Invalid("cannot safely read the configured rule file; inspect its type, size, ownership and YAML before retrying")
+		}
+		if err := m.authorizeWrite(ctx, s, p.Digest); err != nil {
+			return result, err
 		}
 		temp, err := os.CreateTemp(p.Target.Directory, ".nines-rules-*")
 		if err != nil {
@@ -132,13 +179,16 @@ func (m *Manager) Apply(ctx context.Context, s model.SLO, expected string) (Depl
 			err = closeErr
 		}
 		if err == nil {
+			if guard := m.authorizeWrite(ctx, s, p.Digest); guard != nil {
+				return result, guard
+			}
 			err = os.Rename(temp.Name(), file)
 		}
 		if err != nil {
 			return result, errors.New("could not atomically write configured rule file")
 		}
 		result.State = "written"
-		result.Message = "Rule file written to the configured Prometheus directory. Load it through rule_files and reload Prometheus; activation is not yet verified."
+		result.Message = "Rule file written to the configured Prometheus directory. This result proves persistence only."
 		return result, nil
 	}
 	if p.Target.Kind != "mimir" {
@@ -150,9 +200,9 @@ func (m *Manager) Apply(ctx context.Context, s model.SLO, expected string) (Depl
 		return result, err
 	}
 	if code == http.StatusOK {
-		var existing Group
-		if yaml.Unmarshal(body, &existing) != nil || !Owned(existing, m.Tenant, p.Target.Connection, s.ID) || !ownedUID(existing, m.OwnerUID) {
-			return result, model.Invalid("refusing to replace a rule group not owned by this SLO and tenant")
+		existing, decodeErr := decodeRuleGroup(body)
+		if decodeErr != nil || !Owned(existing, m.Tenant, p.Target.Connection, s.ID) || !ownedUID(existing, m.OwnerUID) {
+			return result, model.Invalid("refusing to replace a rule group not owned by this SLO, tenant and resource owner")
 		}
 		if sameGroup(existing, p.Group) {
 			result.State = "unchanged"
@@ -166,14 +216,23 @@ func (m *Manager) Apply(ctx context.Context, s model.SLO, expected string) (Depl
 	if err != nil {
 		return result, err
 	}
-	if m.BeforeWrite != nil {
-		if e := m.BeforeWrite(); e != nil {
-			return result, e
-		}
+	if err := m.authorizeWrite(ctx, s, p.Digest); err != nil {
+		return result, err
 	}
 	code, _, err = rulerRequest(ctx, p.Target, http.MethodPost, path, body)
-	if err != nil {
-		return result, err
+	if err != nil || code >= 500 {
+		// A timeout or gateway error can arrive after the ruler commits. Read
+		// the exact reviewed destination once; never blindly repeat the POST.
+		if ctx.Err() == nil {
+			readCode, readBody, readErr := rulerRequest(ctx, p.Target, http.MethodGet, path+"/"+url.PathEscape(p.Group.Name), nil)
+			stored, decodeErr := decodeRuleGroup(readBody)
+			if readErr == nil && readCode == http.StatusOK && decodeErr == nil && sameGroup(stored, p.Group) {
+				result.State = "verified"
+				result.Message = "The write response was ambiguous, but an exact readback matches the reviewed rule group. Evaluation and notification delivery remain unverified."
+				return result, nil
+			}
+		}
+		return result, deploymentUnverifiedError{}
 	}
 	if code == http.StatusBadRequest || code == http.StatusRequestEntityTooLarge {
 		return result, model.Invalid("ruler rejected a group containing %d rules (HTTP %d); review generated expressions and backend rule-group limits", len(p.Group.Rules), code)
@@ -185,6 +244,28 @@ func (m *Manager) Apply(ctx context.Context, s model.SLO, expected string) (Depl
 	result.Message = "Mimir accepted the rule group in the configured tenant and namespace. Ruler evaluation and sample ingestion must still be monitored."
 	return result, nil
 }
+
+// authorizeWrite checks cancellation, the caller's current authority and the
+// configured destination immediately before an externally visible mutation.
+func (m *Manager) authorizeWrite(ctx context.Context, s model.SLO, digest string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if m.BeforeWrite != nil {
+		if err := m.BeforeWrite(); err != nil {
+			return err
+		}
+	}
+	latest, err := m.PlanContext(ctx, s)
+	if err != nil {
+		return err
+	}
+	if latest.Digest != digest {
+		return model.ErrRevisionConflict
+	}
+	return ctx.Err()
+}
+
 func sameGroup(a, b Group) bool {
 	normal := func(g Group) Group {
 		if seconds, err := DurationSeconds(g.Interval); err == nil {
@@ -271,8 +352,8 @@ func (m *Manager) RemoveOwned(ctx context.Context, source, group, slo string) er
 	if code != http.StatusOK {
 		return fmt.Errorf("ruler cleanup inspection returned HTTP %d", code)
 	}
-	var existing Group
-	if yaml.Unmarshal(body, &existing) != nil || !Owned(existing, m.Tenant, source, slo) || !ownedUID(existing, m.OwnerUID) {
+	existing, decodeErr := decodeRuleGroup(body)
+	if decodeErr != nil || !Owned(existing, m.Tenant, source, slo) || !ownedUID(existing, m.OwnerUID) {
 		return model.Invalid("refusing cleanup of a group owned by another resource")
 	}
 	if m.BeforeWrite != nil {
@@ -298,4 +379,52 @@ func (m *Manager) target(name string) (Target, bool) {
 		return m.DynamicTarget(name)
 	}
 	return Target{}, false
+}
+
+// A provider write can commit before its response is lost. Expose a fixed,
+// actionable unavailable error without echoing upstream content or credentials.
+type deploymentUnverifiedError struct{}
+
+func (deploymentUnverifiedError) Error() string {
+	return "ruler deployment outcome is unverified; inspect the destination before retrying the same reviewed digest"
+}
+func (deploymentUnverifiedError) Unwrap() error { return model.ErrUnavailable }
+
+// OutputIdentity follows the resource UID selected by an external deployment.
+func (m *Manager) OutputIdentity(ctx context.Context, s model.SLO) (model.RuleOutputIdentity, error) {
+	target, ok := m.target(ConnectionID(s))
+	if ok && target.Kind == "operator" {
+		if m.External == nil {
+			return model.RuleOutputIdentity{}, model.ErrUnavailable
+		}
+		return m.External.Identity(ctx, s, target)
+	}
+	if _, err := m.PlanContext(ctx, s); err != nil {
+		return model.RuleOutputIdentity{}, err
+	}
+	return OutputIdentity(s, m.Tenant, m.OwnerUID), nil
+}
+
+// Withdraw is supported only by an external operator destination. It retains
+// the saved SLO and requires the same exact reviewed plan as publication.
+func (m *Manager) Withdraw(ctx context.Context, s model.SLO, expected string) (Deployment, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	plan, err := m.PlanContext(ctx, s)
+	if err != nil {
+		return Deployment{}, err
+	}
+	if plan.Digest != expected || expected == "" {
+		return Deployment{}, model.ErrRevisionConflict
+	}
+	external, ok := m.External.(interface {
+		Withdraw(context.Context, model.SLO, Plan) (Deployment, error)
+	})
+	if !ok || plan.Target.Kind != "operator" {
+		return Deployment{}, model.Invalid("withdraw is supported only for operator publications")
+	}
+	if err := m.authorizeWrite(ctx, s, expected); err != nil {
+		return Deployment{}, err
+	}
+	return external.Withdraw(ctx, s, plan)
 }

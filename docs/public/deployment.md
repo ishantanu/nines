@@ -1,6 +1,6 @@
 # Deploy Nines
 
-Nines runs as one collecting Go server with an embedded web UI and PostgreSQL for durable data. Start with a local demo, then choose a single-instance deployment. The project currently requires Go 1.27.3 to build from source. Node 24 is needed to rebuild the UI or product site.
+Nines supports a server/portal deployment and a standalone Kubernetes operator. The server runs as one collecting Go process with an embedded web UI and PostgreSQL for durable data. The operator uses GitOps CRDs and Kubernetes RBAC without a Nines server or database. The server can also publish reviewed portal SLOs to the operator through a namespace-scoped bridge. Start with a local demo, then choose a single-instance deployment. The project currently requires Go 1.27.3 to build from source. Node 24 is needed to rebuild the UI or product site.
 
 | Deployment | Guide | Scope |
 | --- | --- | --- |
@@ -8,8 +8,8 @@ Nines runs as one collecting Go server with an embedded web UI and PostgreSQL fo
 | Local demonstration | [README quickstart](../../README.md#try-the-demo) | Synthetic, ephemeral and loopback-only |
 | Docker Compose | [Persistent container setup](deployment/docker-compose.md) | Recommended first evaluation with a dedicated database volume |
 | Linux service | [Native binary and systemd](deployment/linux-service.md) | One server behind a TLS reverse proxy |
-| Kubernetes | [Single-replica manifests](deployment/kubernetes.md) | Deployment reference; separate from the experimental operator |
-| Kubernetes operator | [Controller and offline rendering](deployment/operator.md) | Experimental CRDs, PrometheusRule output and Mimir ruler reconciliation |
+| Kubernetes | [Single-replica manifests](deployment/kubernetes.md) | Server deployment with optional reviewed operator publishing |
+| Kubernetes operator | [Controller and offline rendering](deployment/operator.md) | GitOps CRDs, PrometheusRule/Mimir reconciliation, namespaced RBAC and lease-based standby |
 | Team access | [Identity and tenant configuration](deployment/identity-and-tenants.md) | Local accounts, API keys, OIDC/Microsoft Entra, LDAP and roles |
 | Metrics and rules | [Prometheus/Mimir routing](deployment/metrics-and-rules.md) | Explicit query connections and reviewed rule destinations |
 | Data protection | [Backup, restore and upgrades](deployment/backup-and-restore.md) | Database, configuration and credential recovery |

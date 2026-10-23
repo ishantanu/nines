@@ -2,6 +2,8 @@ package operator
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -13,13 +15,23 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 )
 
+// Kubernetes coordination/v1 uses metav1.MicroTime: the wire format must
+// always contain exactly six fractional digits, including integral seconds.
+type leaseTime struct{ time.Time }
+
+func (t leaseTime) MarshalJSON() ([]byte, error) {
+	return json.Marshal(t.UTC().Format("2006-01-02T15:04:05.000000Z"))
+}
+
+var errLeaseHeld = errors.New("another operator holds the namespace lease")
+
 type lease struct {
 	APIVersion string     `json:"apiVersion"`
 	Kind       string     `json:"kind"`
 	Metadata   k.Metadata `json:"metadata"`
 	Spec       struct {
 		Holder    string    `json:"holderIdentity"`
-		RenewTime time.Time `json:"renewTime"`
+		RenewTime leaseTime `json:"renewTime"`
 		Duration  int64     `json:"leaseDurationSeconds"`
 	} `json:"spec"`
 }
@@ -34,14 +46,14 @@ func (a *API) renew(ctx context.Context, holder string) error {
 	}
 	now := time.Now().UTC()
 	if !create && current.Spec.Holder != "" && current.Spec.Holder != holder && current.Spec.RenewTime.Add(time.Duration(current.Spec.Duration)*time.Second).After(now) {
-		return fmt.Errorf("another operator holds the namespace lease")
+		return errLeaseHeld
 	}
 	current.APIVersion = "coordination.k8s.io/v1"
 	current.Kind = "Lease"
 	current.Metadata.Name = "nines-operator"
 	current.Metadata.Namespace = a.Namespace
 	current.Spec.Holder = holder
-	current.Spec.RenewTime = now
+	current.Spec.RenewTime = leaseTime{Time: now}
 	current.Spec.Duration = 30
 	if create {
 		return a.request(ctx, "POST", path[:len(path)-len("/nines-operator")], current, nil)
@@ -66,6 +78,9 @@ func (c *Controller) Run(ctx context.Context, log *slog.Logger) error {
 		e := leaseAPI.renew(attempt, holder)
 		cancel()
 		if e != nil {
+			if ctx.Err() == nil && !errors.Is(e, errLeaseHeld) {
+				log.WarnContext(ctx, "Namespace lease acquisition failed", "namespace", c.Config.Namespace, "error", e)
+			}
 			if !delay(ctx, 5*time.Second) {
 				break
 			}

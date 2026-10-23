@@ -154,3 +154,17 @@ func (m *Memory) Finish(ctx context.Context, id string, attempt int, next time.T
 }
 func (m *Memory) Ping(ctx context.Context) error { return ctx.Err() }
 func (m *Memory) Close()                         {}
+
+// OperatorRoute reads deployment metadata without cloning measurement history.
+func (m *Memory) OperatorRoute(ctx context.Context, id string) (string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	record, ok := m.records[id]
+	if !ok {
+		return "", model.ErrNotFound
+	}
+	return record.OperatorRoute, nil
+}

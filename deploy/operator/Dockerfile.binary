@@ -1,0 +1,7 @@
+# Build from an extracted Linux release archive matching the cluster architecture.
+FROM gcr.io/distroless/static:nonroot
+COPY --chmod=0555 nines-operator /nines-operator
+COPY --chmod=0444 LICENSE NOTICE THIRD_PARTY_NOTICES.md /licenses/
+COPY --chmod=0555 LICENSES/ /licenses/dependencies/
+USER 65532:65532
+ENTRYPOINT ["/nines-operator"]

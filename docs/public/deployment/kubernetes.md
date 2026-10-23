@@ -1,6 +1,6 @@
 # Kubernetes deployment reference
 
-The manifests run the normal Nines server with one replica and an external PostgreSQL database. They are separate from the experimental Kubernetes SLO reconciler. The supplied server manifests have passed a disposable kind cluster rollout, account/RBAC checks and server-restart persistence. This does not establish production storage, ingress, HA or the experimental operator.
+The manifests run the normal Nines server with one replica and an external PostgreSQL database. They can run independently or use the [reviewed operator publishing bridge](operator.md#publish-portal-slos-through-the-operator) for rule deployment. The supplied server manifests have passed a disposable kind cluster rollout, account/RBAC checks and server-restart persistence. This does not establish production storage, ingress, HA or operator conformance across every Kubernetes/provider version.
 
 ## Build and provide an image
 

@@ -1,0 +1,32 @@
+# Optional server-to-operator bridge. Review namespaces and service-account names.
+# The nines server Deployment must use serviceAccountName: nines-publisher and
+# automountServiceAccountToken: true. Its normal server deployment defaults do not.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nines-publisher
+  namespace: nines
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: nines-portal-publisher
+  namespace: team-commerce
+rules:
+  - apiGroups: [nines.dev]
+    resources: [servicelevelobjectives]
+    verbs: [get, create, update, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: nines-portal-publisher
+  namespace: team-commerce
+subjects:
+  - kind: ServiceAccount
+    name: nines-publisher
+    namespace: nines
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: nines-portal-publisher

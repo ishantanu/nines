@@ -49,6 +49,7 @@ jobs:
           python3 scripts/release/verify.py --directory dist/releases --version "$CANDIDATE_VERSION" --commit "$GITHUB_SHA"
           smoke_dir=$(mktemp -d)
           tar -xzf "dist/releases/nines_${CANDIDATE_VERSION}_linux_amd64.tar.gz" -C "$smoke_dir"
+          "$smoke_dir/nines-operator" -version
           "$smoke_dir/nines" version --agent
           "$smoke_dir/nines" validate --offline -f "$smoke_dir/examples/api-availability.slo.yaml" --agent
           python3 scripts/release/smoke.py --binary "$smoke_dir/nines-server"

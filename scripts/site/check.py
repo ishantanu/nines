@@ -42,6 +42,10 @@ for url in parser.urls:
     )
     checked.append(url)
 assert checked, "No assets found"
+assert "./nines-architecture.svg" in checked, "Architecture image must be prerendered"
+assert (SITE / "nines-architecture.svg").read_bytes() == (
+    ROOT / "docs/public/brand/nines-architecture.svg"
+).read_bytes(), "Publish the canonical architecture SVG without drift"
 assert "<h1" in page.read_text() and "Critical user journey" in page.read_text(), (
     "The page must be prerendered for readers without JavaScript"
 )

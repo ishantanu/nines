@@ -111,7 +111,7 @@ func TestReadOnlyProtocolTenantBinding(t *testing.T) {
 			t.Fatalf("not marked read only: %s", x.Name)
 		}
 	}
-	for _, name := range []string{"create_slo", "apply_slo", "apply_journey", "start_workflow", "record_run", "test_connection", "deploy_slo_rules", "approve_workflow", "reject_workflow"} {
+	for _, name := range []string{"create_slo", "apply_slo", "apply_journey", "start_workflow", "record_run", "test_connection", "deploy_slo_rules", "withdraw_slo_rules", "approve_workflow", "reject_workflow"} {
 		if hasTool(tools.Tools, name) {
 			t.Fatalf("forbidden tool %s", name)
 		}
@@ -415,5 +415,39 @@ func TestMCPRealTenantAPIProposalBoundary(t *testing.T) {
 	call(t, mcpctx, session, "get_journey", map[string]any{"id": manifest.Metadata.Name})
 	if _, err := operations.Journeys.JourneyRevision(ctx, manifest.Metadata.Name, 0); err == nil {
 		t.Fatal("approved proposal escaped tenant")
+	}
+}
+
+func TestOperatorWithdrawalRequiresOptInAndExactReviewedDigest(t *testing.T) {
+	if _, err := New(Config{Server: "http://127.0.0.1:8080", Tenant: "commerce", AllowRuleWithdrawal: true}); err == nil {
+		t.Fatal("withdrawal missing write gates accepted")
+	}
+
+	var requests atomic.Int64
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.Method != "POST" || r.URL.Path != "/api/slos/checkout/rules/withdraw" || r.Header.Get("X-Nines-Tenant") != "commerce" || r.Header.Get("Authorization") != "Bearer owner-token" {
+			t.Error("withdraw request escaped fixed route/identity")
+		}
+		_, _ = fmt.Fprint(w, `{"state":"withdrawn"}`)
+	}))
+	defer api.Close()
+	defaultSession, defaultCtx := connect(t, Config{Server: api.URL, Tenant: "commerce", Token: "owner-token", AllowWrites: true, AllowRuleDeployment: true})
+	defaultTools, defaultErr := defaultSession.ListTools(defaultCtx, nil)
+	if defaultErr != nil || hasTool(defaultTools.Tools, "withdraw_slo_rules") {
+		t.Fatal("deployment opt-in silently enabled withdrawal", defaultErr)
+	}
+	session, ctx := connect(t, Config{Server: api.URL, Tenant: "commerce", Token: "owner-token", AllowWrites: true, AllowRuleDeployment: true, AllowRuleWithdrawal: true})
+	tools, err := session.ListTools(ctx, nil)
+	if err != nil || !hasTool(tools.Tools, "withdraw_slo_rules") {
+		t.Fatal(err)
+	}
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "withdraw_slo_rules", Arguments: map[string]any{"id": "checkout", "expectedDigest": "invalid"}})
+	if err != nil || !result.IsError || requests.Load() != 0 {
+		t.Fatal("unreviewed withdrawal reached backend", result, err)
+	}
+	call(t, ctx, session, "withdraw_slo_rules", map[string]any{"id": "checkout", "expectedDigest": strings.Repeat("a", 64)})
+	if requests.Load() != 1 {
+		t.Fatal(requests.Load())
 	}
 }

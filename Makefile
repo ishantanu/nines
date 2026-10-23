@@ -1,13 +1,15 @@
-.PHONY: demo run build server cli mcp ui test test-integration test-mimir intent-eval intent-workflow-eval check release-check public-source release site site-check lint lint-go lint-python
+.PHONY: demo run build server cli mcp operator ui test test-integration test-mimir test-prometheus test-operator intent-eval intent-workflow-eval check release-check public-source release site site-check lint lint-go lint-python
 VERSION ?= dev
 RELEASE_TARGETS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64
 ui:
 	cd web && npm ci --no-audit --no-fund && npm run build
-build: server cli mcp
+build: server cli mcp operator
 server:
 	go build -trimpath -o bin/nines-server ./cmd/server
 cli:
 	go build -trimpath -o bin/nines ./cmd/nines
+operator:
+	go build -trimpath -o bin/nines-operator ./cmd/operator
 mcp:
 	go build -trimpath -o bin/nines-mcp ./cmd/mcp
 demo:
@@ -25,8 +27,12 @@ intent-eval:
 	@go run ./integration/intent-eval
 intent-workflow-eval:
 	@go run ./integration/intent-eval --suite workflow
+test-prometheus:
+	sh integration/prometheus/run.sh
 test-mimir:
 	sh integration/mimir/run.sh
+test-operator:
+	sh integration/operator/run.sh
 check:
 	go vet ./...
 release-check:

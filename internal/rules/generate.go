@@ -50,6 +50,7 @@ func generate(s model.SLO, tenant, ownerUID string) (Group, error) {
 	if err != nil {
 		return Group{}, err
 	}
+	group = withOutputMarker(group, s, tenant, ownerUID)
 	if err := validateExpressions(group); err != nil {
 		return Group{}, err
 	}

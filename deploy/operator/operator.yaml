@@ -28,7 +28,7 @@ rules:
     verbs: [update]
   - apiGroups: [monitoring.coreos.com]
     resources: [prometheusrules]
-    verbs: [get, create, update]
+    verbs: [get, list, create, update]
   - apiGroups: [coordination.k8s.io]
     resources: [leases]
     verbs: [create]

@@ -3,6 +3,10 @@ import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 
 const assets = new Map([
+  [
+    "nines-architecture.svg",
+    new URL("../docs/public/brand/nines-architecture.svg", import.meta.url),
+  ],
   ["nines.svg", new URL("../docs/public/brand/nines.svg", import.meta.url)],
   [
     "nines-dark.svg",

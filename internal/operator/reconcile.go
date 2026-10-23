@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
@@ -43,18 +44,61 @@ func (c *Controller) Reconcile(ctx context.Context, r k.Resource) error {
 	if r.Metadata.Namespace != c.Config.Namespace || r.Metadata.UID == "" {
 		return fmt.Errorf("resource is outside configured namespace/project scope")
 	}
+	// Fence each mutation against the current parent UID, spec generation,
+	// project and deletion state as well as the namespace lease. A stale list
+	// snapshot may not overwrite rules for a newer reviewed desired definition.
+	scoped := *c
+	api := *c.API
+	leaseGuard := api.BeforeWrite
+	api.BeforeWrite = func() error {
+		if leaseGuard != nil {
+			if err := leaseGuard(); err != nil {
+				return err
+			}
+		}
+		current, err := c.API.Get(ctx, r.Kind, r.Metadata.Name)
+		if err != nil {
+			return err
+		}
+		if current.Metadata.UID != r.Metadata.UID || current.Metadata.Generation != r.Metadata.Generation || current.Metadata.Annotations[k.ProjectAnnotation] != r.Metadata.Annotations[k.ProjectAnnotation] || current.Metadata.Annotations[k.PortalPublisher] != r.Metadata.Annotations[k.PortalPublisher] || current.Metadata.Annotations[k.PortalTenant] != r.Metadata.Annotations[k.PortalTenant] || current.Metadata.Annotations[k.PortalRevision] != r.Metadata.Annotations[k.PortalRevision] || current.Metadata.Annotations[k.PortalDefinition] != r.Metadata.Annotations[k.PortalDefinition] || current.Metadata.Annotations[k.PortalProvider] != r.Metadata.Annotations[k.PortalProvider] || current.Metadata.Annotations[k.PortalOrg] != r.Metadata.Annotations[k.PortalOrg] || (current.Metadata.DeletionTimestamp == nil) != (r.Metadata.DeletionTimestamp == nil) {
+			return model.ErrRevisionConflict
+		}
+		if leaseGuard != nil {
+			return leaseGuard()
+		}
+		return nil
+	}
+	scoped.API = &api
+	return scoped.reconcileResource(ctx, r)
+}
+
+func (c *Controller) reconcileResource(ctx context.Context, r k.Resource) error {
 	if r.Metadata.DeletionTimestamp != nil {
-		return c.cleanup(ctx, r)
+		if err := c.cleanup(ctx, r); err != nil {
+			status := ready(r, prior(r), false, "CleanupBlocked", "Owned rule cleanup is blocked. Restore the original route and credentials; inspect ownership before retrying. Do not remove the finalizer to bypass cleanup.")
+			if write := c.API.Status(ctx, r, status); write != nil {
+				return write
+			}
+			return err
+		}
+		return nil
 	}
 	if !c.Config.Allows(r.Metadata.Annotations[k.ProjectAnnotation]) {
-		return c.API.Status(ctx, r, ready(r, prior(r), false, "ScopeDenied", "Project is not allowed in this operator namespace."))
+		status := prior(r)
+		status.Deployment = nil
+		status.Evaluation = nil
+		status.RuleOutput = nil
+		return c.API.Status(ctx, r, ready(r, status, false, "ScopeDenied", "Project is not allowed in this operator namespace."))
 	}
 	status, e := c.reconcile(ctx, r)
 	if errors.Is(e, errRequeue) {
 		return nil
 	}
 	if e != nil {
-		status = ready(r, prior(r), false, "ReconcileFailed", e.Error())
+		status = ready(r, status, false, "ReconcileFailed", e.Error())
+		status.Deployment = nil
+		status.Evaluation = nil
+		status.RuleOutput = nil
 	}
 	if write := c.API.Status(ctx, r, status); write != nil {
 		return write
@@ -63,6 +107,9 @@ func (c *Controller) Reconcile(ctx context.Context, r k.Resource) error {
 }
 func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, error) {
 	status := prior(r)
+	status.Deployment = nil
+	status.Evaluation = nil
+	status.RuleOutput = nil
 	if r.APIVersion != v1.APIVersion {
 		return status, model.Invalid("unsupported API version")
 	}
@@ -92,6 +139,10 @@ func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, err
 		}
 		return ready(r, status, true, "ReferencesValid", "Critical user journey references resolve. This is configuration status, not measured journey health."), nil
 	}
+	revision, err := RuleRevision(r, c.Config.Tenant)
+	if err != nil {
+		return status, err
+	}
 	measurement := service.MeasurementDigest(d.SLO.SLO())
 	if status.MeasurementDigest != "" && status.MeasurementDigest != measurement {
 		return status, model.Invalid("measurement identity changed; create a new metadata.name instead of reusing interval history")
@@ -102,12 +153,21 @@ func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, err
 	if !ok {
 		return status, model.Invalid("source is not configured for this namespace")
 	}
+	if r.Metadata.Annotations[k.PortalPublisher] != "" {
+		provider := target.Kind
+		if provider == "prometheus-operator" {
+			provider = "prometheus"
+		}
+		if r.Metadata.Annotations[k.PortalProvider] != provider || r.Metadata.Annotations[k.PortalOrg] != target.MimirOrgID {
+			return status, model.Invalid("portal source provider or Mimir organization does not match this operator destination")
+		}
+	}
 	route := model.DefinitionDigest(struct{ Source, Destination string }{source, target.Digest()})
 	if status.ManagedGroup != "" && (status.DestinationDigest != route || status.Source != source) {
 		return status, model.Invalid("source/destination changes require deleting this resource with its original route configuration before recreating it")
 	}
 	if target.Kind == "prometheus-operator" {
-		rendered, e := PrometheusRule(*d.SLO, c.Config.Tenant, c.Config.Namespace, r.Metadata.UID, target.PrometheusLabels, r.Metadata.Generation)
+		rendered, e := PrometheusRule(*d.SLO, c.Config.Tenant, c.Config.Namespace, r.Metadata.UID, target.PrometheusLabels, revision)
 		if e != nil {
 			return status, e
 		}
@@ -125,7 +185,17 @@ func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, err
 		status.Source = source
 		status.ManagedGroup = rendered.Metadata.Name
 		status.RuleDigest = CanonicalDigest(rendered.Spec)
-		return ready(r, status, true, "RulesConfigured", "PrometheusRule is configured. Prometheus selection, evaluation and sample availability must be monitored separately."), nil
+		slo := d.SLO.SLO()
+		slo.Revision = revision
+		var file rules.File
+		if err := json.Unmarshal(rendered.Spec, &file); err != nil {
+			return status, err
+		}
+		deployed := v1.IntegrationStage{State: "configured", Code: "prometheus_rule_configured", Message: "The owned PrometheusRule matches the current generation.", NextAction: "Check selector, runtime and query-output evidence separately."}
+		status.Deployment = &deployed
+		status.RuleRevision = revision
+		c.observe(ctx, slo, target, file.Groups[0], r.Metadata.UID, &status)
+		return ready(r, status, true, "RulesConfigured", "The current PrometheusRule is configured. Evaluation and query-output evidence are reported separately; Ready does not mean reliability health or alert delivery."), nil
 	}
 	if !slices.Contains(r.Metadata.Finalizers, k.Finalizer) {
 		if e = c.API.Finalizer(ctx, r, true); e != nil {
@@ -139,7 +209,7 @@ func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, err
 	}
 	manager := rules.Manager{BeforeWrite: c.API.BeforeWrite, Tenant: c.Config.Tenant, OwnerUID: r.Metadata.UID, Targets: map[string]rules.Target{source: configured}}
 	slo := d.SLO.SLO()
-	slo.Revision = r.Metadata.Generation
+	slo.Revision = revision
 	plan, e := manager.Plan(slo)
 	if e != nil {
 		return status, e
@@ -156,7 +226,11 @@ func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, err
 	if _, e = manager.Apply(ctx, slo, plan.Digest); e != nil {
 		return status, e
 	}
-	return ready(r, status, true, "RulesAccepted", "Mimir accepted the owned rule group. This does not establish evaluation success or measured reliability."), nil
+	status.RuleRevision = revision
+	deployment, _ := manager.Inspect(ctx, slo, time.Now().UTC())
+	status.Deployment = &deployment
+	c.observe(ctx, slo, target, plan.Group, r.Metadata.UID, &status)
+	return ready(r, status, true, "RulesAccepted", "The current owned Mimir rule group is configured. Evaluation and query-output evidence are reported separately."), nil
 }
 func (c *Controller) cleanup(ctx context.Context, r k.Resource) error {
 	if !slices.Contains(r.Metadata.Finalizers, k.Finalizer) {
@@ -320,4 +394,39 @@ func (s *bindingSnapshot) ReadTopology(ctx context.Context, kind, id string, rev
 		return model.TopologyRevision{}, model.ErrNotFound
 	}
 	return s.row, nil
+}
+
+// observe adds independent read-only provider evidence. Configuration readiness
+// remains useful when a backend is unavailable; old-generation evidence is cleared.
+func (c *Controller) observe(ctx context.Context, slo model.SLO, source Source, group rules.Group, uid string, status *k.Status) {
+	probe, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	now := time.Now().UTC()
+	var checks sync.WaitGroup
+	checks.Go(func() {
+		target, err := source.Target(rules.ConnectionID(slo))
+		if source.Kind == "prometheus-operator" {
+			path := source.QueryBearerTokenFile
+			if path == "" {
+				path = source.BearerTokenFile
+			}
+			token, tokenErr := secret(path)
+			err = tokenErr
+			target = rules.Target{Kind: "prometheus", QueryURL: source.QueryURL, BearerToken: token}
+		}
+		stage := v1.IntegrationStage{State: "unknown", Code: "evaluator_unavailable", Message: "Runtime evidence could not be verified.", NextAction: "Check the configured evaluator route and credentials."}
+		if err == nil {
+			stage = rules.InspectEvaluation(probe, slo, group, target, now)
+		}
+		status.Evaluation = &stage
+	})
+	checks.Go(func() {
+		stage := v1.IntegrationStage{State: "unknown", Code: "rule_output_unavailable", Message: "Query output could not be verified.", NextAction: "Check query credentials, routing and ingestion."}
+		collector, err := source.Collector()
+		if err == nil {
+			stage = collector.RuleOutput(probe, rules.OutputIdentity(slo, c.Config.Tenant, uid), now)
+		}
+		status.RuleOutput = &stage
+	})
+	checks.Wait()
 }

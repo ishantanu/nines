@@ -24,11 +24,12 @@ func main() {
 	tenant := flag.String("tenant", os.Getenv("NINES_TENANT"), "fixed tenant ID (or NINES_TENANT)")
 	writes := flag.Bool("allow-writes", false, "enable direct writes and workflow creation; never enables workflow approval")
 	rules := flag.Bool("allow-rule-deployment", false, "also expose recording-rule deployment; requires allow-writes and API owner role")
+	withdrawal := flag.Bool("allow-rule-withdrawal", false, "also expose reviewed operator withdrawal; requires both write/deployment flags and API owner role")
 	flag.Parse()
 	if flag.NArg() != 0 {
 		log.Fatal("unexpected positional arguments")
 	}
-	s, err := mcpserver.New(mcpserver.Config{Server: *server, Tenant: *tenant, Token: os.Getenv("API_TOKEN"), AllowWrites: *writes, AllowRuleDeployment: *rules})
+	s, err := mcpserver.New(mcpserver.Config{Server: *server, Tenant: *tenant, Token: os.Getenv("API_TOKEN"), AllowWrites: *writes, AllowRuleDeployment: *rules, AllowRuleWithdrawal: *withdrawal})
 	if err != nil {
 		log.Fatal(err)
 	}

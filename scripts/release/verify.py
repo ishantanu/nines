@@ -5,7 +5,8 @@ import argparse
 import hashlib
 import json
 import re
-from pathlib import Path
+import tarfile
+from pathlib import Path, PurePosixPath
 
 TARGETS = ("linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64")
 
@@ -52,6 +53,26 @@ def verify(directory, version, commit):
             data
         ).hexdigest() != artifact.get("sha256"):
             raise ValueError("archive differs from build metadata: " + artifact["file"])
+        with tarfile.open(directory / artifact["file"], "r:gz") as archive:
+            entries = archive.getmembers()
+            names = [entry.name for entry in entries]
+            if len(names) != len(set(names)):
+                raise ValueError("duplicate archive entry")
+            for entry in entries:
+                path = PurePosixPath(entry.name)
+                if (
+                    not entry.isfile()
+                    or path.is_absolute()
+                    or ".." in path.parts
+                    or entry.size > 128 << 20
+                ):
+                    raise ValueError("unsafe archive entry")
+            by_name = {entry.name: entry for entry in entries}
+            for binary in ["nines", "nines-server", "nines-mcp", "nines-operator"]:
+                if binary not in by_name or not by_name[binary].mode & 0o111:
+                    raise ValueError(
+                        "missing or nonexecutable release binary: " + binary
+                    )
     checksums = {}
     for line in (directory / "SHA256SUMS").read_text().splitlines():
         match = re.fullmatch(r"([0-9a-f]{64})  ([A-Za-z0-9_.-]+)", line)

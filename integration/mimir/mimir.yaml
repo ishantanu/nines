@@ -35,6 +35,8 @@ ruler_storage:
   filesystem:
     dir: /tmp/nines-mimir/rules
 ruler:
+  # Accelerated synthetic acceptance fixture; production offsets need separate tuning.
+  poll_interval: 1s
   enable_api: true
   rule_path: /tmp/nines-mimir/rule-evaluation
   ring:
@@ -46,3 +48,7 @@ store_gateway:
     replication_factor: 1
     kvstore:
       store: inmemory
+
+limits:
+  ruler_evaluation_delay_duration: 0s
+  ruler_max_rules_per_rule_group: 128

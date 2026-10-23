@@ -25,7 +25,7 @@ func TestProviderWindowRulesUseIndependentWindowsAndPinnedCutoffs(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(g.Rules) != 27 {
+	if len(g.Rules) != 28 {
 		t.Fatal(len(g.Rules))
 	}
 	for _, r := range g.Rules {

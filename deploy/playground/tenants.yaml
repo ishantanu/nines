@@ -10,3 +10,4 @@ tenants:
       rules:
         namespace: playground
         directory: /rules
+        reload: true

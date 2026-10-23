@@ -10,4 +10,5 @@ sources:
     rulerURL: http://mimir.monitoring.svc:9009/prometheus
     mimirOrgID: commerce
     rulerNamespace: nines-commerce
-    bearerTokenFile: /var/run/nines-provider/bearer-token
+    queryBearerTokenFile: /var/run/nines-provider/query-token
+    rulerBearerTokenFile: /var/run/nines-provider/ruler-token

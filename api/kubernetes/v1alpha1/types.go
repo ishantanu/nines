@@ -11,6 +11,12 @@ import (
 )
 
 const ProjectAnnotation = "nines.dev/project"
+const PortalPublisher = "nines.dev/portal-publisher"
+const PortalTenant = "nines.dev/portal-tenant"
+const PortalRevision = "nines.dev/portal-revision"
+const PortalProvider = "nines.dev/portal-provider"
+const PortalOrg = "nines.dev/portal-org"
+const PortalDefinition = "nines.dev/portal-definition"
 const Finalizer = "nines.dev/ruler-cleanup"
 
 type OwnerReference struct {
@@ -57,17 +63,21 @@ type Condition struct {
 	LastTransitionTime time.Time `json:"lastTransitionTime"`
 }
 type Status struct {
-	MeasurementDigest  string      `json:"measurementDigest,omitempty"`
-	InputDigest        string      `json:"inputDigest,omitempty"`
-	ObservedGeneration int64       `json:"observedGeneration"`
-	Conditions         []Condition `json:"conditions"`
-	DefinitionDigest   string      `json:"definitionDigest,omitempty"`
-	RuleDigest         string      `json:"ruleDigest,omitempty"`
-	DestinationDigest  string      `json:"destinationDigest,omitempty"`
-	Source             string      `json:"source,omitempty"`
-	ManagedGroup       string      `json:"managedGroup,omitempty"`
-	BindingGeneration  int64       `json:"bindingGeneration,omitempty"`
-	ValidatedAt        *time.Time  `json:"validatedAt,omitempty"`
+	RuleRevision       int64                    `json:"ruleRevision,omitempty"`
+	Deployment         *domain.IntegrationStage `json:"deployment,omitempty"`
+	Evaluation         *domain.IntegrationStage `json:"evaluation,omitempty"`
+	RuleOutput         *domain.IntegrationStage `json:"ruleOutput,omitempty"`
+	MeasurementDigest  string                   `json:"measurementDigest,omitempty"`
+	InputDigest        string                   `json:"inputDigest,omitempty"`
+	ObservedGeneration int64                    `json:"observedGeneration"`
+	Conditions         []Condition              `json:"conditions"`
+	DefinitionDigest   string                   `json:"definitionDigest,omitempty"`
+	RuleDigest         string                   `json:"ruleDigest,omitempty"`
+	DestinationDigest  string                   `json:"destinationDigest,omitempty"`
+	Source             string                   `json:"source,omitempty"`
+	ManagedGroup       string                   `json:"managedGroup,omitempty"`
+	BindingGeneration  int64                    `json:"bindingGeneration,omitempty"`
+	ValidatedAt        *time.Time               `json:"validatedAt,omitempty"`
 }
 
 type MeasurementSelection struct {

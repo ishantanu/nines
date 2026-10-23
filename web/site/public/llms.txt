@@ -16,11 +16,17 @@ Intent change sets require explicit owner/editor approval of the exact digest an
 
 The evaluation guide distinguishes scripted contract coverage from real model behavior. A small local Qwen model passed 7/10 drafting cases but failed the native workflow corpus; real Anthropic validation remains unverified. These are documented limitations, not successful model acceptance. The alpha hardening issue #20 is closed with this caveat; remaining real-provider acceptance is tracked at https://github.com/ishantanu/nines/issues/34.
 
+## Architecture diagram
+
+The #architecture section includes a downloadable nines-architecture.svg. Telemetry flows from applications through scraping or an OpenTelemetry Collector to Prometheus or Mimir. Nines plans reviewed rules and delivers them through shared Prometheus files with opt-in reload, the Mimir ruler API, or the Nines operator. Query feedback verifies recorded output separately from deployment status and SLO coverage. GitOps can use the operator independently of the Nines server and database.
+
 ## Runnable examples
 
 The product site's #examples section covers the Docker Compose Prometheus playground, offline CLI validation and rule generation, tenant contexts and SSO, recorded SLI/burn metrics, the typed Go client and read-only MCP configuration. The intent-checks example runs 75 drafting and 60 workflow fixture checks without contacting a model or a real Nines server. Fixture workflows use disposable in-memory workspaces and simulate reviewed writes. The #as-code section includes complete SLO, critical user journey, measurement binding and experimental SLO intent YAML from the source repository. Prometheus recording results are queried through /query, not its /metrics instrumentation endpoint.
 
 Alpha binary archives are prepared for Linux/macOS on amd64/arm64. Releases include the CLI, server and MCP adapter, SHA256SUMS, source commit metadata and dependency licenses. Tagged alpha releases are drafted for maintainer review before publication. See https://github.com/ishantanu/nines/releases.
+
+Integration status keeps collection, stored deployment and external evaluation separate. Rule stages expose diagnostic codes and corrective nextAction text. Inspect before retrying an ambiguous rule deployment. Exact Mimir readback can verify stored content without proving evaluation or notification delivery. Alertmanager owns receivers, routing, grouping, inhibition and silences.
 
 ## Community credits
 
@@ -37,3 +43,9 @@ Nines takes inspiration from Sloth (https://github.com/slok/sloth) and Pyrra (ht
 - [Intent evaluation commands, provider configuration and measured limitations](https://github.com/ishantanu/nines/blob/main/docs/public/intent-evaluations.md)
 - [Experimental features](https://github.com/ishantanu/nines/blob/main/docs/public/experimental.md)
 - [Release checklist](https://github.com/ishantanu/nines/blob/main/docs/public/release.md)
+
+Rule output evidence: nines integration SLO_ID --agent exposes ruleOutput separately from deployment/evaluation. A fresh nines:rule_definition:info marker must match tenant, source, SLO, definition digest, revision and optional resource UID through query credentials. Missing output may mean an older rule group, ingestion delay or query/ruler routing mismatch; it does not prove a particular cause. Adding markers requires reviewed explicit redeployment. make test-mimir verifies dataset visibility and independent policy pending/recovery; make test-operator verifies upstream selection, Nines CRD/RBAC reconciliation, generation-scoped status, garbage collection, lease failover, Mimir cleanup and the packaged runtime in a private agentless API; workload pod scheduling and scale remain outside the fixture.
+
+Kubernetes operator is a supported alpha deployment mode and ships as nines-operator in release archives. It requires no Nines API server, PostgreSQL or model. Kubernetes RBAC, namespace/tenant/project bindings and GitOps desired state control it; standalone GitOps CRDs are not imported into the portal. The server can publish owner-reviewed portal SLOs into a configured namespace using rules.mode=operator, a stable publisher identity and a dedicated service account. Provider kind/org, tenant, ownership, portal revision and Kubernetes UID are checked. rules withdraw preserves the portal definition and releases the persistent deployment-route pin only after owned cleanup. Use deploy/operator manifests and the operator deployment guide for installation, independent status evidence, provider Secret mounts, standby replicas, upgrades and rollback.
+
+Rule activation: generation is offline; owner-reviewed apply writes files or stores a Mimir group. Prometheus connections can opt into rules.reload=true against their trusted query origin with lifecycle enabled and a shared rule_files mount. Apply returns separate activation and evaluation evidence; HTTP 200 can mean file written with reload failed. Inspect these fields and integration ruleOutput before claiming success. Mimir activates by ruler polling; Kubernetes uses the first-class Nines operator. Unknown SLO health still requires measurement collection and sufficient coverage.

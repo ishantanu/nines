@@ -415,15 +415,15 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			path = "/api/slos/" + id + "/collect"
 			body, _ = json.Marshal(map[string]string{"from": *from, "to": *to})
 			media = "application/json"
-		case "rules-plan", "rules-apply":
+		case "rules-plan", "rules-apply", "rules-withdraw":
 			if id == "" {
 				return fmt.Errorf("rules plan/apply requires -id")
 			}
 			method = http.MethodPost
 			path = "/api/slos/" + id + "/rules/" + strings.TrimPrefix(action, "rules-")
-			if action == "rules-apply" {
+			if action == "rules-apply" || action == "rules-withdraw" {
 				if *digest == "" {
-					return fmt.Errorf("rules apply requires -expected-digest from the reviewed plan")
+					return fmt.Errorf("rules apply/withdraw requires -expected-digest from the reviewed plan")
 				}
 				body, _ = json.Marshal(map[string]string{"expectedDigest": *digest})
 				media = "application/json"

@@ -14,7 +14,7 @@ import (
 func TestInspectionSeparatesDeploymentFromRuntimeEvidence(t *testing.T) {
 	now := time.Now().UTC()
 	s := fixture()
-	var groups []runtimeGroup
+	groups := []runtimeGroup{}
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "GET" || r.URL.Path != "/api/v1/rules" {
 			t.Errorf("unexpected mutation or endpoint: %s %s", r.Method, r.URL)
@@ -22,7 +22,7 @@ func TestInspectionSeparatesDeploymentFromRuntimeEvidence(t *testing.T) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "data": map[string]any{"groups": groups}})
 	}))
 	defer backend.Close()
-	m := Manager{Tenant: "commerce", Targets: map[string]Target{"production": {Kind: "prometheus", Connection: "production", QueryURL: backend.URL, Directory: t.TempDir(), Namespace: "nines"}}}
+	m := Manager{Tenant: "commerce", Targets: map[string]Target{"production": {Kind: "prometheus", Connection: "production", QueryURL: backend.URL + "/", Directory: t.TempDir(), Namespace: "nines"}}}
 	p, err := m.Plan(s)
 	if err != nil {
 		t.Fatal(err)
@@ -30,6 +30,9 @@ func TestInspectionSeparatesDeploymentFromRuntimeEvidence(t *testing.T) {
 	check := func(wantDeployment, wantEvaluation string) {
 		t.Helper()
 		d, e := m.Inspect(context.Background(), s, now)
+		if d.Code == "" || d.NextAction == "" || e.Code == "" || e.NextAction == "" {
+			t.Fatal("missing machine-readable diagnostic or corrective action", d, e)
+		}
 		if d.State != wantDeployment || e.State != wantEvaluation {
 			t.Fatalf("got %+v %+v, want %s %s", d, e, wantDeployment, wantEvaluation)
 		}
@@ -38,7 +41,7 @@ func TestInspectionSeparatesDeploymentFromRuntimeEvidence(t *testing.T) {
 	if _, err = m.Apply(context.Background(), s, p.Digest); err != nil {
 		t.Fatal(err)
 	}
-	check("deployed", "not_loaded")
+	check("written", "not_loaded")
 	g := runtimeGroup{Name: p.Group.Name, Interval: float64(s.StepSeconds)}
 	for _, r := range p.Group.Rules {
 		name, kind := r.Record, "recording"
@@ -49,23 +52,23 @@ func TestInspectionSeparatesDeploymentFromRuntimeEvidence(t *testing.T) {
 		g.Rules = append(g.Rules, runtimeRule{Name: name, Type: kind, Query: r.Expr, Labels: r.Labels, Annotations: r.Annotations, Duration: float64(seconds), Health: "ok", LastEvaluation: now.Add(-time.Second)})
 	}
 	groups = []runtimeGroup{g}
-	check("deployed", "evaluating")
+	check("written", "evaluating")
 	groups[0].Rules[0].Query = "vector(1)"
-	check("deployed", "out_of_date")
+	check("written", "out_of_date")
 	groups[0].Rules[0].Query = p.Group.Rules[0].Expr
 	groups[0].Rules[0].LastError = "credential error with private content"
-	check("deployed", "failed")
+	check("written", "failed")
 	_, e := m.Inspect(context.Background(), s, now)
 	if e.Message == groups[0].Rules[0].LastError {
 		t.Fatal("provider error leaked")
 	}
 	groups[0].Rules[0].LastError = ""
 	groups[0].Rules[0].LastEvaluation = now.Add(-10 * time.Minute)
-	check("deployed", "stale")
+	check("written", "stale")
 	groups[0].Rules[0].LastEvaluation = time.Time{}
-	check("deployed", "pending")
+	check("written", "pending")
 	groups = append(groups, groups[0])
-	check("deployed", "out_of_date")
+	check("written", "out_of_date")
 }
 
 func TestMimirInspectionPinsNamespaceCredentialsAndTenant(t *testing.T) {
@@ -93,7 +96,7 @@ func TestMimirInspectionPinsNamespaceCredentialsAndTenant(t *testing.T) {
 	}
 	group = p.Group
 	d, e := m.Inspect(context.Background(), s, time.Now())
-	if d.State != "deployed" || e.State != "not_loaded" {
+	if d.State != "stored" || e.State != "not_loaded" {
 		t.Fatal(d, e)
 	}
 }

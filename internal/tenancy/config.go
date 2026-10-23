@@ -46,6 +46,9 @@ type Access struct {
 	Role     string `json:"role" yaml:"role"`
 }
 type RuleDestination struct {
+	Mode             string `json:"mode,omitempty" yaml:"mode,omitempty"`
+	Publisher        string `json:"publisher,omitempty" yaml:"publisher,omitempty"`
+	Reload           bool   `json:"reload,omitempty" yaml:"reload,omitempty"`
 	Namespace        string `json:"namespace" yaml:"namespace"`
 	RulerURL         string `json:"rulerURL,omitempty" yaml:"rulerURL,omitempty"`
 	Directory        string `json:"directory,omitempty" yaml:"directory,omitempty"`
@@ -220,13 +223,27 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 			if !ValidID(rules.Namespace) {
 				return nil, fmt.Errorf("rules require a valid namespace")
 			}
-			switch s.Kind {
-			case "mimir":
+			if rules.Mode != "" && rules.Mode != "operator" {
+				return nil, fmt.Errorf("unsupported rule deployment mode")
+			}
+			if rules.Mode == "operator" {
+				if !ValidID(rules.Publisher) || rules.Directory != "" || rules.RulerURL != "" || rules.Reload || rules.BearerTokenEnv != "" || rules.BasicUsername != "" || rules.BasicPasswordEnv != "" {
+					return nil, fmt.Errorf("operator rules require a publisher and Kubernetes namespace, without file/ruler/reload credentials")
+				}
+			} else if rules.Publisher != "" {
+				return nil, fmt.Errorf("publisher requires operator mode")
+			}
+			switch {
+			case rules.Mode == "operator":
+			case s.Kind == "mimir":
+				if rules.Reload {
+					return nil, fmt.Errorf("reload is supported only for Prometheus rule files")
+				}
 				u, err := url.Parse(rules.RulerURL)
 				if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "http" && u.Scheme != "https") || rules.Directory != "" {
 					return nil, fmt.Errorf("mimir rules require an explicit rulerURL with Prometheus prefix, and no directory")
 				}
-			case "prometheus":
+			case s.Kind == "prometheus":
 				if !filepath.IsAbs(rules.Directory) || rules.RulerURL != "" {
 					return nil, fmt.Errorf("prometheus rules require an absolute directory, not a rulerURL")
 				}
@@ -260,7 +277,7 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 			if err != nil {
 				return nil, err
 			}
-			nested, err := Parse(b, lookup)
+			nested, err := parse(b, lookup, identityEnabled)
 			if err != nil {
 				return nil, fmt.Errorf("connection %s: %w", connection.Name, err)
 			}
@@ -281,6 +298,21 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 			}
 		}
 		out = append(out, r)
+	}
+	namespaces := map[string]string{}
+	for _, resolved := range out {
+		sources := []Source{resolved.Config.Source}
+		for _, connection := range resolved.Connections {
+			sources = append(sources, connection.Config.Source)
+		}
+		for _, source := range sources {
+			if rule := source.Rules; rule != nil && rule.Mode == "operator" {
+				if tenant, ok := namespaces[rule.Namespace]; ok && tenant != resolved.Config.ID {
+					return nil, fmt.Errorf("operator namespace cannot be shared by different Nines tenants")
+				}
+				namespaces[rule.Namespace] = resolved.Config.ID
+			}
+		}
 	}
 	return out, nil
 }

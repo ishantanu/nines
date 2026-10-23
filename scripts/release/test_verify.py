@@ -1,6 +1,8 @@
 import hashlib
 import importlib.util
+import io
 import json
+import tarfile
 import tempfile
 import unittest
 from pathlib import Path
@@ -26,7 +28,14 @@ class ReleaseVerificationTests(unittest.TestCase):
         }
         for target in module.TARGETS:
             name = f"nines_{VERSION}_{target.replace('/', '_')}.tar.gz"
-            data = target.encode()
+            raw = io.BytesIO()
+            with tarfile.open(fileobj=raw, mode="w:gz") as tar:
+                for binary in ["nines", "nines-server", "nines-mcp", "nines-operator"]:
+                    entry = tarfile.TarInfo(binary)
+                    entry.mode = 0o755
+                    entry.size = len(target)
+                    tar.addfile(entry, io.BytesIO(target.encode()))
+            data = raw.getvalue()
             (root / name).write_bytes(data)
             manifest["artifacts"].append(
                 {
@@ -53,6 +62,27 @@ class ReleaseVerificationTests(unittest.TestCase):
             root = Path(tmp)
             self.fixture(root)
             self.assertEqual(module.verify(root, VERSION, COMMIT)["commit"], COMMIT)
+
+    def test_missing_operator_rejected_even_with_valid_checksums(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = self.fixture(root)
+            artifact = manifest["artifacts"][0]
+            path = root / artifact["file"]
+            raw = io.BytesIO()
+            with tarfile.open(fileobj=raw, mode="w:gz") as tar:
+                for name in ["nines", "nines-server", "nines-mcp"]:
+                    entry = tarfile.TarInfo(name)
+                    entry.mode = 0o755
+                    entry.size = 1
+                    tar.addfile(entry, io.BytesIO(b"x"))
+            path.write_bytes(raw.getvalue())
+            artifact["bytes"] = path.stat().st_size
+            artifact["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+            (root / "build.json").write_text(json.dumps(manifest))
+            self.checksums(root)
+            with self.assertRaisesRegex(ValueError, "nines-operator"):
+                module.verify(root, VERSION, COMMIT)
 
     def test_wrong_version_or_commit_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

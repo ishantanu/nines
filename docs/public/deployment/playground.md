@@ -38,7 +38,7 @@ Sign in with username `admin` and password `admin`. Set `NINES_PLAYGROUND_PASSWO
 
 1. Open **SLOs**, then **Checkout success** in **Playground Prometheus**. **SLO saved** confirms the stored definition. **Measurements collected** confirms recent provider intervals for that revision; expect a brief initial wait for scrapes and the collector.
 2. **Rules deployed** initially reads **Not deployed**. Creating the SLO and collecting measurements do not create external metrics.
-3. Open the SLO's **Rules** tab. Review the generated group and destination, then select **Deploy reviewed rules**. Nines writes the owned file to a shared volume. The playground's separate rule reloader observes file changes and asks only its own Prometheus to reload. Production deployments must supply their own reload mechanism.
+3. Open the SLO's **Rules** tab. Review the generated group and destination, then select **Apply reviewed rules**. Nines writes the owned file to a shared volume and requests its configured Prometheus to reload using the native `rules.reload: true` setting. Configuration, activation and runtime evaluation have separate results. Production deployments can explicitly enable the same trusted reload path, arrange their own reload, or use the Kubernetes operator.
 4. The Integration status panel refreshes every 15 seconds, or use **Check status**. **Rules deployed** reports whether the destination matches the current definition. **Rules evaluating** requires the expected loaded group and recent successful evaluations of every rule. Failed, stale, missing, changed and unavailable evidence stay distinct.
 
 Prometheus scrapes a synthetic checkout service every five seconds and evaluates its own Nines recording and alert rules. The default stack has no remote-write destination, Mimir container or Mimir workspace. No telemetry or model account is required.
@@ -140,7 +140,7 @@ docker compose -p nines-playground -f compose.playground.yaml down
 docker compose -p nines-playground -f compose.playground.yaml down -v
 ```
 
-Use the same project name for every command. Do not use global container or volume cleanup commands. Rebuild after source changes with `up --build -d`; the database and backend history remain until explicitly removed. If the optional profile was enabled, use its shutdown command above so Mimir is stopped too.
+Use the same project name for every command. Do not use global container or volume cleanup commands. Rebuild after source changes with `up --build -d --remove-orphans`; the database and backend history remain until explicitly removed. If the optional profile was enabled, use its shutdown command above so Mimir is stopped too.
 
 ## Users and data sources
 
@@ -151,3 +151,5 @@ Open **Data sources → Add data source** to create a managed connection. The de
 Use the Alert policy selector on the SLO Performance tab to chart each policy's burn windows. The SLO detail lists independent policy states; Rules lists severity labels for notification routing. The sample uses critical `fast-burn` at 6× and warning `sustained-burn` at 2×. The critical policy uses 60s/120s windows and the warning policy uses 120s/300s. These accelerated windows allow for ingestion delay but are for synthetic testing, not production defaults.
 
 On narrow screens, the navigation dropdown includes Data sources and Access control. Existing playground volumes preserve prior SLO definitions. To try the sample policies against an existing stack, review and apply `deploy/playground/sample.slo.yaml` through the YAML editor; startup does not overwrite user definitions.
+
+When updating an existing playground that used the earlier `rule-reloader` service, use the same Compose project and full file/profile selection with `up --build -d --remove-orphans`. This removes its obsolete watcher; native reviewed apply now requests reload directly. Do not run two reload owners for the same directory.
