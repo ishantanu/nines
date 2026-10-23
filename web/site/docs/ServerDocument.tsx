@@ -10,23 +10,32 @@ import { Button } from "../../src/components/ui/button";
 import { DocsLayout, type DocumentationData, type Heading } from "./DocsLayout";
 import { resolveDocumentLink } from "./links";
 import { rootForPage, type DocPage } from "./navigation";
-function decodeText(text: string) {
-  return text
-    .replace(/<[^>]*>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;/g, "'");
+function headingText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(headingText).join("");
+  if (isValidElement<{ children?: ReactNode; alt?: string }>(node))
+    return node.props.alt ?? headingText(node.props.children);
+  return "";
 }
 export function renderDocumentation(page: DocPage, markdown: string) {
   const root = rootForPage(page);
+  const headings: Heading[] = [];
+  function heading(level: 2 | 3, id: string | undefined, children: ReactNode) {
+    if (id) headings.push({ level, id, text: headingText(children) });
+    return level === 2 ? (
+      <h2 id={id}>{children}</h2>
+    ) : (
+      <h3 id={id}>{children}</h3>
+    );
+  }
   const content = renderToString(
     <Markdown
       remarkPlugins={[remarkGfm]}
       rehypePlugins={[rehypeSlug]}
       skipHtml
       components={{
+        h2: ({ id, children }) => heading(2, id, children),
+        h3: ({ id, children }) => heading(3, id, children),
         a: ({ href, children }) => {
           const target = resolveDocumentLink(href ?? "", page.source, root);
           return (
@@ -86,13 +95,6 @@ export function renderDocumentation(page: DocPage, markdown: string) {
       {markdown}
     </Markdown>,
   );
-  const headings: Heading[] = [
-    ...content.matchAll(/<h([23]) id="([^"]+)">([\s\S]*?)<\/h[23]>/g),
-  ].map((match) => ({
-    level: Number(match[1]),
-    id: match[2],
-    text: decodeText(match[3]),
-  }));
   const data: DocumentationData = { page, root, headings };
   return {
     markup: renderToString(<DocsLayout {...data} content={content} />),

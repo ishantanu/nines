@@ -10,7 +10,11 @@ import {
   rootForPage,
 } from "./navigation";
 import { resolveDocumentLink } from "./links";
-import { documentationHTML, loadDocumentationSource } from "./ServerDocument";
+import {
+  documentationHTML,
+  loadDocumentationSource,
+  renderDocumentation,
+} from "./ServerDocument";
 
 describe("documentation routes and source links", () => {
   it("keeps every guide unique and reachable at root or a GitHub project subpath", () => {
@@ -123,4 +127,21 @@ it("includes canonical examples but rejects files outside the public example tre
   } finally {
     await rm(root, { recursive: true, force: true });
   }
+});
+
+it("takes table-of-contents text from parsed heading nodes without stripping HTML or decoding entities again", () => {
+  const page = docPages.find((page) => page.slug === "latency-slos")!;
+  const markdown =
+    "# Latency\n\n## **Budget** &amp; `ratio <script>` [guide](measurements.md)\n\n### Literal &amp;lt;img&amp;gt; and ![bucket diagram](brand/buckets.svg)\n";
+  const { data, markup } = renderDocumentation(page, markdown);
+  expect(data.headings.map(({ level, text }) => ({ level, text }))).toEqual([
+    { level: 2, text: "Budget & ratio <script> guide" },
+    { level: 3, text: "Literal &lt;img&gt; and bucket diagram" },
+  ]);
+  expect(
+    data.headings.every(({ id }) => markup.includes(`href="#${id}"`)),
+  ).toBe(true);
+  expect(markup).toContain("ratio &lt;script&gt;");
+  expect(markup).toContain("Literal &amp;lt;img&amp;gt;");
+  expect(markup).not.toContain("<script>");
 });
