@@ -198,6 +198,7 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
 		// Static assets are shared code, without tenant data. Health is independent
 		// of tenant selection and never returns tenant IDs or provider details.
 		if r.URL.Path == "/healthz" {

@@ -108,9 +108,10 @@ func (s *Service) Status(ctx context.Context, id string, at time.Time) (model.Sn
 
 // SLOView pairs a definition and status calculated from the same stored record.
 type SLOView struct {
-	MeasurementHealth *v1.BindingHealth `json:"measurementHealth,omitempty"`
-	SLO               model.SLO         `json:"slo"`
-	Status            model.Snapshot    `json:"status"`
+	Collection        *v1.CollectionHealth `json:"collection,omitempty"`
+	MeasurementHealth *v1.BindingHealth    `json:"measurementHealth,omitempty"`
+	SLO               model.SLO            `json:"slo"`
+	Status            model.Snapshot       `json:"status"`
 }
 
 func (s *Service) ReadSLO(ctx context.Context, id string) (SLOView, error) {
@@ -123,6 +124,10 @@ func (s *Service) ReadSLO(ctx context.Context, id string) (SLOView, error) {
 		return SLOView{}, err
 	}
 	view := SLOView{SLO: r.SLO, Status: status}
+	if r.Collection.State != "" {
+		collection := r.Collection
+		view.Collection = &collection
+	}
 	if check, ok := s.measurementHealth(r); ok {
 		view.MeasurementHealth = &check
 	}
@@ -231,6 +236,19 @@ func (s *Service) advance(r *model.Record, at time.Time) {
 }
 func (s *Service) Evaluate(ctx context.Context, id string) error {
 	return s.Store.Update(ctx, id, func(r *model.Record) error { s.advance(r, s.recordEvaluationAt(*r, s.Now())); return nil })
+}
+
+// CollectRecent reads a bounded recent range using the saved SLO and configured
+// source. The server clock and one-step delay match the background collector.
+func (s *Service) CollectRecent(ctx context.Context, id string) (int, error) {
+	record, err := s.Store.Read(ctx, id)
+	if err != nil {
+		return 0, err
+	}
+	step := time.Duration(record.SLO.StepSeconds) * time.Second
+	end := s.Now().UTC().Add(-step).Truncate(step)
+	intervals := max(int64(1), min(int64(900)/record.SLO.StepSeconds, record.SLO.WindowSeconds/record.SLO.StepSeconds))
+	return s.Collect(ctx, id, end.Add(-time.Duration(intervals)*step), end)
 }
 
 func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (count int, collectErr error) {

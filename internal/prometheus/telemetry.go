@@ -72,10 +72,14 @@ func (c *Client) telemetryRequest(ctx context.Context, path string, q url.Values
 	return nil
 }
 func (c *Client) MetricNames(ctx context.Context, prefix string, at time.Time) ([]string, bool, error) {
-	if len(prefix) > 100 || !regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`).MatchString(prefix) {
-		return nil, false, model.Invalid("metric prefix requires 1–100 metric-name characters")
+	if len(prefix) > 100 || prefix != "" && !regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`).MatchString(prefix) {
+		return nil, false, model.Invalid("metric prefix requires at most 100 metric-name characters")
 	}
-	q := url.Values{"match[]": {"{__name__=~" + strconv.Quote(regexp.QuoteMeta(prefix)+".*") + "}"}, "start": {strconv.FormatInt(at.Add(-15*time.Minute).Unix(), 10)}, "end": {strconv.FormatInt(at.Unix(), 10)}, "limit": {"101"}}
+	pattern := regexp.QuoteMeta(prefix) + ".*"
+	if prefix == "" {
+		pattern = ".+"
+	}
+	q := url.Values{"match[]": {"{__name__=~" + strconv.Quote(pattern) + "}"}, "start": {strconv.FormatInt(at.Add(-15*time.Minute).Unix(), 10)}, "end": {strconv.FormatInt(at.Unix(), 10)}, "limit": {"101"}}
 	var names []string
 	if err := c.telemetryRequest(ctx, "label/__name__/values", q, &names); err != nil {
 		return nil, false, err

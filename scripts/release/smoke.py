@@ -51,6 +51,29 @@ def check(origin, token=None):
         or len(tenants) < 2
     ):
         raise ValueError("Missing healthy synthetic demo workspaces")
+    routes = [
+        "/login",
+        "/tenants/default/home",
+        "/tenants/default/slos",
+        "/tenants/default/slos/" + slos[0]["slo"]["id"],
+    ]
+    for path in routes:
+        if get(path).decode() != html:
+            raise ValueError("Deep link did not serve the embedded portal")
+    missing = [
+        "/api/does-not-exist",
+        "/assets/does-not-exist.js",
+        "/tenants/default/does-not-exist",
+    ]
+    for path in missing:
+        try:
+            get(path)
+        except urllib.error.HTTPError as error:
+            error.read()
+            if error.code != 404:
+                raise ValueError("Missing route did not return 404") from error
+        else:
+            raise ValueError("Missing route received a successful response")
     print(
         json.dumps(
             {
@@ -58,6 +81,8 @@ def check(origin, token=None):
                 "demoSLOs": len(slos),
                 "demoTenants": len(tenants),
                 "embeddedAssets": len(assets),
+                "portalRoutes": len(routes),
+                "missingRoutes": len(missing),
                 "writes": False,
             }
         )

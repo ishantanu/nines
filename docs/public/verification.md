@@ -185,3 +185,55 @@ The complete playground verifier then passed local sign-in, tenant user CRUD/RBA
 The full PostgreSQL-backed Go race suite passed **664 tests/subtests**, with zero failures and no required database skips. Eight opt-in upstream/cluster fixture anchors were not enabled in that suite; real Prometheus and Mimir behavior was exercised separately through the Compose flow above. Final affected service, intent, tenancy and query-output race regressions also passed. Tests cover opt-in defaults, foreign-rule protection, reload failure/backoff/recovery, persistent pause state, exact-revision and tenant/role controls, managed-source policy changes and preservation of pinned operator routes. **98 UI tests** passed across 25 files. TypeScript, portal/site builds, source formatting, Go/Python lint, vet, 14 release-script checks, public-source preflight, static-site checks, all four native builds and the embedded-demo HTTP smoke passed.
 
 This pass did not run a live browser walkthrough or a Kubernetes cluster. Automatic delivery reuses the operator publication path; it does not change controller behavior or certify cluster scale. The MVP still requires one collecting server process and one owner per provider group. No commit, push or public site deployment was performed.
+
+
+## Identity session revalidation, 2026-10-23
+
+Browser authentication now records a digest of the authenticating provider identity. Every browser request and linked CLI credential checks that binding against current server configuration. Removed providers, changed OIDC issuer/client identity and changed LDAP directory/search/subject configuration reject old authentication, including direct tenant owners. Display-name and client-secret rotation preserve otherwise valid sessions. Current memberships and mappings remain independently evaluated. Pre-pinning sessions require one new sign-in; no identity-data migration is performed.
+
+The regression failed without the binding check and passed with it. Controlled signed OIDC acceptance follows browser login through CLI authorization, approval, PKCE exchange and tenant HTTP endpoints. It verifies editor restrictions, single-tenant CLI access, live role changes and denial after new claims remove access. Cancellation consumes its request without issuing a grant. PostgreSQL reopen preserves the binding and rejects a persisted direct-owner session after an OIDC client change.
+
+The full race suite against a unique disposable PostgreSQL 17 container passed **676 tests/subtests**, with zero failures and no required database skips. Eight opt-in upstream/cluster fixture anchors were not enabled. The container was removed. Existing encrypted LDAP and identity fixtures ran locally; this pass did not contact Microsoft or a corporate directory. Issue #22 remains open for its remaining acceptance evidence. See [identity acceptance](deployment/identity-acceptance.md).
+
+## Website-hosted documentation, 2026-10-23
+
+The product website publishes **31 directly addressable documentation pages** from curated Markdown, with grouped chapter navigation, on-page outlines, heading anchors, previous/next links, optional search and code copying. Small screens use a native disclosure menu. Prerendered guides and navigation remain readable without JavaScript. Markdown parsing stays on the build/dev-server side, raw HTML is disabled, and public example includes are confined to the example tree. Downloads match canonical YAML sources. Product guides stay on the website; explicitly labeled source-edit links open GitHub.
+
+New guides cover latency bucket selection and ratio/burn arithmetic, critical user journeys, intents and MCP/skills. Published Markdown changes trigger the Pages build. LLM discovery includes hosted guide links and a full-text corpus.
+
+**102 frontend tests** passed across 26 files, covering route/subpath resolution, link rewriting, safe Markdown, code controls and include boundaries. Build/static checks passed for all guides, local assets and heading fragments. Real HTTP checks verified 31 direct guides and 2,547 local links/assets at each of `/` and `/nines/`. The loopback development preview also served nested guides, search, artwork and canonical downloads. No live-browser visual or interaction walkthrough was performed.
+
+Go/Python lint and formatting, vet, 14 release-script checks, public-source preflight, all four native builds, embedded-demo HTTP smoke and dependency-notice collection passed. These are local changes; no commit, push, issue closure or public website deployment was performed for these chunks.
+
+## Portal navigation and identifiers, 2026-10-23
+
+The portal uses canonical login and tenant page/resource paths with native browser history. Rendered DOM tests cover Back/Forward within a page and between pages/tenants, cancellation of the old tenant scope, denied tenant links, same-tab sign-in returns, expired sessions, legacy hash normalization and demo login under React Strict Mode. URL tests reject external return destinations, traversal, malformed identifiers, query-string secrets and unsupported resource routes. Server tests check GET/HEAD deep links, no-store shell responses and 404 behavior for unknown APIs/assets. No physical macOS swipe/browser walkthrough was performed; the tests exercise the history events those gestures use.
+
+New server-generated alert/change-set/rollback IDs and portal-created opaque records use UUIDv4. Tests check the UUID version and variant. Authentication credentials retain their separate 256-bit random generator and hashed storage. Credential forms are excluded from replay, portal API keys stay in memory, login return state contains only a validated non-secret resource path, and responses prevent referrer disclosure. This is scoped verification, not a complete security audit.
+
+The complete Go race suite passed 712 tests/subtests with a disposable PostgreSQL database and no required database skips. The temporary container was removed. All 115 frontend tests passed; production UI and the 31-page static documentation builds passed. Go lint/vet, Python lint/format, release-script tests, source-export checks and generated documentation link/fragment checks passed. All four native binaries compiled; the final read-only demo smoke verified 3 SLOs, 2 tenants, 13 embedded assets, 4 portal paths and 3 missing-route 404s. Dependency notice collection passed for 432 dependencies. No public deployment was performed.
+
+## Observed SLI presentation, 2026-10-23
+
+SLO rows, headers, home summaries and linked objectives now show measured SLI attainment and the target instead of a generic unknown health badge. Partial coverage, zero traffic and missing measurements have distinct labels. Existing firing/pending alerts remain visible, and unavailable budgets no longer show an exhausted progress bar. The SLI chart includes a dashed partial-window rolling series; backend compliance/alert coverage requirements are unchanged.
+
+All 123 frontend tests passed, including regression cases for partial and tiny coverage, missing telemetry versus zero traffic, continued firing alerts, compact journey labels, missing budgets and partial/full chart-series separation. Portal and hosted documentation production builds, formatting and generated links passed. This is a presentation change; the prior database race results remain applicable. No physical browser walkthrough or public deployment was performed.
+
+## Source reads and missing-metric diagnostics, 2026-10-23
+
+Read-only inspection of the running playground found that its checkout SLO already had collected measurements, while API-availability SLOs referenced metrics absent from that dataset. The fixture exports `playground_requests_total`; connection success does not establish that an arbitrary metric exists.
+
+SLO details now expose saved collection evidence, recent collection and bounded metric-name/label discovery through the selected tenant source. The CLI accepts `collect --recent`; explicit backfill ranges remain supported. Collection commits measurements but does not rewrite definitions or deploy rules. Viewer browsing, denied viewer/agent collection, cross-tenant denial, pinned Mimir organization/credentials, bounded server-clock ranges, empty results and sanitized provider failures have regression coverage.
+
+A disposable memory-only Nines process successfully read the existing local Prometheus and Mimir backends. Both returned 120 provider-window observations and 100% SLI/coverage for a ten-minute fixture SLO. An absent metric returned zero observations and a null SLI in both backends. Metric-name discovery, label inspection and the built CLI recent-read command passed for both sources. The process was stopped and no existing SLO definitions, source configuration or external rule deployments were changed.
+
+All 127 frontend tests and 719 Go race tests/subtests passed, including a disposable PostgreSQL run with no required database skips. Go/Python lint and formatting, vet, release-source checks, production UI/site builds and hosted documentation link checks passed. The temporary database was removed. No public deployment or physical browser walkthrough was performed.
+
+
+## Commit review and browser acceptance, 2026-10-23
+
+Fixed a late-response navigation bug in intent conversation creation: completing a request after leaving the workspace or selecting another conversation no longer opens the created conversation over the user's current view. Three StrictMode DOM regressions cover normal creation, unmount during creation and selection changes while the request is pending. All 130 frontend tests, TypeScript and the embedded portal build passed. Go and Python lint/format passed without findings; the earlier 719-case PostgreSQL-backed Go race result remains applicable because this final fix changes only the portal.
+
+A rebuilt native server with temporary memory-only state and the existing local Prometheus passed browser sign-in and return to a tenant-scoped SLO deep link, displayed measured SLI/partial coverage, metric-name and observed-label discovery, and recent collection. Browser Back/Forward restored the expected SLO/home views and reloading an SLO deep link retained sign-in. An absent metric displayed no SLI data and an explicit empty-source-read explanation. Portal browser warning/error logs were empty. The test used no external rule destination and did not modify the existing playground's definitions.
+
+The hosted documentation preview passed a real browser walkthrough of latency guidance, hierarchical navigation and search into the hosted approval/rollback page. Its browser warning/error logs were empty. This acceptance does not certify a physical macOS swipe gesture or a real Entra/LDAP deployment; the identity acceptance checklist still applies. No public deployment was performed.

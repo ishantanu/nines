@@ -35,7 +35,7 @@ func fixture(t *testing.T, postgresMode bool) (*Service, context.Context, string
 		if err != nil {
 			t.Fatal(err)
 		}
-		schema := "investigation_test_" + model.NewID()
+		schema := "investigation_test_" + strings.ReplaceAll(model.NewID(), "-", "")
 		if _, err = admin.Exec(context.Background(), "CREATE SCHEMA "+schema); err != nil {
 			t.Fatal(err)
 		}

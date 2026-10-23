@@ -90,3 +90,27 @@ The operator accepts the same inline measurement in SLOs and [intent CRs](../../
 Direct `goodQuery`/`totalQuery` and `providerWindow` definitions remain available through Settings/YAML for advanced queries. An explicitly authored legacy `MeasurementBinding` and revision-pinned reference remain accepted for existing shared contracts, but they are not a prerequisite and have no primary navigation entry. Nothing silently creates or updates one during the default flow.
 
 Telemetry metadata and observed series verify instrument compatibility. They do not prove business correctness, excluded requests, current traffic, complete historical coverage or end-to-end user success. Missing evidence remains unknown. The observation point, retries and eligible-event semantics require human review.
+
+## Reading observed SLI attainment
+
+The portal shows the measured SLI percentage next to the SLO target in objective lists, headers and linked-objective views. For example, `99.950% SLI` with a `99.900% target` and `Partial window` means that the ratio is available but the full rolling window has not yet been observed. The SLI chart uses a dashed amber rolling line for partial windows and a solid line for a complete window. Coverage reports how much of that window contains measurements; newly created long-window SLOs can have valid ratios while history accumulates.
+
+`No SLI data` means usable measurements are missing. `No traffic` means samples were received but their total eligible-event count is zero, so no attainment percentage can be calculated. Missing budget data is not displayed as an exhausted progress bar. Alert state and recording-rule deployment are separate from measured attainment. Showing partial measurements does not weaken alert coverage requirements or establish full-window compliance.
+
+## Read measurements from a data source
+
+Nines reads existing application metrics through the configured Prometheus or Mimir query API. The background collector runs every 15 seconds for SLOs with a source and saved measurement queries. Nines is not a replacement for scraping applications or sending telemetry into those systems.
+
+Open an SLO and use **Source measurements → Read latest measurements** to collect a bounded recent range immediately. The source, credentials and Mimir organization come from trusted server configuration. The saved SLO defines the good/total selectors; the server chooses completed, step-aligned times with a one-step delay. The recent range covers up to 15 minutes, or one step for larger steps, within the SLO window. Collected values refresh attainment and charts; this operation does not deploy rules or edit the SLO.
+
+Use **Browse metrics in this source** to list up to 100 recent metric names, optionally narrowed by prefix. Select a metric to inspect its observed labels. The browser uses bounded 15-minute index lookups, so series presence alone does not prove fresh traffic or a valid success definition. Browsing never substitutes a metric into your SLO. Editors can open the existing edit/review flow after inspecting the evidence; viewers can browse but cannot collect or edit.
+
+If a connection works but the saved selectors match no data, the panel reports an empty result. For example, the integration playground exports `playground_requests_total{code="200"}` and `playground_requests_total{code="500"}`. An SLO querying `http_requests_total` will not measure that fixture. Use the metric that actually represents your intended application and review its labels; do not substitute an unrelated metric merely to produce a percentage.
+
+For a recent read from the CLI:
+
+```sh
+nines collect api-availability --recent --tenant production --agent
+```
+
+The equivalent API call is `POST /api/slos/api-availability/collect` with `{"recent":true}`. The existing explicit `from`/`to` body remains available for backfills. Do not combine the two modes. Collection commits measurement data, requires an editor or owner, and still checks tenant authorization, CSRF for cookie sessions and measurement revision safety. An empty successful query is not an attained SLO; zero-traffic samples also do not imply success.

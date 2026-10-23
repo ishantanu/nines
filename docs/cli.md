@@ -53,7 +53,7 @@ nines auth logout --context production
 
 The server must have identity authentication enabled. Unset API-key environment variables before explicitly selecting SSO. `--method auto` (the default) selects an environment API key when present and browser login otherwise.
 
-The browser opens Nines' CLI authorization page, where the user signs in through the configured OIDC provider or LDAP directory, sees the exact tenant, current role, server and loopback return address, then explicitly authorizes the CLI. This reuses the existing provider and role mappings. Microsoft Entra ID uses OIDC. SAML-only upstream providers require an OIDC identity broker; **native SAML is not implemented**. No provider client secret, IdP access token, ID token, password or browser cookie is copied to the CLI.
+The browser opens Nines' CLI authorization page, where the user signs in through the configured OIDC provider or LDAP directory, sees the exact tenant, current role, server and loopback return address, then explicitly authorizes the CLI. This reuses the existing provider and role mappings. Microsoft Entra ID uses OIDC. SAML-only upstream providers require an OIDC identity broker; **native SAML is not implemented**. No provider client secret, IdP access token, ID token, password or browser cookie is copied to the CLI. The credential follows its original browser session: logout, session expiry or a changed/removed authenticating provider invalidates it. Changes to current tenant roles are applied on each request. Secret rotation alone does not invalidate the session.
 
 The Nines authorization-code exchange uses a random loopback port, state and S256 PKCE. Requests expire in five minutes and approved codes in one minute; codes are consumed atomically once. A resulting opaque credential is restricted to the selected tenant and expires within one hour or the browser session's earlier deadline. Every API request resolves current membership/team/SSO grants and the original session epoch/expiry. Role reductions and browser sign-out revoke access. Upstream IdP changes retain the existing configured claim-freshness limit; this adds no continuous-access or refresh-token promise.
 
@@ -136,3 +136,7 @@ nines rules resume --id checkout-success --expected-revision 2 --agent
 ```
 
 Pause retains loaded rules and survives PostgreSQL-backed restarts and SLO edits. Resume queues the current saved definition. These owner controls neither edit nor approve an SLO. See [automatic rule delivery](public/deployment/automatic-rules.md).
+
+### Read recent SLO measurements
+
+`nines collect SLO_ID --recent --context CONTEXT --agent` reads a bounded recent range from the SLO's configured source using the server clock. It commits measurement data without changing the SLO definition or deploying rules. Editors and owners may collect; this is a write operation in the command catalog. Explicit `--from` and `--to` remain available for backfills and cannot be combined with `--recent`. A returned `collected: 0` means no measurement rows matched, not a successful SLI calculation. Inspect the source's metric names and labels in the portal before changing a selector.

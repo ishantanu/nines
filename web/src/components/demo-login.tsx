@@ -35,7 +35,11 @@ export function DemoLogin({
   }
 
   return (
-    <main className="demo-login min-h-svh bg-background px-5 py-10 text-foreground">
+    <main
+      data-replay-block
+      data-private
+      className="demo-login min-h-svh bg-background px-5 py-10 text-foreground"
+    >
       <Button
         variant="ghost"
         size="icon"

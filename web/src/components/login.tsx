@@ -48,7 +48,11 @@ export function Login({
     }
   }
   return (
-    <main className="flex min-h-svh items-center justify-center bg-background px-5 py-10">
+    <main
+      data-private
+      data-replay-block
+      className="flex min-h-svh items-center justify-center bg-background px-5 py-10"
+    >
       <Card className="w-full max-w-md gap-0 py-0">
         <div className="space-y-3 border-b p-6">
           <div className="flex items-center gap-2 text-sm font-semibold">

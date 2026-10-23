@@ -23,6 +23,24 @@ interface Line {
   get: (p: HistoryPoint) => number | null;
   dashed?: boolean;
 }
+export const sliTimelineLines: Line[] = [
+  {
+    name: "Interval SLI",
+    color: "#7c93b5",
+    get: (p) => (p.intervalCoverage === 1 ? p.intervalReliability : null),
+  },
+  {
+    name: "Rolling SLI",
+    color: "#0f766e",
+    get: (p) => (p.coverage === 1 ? p.reliability : null),
+  },
+  {
+    name: "Rolling SLI (partial window)",
+    color: "#a16207",
+    dashed: true,
+    get: (p) => (p.coverage > 0 && p.coverage < 1 ? p.reliability : null),
+  },
+];
 export function Timeline({
   title,
   history,
@@ -99,8 +117,10 @@ export function Timeline({
           {lines.map((l) => (
             <span key={l.name} className="inline-flex items-center gap-1.5">
               <span
-                className="inline-block h-0.5 w-4"
-                style={{ background: l.color }}
+                className="inline-block w-4"
+                style={{
+                  borderTop: `2px ${l.dashed ? "dashed" : "solid"} ${l.color}`,
+                }}
               />
               {l.name}
             </span>
@@ -483,19 +503,7 @@ export function SLOPerformance({
             <Timeline
               title="SLI and SLO target"
               history={history}
-              lines={[
-                {
-                  name: "Interval SLI",
-                  color: "#7c93b5",
-                  get: (p) =>
-                    p.intervalCoverage === 1 ? p.intervalReliability : null,
-                },
-                {
-                  name: "Rolling SLI",
-                  color: "#0f766e",
-                  get: (p) => (p.coverage === 1 ? p.reliability : null),
-                },
-              ]}
+              lines={sliTimelineLines}
               threshold={history.target}
               thresholdLabel={`Target ${percent(history.target, 3)}`}
               percentages
@@ -620,7 +628,9 @@ export function SLOPerformance({
                   require both windows and minimum coverage; they are not alert
                   episodes. Period boundaries are approximate to chart
                   resolution. History uses the current definition; missing
-                  coverage and no traffic create chart gaps.
+                  measurements and no traffic create chart gaps. Dashed amber
+                  rolling SLI shows available measurements from partial windows;
+                  it does not establish full-window compliance.
                 </p>
                 <Table>
                   <TableHeader>

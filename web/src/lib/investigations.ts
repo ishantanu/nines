@@ -1,3 +1,4 @@
+import { workspacePath, parseRoute } from "./navigation";
 import type { RequestScope } from "./api";
 import { api } from "./api";
 export type InvestigationScope = {
@@ -65,22 +66,18 @@ export type InvestigationList = {
   nextCursor?: string;
 };
 export function investigationLink(tenant: string, id = "") {
-  return `#/tenants/${encodeURIComponent(tenant)}/reviews${id ? "/" + encodeURIComponent(id) : ""}`;
+  return workspacePath(tenant, "investigations", id);
 }
 export function investigationFromHash(
-  hash: string,
+  path: string,
   tenant: string,
 ): string | null {
-  for (const base of [
-    investigationLink(tenant),
-    `#/tenants/${encodeURIComponent(tenant)}/investigations`,
-  ]) {
-    if (hash === base) return "";
-    if (!hash.startsWith(base + "/")) continue;
-    const id = hash.slice(base.length + 1);
-    return /^[a-z0-9][a-z0-9-]{0,62}$/.test(id) ? id : null;
-  }
-  return null;
+  const route = parseRoute(path.startsWith("#") ? path.slice(1) : path);
+  return route.kind === "workspace" &&
+    route.tenant === tenant &&
+    route.page === "investigations"
+    ? route.id
+    : null;
 }
 export function listInvestigations(scope: RequestScope, cursor = "") {
   return api<InvestigationList>(

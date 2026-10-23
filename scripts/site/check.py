@@ -16,9 +16,22 @@ class Assets(HTMLParser):
     def __init__(self):
         super().__init__()
         self.urls = []
+        self.ids = set()
+        self.documentation = False
+        self.repository_guide_links = []
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        if "id" in attrs:
+            self.ids.add(attrs["id"])
+        if attrs.get("aria-label") == "Documentation chapters":
+            self.documentation = True
+        if (
+            tag == "a"
+            and "github.com/ishantanu/nines/blob/main/docs/" in attrs.get("href", "")
+            and "data-doc-source" not in attrs
+        ):
+            self.repository_guide_links.append(attrs["href"])
         for attr in ["src", "href"]:
             if attr in attrs:
                 self.urls.append(attrs[attr])
@@ -26,22 +39,60 @@ class Assets(HTMLParser):
 
 page = SITE / "index.html"
 assert page.is_file(), "Build the site first: make site"
-parser = Assets()
-parser.feed(page.read_text())
+parsers = {}
+for html in SITE.rglob("*.html"):
+    parsed = Assets()
+    parsed.feed(html.read_text())
+    parsers[html.resolve()] = parsed
 checked = []
-for url in parser.urls:
-    u = urlsplit(url)
-    if u.scheme or u.netloc or not u.path:
-        continue
-    assert not u.path.startswith("/"), (
-        "Root-relative URLs break GitHub project sites: " + url
+for html, parsed in parsers.items():
+    assert not parsed.repository_guide_links, (
+        "Guide navigation must stay on the website: "
+        + str(parsed.repository_guide_links)
     )
-    dest = (SITE / unquote(u.path)).resolve()
-    assert dest.is_relative_to(SITE.resolve()) and dest.is_file(), (
-        "Missing static asset: " + url
-    )
-    checked.append(url)
+    for url in parsed.urls:
+        u = urlsplit(url)
+        if u.scheme or u.netloc:
+            continue
+        assert not u.path.startswith("/"), (
+            "Root-relative URLs break GitHub project sites: " + str(html) + " " + url
+        )
+        dest = (html.parent / unquote(u.path)).resolve() if u.path else html
+        if dest.is_dir():
+            dest = dest / "index.html"
+        assert dest.is_relative_to(SITE.resolve()) and dest.is_file(), (
+            "Missing static asset/page: " + str(html.relative_to(SITE)) + " " + url
+        )
+        if u.fragment and dest in parsers:
+            assert unquote(u.fragment) in parsers[dest].ids, (
+                "Missing heading: " + str(html.relative_to(SITE)) + " " + url
+            )
+        if html == page.resolve():
+            checked.append(url)
+    if html != page.resolve():
+        assert parsed.documentation, (
+            "A documentation page is missing chapter navigation"
+        )
+        assert "doc-content" in parsed.ids, "A guide is missing prerendered content"
+        assert "docs-page-data" in parsed.ids, "A guide is missing hydration metadata"
 assert checked, "No assets found"
+search = json.loads((SITE / "docs/search.json").read_text())
+assert len(search) >= 30, "Public guides are missing from documentation search"
+assert len({row["slug"] for row in search}) == len(search), (
+    "Duplicate documentation route"
+)
+assert len(parsers) == len(search) + 1, "Search and published HTML routes differ"
+for row in search:
+    target = SITE / "docs" / row["slug"] / "index.html"
+    assert target.is_file(), "Missing directly addressable guide: " + row["slug"]
+assert "thresholdSeconds" in (SITE / "llms-full.txt").read_text()
+assert (SITE / "examples/request-latency.slo.yaml").read_bytes() == (
+    ROOT / "examples/request-latency.slo.yaml"
+).read_bytes(), "Downloadable examples must match the source"
+assert (
+    "kind: ServiceLevelObjective" in (SITE / "docs/latency-slos/index.html").read_text()
+)
+assert ET.parse(SITE / "sitemap.xml").getroot().tag.endswith("urlset")
 assert "./nines-architecture.svg" in checked, "Architecture image must be prerendered"
 assert (SITE / "nines-architecture.svg").read_bytes() == (
     ROOT / "docs/public/brand/nines-architecture.svg"
@@ -69,6 +120,8 @@ print(
         {
             "status": "passed",
             "staticAssets": len(checked),
+            "documentationPages": len(search),
+            "localLinksAndFragments": "passed",
             "projectSubpath": "relative",
             "svgChecks": "passed",
             "deployed": False,

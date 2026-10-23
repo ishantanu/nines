@@ -1,3 +1,4 @@
+import { useResourceRoute } from "@/lib/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   MessageSquare,
@@ -37,8 +38,6 @@ import { backtestTime } from "@/lib/intent";
 import {
   captureInvestigationEvidence,
   createInvestigation,
-  investigationFromHash,
-  investigationLink,
   listInvestigations,
   readInvestigation,
   saveInvestigationMessage,
@@ -248,10 +247,12 @@ export function Investigations({
 }) {
   const [items, setItems] = useState<InvestigationSummary[]>([]);
   const [cursor, setCursor] = useState("");
-  const [selected, setSelected] = useState(
-    () => investigationFromHash(window.location.hash, scope.tenant) || "",
+  const [selected, setSelected] = useResourceRoute(
+    scope.tenant,
+    "investigations",
   );
-  const [doc, setDoc] = useState<Investigation | null>(null);
+  const [storedDoc, setDoc] = useState<Investigation | null>(null);
+  const doc = storedDoc?.id === selected ? storedDoc : null;
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -315,7 +316,6 @@ export function Investigations({
     setError("");
     pendingMessage.current = null;
     pendingCapture.current = null;
-    window.history.replaceState(null, "", investigationLink(scope.tenant, id));
   }
   function accept(value: Investigation) {
     if (scope.signal.aborted || !mounted.current) return;
@@ -362,6 +362,11 @@ export function Investigations({
   }, [scope]);
   useEffect(() => {
     let active = true;
+    setText("");
+    setCaptureId("");
+    setError("");
+    pendingMessage.current = null;
+    pendingCapture.current = null;
     if (!selected) {
       setDoc(null);
       return;
@@ -371,11 +376,6 @@ export function Investigations({
       .then((v) => {
         if (active) {
           setDoc(v);
-          window.history.replaceState(
-            null,
-            "",
-            investigationLink(scope.tenant, selected),
-          );
         }
       })
       .catch((e) => {

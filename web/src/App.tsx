@@ -78,11 +78,8 @@ import {
 import { Status } from "@/components/status";
 import { ManifestEditor } from "@/components/manifest-editor";
 import { initialDarkMode, savePreference } from "@/lib/preferences";
-import { replayFromHash, replayLink, type ReplayRef } from "@/lib/replays";
-import {
-  conversationFromHash,
-  conversationLink,
-} from "@/lib/intent-conversations";
+import type { ReplayRef } from "@/lib/replays";
+
 import { MaskedReplayCapture } from "@/lib/replay-capture";
 import type { ReplayOption } from "@/components/session-replays";
 import { DemoLogin } from "@/components/demo-login";
@@ -93,7 +90,18 @@ import {
 
 import { ObjectiveDetail, Objectives } from "@/components/objectives";
 import { cn } from "@/lib/utils";
-import { investigationFromHash, investigationLink } from "@/lib/investigations";
+import {
+  useRoute,
+  workspacePath,
+  navigateTo,
+  followLink,
+  loginReturnPath,
+  clearLoginReturn,
+  showLogin,
+  parseRoute,
+  routeFromLocation,
+  type Page,
+} from "@/lib/navigation";
 const JourneyDetail = lazy(() =>
   import("@/components/journey-detail").then((m) => ({
     default: m.JourneyDetail,
@@ -153,22 +161,6 @@ const SessionReplays = lazy(() =>
     default: m.SessionReplays,
   })),
 );
-type Page =
-  | "replays"
-  | "investigations"
-  | "intents"
-  | "maps"
-  | "bindings"
-  | "home"
-  | "journeys"
-  | "objectives"
-  | "agents"
-  | "alerts"
-  | "workflows"
-  | "connections"
-  | "access"
-  | "clients";
-
 const navigation = [
   { id: "home" as const, label: "Home", icon: House },
   {
@@ -260,8 +252,14 @@ function Credentials({
 }) {
   const [token, setToken] = useState("");
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <Dialog
+      open={open}
+      onOpenChange={(value) => {
+        if (!value) setToken("");
+        onOpenChange(value);
+      }}
+    >
+      <DialogContent data-replay-block data-private>
         <DialogHeader>
           <DialogTitle>Connect to this workspace</DialogTitle>
           <DialogDescription>
@@ -294,6 +292,7 @@ function Credentials({
   );
 }
 export default function App() {
+  const route = useRoute();
   const [token, setToken] = useState("");
   const [demoAuthenticated, setDemoAuthenticated] = useState(false);
   const [demoReplayConsent, setDemoReplayConsent] = useState(false);
@@ -316,9 +315,13 @@ export default function App() {
     document.documentElement.style.colorScheme = darkMode ? "dark" : "light";
     savePreference("nines-theme", darkMode ? "dark" : "light");
   }, [darkMode]);
-  function chooseTenant(id: string) {
+  function chooseTenant(id: string, fromHistory = false) {
     const tenant = tenants.find((t) => t.id === id);
     if (!tenant) return;
+    if (!fromHistory)
+      navigateTo(
+        workspacePath(id, route.kind === "workspace" ? route.page : "home"),
+      );
     active.current?.close();
     chosenTenant.current = id;
     const scope = createTenantSession(
@@ -341,7 +344,10 @@ export default function App() {
       .then(async (info) => {
         if (controller.signal.aborted) return;
         setAuth(info);
-        if (info.enabled && !info.authenticated && !token) return;
+        if (info.enabled && !info.authenticated && !token) {
+          showLogin();
+          return;
+        }
         const allowed = await discoverTenants(token, controller.signal);
         if (controller.signal.aborted) return;
         setTenants(allowed);
@@ -349,14 +355,38 @@ export default function App() {
           throw new Error(
             "You have no workspace memberships. Ask a workspace owner to grant access using the identity below.",
           );
+        const current = routeFromLocation(
+          window.location.pathname +
+            window.location.search +
+            window.location.hash,
+        );
+        const requested =
+          current.kind === "workspace"
+            ? current
+            : parseRoute(loginReturnPath() ?? "/");
         const tenant =
-          allowed.find((t) => t.id === chosenTenant.current) ??
-          allowed.find(
-            (t) =>
-              investigationFromHash(window.location.hash, t.id) !== null ||
-              replayFromHash(window.location.hash, t.id) !== null,
-          ) ??
-          allowed[0];
+          requested.kind === "workspace"
+            ? allowed.find((t) => t.id === requested.tenant)
+            : (allowed.find((t) => t.id === chosenTenant.current) ??
+              allowed[0]);
+        if (!tenant)
+          throw new Error(
+            "You do not have access to the tenant in this link. Choose an authorized workspace below.",
+          );
+        if (current.kind === "root" || current.kind === "login") {
+          navigateTo(
+            requested.kind === "workspace"
+              ? workspacePath(requested.tenant, requested.page, requested.id)
+              : workspacePath(tenant.id),
+            true,
+          );
+          clearLoginReturn();
+        } else if (current.kind === "workspace") {
+          navigateTo(
+            workspacePath(current.tenant, current.page, current.id),
+            true,
+          );
+        }
         chosenTenant.current = tenant.id;
         const scope = createTenantSession(
           token,
@@ -368,7 +398,11 @@ export default function App() {
         setSession({ scope, key: ++generation.current });
       })
       .catch((e: unknown) => {
-        if (!controller.signal.aborted) setError(message(e));
+        if (!controller.signal.aborted) {
+          if (e instanceof Error && "status" in e && e.status === 401)
+            showLogin();
+          setError(message(e));
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -378,6 +412,29 @@ export default function App() {
       active.current?.close();
     };
   }, [token, connection]);
+  useEffect(() => {
+    if (
+      loading ||
+      route.kind !== "workspace" ||
+      !session ||
+      (session.scope.tenant === route.tenant && !session.scope.signal.aborted)
+    )
+      return;
+    active.current?.close();
+    if (tenants.some((t) => t.id === route.tenant))
+      chooseTenant(route.tenant, true);
+  }, [route, loading, session, tenants]);
+  useEffect(() => {
+    if (
+      route.kind !== "not-found" &&
+      auth?.enabled &&
+      !auth.authenticated &&
+      !token
+    ) {
+      showLogin();
+      document.title = "Sign in | Nines";
+    }
+  }, [route, auth?.enabled, auth?.authenticated, token]);
   useEffect(() => {
     let pending: ReturnType<typeof setTimeout> | undefined;
     function refreshAccess() {
@@ -447,6 +504,8 @@ export default function App() {
       setSession(null);
       setTenants([]);
       setToken("");
+      clearLoginReturn();
+      navigateTo("/login", true);
       setConnection((n) => n + 1);
     } catch (e) {
       setError(message(e));
@@ -471,7 +530,38 @@ export default function App() {
           )}
         </Button>
       ) : null}
-      {session ? (
+      {route.kind === "not-found" ? (
+        <main className="empty-state">
+          <h1>Page not found</h1>
+          <p>Check the address or return to your workspace.</p>
+          <Button
+            onClick={() =>
+              navigateTo(
+                session ? workspacePath(session.scope.tenant) : "/login",
+                true,
+              )
+            }
+          >
+            Return to Nines
+          </Button>
+        </main>
+      ) : session &&
+        route.kind === "workspace" &&
+        route.tenant !== session.scope.tenant ? (
+        <main className="empty-state" role="status">
+          <h1>Workspace access</h1>
+          <p>
+            {tenants.some((t) => t.id === route.tenant)
+              ? "Switching workspace…"
+              : "You do not have access to the tenant in this link."}
+          </p>
+          {tenants.map((t) => (
+            <Button key={t.id} onClick={() => chooseTenant(t.id)}>
+              {t.id}
+            </Button>
+          ))}
+        </main>
+      ) : session ? (
         <TenantWorkspace
           key={session.key}
           scope={session.scope}
@@ -480,12 +570,15 @@ export default function App() {
           onCredentials={() => setCredentials(true)}
           credentialsOpen={credentials}
           identityLabel={token ? "API credential" : auth?.actor?.name}
-          onSignOut={auth?.enabled ? signOut : undefined}
+          onSignOut={auth?.enabled || token ? signOut : undefined}
           darkMode={darkMode}
           onToggleTheme={() => setDarkMode((current) => !current)}
           demoAuthenticated={demoAuthenticated}
           demoReplayConsent={demoReplayConsent}
           onDemoSignIn={(allowReplay) => {
+            const next = loginReturnPath();
+            navigateTo(next ?? workspacePath(session.scope.tenant), true);
+            clearLoginReturn();
             setDemoAuthenticated(true);
             setDemoReplayConsent(allowReplay);
           }}
@@ -494,6 +587,8 @@ export default function App() {
             setDemoReplayConsent(allowReplay);
           }}
           onDemoSignOut={() => {
+            clearLoginReturn();
+            navigateTo("/login", true);
             setDemoAuthenticated(false);
             setDemoReplayConsent(false);
           }}
@@ -548,6 +643,11 @@ export default function App() {
                   </Button>
                 </div>
               ) : null}
+              {tenants.map((t) => (
+                <Button key={t.id} onClick={() => chooseTenant(t.id)}>
+                  {t.id}
+                </Button>
+              ))}
               <Button onClick={() => setCredentials(true)}>
                 Set API token
               </Button>
@@ -600,25 +700,32 @@ function TenantWorkspace({
   onCredentials: () => void;
   credentialsOpen: boolean;
 }) {
-  const [page, setPage] = useState<Page>(() =>
-    typeof window !== "undefined" &&
-    investigationFromHash(window.location.hash, scope.tenant) !== null
-      ? "investigations"
-      : typeof window !== "undefined" &&
-          replayFromHash(window.location.hash, scope.tenant) !== null
-        ? "replays"
-        : typeof window !== "undefined" &&
-            conversationFromHash(window.location.hash, scope.tenant) !== null
-          ? "intents"
-          : "home",
-  );
+  const route = useRoute();
+  const page =
+    route.kind === "workspace" && route.tenant === scope.tenant
+      ? route.page
+      : "home";
+  const selected =
+    route.kind === "workspace" && ["journeys", "agents"].includes(route.page)
+      ? route.id
+      : "";
+  const slo =
+    route.kind === "workspace" && route.page === "objectives" ? route.id : "";
+  const setSLO = (id: string) =>
+    navigateTo(workspacePath(scope.tenant, "objectives", id));
+  const setSelected = (id: string) =>
+    navigateTo(
+      workspacePath(
+        scope.tenant,
+        page === "agents" ? "agents" : "journeys",
+        id,
+      ),
+    );
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState("");
-  const [slo, setSLO] = useState("");
   const [replayError, setReplayError] = useState("");
   const [replayFilter, setReplayFilter] = useState("all");
   const [updated, setUpdated] = useState<Date | null>(null);
@@ -655,8 +762,8 @@ function TenantWorkspace({
   const main = useRef<HTMLElement>(null);
   useEffect(() => {
     main.current?.focus({ preventScroll: true });
-    window.scrollTo({ top: 0, behavior: "instant" });
-  }, [page, slo]);
+    document.title = `${slo || copy[page][0]} | Nines`;
+  }, [page, slo, selected, route]);
   const activePage = slo ? "objectives" : page;
   const journeys = data?.journeys ?? [];
   const objectives = data?.objectives ?? [];
@@ -675,6 +782,24 @@ function TenantWorkspace({
       discard();
     };
   }, [nativeCapture, scope]);
+  useEffect(() => {
+    if (!data) return;
+    if (isDemo && !demoAuthenticated) {
+      showLogin();
+      document.title = "Sign in | Nines";
+    } else if (route.kind === "login" || route.kind === "root") {
+      const next = loginReturnPath();
+      const requested = next ? parseRoute(next) : null;
+      navigateTo(
+        requested?.kind === "workspace" && requested.tenant === scope.tenant
+          ? next!
+          : workspacePath(scope.tenant),
+        true,
+      );
+      clearLoginReturn();
+    }
+  }, [data, isDemo, demoAuthenticated, route, scope.tenant]);
+
   useLayoutEffect(() => {
     if (isDemo && !demoAuthenticated) {
       nativeCapture.discard();
@@ -781,23 +906,10 @@ function TenantWorkspace({
   );
   const chosen =
     shown.find((j) => j.resource.manifest.metadata.name === selected) ??
-    shown[0];
+    (selected ? undefined : shown[0]);
   function navigate(p: Page) {
-    if (p === "investigations")
-      window.history.replaceState(null, "", investigationLink(scope.tenant));
-    else if (p === "intents") {
-      window.history.replaceState(null, "", conversationLink(scope.tenant));
-    } else if (p === "replays") {
-      window.history.replaceState(null, "", replayLink(scope.tenant));
-      setReplayFilter("all");
-    } else if (window.location.hash.startsWith("#/tenants/"))
-      window.history.replaceState(
-        null,
-        "",
-        window.location.pathname + window.location.search,
-      );
-    setPage(p);
-    setSLO("");
+    navigateTo(workspacePath(scope.tenant, p));
+    if (p === "replays") setReplayFilter("all");
     setQuery("");
   }
   function openReplays(ref: ReplayRef) {
@@ -805,8 +917,7 @@ function TenantWorkspace({
     setReplayFilter(ref.kind + ":" + ref.id);
   }
   function openJourney(id: string) {
-    setSelected(id);
-    navigate("journeys");
+    navigateTo(workspacePath(scope.tenant, "journeys", id));
   }
   function reload() {
     setRefresh((n) => n + 1);
@@ -836,19 +947,26 @@ function TenantWorkspace({
         </div>
         <nav className="space-y-1 px-3 py-5" aria-label="Main navigation">
           {navigation.map((n) => (
-            <button
+            <a
+              href={workspacePath(scope.tenant, n.id)}
               key={n.id}
               className={cn(
                 "nav-item",
                 n.id === "connections" && "mt-6",
                 activePage === n.id && "nav-active",
               )}
-              onClick={() => navigate(n.id)}
+              onClick={(event) => {
+                followLink(event, workspacePath(scope.tenant, n.id));
+                if (event.defaultPrevented) {
+                  setQuery("");
+                  setReplayFilter("all");
+                }
+              }}
               aria-current={activePage === n.id ? "page" : undefined}
             >
               <n.icon className="size-4 shrink-0" aria-hidden="true" />
               <span>{n.label}</span>
-            </button>
+            </a>
           ))}
         </nav>
         <div className="mt-auto border-t p-3">
@@ -910,7 +1028,20 @@ function TenantWorkspace({
           tabIndex={-1}
           className="workspace-main outline-none"
         >
-          {slo && objectives.some((o) => o.slo.id === slo) ? (
+          {data &&
+          ((slo && !objectives.some((o) => o.slo.id === slo)) ||
+            (selected &&
+              !journeys.some(
+                (j) => j.resource.manifest.metadata.name === selected,
+              ))) ? (
+            <div className="empty-state">
+              <h1>Resource not found</h1>
+              <p>This resource is unavailable in this workspace.</p>
+              <Button onClick={() => navigate(page)}>
+                Back to {copy[page][0]}
+              </Button>
+            </div>
+          ) : slo && objectives.some((o) => o.slo.id === slo) ? (
             <ObjectiveDetail
               refreshKey={updated?.getTime() ?? 0}
               objective={objectives.find((o) => o.slo.id === slo)}
@@ -1062,7 +1193,7 @@ function TenantWorkspace({
                               ).length,
                             },
                             {
-                              label: "Unknown",
+                              label: "Without full coverage",
                               value: objectives.filter(
                                 (o) => healthOf(o.status) === "unknown",
                               ).length,
@@ -1140,7 +1271,6 @@ function TenantWorkspace({
                         objectives={objectives}
                         journeys={journeys}
                         onSLO={(id) => {
-                          navigate("objectives");
                           setSLO(id);
                         }}
                         onJourney={openJourney}
@@ -1158,7 +1288,6 @@ function TenantWorkspace({
                         options={replayOptions}
                         onResource={(ref) => {
                           if (ref.kind === "ServiceLevelObjective") {
-                            navigate("objectives");
                             setSLO(ref.id);
                           } else if (ref.kind === "CriticalUserJourney") {
                             openJourney(ref.id);

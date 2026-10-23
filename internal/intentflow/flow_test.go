@@ -38,7 +38,7 @@ func fixture(t *testing.T, pg bool) (*Service, context.Context, string) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		schema := "intent_flow_" + model.NewID()
+		schema := "intent_flow_" + strings.ReplaceAll(model.NewID(), "-", "")
 		if _, e = admin.Exec(context.Background(), "CREATE SCHEMA "+schema); e != nil {
 			t.Fatal(e)
 		}

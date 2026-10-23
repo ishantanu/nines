@@ -3,8 +3,10 @@ package prometheus
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -148,5 +150,38 @@ func TestHistogramSeriesDiscoveryResolvesMetadataFamily(t *testing.T) {
 	d, err := c.Discover(context.Background(), "duration_seconds_bucket", nil, at)
 	if err != nil || d.Metric != "duration_seconds" || len(d.Series) != 2 || len(d.Metadata) != 1 {
 		t.Fatal(d, err)
+	}
+}
+
+func TestMetricNamesEmptyPrefixIsBoundedAndTruncated(t *testing.T) {
+	for _, amount := range []int{0, 101, 102} {
+		t.Run(strconv.Itoa(amount), func(t *testing.T) {
+			source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				q := r.URL.Query()
+				if q.Get("match[]") != `{__name__=~".+"}` || q.Get("limit") != "101" || q.Get("end") == "" || q.Get("start") == "" {
+					t.Error(q)
+				}
+				names := []string{}
+				for i := 0; i < amount; i++ {
+					names = append(names, fmt.Sprintf("requests_%03d_total", i))
+				}
+				_ = json.NewEncoder(w).Encode(map[string]any{"status": "success", "data": names})
+			}))
+			defer source.Close()
+			c, err := New(source.URL, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			names, truncated, err := c.MetricNames(context.Background(), "", time.Now())
+			if amount > 101 {
+				if err == nil {
+					t.Fatal("unbounded response accepted")
+				}
+				return
+			}
+			if err != nil || len(names) != min(100, amount) || truncated != (amount > 100) {
+				t.Fatal(names, truncated, err)
+			}
+		})
 	}
 }

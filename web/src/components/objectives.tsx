@@ -21,7 +21,6 @@ import {
   api,
   canEdit,
   type RequestScope,
-  healthOf,
   message,
   percent,
   type Journey,
@@ -29,10 +28,15 @@ import {
   type Point,
   type Snapshot,
 } from "@/lib/api";
-import { Status } from "./status";
+import { SLIValue, SLOAlertState } from "./sli-value";
 import { SLOIntegrationStatus } from "./integration-status";
 import { SLOHealthNotice } from "./slo-health-notice";
 import { PageHeader } from "./workspace-chrome";
+const SourceMeasurements = lazy(() =>
+  import("./source-measurements").then((m) => ({
+    default: m.SourceMeasurements,
+  })),
+);
 const SLOPerformance = lazy(() =>
   import("./slo-performance").then((m) => ({ default: m.SLOPerformance })),
 );
@@ -65,10 +69,10 @@ export function Objectives({
           <TableHeader>
             <TableRow>
               <TableHead className="pl-6">Objective / service</TableHead>
-              <TableHead>Target / observed</TableHead>
+              <TableHead>SLI / SLO target</TableHead>
               <TableHead>Budget remaining</TableHead>
               <TableHead>Journeys</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Alerts</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -87,35 +91,42 @@ export function Objectives({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="font-mono text-sm">
-                    {percent(o.status.reliability, 3)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Target {percent(o.slo.target, 2)}
-                  </div>
+                  <SLIValue
+                    status={o.status}
+                    target={o.slo.target}
+                    showAlerts={false}
+                  />
                 </TableCell>
                 <TableCell className="min-w-40">
                   <div className="mb-2 flex justify-between gap-4 font-mono text-xs">
-                    <span>{percent(o.status.budgetRemainingFraction, 1)}</span>
+                    <span>
+                      {o.status.budgetRemainingFraction === null
+                        ? "No estimate"
+                        : percent(o.status.budgetRemainingFraction, 1)}
+                    </span>
                     <span className="text-muted-foreground">
                       {o.status.burnRate == null
                         ? "N/A"
                         : `${o.status.burnRate.toFixed(1)}×`}
                     </span>
                   </div>
-                  <Progress
-                    value={Math.max(
-                      0,
-                      Math.min(
-                        100,
-                        (o.status.budgetRemainingFraction ?? 0) * 100,
-                      ),
-                    )}
-                    aria-label={`Budget remaining for ${o.slo.name}`}
-                  />
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {percent(o.status.coverage, 1)} coverage
-                  </div>
+                  {o.status.budgetRemainingFraction !== null ? (
+                    <Progress
+                      value={Math.max(
+                        0,
+                        Math.min(
+                          100,
+                          (o.status.budgetRemainingFraction ?? 0) * 100,
+                        ),
+                      )}
+                      aria-label={`Budget remaining for ${o.slo.name}`}
+                    />
+                  ) : null}
+                  {o.status.reliability !== null && o.status.coverage < 1 ? (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Based on observed data
+                    </div>
+                  ) : null}
                 </TableCell>
                 <TableCell>
                   <div className="flex max-w-48 flex-wrap gap-1">
@@ -137,7 +148,7 @@ export function Objectives({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Status value={healthOf(o.status)} />
+                  <SLOAlertState status={o.status} />
                 </TableCell>
               </TableRow>
             ))}
@@ -328,7 +339,9 @@ export function ObjectiveDetail({
           <ArrowLeft className="size-4" />
           Back
         </Button>
-        {objective ? <Status value={healthOf(objective.status)} /> : null}
+        {objective && status ? (
+          <SLIValue status={status} target={objective.slo.target} />
+        ) : null}
       </PageHeader>
       {objective ? (
         <SLOIntegrationStatus
@@ -337,6 +350,20 @@ export function ObjectiveDetail({
           refreshKey={refresh + refreshKey}
           scope={scope}
         />
+      ) : null}
+      {objective ? (
+        <Suspense fallback={<p role="status">Loading source measurements…</p>}>
+          <SourceMeasurements
+            scope={scope}
+            slo={objective.slo}
+            collection={objective.collection}
+            onConnections={onConnections}
+            onCollected={() => {
+              onRefresh();
+              setRefresh((n) => n + 1);
+            }}
+          />
+        </Suspense>
       ) : null}
       {objective?.slo.policies?.length ? (
         <Card className="gap-0 py-0">
@@ -389,7 +416,14 @@ export function ObjectiveDetail({
       {status ? (
         <dl className="summary-grid">
           {[
-            ["Observed", percent(status.reliability, 3)],
+            [
+              "Observed SLI",
+              status.reliability === null
+                ? status.dataStatus === "no_traffic"
+                  ? "No traffic"
+                  : "No SLI data"
+                : percent(status.reliability, 3),
+            ],
             ["Budget left", percent(status.budgetRemainingFraction, 1)],
             [
               "Burn rate",

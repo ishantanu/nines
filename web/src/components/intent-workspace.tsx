@@ -1,3 +1,4 @@
+import { useResourceRoute } from "@/lib/navigation";
 import { useEffect, useRef, useState } from "react";
 import { stringify } from "yaml";
 import {
@@ -17,8 +18,6 @@ import {
   conversation,
   conversations,
   conversationBase,
-  conversationFromHash,
-  conversationLink,
   type IntentConversation,
   type ConversationSummary,
   type FlowCapabilities,
@@ -62,18 +61,24 @@ export function IntentWorkspace({
   );
   const [tab, setTab] = useState("conversations");
   const mutation = useRef(false);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, [scope]);
   const [items, setItems] = useState<ConversationSummary[]>([]),
     [cursor, setCursor] = useState("");
-  const [selected, setSelected] = useState(
-    () => conversationFromHash(window.location.hash, scope.tenant) ?? "",
-  );
+  const [selected, setSelected] = useResourceRoute(scope.tenant, "intents");
   const [pollEpoch, setPollEpoch] = useState(0);
   const messagesRef = useRef<HTMLDivElement>(null);
   const followMessages = useRef(true);
   const activeID = useRef(selected);
   activeID.current = selected;
-  const [value, setValue] = useState<IntentConversation | null>(null),
+  const [storedValue, setValue] = useState<IntentConversation | null>(null),
     [caps, setCaps] = useState<FlowCapabilities | null>(null);
+  const value = storedValue?.id === selected ? storedValue : null;
   const activeChangeDigest = useRef<string | undefined>(undefined);
   activeChangeDigest.current = value?.changeSet?.digest;
   const [error, setError] = useState(""),
@@ -190,6 +195,12 @@ export function IntentWorkspace({
     };
   }, [scope]);
   useEffect(() => {
+    setReply("");
+    setConsent(false);
+    setAck(false);
+    followMessages.current = true;
+  }, [selected]);
+  useEffect(() => {
     if (!selected) {
       setValue(null);
       return;
@@ -230,13 +241,13 @@ export function IntentWorkspace({
   function choose(id: string) {
     setConsent(false);
     followMessages.current = true;
+    activeID.current = id;
     setSelected(id);
-    window.history.replaceState(null, "", conversationLink(scope.tenant, id));
     setReply("");
     setAck(false);
   }
   function accept(r: IntentConversation) {
-    if (scope.signal.aborted) return;
+    if (!mounted.current || scope.signal.aborted) return;
     setValue((prev) =>
       prev?.id === r.id && prev.version > r.version ? prev : r,
     );
@@ -244,6 +255,7 @@ export function IntentWorkspace({
   }
   async function create(goal?: IntentDocument) {
     if (mutation.current) return;
+    const originID = activeID.current;
     mutation.current = true;
     setBusy(true);
     setError("");
@@ -272,16 +284,26 @@ export function IntentWorkspace({
         method: "POST",
         body: JSON.stringify(input),
       });
-      if (scope.signal.aborted) return;
-      accept(r);
+      if (
+        !mounted.current ||
+        scope.signal.aborted ||
+        activeID.current !== originID
+      )
+        return;
       choose(r.id);
+      accept(r);
       setCreateOpen(false);
       setTab("conversations");
     } catch (e) {
-      if (!scope.signal.aborted) setError(message(e));
+      if (
+        mounted.current &&
+        !scope.signal.aborted &&
+        activeID.current === originID
+      )
+        setError(message(e));
     } finally {
       mutation.current = false;
-      setBusy(false);
+      if (mounted.current && !scope.signal.aborted) setBusy(false);
     }
   }
   async function mutate(suffix: string, body: unknown) {

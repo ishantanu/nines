@@ -65,9 +65,10 @@ type AccountView struct {
 func (a Account) Public() AccountView { return AccountView{a.ID, a.Name, a.Role, a.Expires, a.Created} }
 
 type Session struct {
-	UserID  string    `json:"userId"`
-	Epoch   int64     `json:"epoch"`
-	Expires time.Time `json:"expiresAt"`
+	ProviderBinding string    `json:"providerBinding"`
+	UserID          string    `json:"userId"`
+	Epoch           int64     `json:"epoch"`
+	Expires         time.Time `json:"expiresAt"`
 }
 type flow struct {
 	Provider string    `json:"provider"`
@@ -224,6 +225,10 @@ func (s *Service) login(ctx context.Context, id string, e externalUser) (string,
 		return "", Actor{}, ErrForbidden
 	}
 	u := s.user(id, e)
+	binding := s.sessionProviderBinding(u)
+	if binding == "" {
+		return "", Actor{}, ErrForbidden
+	}
 	token := randomToken()
 	expires := s.Now().Add(time.Duration(s.config.SessionHours) * time.Hour)
 	err := s.repo.Update(ctx, "user:"+u.ID, func(tx Tx) error {
@@ -248,7 +253,7 @@ func (s *Service) login(ctx context.Context, id string, e externalUser) (string,
 		if err = s.saveAuthorization(tx, u, e.Authorization, &expires); err != nil {
 			return err
 		}
-		return put(tx, "session", "global", hash(token), Session{u.ID, u.Epoch, expires}, expires)
+		return put(tx, "session", "global", hash(token), Session{UserID: u.ID, Epoch: u.Epoch, Expires: expires, ProviderBinding: binding}, expires)
 	})
 	if err != nil {
 		return "", Actor{}, err
@@ -276,7 +281,7 @@ func (s *Service) sessionActorTx(tx Tx, h string) (Actor, error) {
 	if e != nil {
 		return Actor{}, e
 	}
-	if u.Epoch != v.Epoch {
+	if u.Epoch != v.Epoch || !equal(v.ProviderBinding, s.sessionProviderBinding(u)) {
 		return Actor{}, ErrForbidden
 	}
 	g, e := s.effectiveGrants(tx, u)

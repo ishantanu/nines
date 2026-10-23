@@ -42,7 +42,7 @@ func fixture(t *testing.T, pg bool) (*Service, context.Context, string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		schema := "replay_test_" + model.NewID()
+		schema := "replay_test_" + strings.ReplaceAll(model.NewID(), "-", "")
 		if _, err = admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
 			t.Fatal(err)
 		}

@@ -18,9 +18,12 @@ const snapshot: Snapshot = {
 };
 test("perfect observed ratios cannot hide incomplete window coverage", () => {
   const html = renderToStaticMarkup(<SLOHealthNotice status={snapshot} />);
-  expect(html).toContain("SLO health is unknown.");
-  expect(html).toContain("10.0%");
-  expect(html).toContain("Displayed ratios use the available measurements.");
+  expect(html).toContain("Partial measurement window.");
+  expect(html).toContain("10.000%");
+  expect(html).toContain(
+    "SLI attainment is calculated from the available measurements",
+  );
+  expect(html).toContain("not yet a full-window compliance result");
 });
 test("zero traffic has its own explanation even with complete sampling", () => {
   const html = renderToStaticMarkup(
