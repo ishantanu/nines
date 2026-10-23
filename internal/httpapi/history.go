@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ishantanu/nines/internal/engine"
 	"github.com/ishantanu/nines/internal/model"
 )
 
@@ -43,7 +44,17 @@ func (a *Server) history(w http.ResponseWriter, r *http.Request) {
 		span = []int64{n}
 	}
 
-	result, err := a.Service.HistoryForPolicy(r.Context(), r.PathValue("id"), from, to, resolution, r.URL.Query().Get("policy"), span...)
+	var result engine.History
+	if text := r.URL.Query().Get("revision"); text != "" {
+		revision, parseErr := strconv.ParseInt(text, 10, 64)
+		if parseErr != nil || revision < 1 {
+			a.fail(w, r, model.Invalid("revision must be positive"))
+			return
+		}
+		result, err = a.Service.HistoryForRevision(r.Context(), r.PathValue("id"), revision, from, to, resolution, r.URL.Query().Get("policy"), span...)
+	} else {
+		result, err = a.Service.HistoryForPolicy(r.Context(), r.PathValue("id"), from, to, resolution, r.URL.Query().Get("policy"), span...)
+	}
 	if err != nil {
 		a.fail(w, r, err)
 		return

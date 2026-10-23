@@ -7,9 +7,9 @@ import {
   TabsList,
   TabsTrigger,
 } from "../src/components/ui/tabs";
-import slo from "../../examples/api-availability.slo.yaml?raw";
+import slo from "../../examples/request-success.slo.yaml?raw";
 import journey from "../../examples/checkout.journey.yaml?raw";
-import binding from "../../examples/request-latency.binding.yaml?raw";
+import latency from "../../examples/request-latency.slo.yaml?raw";
 import intent from "../../examples/api-success.intent.yaml?raw";
 import { examples } from "./examples";
 
@@ -384,7 +384,7 @@ export function App() {
                   <TabsTrigger value="journey">
                     Critical user journey
                   </TabsTrigger>
-                  <TabsTrigger value="binding">Measurement binding</TabsTrigger>
+                  <TabsTrigger value="latency">Latency SLO</TabsTrigger>
                   <TabsTrigger value="intent">
                     Intent (experimental)
                   </TabsTrigger>
@@ -392,7 +392,7 @@ export function App() {
                 <span>YAML</span>
               </div>
               <TabsContent value="slo">
-                <div className="file-name">api-availability.slo.yaml</div>
+                <div className="file-name">request-success.slo.yaml</div>
                 <pre tabIndex={0} aria-label="Complete SLO YAML example">
                   <code>{slo}</code>
                 </pre>
@@ -406,13 +406,13 @@ export function App() {
                   <code>{journey}</code>
                 </pre>
               </TabsContent>
-              <TabsContent value="binding">
-                <div className="file-name">request-latency.binding.yaml</div>
+              <TabsContent value="latency">
+                <div className="file-name">request-latency.slo.yaml</div>
                 <pre
                   tabIndex={0}
-                  aria-label="Latency measurement binding YAML example"
+                  aria-label="Self-contained latency SLO YAML example"
                 >
-                  <code>{binding}</code>
+                  <code>{latency}</code>
                 </pre>
               </TabsContent>
               <TabsContent value="intent">
@@ -550,6 +550,13 @@ export function App() {
               </a>
               <a
                 className="text-link"
+                href={`${docs}/public/intent-governance.md`}
+              >
+                Recommendation review, audit and rollback{" "}
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
+              <a
+                className="text-link"
                 href={`${docs}/cli.md#scripts-and-llm-skills`}
               >
                 Read the CLI and skills guide{" "}
@@ -577,8 +584,9 @@ export function App() {
               <p>
                 Model-assisted intent and review workflows are experimental.
                 Providers are configurable, including local models. Evaluate
-                your model before enabling the workflow. There is no automatic
-                post-apply rollback; restoring a definition cannot undo consumed
+                your model before enabling the workflow. Review recommendation
+                evidence and decision history before approval. Configuration
+                rollback requires a separate review and cannot restore consumed
                 error budget.
               </p>
             </aside>

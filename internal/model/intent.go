@@ -49,6 +49,15 @@ func ValidateIntentSpec(s v1.IntentSpec) error {
 			return Invalid("journey needs a name, step and positive expectedRevision")
 		}
 	}
+	if s.Measurement != nil {
+		probe := SLO{ID: "intent", Project: "intent", Name: "Intent", Service: s.Service, Source: s.Source, Target: s.Target, WindowSeconds: s.WindowSeconds, StepSeconds: s.StepSeconds, Measurement: s.Measurement, ProviderWindow: MeasurementWindow(*s.Measurement)}
+		if err := ValidateInlineSLO(probe); err != nil {
+			return err
+		}
+		if !IntentMatchesBinding(v1.SLOIntent{Metadata: v1.Metadata{Project: "intent"}, Spec: s}, InlineBinding(probe)) {
+			return Invalid("inline measurement must match the intent outcome, entire population and latency threshold")
+		}
+	}
 	return nil
 }
 
@@ -77,8 +86,14 @@ func validateSLOIntent(s SLO) error {
 		return err
 	}
 	i := s.Intent
-	if s.MeasurementBinding == nil || s.ProviderWindow == nil || i.Service != s.Service || i.Source != s.Source || i.Target != s.Target || i.WindowSeconds != s.WindowSeconds || (DefinitionDigest(i.Policy) != DefinitionDigest(s.Policy) || DefinitionDigest(i.Policies) != DefinitionDigest(s.Policies)) {
-		return Invalid("compiled SLO must agree with its intent and retain a provider-window binding")
+	if s.Measurement != nil && (i.StepSeconds != s.StepSeconds || DefinitionDigest(i.Measurement) != DefinitionDigest(s.Measurement)) {
+		return Invalid("SLO measurement and stepSeconds must agree with its reviewed intent")
+	}
+	if s.Measurement == nil && i.Measurement != nil {
+		return Invalid("inline intent must retain its measurement")
+	}
+	if (s.MeasurementBinding == nil && s.Measurement == nil) || s.ProviderWindow == nil || i.Service != s.Service || i.Source != s.Source || i.Target != s.Target || i.WindowSeconds != s.WindowSeconds || (DefinitionDigest(i.Policy) != DefinitionDigest(s.Policy) || DefinitionDigest(i.Policies) != DefinitionDigest(s.Policies)) {
+		return Invalid("compiled SLO must agree with its intent and retain its reviewed measurement")
 	}
 	return nil
 }

@@ -12,7 +12,6 @@ import (
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
-	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
 	"github.com/ishantanu/nines/internal/tenancy"
 )
@@ -99,9 +98,8 @@ func (p *Publisher) Plan(ctx context.Context, s model.SLO, target rules.Target) 
 		if current.Metadata.DeletionTimestamp != nil {
 			return plan, model.Invalid("operator cleanup is in progress; wait before publishing")
 		}
-		native, parseErr := Native(current)
-		if parseErr != nil || service.MeasurementDigest(native.SLO.SLO()) != service.MeasurementDigest(s) {
-			return plan, model.Invalid("published measurement identity differs; use a new SLO identity")
+		if _, parseErr := Native(current); parseErr != nil {
+			return plan, parseErr
 		}
 		revision, parseErr := strconv.ParseInt(current.Metadata.Annotations[k.PortalRevision], 10, 64)
 		if parseErr != nil || revision > model.ConfigRevision(s) {

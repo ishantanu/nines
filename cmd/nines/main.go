@@ -54,6 +54,7 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 	to := flags.String("to", "", "range end RFC3339")
 	rangeText := flags.String("range", "", "history duration")
 	resolution := flags.String("resolution", "", "history bucket duration")
+	historyRevision := flags.Int64("revision", 0, "archived SLO revision for history (omit for current)")
 	name := flags.String("name", "", "resource name")
 	project := flags.String("project", "production", "project")
 	serviceName := flags.String("service", "api", "service")
@@ -376,6 +377,12 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			path = "/api/slos/" + id + "/status"
 		case "history":
 			q := url.Values{}
+			if *historyRevision < 0 {
+				return fmt.Errorf("revision must be positive")
+			}
+			if *historyRevision > 0 {
+				q.Set("revision", strconv.FormatInt(*historyRevision, 10))
+			}
 			if *from != "" {
 				q.Set("from", *from)
 			}

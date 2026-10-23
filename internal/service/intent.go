@@ -11,14 +11,15 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 )
 
-// PlanIntent is read-only. A candidate is an exact catalog match, not proof of
-// live traffic or business success. Only explicit revision selection compiles.
+// PlanIntent verifies and compiles an inline measurement without resource writes.
+// Explicit legacy catalog selection remains supported. Neither path establishes
+// live traffic or business correctness; conversation confirmation is separate.
 func (s *Service) PlanIntent(ctx context.Context, in v1.PlanIntentInput) (v1.IntentPlan, error) {
 	return s.planIntent(ctx, in, true)
 }
 
 func (s *Service) planIntent(ctx context.Context, in v1.PlanIntentInput, includeJourney bool) (v1.IntentPlan, error) {
-	out := v1.IntentPlan{SourceDigest: s.SourceFingerprint(in.Intent.Spec.Source), APIVersion: v1.APIVersion, Tenant: s.TenantID, Intent: in.Intent, IntentDigest: model.DefinitionDigest(in.Intent), Candidates: []v1.IntentCandidate{}, Clarifications: []string{}, Warnings: []string{"Description is explanatory text, not an executable condition. Review the selected binding's success labels, observation point, retries and denominator.", "Telemetry validation checks recent metadata and series. It is not a traffic backtest or proof of end-to-end journey success.", "Planning writes no resources or recording/alert rules. An approved intent change set can apply the SLO and CUJ link together; rule deployment requires its separate destination review."}}
+	out := v1.IntentPlan{SourceDigest: s.SourceFingerprint(in.Intent.Spec.Source), APIVersion: v1.APIVersion, Tenant: s.TenantID, Intent: in.Intent, IntentDigest: model.DefinitionDigest(in.Intent), Candidates: []v1.IntentCandidate{}, Clarifications: []string{}, Warnings: []string{"Description is explanatory text, not an executable condition. Review the measurement's success labels, observation point, retries and denominator.", "Telemetry validation checks recent metadata and series. It is not a traffic backtest or proof of end-to-end journey success.", "Planning writes no resources or recording/alert rules. An approved intent change set can apply the SLO and CUJ link together; rule deployment requires its separate destination review."}}
 	if err := model.ValidateIntent(in.Intent); err != nil {
 		return out, err
 	}
@@ -38,66 +39,80 @@ func (s *Service) planIntent(ctx context.Context, in v1.PlanIntentInput, include
 			return out, err
 		}
 	}
-	if in.Binding == nil {
-		st, err := s.topologyStore()
-		if err != nil {
-			return out, err
+	var compiled v1.CompiledBinding
+	var err error
+	if in.Intent.Spec.Measurement != nil {
+		if in.Binding != nil {
+			return out, model.Invalid("an inline intent does not use a separate measurement binding")
 		}
-		rows, err := st.ListTopology(ctx, v1.BindingKind, "", 101)
-		if err != nil {
-			return out, err
+		inline, e := s.CompileMeasurement(ctx, inlineIntentManifest(in.Intent))
+		if e != nil {
+			return out, e
 		}
-		if len(rows) > 100 {
-			out.Truncated = true
-			rows = rows[:100]
-		}
-		for _, r := range rows {
-			var b model.MeasurementBinding
-			if err := json.Unmarshal(r.Manifest, &b); err != nil {
+		compiled = v1.CompiledBinding{APIVersion: inline.APIVersion, Tenant: inline.Tenant, CompilerVersion: inline.CompilerVersion, MeasurementDigest: inline.MeasurementDigest, Evidence: inline.Evidence, Manifest: inline.Manifest, YAML: inline.YAML, Digest: inline.Digest, Warnings: inline.Warnings}
+	} else {
+		if in.Binding == nil {
+			st, err := s.topologyStore()
+			if err != nil {
 				return out, err
 			}
-			if model.IntentMatchesBinding(in.Intent, b) {
-				if len(out.Candidates) == 20 {
-					out.Truncated = true
-					continue
+			rows, err := st.ListTopology(ctx, v1.BindingKind, "", 101)
+			if err != nil {
+				return out, err
+			}
+			if len(rows) > 100 {
+				out.Truncated = true
+				rows = rows[:100]
+			}
+			for _, r := range rows {
+				var b model.MeasurementBinding
+				if err := json.Unmarshal(r.Manifest, &b); err != nil {
+					return out, err
 				}
-				out.Candidates = append(out.Candidates, v1.IntentCandidate{Binding: v1.BindingReference{Name: r.ID, Revision: r.Revision, Digest: r.Digest}, Definition: v1.MeasurementBinding(b)})
+				if model.IntentMatchesBinding(in.Intent, b) {
+					if len(out.Candidates) == 20 {
+						out.Truncated = true
+						continue
+					}
+					out.Candidates = append(out.Candidates, v1.IntentCandidate{Binding: v1.BindingReference{Name: r.ID, Revision: r.Revision, Digest: r.Digest}, Definition: v1.MeasurementBinding(b)})
+				}
 			}
-		}
-		out.Status = "needs_selection"
-		out.Clarifications = append(out.Clarifications, "Select a binding and its reviewed revision after confirming population and success semantics. Even a single candidate requires an explicit choice.")
-		if len(out.Candidates) == 0 {
-			out.Status = "needs_instrumentation"
-			out.Clarifications = []string{"No exact binding matches the project, service, source, entire population and threshold. Create a MeasurementBinding from verified telemetry; do not broaden the population or substitute a percentile."}
-		}
-		if out.Truncated {
+			out.Status = "needs_selection"
+			out.Clarifications = append(out.Clarifications, "Select a binding and its reviewed revision after confirming population and success semantics. Even a single candidate requires an explicit choice.")
 			if len(out.Candidates) == 0 {
-				out.Status = "catalog_incomplete"
+				out.Status = "needs_instrumentation"
+				out.Clarifications = []string{"No exact binding matches the project, service, source, entire population and threshold. Define the measurement inside this SLO; do not broaden the population or substitute a percentile."}
 			}
-			out.Clarifications = append(out.Clarifications, "Catalog results are bounded to 100 scanned bindings and 20 matching candidates. Absence is inconclusive; use the paginated binding catalog and select a matching binding explicitly.")
+			if out.Truncated {
+				if len(out.Candidates) == 0 {
+					out.Status = "catalog_incomplete"
+				}
+				out.Clarifications = append(out.Clarifications, "Catalog results are bounded to 100 scanned bindings and 20 matching candidates. Absence is inconclusive; use the paginated binding catalog and select a matching binding explicitly.")
+			}
+			return out, nil
 		}
-		return out, nil
-	}
-	if !validResourceID(in.Binding.Name) || in.Binding.ExpectedRevision < 1 {
-		return out, model.Invalid("binding requires a name and positive expectedRevision")
-	}
-	row, err := s.ReadTopology(ctx, v1.BindingKind, in.Binding.Name, 0)
-	if err != nil {
-		return out, err
-	}
-	if row.Revision != in.Binding.ExpectedRevision {
-		return out, model.ErrRevisionConflict
-	}
-	var b model.MeasurementBinding
-	if err = json.Unmarshal(row.Manifest, &b); err != nil {
-		return out, err
-	}
-	if !model.IntentMatchesBinding(in.Intent, b) {
-		return out, model.Invalid("selected binding does not match the intent's exact population, outcome, threshold, service, source and project")
-	}
-	compiled, err := s.CompileBinding(ctx, row.ID, v1.CompileBindingInput{ExpectedRevision: row.Revision, Name: in.Intent.Metadata.Name, DisplayName: in.Intent.Metadata.Name, Target: in.Intent.Spec.Target, WindowSeconds: in.Intent.Spec.WindowSeconds, Policies: in.Intent.Spec.Policies, Policy: in.Intent.Spec.Policy})
-	if err != nil {
-		return out, err
+		if !validResourceID(in.Binding.Name) || in.Binding.ExpectedRevision < 1 {
+			return out, model.Invalid("binding requires a name and positive expectedRevision")
+		}
+		row, err := s.ReadTopology(ctx, v1.BindingKind, in.Binding.Name, 0)
+		if err != nil {
+			return out, err
+		}
+		if row.Revision != in.Binding.ExpectedRevision {
+			return out, model.ErrRevisionConflict
+		}
+		var b model.MeasurementBinding
+		if err = json.Unmarshal(row.Manifest, &b); err != nil {
+			return out, err
+		}
+		if !model.IntentMatchesBinding(in.Intent, b) {
+			return out, model.Invalid("selected binding does not match the intent's exact population, outcome, threshold, service, source and project")
+		}
+		compiled, err = s.CompileBinding(ctx, row.ID, v1.CompileBindingInput{ExpectedRevision: row.Revision, Name: in.Intent.Metadata.Name, DisplayName: in.Intent.Metadata.Name, Target: in.Intent.Spec.Target, WindowSeconds: in.Intent.Spec.WindowSeconds, Policies: in.Intent.Spec.Policies, Policy: in.Intent.Spec.Policy})
+		if err != nil {
+			return out, err
+		}
+
 	}
 	compiled.Manifest.Spec.Intent = &in.Intent.Spec
 	def := model.SLODefinition(compiled.Manifest)
@@ -115,6 +130,7 @@ func (s *Service) planIntent(ctx context.Context, in v1.PlanIntentInput, include
 	}
 	compiled.YAML = string(encoded)
 	compiled.Digest = model.DefinitionDigest(compiled.Manifest)
+	out.Warnings = append(out.Warnings, resourcePlan.Warnings...)
 	out.ExpectedRevision = resourcePlan.ExpectedRevision
 	out.Compiled = &compiled
 	out.Status = "ready"

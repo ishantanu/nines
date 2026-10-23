@@ -27,7 +27,7 @@ export function IntentBacktestPanel({
 }: {
   scope: RequestScope;
   intent: IntentDocument;
-  binding: { name: string; revision: number };
+  binding?: { name: string; revision: number };
   step: number;
 }) {
   const resolution = Math.ceil(Math.max(step, 300) / step) * step;
@@ -59,7 +59,14 @@ export function IntentBacktestPanel({
         body: JSON.stringify({
           plan: {
             intent,
-            binding: { name: binding.name, expectedRevision: binding.revision },
+            ...(binding
+              ? {
+                  binding: {
+                    name: binding.name,
+                    expectedRevision: binding.revision,
+                  },
+                }
+              : {}),
           },
           from: backtestTime(from),
           to: backtestTime(to),

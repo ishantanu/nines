@@ -27,7 +27,20 @@ export function IntentEvidence({
   compiled: NonNullable<IntentPlan["compiled"]>;
   sourceDigest?: string;
 }) {
-  const spec = compiled.definition.spec;
+  const inline = compiled.manifest?.spec.measurement;
+  const spec = inline
+    ? {
+        ...inline,
+        source: compiled.manifest.spec.source,
+        measurement: inline.type,
+      }
+    : compiled.definition?.spec;
+  if (!spec)
+    return (
+      <p role="alert">
+        Measurement evidence is unavailable. Verify telemetry again.
+      </p>
+    );
   const warnings = [
     ...new Set([...compiled.warnings, ...compiled.evidence.warnings]),
   ];
@@ -46,12 +59,19 @@ export function IntentEvidence({
           <dt className="text-muted-foreground">Metric</dt>
           <dd className="mt-1 break-all font-mono">{spec.metric}</dd>
         </div>
-        <div>
-          <dt className="text-muted-foreground">Selected binding</dt>
-          <dd className="mt-1 break-all">
-            {compiled.binding.name} · revision {compiled.binding.revision}
-          </dd>
-        </div>
+        {compiled.binding ? (
+          <div>
+            <dt className="text-muted-foreground">Shared measurement</dt>
+            <dd className="mt-1 break-all">
+              {compiled.binding.name} · revision {compiled.binding.revision}
+            </dd>
+          </div>
+        ) : (
+          <div>
+            <dt className="text-muted-foreground">Versioning</dt>
+            <dd className="mt-1">Owned by this SLO</dd>
+          </div>
+        )}
         <div>
           <dt className="text-muted-foreground">Observation point</dt>
           <dd className="mt-1">{spec.observationPoint}</dd>
@@ -92,8 +112,12 @@ export function IntentEvidence({
             <dd>{sourceDigest ?? "Unavailable"}</dd>
           </div>
           <div>
-            <dt>Binding digest</dt>
-            <dd>{compiled.binding.digest ?? "Unavailable"}</dd>
+            <dt>Measurement digest</dt>
+            <dd>
+              {compiled.measurementDigest ??
+                compiled.binding?.digest ??
+                "Unavailable"}
+            </dd>
           </div>
         </dl>
       </details>

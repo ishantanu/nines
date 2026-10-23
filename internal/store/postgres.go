@@ -168,6 +168,20 @@ func (p *Postgres) Update(ctx context.Context, id string, fn func(*model.Record)
 	if err = fn(&r); err != nil {
 		return err
 	}
+	if model.ConfigRevision(r.SLO) != model.ConfigRevision(before.SLO) {
+		archive := archiveSLO(ctx, before)
+		document, marshalErr := json.Marshal(archive)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		summary, marshalErr := json.Marshal(archive.Summary)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		if _, err = tx.Exec(ctx, "INSERT INTO slo_revision_archives(slo_id,revision,summary,document) VALUES($1,$2,$3,$4)", id, archive.Summary.Revision, summary, document); err != nil {
+			return err
+		}
+	}
 	batch := &pgx.Batch{}
 	for k, v := range r.Points {
 		old, ok := before.Points[k]

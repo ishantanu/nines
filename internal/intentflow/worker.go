@@ -50,7 +50,7 @@ var contract = func() skillContract {
 	if e := yaml.Unmarshal(skillYAML, &c); e != nil {
 		panic(e)
 	}
-	if c.APIVersion != v1.APIVersion || c.Kind != "IntentAuthoringSkill" || c.Metadata.Name != "intent-authoring" || c.Metadata.Version != "0.1.0" || c.Spec.MaxModelCalls != 6 || c.Spec.MaxToolCalls != 6 || len(c.Spec.Tools) != 6 || len(c.Spec.Definitions) != 6 {
+	if c.APIVersion != v1.APIVersion || c.Kind != "IntentAuthoringSkill" || c.Metadata.Name != "intent-authoring" || c.Metadata.Version != "0.3.0" || c.Spec.MaxModelCalls != 6 || c.Spec.MaxToolCalls != 6 || len(c.Spec.Tools) != 6 || len(c.Spec.Definitions) != 6 {
 		panic("invalid intent skill contract")
 	}
 	seen := map[string]bool{}
@@ -66,10 +66,10 @@ var contract = func() skillContract {
 
 func bytesDigest(b []byte) string { d := sha256.Sum256(b); return hex.EncodeToString(d[:]) }
 func skillRef() v1.ReviewSkillRef {
-	return v1.ReviewSkillRef{ID: "intent-authoring", Version: "0.1.0", Digest: bytesDigest(skillYAML)}
+	return v1.ReviewSkillRef{ID: "intent-authoring", Version: "0.3.0", Digest: bytesDigest(skillYAML)}
 }
 func (s *Service) Capabilities() any {
-	return map[string]any{"apiVersion": v1.APIVersion, "tenant": s.Platform.TenantID, "modelEnabled": s.Model != nil, "draftEnabled": s.Platform.IntentDrafter != nil, "skill": skillRef(), "maxRuns": 8, "maxModelCalls": 6, "maxToolCalls": 6, "tools": contract.Spec.Tools, "appliesResources": false, "reviewedChangeSets": true, "humanApprovalRequired": true, "skillYAML": string(skillYAML)}
+	return map[string]any{"apiVersion": v1.APIVersion, "tenant": s.Platform.TenantID, "modelEnabled": s.Model != nil, "draftEnabled": s.Platform.IntentDrafter != nil, "skill": skillRef(), "maxRuns": 8, "maxModelCalls": 6, "maxToolCalls": 6, "tools": contract.Spec.Tools, "appliesResources": false, "reviewedChangeSets": true, "humanApprovalRequired": true, "auditTrail": true, "reviewedConfigurationRollback": true, "rollbackCreatesNewRevisions": true, "rollbackDeletesResources": false, "rollbackDeploysRules": false, "skillYAML": string(skillYAML)}
 }
 func decodeArgs(raw json.RawMessage, out any) error {
 	if len(raw) > 4096 {
@@ -251,6 +251,9 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 		}
 		if err != nil {
 			return fail(safeModelFailure(err))
+		}
+		if s.sensitiveInput(response) {
+			return fail("unsafe_model_response")
 		}
 		if len(response.Calls) != 1 || response.InputTokens < 0 || response.OutputTokens < 0 || response.OutputTokens > 1024 || len(response.Native) > 64<<10 || !json.Valid(response.Native) {
 			return fail("unsafe_model_response")
@@ -487,20 +490,23 @@ func (s *Service) execute(ctx context.Context, r *record, call rm.Call) (any, er
 		if current(r).Mode == "guided" {
 			state := "needs_input"
 			message := strings.Join(plan.Clarifications, "\n")
-			if len(plan.Candidates) > 0 {
+			if len(plan.Candidates) > 0 || (plan.Compiled != nil && r.Session.Goal.Spec.Measurement != nil) {
 				state = "needs_selection"
-				message = "Review the candidate observation point, success labels and retry semantics, then explicitly confirm one binding revision."
+				message = "Review the observation point, success criteria and eligible population, then confirm this measurement."
 			}
 			finish(r, state, "", message, now)
 		}
 		return plan, nil
 	case "compile_intent":
 		if r.Session.Goal == nil || r.Session.Selection == nil || hash(*r.Session.Goal) != r.Session.Selection.IntentDigest {
-			return nil, model.Invalid("human binding confirmation is required")
+			return nil, model.Invalid("human measurement confirmation is required")
 		}
-		plan, e := s.Platform.PlanIntent(ctx, v1.PlanIntentInput{Intent: *r.Session.Goal, Binding: &r.Session.Selection.Binding})
+		plan, e := s.Platform.PlanIntent(ctx, confirmedIntent(r.Session))
 		if e != nil {
 			return nil, e
+		}
+		if r.Session.Goal.Spec.Measurement != nil && (plan.Compiled == nil || plan.Compiled.MeasurementDigest != r.Session.Selection.MeasurementDigest) {
+			return nil, ErrConflict
 		}
 		r.Session.Plan = &plan
 		return plan, nil
@@ -509,7 +515,7 @@ func (s *Service) execute(ctx context.Context, r *record, call rm.Call) (any, er
 		if b == nil || r.Session.Plan == nil || r.Session.Plan.Compiled == nil || r.Session.Selection == nil {
 			return nil, model.Invalid("provide a historical window and compile the confirmed measurement first")
 		}
-		backtest, e := s.Platform.BacktestIntent(ctx, v1.IntentBacktestInput{Plan: v1.PlanIntentInput{Intent: *r.Session.Goal, Binding: &r.Session.Selection.Binding}, From: b.From, To: b.To, ResolutionSeconds: b.ResolutionSeconds})
+		backtest, e := s.Platform.BacktestIntent(ctx, v1.IntentBacktestInput{Plan: confirmedIntent(r.Session), From: b.From, To: b.To, ResolutionSeconds: b.ResolutionSeconds})
 		if e != nil {
 			return nil, e
 		}
@@ -517,4 +523,12 @@ func (s *Service) execute(ctx context.Context, r *record, call rm.Call) (any, er
 		return backtest, nil
 	}
 	return nil, rm.Failure("unsafe_tool_call")
+}
+
+func confirmedIntent(session v1.IntentConversation) v1.PlanIntentInput {
+	in := v1.PlanIntentInput{Intent: *session.Goal}
+	if session.Goal.Spec.Measurement == nil && session.Selection != nil {
+		in.Binding = &session.Selection.Binding
+	}
+	return in
 }

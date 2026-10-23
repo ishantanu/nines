@@ -88,7 +88,7 @@ func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
 	connection := ConnectionID(s)
 	hash := sha256.Sum256([]byte(tenant + "/" + connection))
 	g := Group{Name: "nines-" + s.ID + "-" + hex.EncodeToString(hash[:5]), Interval: fmt.Sprintf("%ds", s.StepSeconds)}
-	base := map[string]string{"nines_managed": "true", "nines_tenant": tenant, "nines_source": connection, "nines_slo": s.ID}
+	base := map[string]string{"nines_managed": "true", "nines_tenant": tenant, "nines_source": connection, "nines_slo": s.ID, "nines_revision": strconv.FormatInt(model.ConfigRevision(s), 10)}
 	if ownerUID != "" {
 		base["nines_resource_uid"] = ownerUID
 	}
@@ -102,7 +102,7 @@ func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
 		}
 		return x
 	}
-	selector := fmt.Sprintf("nines_tenant=%q,nines_source=%q,nines_slo=%q,nines_resource_uid=%q", tenant, connection, s.ID, ownerUID)
+	selector := fmt.Sprintf("nines_tenant=%q,nines_source=%q,nines_slo=%q,nines_resource_uid=%q,nines_revision=%q", tenant, connection, s.ID, ownerUID, strconv.FormatInt(model.ConfigRevision(s), 10))
 	add := func(name, expr string, window int64) {
 		g.Rules = append(g.Rules, Rule{Record: name, Expr: expr, Labels: labels(window)})
 	}
@@ -156,7 +156,7 @@ func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
 		add("nines:slo_budget_remaining:ratio", "1 - ("+burn+")", window)
 	}
 	for _, p := range s.AlertPolicies() {
-		join := " on(nines_tenant,nines_source,nines_slo) "
+		join := " on(nines_tenant,nines_source,nines_slo,nines_resource_uid,nines_revision) "
 		expr := fmt.Sprintf("(nines:slo_burn_rate:ratio{%s,window=%q} >= %g) and%s(nines:slo_burn_rate:ratio{%s,window=%q} >= %g) and%s(nines:slo_coverage:ratio{%s,window=%q} >= %g) and%s(nines:slo_coverage:ratio{%s,window=%q} >= %g)", selector, fmt.Sprintf("%ds", p.ShortWindowSeconds), p.BurnRate, join, selector, fmt.Sprintf("%ds", p.LongWindowSeconds), p.BurnRate, join, selector, fmt.Sprintf("%ds", p.ShortWindowSeconds), p.MinCoverage, join, selector, fmt.Sprintf("%ds", p.LongWindowSeconds), p.MinCoverage)
 		alertLabels := labels(0)
 		if p.Name != "" {

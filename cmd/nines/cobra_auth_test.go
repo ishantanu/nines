@@ -370,3 +370,33 @@ func TestOfflineIntentValidationUsesSharedSchema(t *testing.T) {
 		t.Fatal("intent silently ignored an SLO override")
 	}
 }
+
+func TestIntentAuditReadAndRollbackExportDoNotRequireAFile(t *testing.T) {
+	cliEnv(t)
+	t.Setenv("NINES_API_KEY", "fixture-key")
+	var calls atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.Method != "GET" || r.URL.Path != "/api/intent-conversations/chat/audit" || r.Header.Get("X-Nines-Tenant") != "alpha" || r.Header.Get("Authorization") != "Bearer fixture-key" {
+			t.Error("unscoped audit read", r.Method, r.URL.Path)
+		}
+		_, _ = io.WriteString(w, `{"apiVersion":"nines.dev/v1alpha1","tenant":"alpha","conversation":"chat","integrity":"verified","events":[],"changeSets":[]}`)
+	}))
+	defer server.Close()
+	var out bytes.Buffer
+	if e := run([]string{"intent", "conversations", "audit", "chat", "--server", server.URL, "--tenant", "alpha", "--agent"}, &out); e != nil {
+		t.Fatal(e, out.String())
+	}
+	if calls.Load() != 1 || !strings.Contains(out.String(), `"integrity": "verified"`) {
+		t.Fatal(out.String(), calls.Load())
+	}
+	for _, action := range []string{"audit", "rollback-kubernetes"} {
+		out.Reset()
+		if e := run([]string{"intent", "conversations", action, "--help"}, &out); e != nil {
+			t.Fatal(e)
+		}
+		if strings.Contains(out.String(), "--file") {
+			t.Fatal("read/export inherited required write file", action, out.String())
+		}
+	}
+}

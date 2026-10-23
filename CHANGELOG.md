@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- SLOs now own structured measurements directly. Portal authoring, intent review, offline rule generation, connected telemetry verification and Kubernetes reconciliation work without creating a separate measurement binding. Measurement edits follow the SLO revision and review lifecycle.
+
+- Allow same-name SLO measurement edits with atomic revision archives, fresh active coverage, explicit review warnings and revision-isolated Prometheus/Mimir recording rules.
+
+- Freeze recommendation rationale and evidence into intent change sets, record reasoned approvals/rejections and audited transaction receipts, and add separately reviewed, revision-safe configuration rollback through UI, CLI and the Go client.
+
 - Publish owner-reviewed portal SLOs through the Kubernetes operator, with persistent route pins, distinct portal/Kubernetes revisions, status readback, least-privilege RBAC and guarded withdrawal.
 
 - Add opt-in native Prometheus reload after reviewed rule apply, separate configuration/activation/runtime results, truthful file-written status and a real shared-mount acceptance test. The playground uses this path without a separate watcher.
@@ -12,7 +18,7 @@
 - Revision/digest-scoped recording markers and independent query-dataset output evidence, plus real operator selector and critical/warning alert timing/recovery acceptance fixtures.
 
 - Tag-triggered alpha release drafts for Linux/macOS on amd64/arm64, with archive verification, build metadata and binary smoke checks.
-- Practical site examples for the Prometheus playground, CLI, tenant access, SLI queries, Go client and MCP, plus measurement-binding and experimental intent YAML.
+- Practical site examples for the Prometheus playground, CLI, tenant access, SLI queries, Go client and MCP, plus self-contained latency SLO and experimental intent YAML.
 
 - Consistent `admin` / `admin` login for the in-memory demo and loopback playground, with persistent password policy unchanged.
 

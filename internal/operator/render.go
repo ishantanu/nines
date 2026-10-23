@@ -182,7 +182,17 @@ func CRDs() []any {
 	}{{domain.SLOKind, domain.SLOSpec{}, "slo"}, {domain.JourneyKind, domain.JourneySpec{}, "cuj"}, {domain.BindingKind, domain.BindingSpec{}, "mb"}, {domain.IntentKind, k.IntentSpec{}, "sloi"}}
 	out := []any{}
 	for _, item := range kinds {
-		schema := map[string]any{"type": "object", "required": []string{"spec"}, "properties": map[string]any{"apiVersion": map[string]any{"type": "string"}, "kind": map[string]any{"type": "string"}, "metadata": map[string]any{"type": "object"}, "spec": schemaFor(reflect.TypeOf(item.Spec)), "status": map[string]any{"type": "object", "x-kubernetes-preserve-unknown-fields": true}}}
+		specSchema := schemaFor(reflect.TypeOf(item.Spec))
+		if item.Kind == domain.IntentKind {
+			specSchema["x-kubernetes-validations"] = []any{
+				map[string]string{"rule": "has(self.measurement) != has(self.measurementSelection)", "message": "define spec.measurement; a legacy measurementSelection is an alternative, never an additional input"},
+				map[string]string{"rule": "!has(self.measurement) || (has(self.stepSeconds) && self.stepSeconds >= 1 && self.stepSeconds <= 3600)", "message": "inline measurement requires stepSeconds from 1 to 3600"},
+			}
+		}
+		if item.Kind == domain.SLOKind {
+			specSchema["x-kubernetes-validations"] = []any{map[string]string{"rule": "!has(self.measurement) || (!has(self.measurementBinding) && !has(self.providerWindow) && !has(self.goodQuery) && !has(self.totalQuery))", "message": "inline measurement cannot be combined with binding references or explicit queries"}}
+		}
+		schema := map[string]any{"type": "object", "required": []string{"spec"}, "properties": map[string]any{"apiVersion": map[string]any{"type": "string"}, "kind": map[string]any{"type": "string"}, "metadata": map[string]any{"type": "object"}, "spec": specSchema, "status": map[string]any{"type": "object", "x-kubernetes-preserve-unknown-fields": true}}}
 		out = append(out, map[string]any{"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition", "metadata": map[string]string{"name": Plurals[item.Kind] + ".nines.dev"}, "spec": map[string]any{"group": "nines.dev", "scope": "Namespaced", "names": map[string]any{"kind": item.Kind, "plural": Plurals[item.Kind], "singular": strings.ToLower(item.Kind), "shortNames": []string{item.Short}}, "versions": []any{map[string]any{"name": "v1alpha1", "served": true, "storage": true, "schema": map[string]any{"openAPIV3Schema": schema}, "subresources": map[string]any{"status": map[string]any{}}, "additionalPrinterColumns": []any{map[string]any{"name": "Ready", "type": "string", "jsonPath": ".status.conditions[?(@.type=='Ready')].status"}, map[string]any{"name": "Reason", "type": "string", "jsonPath": ".status.conditions[?(@.type=='Ready')].reason"}}}}}})
 	}
 	return out
@@ -192,8 +202,14 @@ func FromIntent(goal domain.SLOIntent, namespace string, selection k.Measurement
 	if e := model.ValidateIntent(goal); e != nil {
 		return k.Resource{}, e
 	}
-	if !tenancy.ValidID(namespace) || !tenancy.ValidID(selection.Name) || selection.ExpectedGeneration < 1 {
-		return k.Resource{}, model.Invalid("provide namespace, binding name and expected binding generation")
+	if !tenancy.ValidID(namespace) {
+		return k.Resource{}, model.Invalid("provide a Kubernetes namespace")
+	}
+	if goal.Spec.Measurement == nil && (!tenancy.ValidID(selection.Name) || selection.ExpectedGeneration < 1) {
+		return k.Resource{}, model.Invalid("legacy intents require a binding name and expected generation; prefer spec.measurement")
+	}
+	if goal.Spec.Measurement != nil && (selection.Name != "" || selection.ExpectedGeneration != 0) {
+		return k.Resource{}, model.Invalid("inline measurement cannot be combined with a binding selection")
 	}
 	spec, e := json.Marshal(k.IntentSpec{IntentSpec: goal.Spec, MeasurementSelection: selection})
 	if e != nil {

@@ -15,13 +15,15 @@ type ResourceRevision struct {
 	Digest   string `json:"digest"`
 }
 type ResourcePlan struct {
-	APIVersion       string `json:"apiVersion"`
-	Kind             string `json:"kind"`
-	Action           string `json:"action"`
-	ExpectedRevision int64  `json:"expectedRevision"`
-	Digest           string `json:"digest"`
-	Manifest         any    `json:"manifest"`
-	Previous         any    `json:"previous,omitempty"`
+	MeasurementChanged bool     `json:"measurementChanged,omitempty"`
+	Warnings           []string `json:"warnings,omitempty"`
+	APIVersion         string   `json:"apiVersion"`
+	Kind               string   `json:"kind"`
+	Action             string   `json:"action"`
+	ExpectedRevision   int64    `json:"expectedRevision"`
+	Digest             string   `json:"digest"`
+	Manifest           any      `json:"manifest"`
+	Previous           any      `json:"previous,omitempty"`
 }
 
 func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (ResourcePlan, error) {
@@ -64,8 +66,9 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	p.ExpectedRevision = model.ConfigRevision(old.SLO)
 	p.Previous = ResourceRevision{manifest, p.ExpectedRevision, model.DefinitionDigest(manifest)}
 	if model.DefinitionDigest(manifest) != p.Digest {
-		if err := sloMeasurementCompatible(old.SLO, d.SLO.SLO()); err != nil {
-			return p, err
+		p.MeasurementChanged = MeasurementDigest(old.SLO) != MeasurementDigest(d.SLO.SLO())
+		if p.MeasurementChanged {
+			p.Warnings = []string{"This edit changes the measurement. The previous definition and retained evidence will be archived; active samples, coverage and measurement health start fresh. Review and redeploy rules separately. Operator destination changes still require withdrawal from the original route."}
 		}
 		p.Action = "update"
 		return p, nil
@@ -115,9 +118,7 @@ func (s *Service) ApplyDefinition(ctx context.Context, d model.Definition, expec
 				return nil
 			}
 			next := d.SLO.SLO()
-			if err := sloMeasurementCompatible(r.SLO, next); err != nil {
-				return err
-			}
+			measurementChanged := MeasurementDigest(r.SLO) != MeasurementDigest(next)
 			next.CreatedAt = r.SLO.CreatedAt
 			next.Revision = revision + 1
 			// A definition update ends an existing firing episode explicitly, then
@@ -132,11 +133,15 @@ func (s *Service) ApplyDefinition(ctx context.Context, d model.Definition, expec
 				r.Events = append(r.Events, model.AlertEvent{ID: model.NewID(), SLOID: r.SLO.ID, Kind: "resolved", Reason: "configuration_changed", ConfigRevision: revision, Time: s.Now().UTC().Truncate(time.Duration(r.SLO.StepSeconds) * time.Second)})
 			}
 			r.SLO = next
-			// Observations are revision scoped; a target/policy/window edit starts fresh.
-			if next.ProviderWindow != nil {
+			// Store.Update archives the previous definition and observations atomically.
+			// New measurement identities cannot reuse old interval counts or health.
+			if measurementChanged {
+				r.Points = map[int64]model.Point{}
+			}
+			if measurementChanged || next.ProviderWindow != nil {
 				r.Windows = nil
 				var measurement *v1.BindingHealth
-				if previous := r.Collection.Measurement; previous != nil {
+				if previous := r.Collection.Measurement; previous != nil && !measurementChanged {
 					copy := *previous
 					copy.SLORevision = next.Revision
 					measurement = &copy
@@ -166,14 +171,6 @@ func (s *Service) ApplyDefinition(ctx context.Context, d model.Definition, expec
 	return ResourceRevision{*d.SLO, 1, digest}, nil
 }
 
-// Existing interval counts must not be reinterpreted as different measurements.
-func sloMeasurementCompatible(old, next model.SLO) error {
-	if MeasurementDigest(old) != MeasurementDigest(next) {
-		return model.Invalid("service, binding reference, stepSeconds, queries and source identify the measurement and cannot change; create a new metadata.name")
-	}
-	return nil
-}
-
 func sourceID(name string) string {
 	if name == "" {
 		return "primary"
@@ -182,12 +179,13 @@ func sourceID(name string) string {
 }
 
 // MeasurementDigest is shared by the API and optional Kubernetes controller so
-// definition edits cannot reinterpret an existing interval measurement history.
+// measurement edits can archive and reset observations without reinterpreting history.
 func MeasurementDigest(s model.SLO) string {
 	return model.DefinitionDigest(struct {
+		Measurement                  *v1.MeasurementSpec
 		Window                       *v1.ProviderWindow
 		Binding                      *v1.BindingReference
 		Service, Source, Good, Total string
 		Step                         int64
-	}{s.ProviderWindow, s.MeasurementBinding, s.Service, sourceID(s.Source), s.GoodQuery, s.TotalQuery, s.StepSeconds})
+	}{s.Measurement, s.ProviderWindow, s.MeasurementBinding, s.Service, sourceID(s.Source), s.GoodQuery, s.TotalQuery, s.StepSeconds})
 }

@@ -36,6 +36,7 @@ func (m *Memory) DefinitionBatch(ctx context.Context, key, digest string, commit
 	}
 	snapshot := NewMemory()
 	snapshot.records = copyJSON(m.records)
+	snapshot.archives = copyJSON(m.archives)
 	snapshot.deliveries = copyJSON(m.deliveries)
 	snapshot.topology = copyJSON(m.topology)
 	snapshot.journeys = copyJSON(m.journeys)
@@ -53,6 +54,7 @@ func (m *Memory) DefinitionBatch(ctx context.Context, key, digest string, commit
 	}
 	if commit {
 		m.records = snapshot.records
+		m.archives = snapshot.archives
 		m.deliveries = snapshot.deliveries
 		m.topology = snapshot.topology
 		m.journeys = snapshot.journeys

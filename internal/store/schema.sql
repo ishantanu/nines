@@ -73,3 +73,13 @@ CREATE TABLE IF NOT EXISTS definition_batch_receipts (
 );
 
 ALTER TABLE slos ADD COLUMN IF NOT EXISTS operator_route text NOT NULL DEFAULT '';
+
+-- Frozen snapshots from immediately before a definition revision was replaced.
+-- Active samples stay separate; old measurements are never reinterpreted.
+CREATE TABLE IF NOT EXISTS slo_revision_archives (
+ slo_id text NOT NULL REFERENCES slos(id),
+ revision bigint NOT NULL CHECK(revision > 0),
+ summary jsonb NOT NULL,
+ document jsonb NOT NULL,
+ PRIMARY KEY(slo_id, revision)
+);

@@ -51,7 +51,7 @@ func addOperations(s *mcp.Server, a *apiClient, c Config) {
 		return a.request(ctx, http.MethodGet, path, nil)
 	})
 	register(s, a, "plan_slo_rules", "Preview generated recording/alert rules, SLO revision, exact configured dataset/namespace and deployment digest. Does not deploy or contact the ruler.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/slos/", "/rules"))
-	register(s, a, "export_slo", "Export the current SLO definition as canonical YAML. Previous SLO definitions are not archived.", true, func(ctx context.Context, in idInput) (any, error) {
+	register(s, a, "export_slo", "Export the current SLO definition as canonical YAML. Previous definitions and retained measurement evidence are available through the SLO revision APIs.", true, func(ctx context.Context, in idInput) (any, error) {
 		if err := validID(in.ID); err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ func addOperations(s *mcp.Server, a *apiClient, c Config) {
 		}
 		return map[string]string{"manifest": text}, nil
 	})
-	register(s, a, "plan_slo", "Validate a ServiceLevelObjective YAML definition against tenant state and preview its expected revision. No mutation; edits cannot change source, queries or sampling interval.", true, func(ctx context.Context, in createInput) (any, error) {
+	register(s, a, "plan_slo", "Validate a ServiceLevelObjective YAML definition against tenant state and preview its expected revision. No mutation; measurement edits start a new configuration revision with fresh coverage and archived evidence. Inspect measurementChanged and warnings before applying.", true, func(ctx context.Context, in createInput) (any, error) {
 		if _, err := model.ParseSLODefinition([]byte(in.Manifest)); err != nil {
 			return nil, err
 		}

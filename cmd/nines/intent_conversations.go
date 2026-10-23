@@ -74,12 +74,18 @@ func conversationCommand(action string, o *options) *cobra.Command {
 		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 		defer cancel()
 		var result any
-		if action != "list" && action != "show" && action != "verify" && action != "kubernetes" && *file == "" {
+		if action != "list" && action != "show" && action != "verify" && action != "kubernetes" && action != "rollback-kubernetes" && action != "audit" && *file == "" {
 			return fmt.Errorf("provide -f with an explicit operational YAML request")
 		}
 		switch action {
-		case "kubernetes":
-			exported, err := c.ExportIntentKubernetes(ctx, id, *namespace, *digest)
+		case "kubernetes", "rollback-kubernetes":
+			var exported v1.IntentKubernetesExport
+			var err error
+			if action == "kubernetes" {
+				exported, err = c.ExportIntentKubernetes(ctx, id, *namespace, *digest)
+			} else {
+				exported, err = c.ExportIntentRollbackKubernetes(ctx, id, *namespace, *digest)
+			}
 			if err != nil {
 				return err
 			}
@@ -92,6 +98,24 @@ func conversationCommand(action string, o *options) *cobra.Command {
 			}
 			if e = conversationFile(*file, &in); e == nil {
 				result, e = c.PrepareIntentChangeSet(ctx, id, in.ExpectedVersion)
+			}
+		case "audit":
+			result, e = c.IntentAudit(ctx, id)
+		case "reject", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject":
+			var in v1.ReviewIntentChangeSet
+			if e = conversationFile(*file, &in); e == nil {
+				switch action {
+				case "reject":
+					result, e = c.RejectIntentChangeSet(ctx, id, in)
+				case "rollback-plan":
+					result, e = c.PrepareIntentRollback(ctx, id, in)
+				case "rollback-approve":
+					result, e = c.ApproveIntentRollback(ctx, id, in)
+				case "rollback-apply":
+					result, e = c.ApplyIntentRollback(ctx, id, in)
+				case "rollback-reject":
+					result, e = c.RejectIntentRollback(ctx, id, in)
+				}
 			}
 		case "approve", "apply":
 			var in v1.ReviewIntentChangeSet
@@ -137,7 +161,7 @@ func conversationCommand(action string, o *options) *cobra.Command {
 				result, e = c.CancelIntentFlowRun(ctx, id, in.ExpectedVersion)
 			}
 		default:
-			return fmt.Errorf("use intent conversations list|show|create|message|run|confirm|cancel|changes|approve|apply|verify|kubernetes")
+			return fmt.Errorf("use intent conversations list|show|create|message|run|confirm|cancel|changes|approve|reject|apply|audit|verify|rollback-plan|rollback-approve|rollback-apply|rollback-reject|kubernetes|rollback-kubernetes")
 		}
 		if e != nil {
 			return e

@@ -13,6 +13,8 @@ type SLOIntent struct {
 	Spec       IntentSpec `json:"spec" yaml:"spec"`
 }
 type IntentSpec struct {
+	Measurement      *MeasurementSpec  `json:"measurement,omitempty" yaml:"measurement,omitempty"`
+	StepSeconds      int64             `json:"stepSeconds,omitempty" yaml:"stepSeconds,omitempty"`
 	Description      string            `json:"description" yaml:"description"`
 	Service          string            `json:"service" yaml:"service"`
 	Source           string            `json:"source" yaml:"source"`

@@ -24,6 +24,7 @@ type ProviderWindow struct {
 	ScrapeIntervalSeconds int64  `json:"scrapeIntervalSeconds" yaml:"scrapeIntervalSeconds"`
 }
 type SLOSpec struct {
+	Measurement        *MeasurementSpec  `json:"measurement,omitempty" yaml:"measurement,omitempty"`
 	Intent             *IntentSpec       `json:"intent,omitempty" yaml:"intent,omitempty"`
 	ProviderWindow     *ProviderWindow   `json:"providerWindow,omitempty" yaml:"providerWindow,omitempty"`
 	MeasurementBinding *BindingReference `json:"measurementBinding,omitempty" yaml:"measurementBinding,omitempty"`

@@ -103,7 +103,7 @@ func TestReadOnlyProtocolTenantBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 43 {
+	if len(tools.Tools) != 45 {
 		t.Fatalf("unexpected read tools: %d", len(tools.Tools))
 	}
 	for _, x := range tools.Tools {
@@ -111,7 +111,7 @@ func TestReadOnlyProtocolTenantBinding(t *testing.T) {
 			t.Fatalf("not marked read only: %s", x.Name)
 		}
 	}
-	for _, name := range []string{"create_slo", "apply_slo", "apply_journey", "start_workflow", "record_run", "test_connection", "deploy_slo_rules", "withdraw_slo_rules", "approve_workflow", "reject_workflow"} {
+	for _, name := range []string{"create_slo", "apply_slo", "apply_journey", "start_workflow", "record_run", "test_connection", "deploy_slo_rules", "withdraw_slo_rules", "approve_workflow", "reject_workflow", "approve_intent_changes", "apply_intent_changes", "apply_intent_rollback"} {
 		if hasTool(tools.Tools, name) {
 			t.Fatalf("forbidden tool %s", name)
 		}
@@ -190,7 +190,7 @@ func TestWriteToolsManifestCASAndWorkflowProposal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(tools.Tools) != 54 || hasTool(tools.Tools, "approve_workflow") || hasTool(tools.Tools, "reject_workflow") {
+	if len(tools.Tools) != 56 || hasTool(tools.Tools, "approve_workflow") || hasTool(tools.Tools, "reject_workflow") {
 		t.Fatal("invalid write tool surface")
 	}
 	call(t, ctx, session, "plan_journey", map[string]any{"manifest": examples.Checkout})

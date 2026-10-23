@@ -44,6 +44,7 @@ func addIntentConversations(s *mcp.Server, a *apiClient, c Config) {
 		return a.request(ctx, http.MethodGet, path, nil)
 	})
 	register(s, a, "get_intent_conversation", "Read a saved intent conversation, confirmed binding, preparation evidence and SLO/CUJ proposal. Native model correlation state and credentials are not exposed.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/intent-conversations/", ""))
+	register(s, a, "get_intent_audit", "Read tenant-scoped recommendation decision events and audit chain integrity. Cannot approve, reject, apply or roll back definitions.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/intent-conversations/", "/audit"))
 	register(s, a, "intent_workflow_capabilities", "Read the intent skill contract, tool budgets and model availability. This neither starts a run nor grants binding confirmation or apply permission.", true, func(ctx context.Context, _ emptyInput) (any, error) {
 		return a.request(ctx, http.MethodGet, "/api/intent-conversations/capabilities", nil)
 	})

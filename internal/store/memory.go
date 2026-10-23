@@ -11,6 +11,7 @@ import (
 
 type Memory struct {
 	batches    map[string]definitionReceipt
+	archives   map[string]map[int64]SLOArchive
 	mu         sync.Mutex
 	topology   map[string][]model.TopologyRevision
 	journeys   map[string][]model.JourneyRevision
@@ -76,6 +77,19 @@ func (m *Memory) Update(ctx context.Context, id string, fn func(*model.Record) e
 	}
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if model.ConfigRevision(next.SLO) != model.ConfigRevision(r.SLO) {
+		archive := archiveSLO(ctx, r)
+		if m.archives == nil {
+			m.archives = map[string]map[int64]SLOArchive{}
+		}
+		if m.archives[id] == nil {
+			m.archives[id] = map[int64]SLOArchive{}
+		}
+		if _, exists := m.archives[id][archive.Summary.Revision]; exists {
+			return model.ErrRevisionConflict
+		}
+		m.archives[id][archive.Summary.Revision] = archive
 	}
 	for _, e := range next.Events {
 		m.deliveries[e.ID] = model.Delivery{Event: e, Status: "pending", NextAttempt: e.Time}

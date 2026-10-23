@@ -1,5 +1,7 @@
+import { SLORevisionHistory } from "./slo-revision-history";
+import { MeasuredObjective } from "./measured-objective";
 import { PolicyEditor } from "./policy-editor";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { parse, stringify } from "yaml";
 import { Plus, Settings2 } from "lucide-react";
 import { definitionFromSLO, type SLODefinition } from "@/lib/definitions";
@@ -19,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 type Draft = {
+  customMeasurement: boolean;
   policies: NonNullable<SLO["policies"]>;
   providerWindow: boolean;
   scrape: string;
@@ -39,11 +42,16 @@ type Draft = {
   pending: string;
   coverage: string;
 };
-function fromDefinition(d: SLODefinition): Draft {
+export function objectiveDraft(
+  d: SLODefinition,
+  derived?: SLO["providerWindow"],
+): Draft {
+  const window = d.spec.providerWindow ?? derived;
   const p = d.spec.policy;
   return {
-    providerWindow: !!d.spec.providerWindow,
-    scrape: String(d.spec.providerWindow?.scrapeIntervalSeconds ?? 15),
+    customMeasurement: false,
+    providerWindow: !!window,
+    scrape: String(window?.scrapeIntervalSeconds ?? 15),
     name: d.metadata.name,
     project: d.metadata.project,
     displayName: d.spec.displayName,
@@ -52,8 +60,8 @@ function fromDefinition(d: SLODefinition): Draft {
     target: String(d.spec.target),
     window: duration(d.spec.windowSeconds),
     step: duration(d.spec.stepSeconds),
-    goodQuery: d.spec.providerWindow?.goodSelector ?? d.spec.goodQuery ?? "",
-    totalQuery: d.spec.providerWindow?.totalSelector ?? d.spec.totalQuery ?? "",
+    goodQuery: window?.goodSelector ?? d.spec.goodQuery ?? "",
+    totalQuery: window?.totalSelector ?? d.spec.totalQuery ?? "",
     enabled: !!p || !!d.spec.policies?.length,
     policies:
       d.spec.policies ??
@@ -73,7 +81,10 @@ function fromDefinition(d: SLODefinition): Draft {
     coverage: String(p?.minCoverage ?? 1),
   };
 }
-function toDefinition(base: SLODefinition, d: Draft): SLODefinition {
+export function objectiveDefinition(
+  base: SLODefinition,
+  d: Draft,
+): SLODefinition {
   if (d.enabled && !d.policies.length)
     throw new Error("Add an alert policy or disable burn-rate alerts.");
   const spec = {
@@ -83,20 +94,34 @@ function toDefinition(base: SLODefinition, d: Draft): SLODefinition {
     target: Number(d.target),
     windowSeconds: durationSeconds(d.window),
     stepSeconds: durationSeconds(d.step),
-    providerWindow: d.providerWindow
-      ? {
-          goodSelector: d.goodQuery,
-          totalSelector: d.totalQuery,
-          scrapeIntervalSeconds: Number(d.scrape),
-        }
-      : undefined,
-    goodQuery: d.providerWindow ? undefined : d.goodQuery || undefined,
-    totalQuery: d.providerWindow ? undefined : d.totalQuery || undefined,
+    providerWindow:
+      base.spec.measurement && !d.customMeasurement
+        ? undefined
+        : d.providerWindow
+          ? {
+              goodSelector: d.goodQuery,
+              totalSelector: d.totalQuery,
+              scrapeIntervalSeconds: Number(d.scrape),
+            }
+          : undefined,
+    goodQuery:
+      d.providerWindow || (base.spec.measurement && !d.customMeasurement)
+        ? undefined
+        : d.goodQuery || undefined,
+    totalQuery:
+      d.providerWindow || (base.spec.measurement && !d.customMeasurement)
+        ? undefined
+        : d.totalQuery || undefined,
     source: d.source || undefined,
     policy: undefined,
     policies: d.enabled ? d.policies : undefined,
   };
-  if (base.spec.intent)
+  if (d.customMeasurement) {
+    spec.measurement = undefined;
+    spec.measurementBinding = undefined;
+    spec.intent = undefined;
+  }
+  if (base.spec.intent && !d.customMeasurement)
     spec.intent = {
       ...base.spec.intent,
       service: spec.service,
@@ -125,13 +150,21 @@ export function ObjectiveCreate({
     { id: string; kind: string }[]
   >([]);
   const [error, setError] = useState("");
+  const [measurementAck, setMeasurementAck] = useState(false);
   const [busy, setBusy] = useState(false);
   const [plan, setPlan] = useState<{
+    measurementChanged?: boolean;
+    warnings?: string[];
     action: string;
     expectedRevision: number;
     digest: string;
     manifest: SLODefinition;
   } | null>(null);
+  useEffect(() => {
+    setOpen(false);
+    setPlan(null);
+    setBusy(false);
+  }, [scope]);
   function changeOpen(value: boolean) {
     if (busy) return;
     setOpen(value);
@@ -173,10 +206,11 @@ export function ObjectiveCreate({
         },
       );
       setText(stringify(d));
-      setDraft(fromDefinition(d));
-      setMode("settings");
+      setDraft(objectiveDraft(d, resource?.providerWindow));
+      setMode(resource && !resource.measurement ? "settings" : "measurement");
       setPlan(null);
       setError("");
+      setMeasurementAck(false);
       api<{ connections: { id: string; kind: string }[] }>(
         "/api/connections",
         scope,
@@ -189,11 +223,13 @@ export function ObjectiveCreate({
     const d = parse(text) as SLODefinition;
     if (d.kind !== "ServiceLevelObjective")
       throw new Error("Expected a ServiceLevelObjective YAML definition.");
-    return mode === "settings" && draft ? toDefinition(d, draft) : d;
+    return mode === "settings" && draft ? objectiveDefinition(d, draft) : d;
   }
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
     setPlan(null);
+    setError("");
+    setMeasurementAck(false);
   }
   async function review() {
     setBusy(true);
@@ -201,6 +237,8 @@ export function ObjectiveCreate({
     try {
       const body = stringify(document());
       const result = await api<{
+        measurementChanged?: boolean;
+        warnings?: string[];
         action: string;
         expectedRevision: number;
         digest: string;
@@ -214,6 +252,7 @@ export function ObjectiveCreate({
         throw new Error("Expected a ServiceLevelObjective.");
       setText(body);
       setPlan(result);
+      setMeasurementAck(false);
     } catch (e) {
       setError(message(e));
       setPlan(null);
@@ -222,7 +261,7 @@ export function ObjectiveCreate({
     }
   }
   async function apply() {
-    if (!plan) return;
+    if (!plan || (plan.measurementChanged && !measurementAck)) return;
     setBusy(true);
     setError("");
     try {
@@ -255,8 +294,11 @@ export function ObjectiveCreate({
     { key: "service", label: "Service" },
     { key: "target", label: "SLO target (fraction)", type: "number" },
     { key: "window", label: "Rolling SLO window (e.g. 28d)" },
-    { key: "step", label: "Measurement interval (e.g. 1m)", fixed: true },
+    { key: "step", label: "Measurement interval (e.g. 1m)" },
   ];
+  const measurementLocked =
+    !!(resource?.measurementBinding || resource?.measurement) &&
+    !draft?.customMeasurement;
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
@@ -277,22 +319,35 @@ export function ObjectiveCreate({
               : "Define service level objective"}
           </DialogTitle>
           <DialogDescription>
-            Configure the objective, source and burn-rate policies, then review
-            the YAML plan. Existing measurements retain their query, interval
-            and source.
+            {resource
+              ? "Edit the objective, measurement and burn-rate policies, then review the new revision. Measurement changes archive existing evidence and require fresh coverage and separate rule deployment."
+              : "Define what counts as success, choose a target and window, then review before applying. Use advanced queries or YAML for custom measurements."}
           </DialogDescription>
         </DialogHeader>
         <Tabs
           value={mode}
           onValueChange={(value) => {
             try {
+              if (value === "measurement" || mode === "measurement") {
+                if (mode === "settings") setText(stringify(document()));
+                if (value === "settings") {
+                  const d = parse(text) as SLODefinition;
+                  if (d.kind !== "ServiceLevelObjective")
+                    throw new Error("Expected a ServiceLevelObjective.");
+                  setDraft(objectiveDraft(d, resource?.providerWindow));
+                }
+                setMode(value);
+                setPlan(null);
+                setError("");
+                return;
+              }
               if (value === "yaml") {
                 setText(stringify(document()));
               } else {
                 const d = parse(text) as SLODefinition;
                 if (d.kind !== "ServiceLevelObjective")
                   throw new Error("Expected a ServiceLevelObjective.");
-                setDraft(fromDefinition(d));
+                setDraft(objectiveDraft(d, resource?.providerWindow));
               }
               setMode(value);
               setPlan(null);
@@ -303,16 +358,61 @@ export function ObjectiveCreate({
           }}
         >
           <TabsList>
+            {!resource || resource.measurement ? (
+              <TabsTrigger value="measurement" disabled={busy}>
+                Measurement
+              </TabsTrigger>
+            ) : null}
             <TabsTrigger value="settings" disabled={busy}>
-              Settings
+              {resource ? "Settings" : "Advanced queries"}
             </TabsTrigger>
             <TabsTrigger value="yaml" disabled={busy}>
               YAML
             </TabsTrigger>
           </TabsList>
+          {!resource || resource.measurement ? (
+            <TabsContent value="measurement">
+              <MeasuredObjective
+                resource={resource}
+                scope={scope}
+                onBusyChange={setBusy}
+                onCreated={() => {
+                  setOpen(false);
+                  onCreated();
+                }}
+              />
+            </TabsContent>
+          ) : null}
           <TabsContent value="settings" className="space-y-5">
             {draft ? (
               <>
+                {resource?.measurementBinding || resource?.measurement ? (
+                  <div className="space-y-2 rounded-md border p-3 text-sm">
+                    <p>
+                      {resource.measurement
+                        ? "This measurement is owned by the SLO. Edit it in the Measurement tab, or switch to custom queries below."
+                        : `Shared measurement: ${resource.measurementBinding?.name} · revision ${resource.measurementBinding?.revision}. Update the reference in YAML or use custom queries.`}
+                    </p>
+                    <Button
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        setField("customMeasurement", !draft.customMeasurement)
+                      }
+                    >
+                      {draft.customMeasurement
+                        ? "Keep saved measurement"
+                        : "Use custom queries"}
+                    </Button>
+                    {draft.customMeasurement ? (
+                      <p className="text-xs text-muted-foreground">
+                        The next reviewed revision removes the saved measurement
+                        reference and intent provenance. Previous revisions
+                        retain both.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <div className="grid gap-3 sm:grid-cols-2">
                   {fields.map((f) => (
                     <div key={f.key}>
@@ -323,7 +423,12 @@ export function ObjectiveCreate({
                         type={f.type ?? "text"}
                         step="any"
                         value={String(draft[f.key])}
-                        disabled={busy || (!!resource && f.fixed)}
+                        disabled={
+                          busy ||
+                          (!!resource && f.fixed) ||
+                          (measurementLocked &&
+                            (f.key === "service" || f.key === "step"))
+                        }
                         onChange={(e) => setField(f.key, e.target.value)}
                       />
                     </div>
@@ -334,7 +439,7 @@ export function ObjectiveCreate({
                       id="slo-source"
                       className="mt-1 h-9 w-full rounded-md border bg-white px-3 text-sm"
                       value={draft.source === "primary" ? "" : draft.source}
-                      disabled={busy || !!resource}
+                      disabled={busy || measurementLocked}
                       onChange={(e) => setField("source", e.target.value)}
                     >
                       <option value="">Primary (default)</option>
@@ -359,7 +464,7 @@ export function ObjectiveCreate({
                       id="slo-good-query"
                       className="mt-1 font-mono text-xs"
                       value={draft.goodQuery}
-                      disabled={busy || !!resource}
+                      disabled={busy || measurementLocked}
                       onChange={(e) => setField("goodQuery", e.target.value)}
                     />
                   </div>
@@ -373,7 +478,7 @@ export function ObjectiveCreate({
                       id="slo-total-query"
                       className="mt-1 font-mono text-xs"
                       value={draft.totalQuery}
-                      disabled={busy || !!resource}
+                      disabled={busy || measurementLocked}
                       onChange={(e) => setField("totalQuery", e.target.value)}
                     />
                   </div>
@@ -389,7 +494,7 @@ export function ObjectiveCreate({
                       min="1"
                       className="mt-1"
                       value={draft.scrape}
-                      disabled={busy || !!resource}
+                      disabled={busy || measurementLocked}
                       onChange={(e) => setField("scrape", e.target.value)}
                     />
                     <p className="mt-1 text-xs text-muted-foreground">
@@ -430,19 +535,40 @@ export function ObjectiveCreate({
               onChange={(e) => {
                 setText(e.target.value);
                 setPlan(null);
+                setError("");
+                setMeasurementAck(false);
               }}
               className="mt-2 min-h-80 font-mono text-xs"
               spellCheck={false}
             />
           </TabsContent>
         </Tabs>
-        {error ? (
+        {mode !== "measurement" && error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
         ) : null}
-        {plan ? (
+        {mode !== "measurement" && plan ? (
           <div className="rounded-md border bg-slate-50 p-3 text-sm">
+            {plan.measurementChanged ? (
+              <div className="mb-3 space-y-2 rounded-md border p-3">
+                {(plan.warnings ?? []).map((warning) => (
+                  <p key={warning} className="text-sm">
+                    {warning}
+                  </p>
+                ))}
+                <label className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={measurementAck}
+                    onChange={(e) => setMeasurementAck(e.target.checked)}
+                    disabled={busy}
+                  />
+                  I reviewed the measurement change and understand that active
+                  coverage starts fresh.
+                </label>
+              </div>
+            ) : null}
             <p>
               Validated · {plan.action} · revision {plan.expectedRevision} →{" "}
               {plan.action === "unchanged"
@@ -464,20 +590,33 @@ export function ObjectiveCreate({
             </p>
           </div>
         ) : null}
-        <div className="dialog-actions">
-          <Button
-            variant="outline"
-            disabled={busy || !text.trim()}
-            onClick={review}
-          >
-            {busy ? "Working…" : "Validate and plan"}
-          </Button>
-          <Button disabled={busy || !plan || !canEdit(scope)} onClick={apply}>
-            {plan?.action === "unchanged"
-              ? "Keep current definition"
-              : "Apply definition"}
-          </Button>
-        </div>
+        {resource ? (
+          <SLORevisionHistory scope={scope} id={resource.id} />
+        ) : null}
+        {mode !== "measurement" ? (
+          <div className="dialog-actions">
+            <Button
+              variant="outline"
+              disabled={busy || !text.trim()}
+              onClick={review}
+            >
+              {busy ? "Working…" : "Validate and plan"}
+            </Button>
+            <Button
+              disabled={
+                busy ||
+                !plan ||
+                !canEdit(scope) ||
+                (!!plan.measurementChanged && !measurementAck)
+              }
+              onClick={apply}
+            >
+              {plan?.action === "unchanged"
+                ? "Keep current definition"
+                : "Apply definition"}
+            </Button>
+          </div>
+        ) : null}
       </DialogContent>
     </Dialog>
   );

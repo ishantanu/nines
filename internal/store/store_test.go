@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/url"
 	"os"
@@ -237,8 +238,30 @@ func TestSLOConfigurationCASPersistsWithoutReinterpretingSamples(t *testing.T) {
 			}
 			d.Spec.TotalQuery = "different"
 			d.Spec.GoodQuery = "different-good"
-			if _, err = svc.ApplyDefinition(ctx, model.Definition{SLO: &d}, 2); err == nil {
-				t.Fatal("measurement identity changed")
+			if edited, err := svc.ApplyDefinition(ctx, model.Definition{SLO: &d}, 2); err != nil || edited.Revision != 3 {
+				t.Fatal("measurement edit failed", edited, err)
+			}
+			current, err := read.Read(ctx, c.ID)
+			if err != nil || len(current.Points) != 0 || current.Collection.State != "not_observed" {
+				t.Fatal("old evidence reused", current, err)
+			}
+			archive, err := read.(store.SLORevisionStore).SLORevision(ctx, c.ID, 2)
+			if err != nil || len(archive.Record.Points) != 1 || archive.Record.SLO.GoodQuery != "" || archive.Summary.IntervalSamples != 1 {
+				t.Fatal("old evidence not archived", archive, err)
+			}
+			// Returned snapshots cannot mutate archived state.
+			delete(archive.Record.Points, at.Unix())
+			again, err := read.(store.SLORevisionStore).SLORevision(ctx, c.ID, 2)
+			if err != nil || len(again.Record.Points) != 1 {
+				t.Fatal("archive alias", again, err)
+			}
+			rows, err := read.(store.SLORevisionStore).SLORevisions(ctx, c.ID, 0, 1)
+			if err != nil || len(rows) != 1 || rows[0].Revision != 2 {
+				t.Fatal(rows, err)
+			}
+			rows, err = read.(store.SLORevisionStore).SLORevisions(ctx, c.ID, 2, 1)
+			if err != nil || len(rows) != 1 || rows[0].Revision != 1 {
+				t.Fatal(rows, err)
 			}
 		})
 	}
@@ -266,5 +289,56 @@ func TestPostgresOperatorRouteSurvivesRestartAndDefinitionUpdates(t *testing.T) 
 	record, err := reopened.Read(ctx, slo.ID)
 	if err != nil || record.OperatorRoute != "reviewed-route-digest" || record.SLO.Revision != 2 {
 		t.Fatal(record.OperatorRoute, err)
+	}
+}
+
+func TestDefinitionBatchArchivesCommitAndAbortTogether(t *testing.T) {
+	for _, pg := range []bool{false, true} {
+		t.Run(map[bool]string{false: "memory", true: "postgres"}[pg], func(t *testing.T) {
+			var st store.Store
+			if pg {
+				st, _ = postgres(t)
+			} else {
+				st = store.NewMemory()
+			}
+			ctx := context.Background()
+			svc := service.New(st, nil)
+			original := model.SLO{ID: "archive-batch", Project: "p", Service: "api", Name: "API", Target: .99, WindowSeconds: 3600, StepSeconds: 60}
+			if err := svc.Create(ctx, original); err != nil {
+				t.Fatal(err)
+			}
+			changed := model.DefinitionFromSLO(original)
+			changed.Spec.GoodQuery = "vector(99)"
+			changed.Spec.TotalQuery = "vector(100)"
+			batch := st.(store.DefinitionBatchStore)
+			aborted := errors.New("abort after SLO edit")
+			_, err := batch.DefinitionBatch(ctx, "abort", "digest", true, func(tx store.Store) (json.RawMessage, error) {
+				_, err := service.New(tx, nil).ApplyDefinition(ctx, model.Definition{SLO: &changed}, 1)
+				if err != nil {
+					return nil, err
+				}
+				return nil, aborted
+			})
+			if !errors.Is(err, aborted) {
+				t.Fatal(err)
+			}
+			current, _ := st.Read(ctx, original.ID)
+			if model.ConfigRevision(current.SLO) != 1 {
+				t.Fatal("aborted revision committed")
+			}
+			if _, err = st.(store.SLORevisionStore).SLORevision(ctx, original.ID, 1); !errors.Is(err, model.ErrNotFound) {
+				t.Fatal("aborted archive committed", err)
+			}
+			_, err = batch.DefinitionBatch(ctx, "commit", "digest", true, func(tx store.Store) (json.RawMessage, error) {
+				_, err := service.New(tx, nil).ApplyDefinition(ctx, model.Definition{SLO: &changed}, 1)
+				return json.RawMessage(`{"ok":true}`), err
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = st.(store.SLORevisionStore).SLORevision(ctx, original.ID, 1); err != nil {
+				t.Fatal("committed archive absent", err)
+			}
+		})
 	}
 }

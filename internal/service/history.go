@@ -16,6 +16,9 @@ func (s *Service) HistoryForPolicy(ctx context.Context, id string, from, to time
 	if err != nil {
 		return engine.History{}, err
 	}
+	return s.historyFromRecord(ctx, r, s.Now(), from, to, resolution, policyName, requestedRange...)
+}
+func (s *Service) historyFromRecord(ctx context.Context, r model.Record, now, from, to time.Time, resolution int64, policyName string, requestedRange ...int64) (engine.History, error) {
 	if len(r.SLO.Policies) > 0 {
 		found := false
 		for _, p := range r.SLO.Policies {
@@ -32,7 +35,7 @@ func (s *Service) HistoryForPolicy(ctx context.Context, id string, from, to time
 	} else if policyName != "" {
 		return engine.History{}, model.Invalid("unknown alert policy")
 	}
-	current := s.recordEvaluationAt(r, s.Now())
+	current := s.recordEvaluationAt(r, now)
 	if to.IsZero() {
 		to = current
 	}
@@ -58,7 +61,7 @@ func (s *Service) HistoryForPolicy(ctx context.Context, id string, from, to time
 		return result, err
 	}
 	for _, event := range events {
-		if event.Event.SLOID == id && !event.Event.Time.Before(from) && !event.Event.Time.After(to) {
+		if event.Event.SLOID == r.SLO.ID && (event.Event.ConfigRevision == 0 || event.Event.ConfigRevision == model.ConfigRevision(r.SLO)) && !event.Event.Time.Before(from) && !event.Event.Time.After(to) {
 			result.AlertEvents = append(result.AlertEvents, event.Event)
 		}
 	}

@@ -49,13 +49,15 @@ type Revision struct {
 	Digest   string          `json:"digest"`
 }
 type Plan struct {
-	APIVersion       string          `json:"apiVersion"`
-	Kind             string          `json:"kind"`
-	Action           string          `json:"action"`
-	ExpectedRevision int64           `json:"expectedRevision"`
-	Digest           string          `json:"digest"`
-	Manifest         json.RawMessage `json:"manifest"`
-	Previous         *Revision       `json:"previous,omitempty"`
+	MeasurementChanged bool            `json:"measurementChanged,omitempty"`
+	Warnings           []string        `json:"warnings,omitempty"`
+	APIVersion         string          `json:"apiVersion"`
+	Kind               string          `json:"kind"`
+	Action             string          `json:"action"`
+	ExpectedRevision   int64           `json:"expectedRevision"`
+	Digest             string          `json:"digest"`
+	Manifest           json.RawMessage `json:"manifest"`
+	Previous           *Revision       `json:"previous,omitempty"`
 }
 
 var identifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)

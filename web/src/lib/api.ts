@@ -9,8 +9,19 @@ export interface BurnRatePolicy {
   forSeconds: number;
   minCoverage: number;
 }
+export type MeasurementSpec = {
+  type: "availability" | "latency";
+  metric: string;
+  labels: Record<string, string>;
+  successLabels?: Record<string, string>;
+  countFrom?: "counter" | "histogram";
+  thresholdSeconds?: number;
+  scrapeIntervalSeconds: number;
+  observationPoint: string;
+};
 export interface SLO {
   intent?: import("./intent").IntentSpec;
+  measurement?: MeasurementSpec;
   providerWindow?: {
     goodSelector: string;
     totalSelector: string;

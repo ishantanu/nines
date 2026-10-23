@@ -5,6 +5,7 @@ export interface SLODefinition {
   kind: "ServiceLevelObjective";
   metadata: { name: string; project: string };
   spec: {
+    measurement?: SLO["measurement"];
     intent?: SLO["intent"];
     providerWindow?: SLO["providerWindow"];
     measurementBinding?: SLO["measurementBinding"];
@@ -27,7 +28,11 @@ export function definitionFromSLO(slo: SLO): SLODefinition {
     metadata: { name: slo.id, project: slo.project },
     spec: {
       ...(slo.intent ? { intent: slo.intent } : {}),
-      ...(slo.providerWindow ? { providerWindow: slo.providerWindow } : {}),
+      ...(slo.measurement
+        ? { measurement: slo.measurement }
+        : slo.providerWindow
+          ? { providerWindow: slo.providerWindow }
+          : {}),
       ...(slo.measurementBinding
         ? { measurementBinding: slo.measurementBinding }
         : {}),

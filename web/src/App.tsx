@@ -25,7 +25,6 @@ import {
   Waypoints,
   Workflow,
   Network,
-  ScanSearch,
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -183,9 +182,9 @@ const navigation = [
     label: "Service level objectives",
     icon: Activity,
   },
-  { id: "intents" as const, label: "SLO intents", icon: ScanSearch },
+  { id: "intents" as const, label: "SLO intents", icon: Activity },
   { id: "maps" as const, label: "Service dependencies", icon: Network },
-  { id: "bindings" as const, label: "Measurement bindings", icon: ScanSearch },
+
   { id: "replays" as const, label: "Session replay", icon: Video },
   { id: "agents" as const, label: "Agent evidence", icon: Bot },
   { id: "workflows" as const, label: "Workflows", icon: Workflow },
@@ -211,7 +210,10 @@ const copy = {
     "Service dependencies",
     "Inspect service relationships, linked objectives and journey impact.",
   ],
-  bindings: ["Measurement bindings", "Connect telemetry to SLO measurements."],
+  bindings: [
+    "Measurements",
+    "Define eligible events and success criteria for SLOs.",
+  ],
   home: ["Overview", "Tenant reliability, journey impact and configuration."],
   connections: [
     "Data sources",

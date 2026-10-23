@@ -178,3 +178,46 @@ func TestAvailabilityCompilesExplicitHistogramEventCounts(t *testing.T) {
 		t.Fatal("histogram silently treated as a counter")
 	}
 }
+
+func TestBindingReferenceCanAdvanceUnderSameSLOName(t *testing.T) {
+	ctx := context.Background()
+	svc, _, err := testtelemetry.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := v1.CompileBindingInput{ExpectedRevision: 1, Name: "editable-binding", DisplayName: "API", Target: .99, WindowSeconds: 3600}
+	first, err := svc.CompileBinding(ctx, "requests", in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d := model.SLODefinition(first.Manifest)
+	if _, err = svc.ApplyDefinition(ctx, model.Definition{SLO: &d}, 0); err != nil {
+		t.Fatal(err)
+	}
+	b := testtelemetry.Binding()
+	b.Spec.ObservationPoint = "Re-reviewed API boundary and retry semantics"
+	if _, err = svc.ApplyDefinition(ctx, model.Definition{Binding: &b}, 1); err != nil {
+		t.Fatal(err)
+	}
+	in.ExpectedRevision = 2
+	next, err := svc.CompileBinding(ctx, "requests", in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d = model.SLODefinition(next.Manifest)
+	plan, err := svc.PlanDefinition(ctx, model.Definition{SLO: &d})
+	if err != nil || !plan.MeasurementChanged {
+		t.Fatal(plan, err)
+	}
+	if edited, err := svc.ApplyDefinition(ctx, model.Definition{SLO: &d}, 1); err != nil || edited.Revision != 2 {
+		t.Fatal(edited, err)
+	}
+	archived, err := svc.SLORevision(ctx, "editable-binding", 1)
+	if err != nil || archived.Record.SLO.MeasurementBinding.Revision != 1 {
+		t.Fatal(archived, err)
+	}
+	current, _ := svc.Store.Read(ctx, "editable-binding")
+	if current.SLO.MeasurementBinding.Revision != 2 || current.Collection.Measurement != nil {
+		t.Fatal("old binding or health reused", current)
+	}
+}

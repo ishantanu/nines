@@ -1,9 +1,11 @@
 import { parse } from "yaml";
 import { RESOURCE_API_VERSION } from "./definitions";
 import { durationSeconds } from "./history";
-import type { SLO, Manifest } from "./api";
+import type { SLO, Manifest, MeasurementSpec } from "./api";
 import type { BindingManifest } from "./topology";
 export interface IntentSpec {
+  measurement?: MeasurementSpec;
+  stepSeconds?: number;
   description: string;
   service: string;
   source: string;
@@ -40,8 +42,10 @@ export interface IntentPlan {
   clarifications: string[];
   truncated: boolean;
   compiled?: {
-    binding: { name: string; revision: number; digest?: string };
-    definition: BindingManifest;
+    measurementDigest?: string;
+    manifest: import("./definitions").SLODefinition;
+    binding?: { name: string; revision: number; digest?: string };
+    definition?: BindingManifest;
     yaml: string;
     digest: string;
     warnings: string[];

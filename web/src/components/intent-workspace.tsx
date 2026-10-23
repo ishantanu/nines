@@ -38,8 +38,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { IntentMeasurementEditor } from "./intent-measurement";
 import { IntentAuthoring } from "./intent-authoring";
 import { IntentEvidence, IntentProgress } from "./intent-evidence";
+import {
+  IntentRecommendationReport,
+  IntentDecisionControls,
+  IntentGovernanceHistory,
+} from "./intent-governance";
 import { duration } from "@/lib/history";
 export function IntentWorkspace({
   scope,
@@ -51,7 +57,6 @@ export function IntentWorkspace({
   onApplied: () => void;
 }) {
   const [kubeNamespace, setKubeNamespace] = useState("");
-  const [reviewAck, setReviewAck] = useState(false);
   const [verification, setVerification] = useState<IntentVerification | null>(
     null,
   );
@@ -97,7 +102,6 @@ export function IntentWorkspace({
   const sharesModel =
     mode === "model" || (!value?.goal && !!caps?.draftEnabled);
   useEffect(() => {
-    setReviewAck(false);
     setVerification(null);
   }, [selected, value?.changeSet?.digest, value?.changeSet?.state]);
   async function exportKubernetes() {
@@ -305,6 +309,16 @@ export function IntentWorkspace({
       setBusy(false);
     }
   }
+  async function governanceAction(
+    suffix: string,
+    body: unknown,
+    applied = false,
+  ) {
+    return action(async () => {
+      const result = await mutate(suffix, body);
+      if (applied && result && !scope.signal.aborted) onApplied();
+    });
+  }
   async function prepare() {
     if (!value) return;
     const r = await mutate("/runs", {
@@ -360,7 +374,6 @@ export function IntentWorkspace({
         <IntentAuthoring
           scope={scope}
           journeys={journeys}
-          onApplied={onApplied}
           onStartConversation={(goal) => void create(goal)}
         />
       </TabsContent>
@@ -747,6 +760,59 @@ export function IntentWorkspace({
                     before discovery.
                   </p>
                 )}
+                {value.goal && !value.selection ? (
+                  <IntentMeasurementEditor
+                    key={value.id + ":" + value.version}
+                    goal={value.goal}
+                    disabled={!canEdit(scope) || busy || running}
+                    onSave={(goal) =>
+                      action(() =>
+                        mutate("/messages", {
+                          id: crypto.randomUUID(),
+                          expectedVersion: value.version,
+                          text: "Updated the SLO measurement. Verify telemetry and review it before confirmation.",
+                          goal,
+                        }),
+                      )
+                    }
+                  />
+                ) : null}
+                {value.goal?.spec.measurement &&
+                value.plan?.compiled?.measurementDigest &&
+                !value.selection ? (
+                  <div className="space-y-3 rounded-md border p-3">
+                    <Label className="flex items-start gap-2 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={ack}
+                        disabled={busy || running}
+                        onChange={(e) => setAck(e.target.checked)}
+                      />
+                      <span>
+                        I have reviewed the observation point, success criteria,
+                        eligible attempts and retry semantics shown below.
+                      </span>
+                    </Label>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!canEdit(scope) || busy || running || !ack}
+                      onClick={() =>
+                        void action(() =>
+                          mutate("/selection", {
+                            expectedVersion: value.version,
+                            intentDigest: value.plan!.intentDigest,
+                            measurementDigest:
+                              value.plan!.compiled!.measurementDigest,
+                            confirm: true,
+                          }),
+                        )
+                      }
+                    >
+                      Confirm SLO measurement
+                    </Button>
+                  </div>
+                ) : null}
                 {value.plan?.clarifications.map((q, i) => (
                   <p key={i} className="text-sm">
                     {q}
@@ -811,8 +877,9 @@ export function IntentWorkspace({
                 ) : null}
                 {value.selection ? (
                   <p className="rounded-md border p-3 text-xs">
-                    Confirmed binding: {value.selection.binding.name} · revision{" "}
-                    {value.selection.binding.expectedRevision}.{" "}
+                    {value.selection.measurementDigest
+                      ? "SLO measurement confirmed."
+                      : `Shared measurement confirmed: ${value.selection.binding.name} · revision ${value.selection.binding.expectedRevision}.`}{" "}
                     {value.plan?.compiled
                       ? "This measurement was used for the proposal."
                       : "Select Prepare proposal to compile it."}
@@ -904,6 +971,9 @@ export function IntentWorkspace({
                       Applies definitions and CUJ links together. Recording and
                       alert rules require a separate destination review.
                     </p>
+                    <IntentRecommendationReport
+                      report={value.changeSet.recommendation}
+                    />
                     {value.changeSet.changes.map((change) => (
                       <details
                         className="text-xs"
@@ -969,63 +1039,13 @@ export function IntentWorkspace({
                         </Button>
                       </div>
                     </details>
-                    {value.changeSet.state === "proposed" ? (
-                      <>
-                        <Label className="flex items-start gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={reviewAck}
-                            disabled={!canEdit(scope) || busy}
-                            onChange={(e) => setReviewAck(e.target.checked)}
-                          />
-                          <span>
-                            I reviewed the target, window, measurement and all
-                            resource changes.
-                          </span>
-                        </Label>
-                        <Button
-                          size="sm"
-                          disabled={!canEdit(scope) || busy || !reviewAck}
-                          onClick={() =>
-                            void action(() =>
-                              mutate("/change-set/approve", {
-                                expectedVersion: value.version,
-                                digest: value.changeSet!.digest,
-                                confirm: true,
-                              }),
-                            )
-                          }
-                        >
-                          Approve changes
-                        </Button>
-                      </>
-                    ) : value.changeSet.state === "approved" ? (
-                      <>
-                        <p className="text-xs">
-                          Approved by{" "}
-                          {value.changeSet.approvedBy?.name ||
-                            "an authorized reviewer"}
-                          . Apply checks the resource and binding revisions
-                          again.
-                        </p>
-                        <Button
-                          size="sm"
-                          disabled={!canEdit(scope) || busy}
-                          onClick={() =>
-                            void action(async () => {
-                              await mutate("/change-set/apply", {
-                                expectedVersion: value.version,
-                                digest: value.changeSet!.digest,
-                                confirm: true,
-                              });
-                              if (!scope.signal.aborted) onApplied();
-                            })
-                          }
-                        >
-                          Apply approved changes
-                        </Button>
-                      </>
-                    ) : (
+                    <IntentDecisionControls
+                      scope={scope}
+                      conversation={value}
+                      busy={busy || running}
+                      onAction={governanceAction}
+                    />
+                    {value.changeSet.state === "applied" ? (
                       <>
                         <p className="text-xs">
                           Definitions applied. New observations are required to
@@ -1041,7 +1061,12 @@ export function IntentWorkspace({
                         </Button>
                         {verification ? (
                           <p className="text-xs">
-                            Source connection: {verification.sourceState}
+                            Verifying{" "}
+                            {verification.operation === "rollback"
+                              ? "restored"
+                              : "applied"}{" "}
+                            configuration. Source connection:{" "}
+                            {verification.sourceState}
                           </p>
                         ) : null}
                         {verification?.resources.map((r) => (
@@ -1051,9 +1076,17 @@ export function IntentWorkspace({
                           </p>
                         ))}
                       </>
-                    )}
+                    ) : null}
                   </section>
                 ) : null}
+                <IntentGovernanceHistory
+                  scope={scope}
+                  conversation={value}
+                  busy={busy}
+                  running={running}
+                  onAction={governanceAction}
+                  onRead={(fn) => void action(fn)}
+                />
                 {value.backtest ? (
                   <div className="rounded-md border p-3 text-xs">
                     <p className="mb-2 font-medium">Historical validation</p>

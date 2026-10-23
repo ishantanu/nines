@@ -1,24 +1,4 @@
 apiVersion: nines.dev/v1alpha1
-kind: MeasurementBinding
-metadata:
-  name: checkout-attempts
-  namespace: team-commerce
-  annotations:
-    nines.dev/project: commerce
-spec:
-  displayName: Checkout attempt completion
-  service: checkout
-  source: primary
-  measurement: availability
-  metric: checkout_attempts_total
-  countFrom: counter
-  labels: {service: checkout}
-  successLabels: {outcome: success}
-  stepSeconds: 60
-  scrapeIntervalSeconds: 15
-  observationPoint: Server result for each eligible checkout attempt, including failed attempts.
----
-apiVersion: nines.dev/v1alpha1
 kind: ServiceLevelObjectiveIntent
 metadata:
   name: checkout-intent-availability
@@ -34,9 +14,14 @@ spec:
   target: 0.999
   windowSeconds: 2419200
   noDataPolicy: unknown
-  measurementSelection:
-    name: checkout-attempts
-    expectedGeneration: 1
+  stepSeconds: 60
+  measurement:
+    type: availability
+    metric: checkout_attempts_total
+    labels: {service: checkout}
+    successLabels: {outcome: success}
+    scrapeIntervalSeconds: 15
+    observationPoint: Server result for each eligible checkout attempt, including failed attempts.
   journey:
     name: checkout-intent-journey
     step: checkout

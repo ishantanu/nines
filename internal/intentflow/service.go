@@ -179,7 +179,9 @@ func (s *Service) Append(ctx context.Context, id string, in v1.AppendIntentConve
 			Goal *v1.SLOIntent
 		}{in.Text, in.Goal})
 		// A clarification or goal edit invalidates previous selection/proposal evidence.
-		invalidateChangeSet(r)
+		if e := invalidateChangeSet(r, a, "Goal or clarification changed; pending approval no longer applies.", now); e != nil {
+			return e
+		}
 		r.Session.Goal = clone(in.Goal)
 		r.Session.Selection = nil
 		r.Session.Plan = nil
@@ -199,8 +201,8 @@ func (s *Service) Select(ctx context.Context, id string, in v1.ConfirmIntentBind
 	if p.Role != "owner" && p.Role != "editor" {
 		return v1.IntentConversation{}, ErrForbidden
 	}
-	if !identifier.MatchString(id) || !in.Confirm || in.ExpectedVersion < 1 || !identifier.MatchString(in.Binding.Name) || in.Binding.ExpectedRevision < 1 {
-		return v1.IntentConversation{}, model.Invalid("confirm the exact binding and conversation revision")
+	if !identifier.MatchString(id) || !in.Confirm || in.ExpectedVersion < 1 || (in.MeasurementDigest == "" && (!identifier.MatchString(in.Binding.Name) || in.Binding.ExpectedRevision < 1)) || (in.MeasurementDigest != "" && (!auditDigestPattern.MatchString(in.MeasurementDigest) || in.Binding.Name != "" || in.Binding.ExpectedRevision != 0)) {
+		return v1.IntentConversation{}, model.Invalid("confirm the exact measurement and conversation revision")
 	}
 	r, e := s.Repository.Update(ctx, id, func(r *record, now time.Time) error {
 		if r.Session.Tenant != s.Platform.TenantID {
@@ -212,7 +214,7 @@ func (s *Service) Select(ctx context.Context, id string, in v1.ConfirmIntentBind
 		if r.Session.Goal == nil || r.Session.Plan == nil || hash(*r.Session.Goal) != in.IntentDigest || r.Session.Plan.IntentDigest != in.IntentDigest {
 			return ErrConflict
 		}
-		found := false
+		found := in.MeasurementDigest != "" && r.Session.Goal.Spec.Measurement != nil && r.Session.Plan.Compiled != nil && r.Session.Plan.Compiled.MeasurementDigest == in.MeasurementDigest
 		for _, c := range r.Session.Plan.Candidates {
 			if c.Binding.Name == in.Binding.Name && c.Binding.Revision == in.Binding.ExpectedRevision {
 				found = true
@@ -221,8 +223,10 @@ func (s *Service) Select(ctx context.Context, id string, in v1.ConfirmIntentBind
 		if !found {
 			return model.Invalid("select a candidate from the saved plan after reviewing its observation point and success semantics")
 		}
-		invalidateChangeSet(r)
-		r.Session.Selection = &v1.IntentBindingConfirmation{IntentDigest: in.IntentDigest, Binding: in.Binding, Actor: a, At: now}
+		if e := invalidateChangeSet(r, a, "Measurement selection changed; the previous review no longer applies.", now); e != nil {
+			return e
+		}
+		r.Session.Selection = &v1.IntentBindingConfirmation{IntentDigest: in.IntentDigest, MeasurementDigest: in.MeasurementDigest, Binding: in.Binding, Actor: a, At: now}
 		r.Session.State = "draft"
 		r.Session.Backtest = nil
 		touch(r, now)
@@ -281,7 +285,9 @@ func (s *Service) Start(ctx context.Context, id string, in v1.CreateIntentFlowRu
 			route := s.Model.Descriptor()
 			run.ModelRoute = &route
 		}
-		invalidateChangeSet(r)
+		if e := invalidateChangeSet(r, a, "Preparation restarted; earlier reviewed evidence is retained in history.", now); e != nil {
+			return e
+		}
 		r.Session.Runs = append(r.Session.Runs, run)
 		r.Session.State = "queued"
 		r.Session.Plan = nil
@@ -308,7 +314,7 @@ func (s *Service) Start(ctx context.Context, id string, in v1.CreateIntentFlowRu
 		}
 		var selection any
 		if r.Session.Selection != nil {
-			selection = map[string]any{"binding": r.Session.Selection.Binding, "intentDigest": r.Session.Selection.IntentDigest, "confirmed": true}
+			selection = map[string]any{"binding": r.Session.Selection.Binding, "intentDigest": r.Session.Selection.IntentDigest, "measurementDigest": r.Session.Selection.MeasurementDigest, "confirmed": true}
 		}
 		contextBody, _ := json.Marshal(map[string]any{"scope": r.Session.Scope, "goal": r.Session.Goal, "selection": selection, "conversation": history, "backtest": in.Backtest})
 		r.Native = []rm.Message{{Role: "user", Text: string(contextBody)}}
