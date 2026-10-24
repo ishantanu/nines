@@ -1,6 +1,7 @@
 package replay
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -22,7 +23,8 @@ var presentation = map[string]string{
 }
 var flags = map[string]bool{"open": true, "hidden": true, "disabled": true, "checked": true, "selected": true}
 
-var cssURL = regexp.MustCompile(`(?is)url\s*\([^)]*\)|@import[^;]*;|content\s*:[^;}]*|https?://[^\s"'<>;)]+`)
+var cssURL = regexp.MustCompile(`(?is)url\s*\([^)]*\)|@import[^;]*;|https?://[^\s"'<>;)]+`)
+var cssContent = regexp.MustCompile(`(?is)(^|[;{])\s*(?:--tw-)?content\s*:(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^;}"'])*`)
 
 func Mask(s string) string {
 	if len(s) > 20000 {
@@ -39,7 +41,7 @@ func cleanCSS(s string) string {
 	if len(s) > 256<<10 {
 		s = ""
 	}
-	return cssURL.ReplaceAllString(s, "")
+	return cssContent.ReplaceAllString(cssURL.ReplaceAllString(s, ""), "$1")
 }
 func number(v any) float64 { n, _ := v.(float64); return n }
 func pick(m map[string]any, keys ...string) map[string]any {
@@ -103,9 +105,30 @@ func attributes(value any) map[string]any {
 	return out
 }
 
+//go:embed public-labels.json
+var publicLabelFiles embed.FS
+var publicLabels = map[string]bool{}
 var tags = map[string]bool{}
 
+func publicText(s, label string) string {
+	if publicLabels[label] && strings.TrimSpace(s) == label {
+		return s
+	}
+	return Mask(s)
+}
+
 func init() {
+	raw, err := publicLabelFiles.ReadFile("public-labels.json")
+	if err != nil {
+		panic(err)
+	}
+	var labels []string
+	if err := json.Unmarshal(raw, &labels); err != nil {
+		panic(err)
+	}
+	for _, label := range labels {
+		publicLabels[label] = true
+	}
 	for _, key := range strings.Fields("viewbox d x y x1 y1 x2 y2 cx cy r rx ry width height points transform stroke-width stroke-linecap stroke-linejoin fill stroke fill-opacity stroke-opacity opacity offset stop-color") {
 		geometry[key] = true
 	}
@@ -113,7 +136,7 @@ func init() {
 		tags[tag] = true
 	}
 }
-func node(value any, depth int, count *int, style bool) (map[string]any, error) {
+func node(value any, depth int, count *int, style bool, labels map[float64]string, publicLabel string) (map[string]any, error) {
 	*count++
 	if depth > 60 || *count > 12000 {
 		return nil, fmt.Errorf("snapshot exceeds node bounds")
@@ -123,10 +146,18 @@ func node(value any, depth int, count *int, style bool) (map[string]any, error) 
 		return nil, fmt.Errorf("invalid snapshot node")
 	}
 	typ := int(number(m["type"]))
+	delete(labels, number(m["id"]))
 	out := map[string]any{"type": typ, "id": number(m["id"])}
+	childLabel := ""
 	switch typ {
 	case 0, 2:
 		if typ == 2 {
+			attrs, _ := m["attributes"].(map[string]any)
+			_, private := attrs["data-private"]
+			_, blocked := attrs["data-replay-block"]
+			if private || blocked {
+				return map[string]any{"type": 2, "id": number(m["id"]), "tagName": "div", "attributes": map[string]any{}, "childNodes": []any{}}, nil
+			}
 			tag, _ := m["tagName"].(string)
 			tag = strings.ToLower(tag)
 			if tag == "link" {
@@ -142,6 +173,12 @@ func node(value any, depth int, count *int, style bool) (map[string]any, error) 
 			}
 			out["tagName"] = tag
 			out["attributes"] = attributes(m["attributes"])
+			candidate, _ := attrs["data-replay-label"].(string)
+			if labels != nil && tag == "span" && publicLabels[candidate] {
+				childLabel = candidate
+				labels[number(m["id"])] = candidate
+				out["attributes"].(map[string]any)["data-replay-label"] = candidate
+			}
 			style = tag == "style"
 			if m["isSVG"] == true {
 				out["isSVG"] = true
@@ -153,7 +190,7 @@ func node(value any, depth int, count *int, style bool) (map[string]any, error) 
 		children, _ := m["childNodes"].([]any)
 		clean := []any{}
 		for _, child := range children {
-			c, err := node(child, depth+1, count, style)
+			c, err := node(child, depth+1, count, style, labels, childLabel)
 			if err != nil {
 				return nil, err
 			}
@@ -166,10 +203,13 @@ func node(value any, depth int, count *int, style bool) (map[string]any, error) 
 		out["systemId"] = ""
 	case 3, 4, 5:
 		s, _ := m["textContent"].(string)
+		if labels != nil && publicLabel != "" {
+			labels[number(m["id"])] = publicLabel
+		}
 		if style {
 			out["textContent"] = cleanCSS(s)
 		} else {
-			out["textContent"] = Mask(s)
+			out["textContent"] = publicText(s, publicLabel)
 		}
 		if typ != 3 {
 			out["type"] = 3
@@ -183,6 +223,13 @@ func node(value any, depth int, count *int, style bool) (map[string]any, error) 
 // Sanitize drops unsupported event/plugin payloads, scripts, media, URLs and identifying
 // attributes. Recorders must also mask before transport. Playback has an independent CSP/sandbox.
 func Sanitize(events []json.RawMessage) ([]json.RawMessage, error) {
+	return sanitize(events, true)
+}
+func sanitize(events []json.RawMessage, selective bool) ([]json.RawMessage, error) {
+	var labels map[float64]string
+	if selective {
+		labels = map[float64]string{}
+	}
 	if len(events) < 2 || len(events) > MaxEvents {
 		return nil, fmt.Errorf("recording requires 2–2000 events")
 	}
@@ -220,7 +267,8 @@ func Sanitize(events []json.RawMessage) ([]json.RawMessage, error) {
 			if number(asMap(e.Data["node"])["type"]) != 0 {
 				return nil, fmt.Errorf("full snapshot requires a document root")
 			}
-			n, err := node(e.Data["node"], 0, &nodes, false)
+			clear(labels)
+			n, err := node(e.Data["node"], 0, &nodes, false, labels, "")
 			if err != nil {
 				return nil, err
 			}
@@ -247,11 +295,11 @@ func Sanitize(events []json.RawMessage) ([]json.RawMessage, error) {
 						switch key {
 						case "texts":
 							s, _ := m["value"].(string)
-							v["value"] = Mask(s)
+							v["value"] = publicText(s, labels[number(m["id"])])
 						case "attributes":
 							v["attributes"] = attributes(m["attributes"])
 						case "adds":
-							n, err := node(m["node"], 0, &nodes, false)
+							n, err := node(m["node"], 0, &nodes, false, labels, labels[number(m["parentId"])])
 							if err != nil {
 								return nil, err
 							}

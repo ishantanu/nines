@@ -40,3 +40,7 @@ Nines keeps definition storage, measurement collection, rule deployment, backend
 - Use **MCP** for scoped agent tools. Models are optional; mutation permissions and human approval remain explicit.
 
 See [architecture](architecture.md), [installation](deployment.md) and [current limits](operations.md). Model-assisted workflows, replay and other experimental features retain their documented acceptance boundaries.
+
+Read the [session replay guide](session-replay.md) to capture the current tab, inspect masked playback and export a portable HTML recording. Replay remains experimental; browser acceptance is recorded separately.
+
+Owners can configure [immutable audit archival](deployment/audit-archive.md) and inspect delivery/retention receipts in Audit log or with `nines audit status`. Amazon S3 and explicitly configured S3-compatible gateways are supported by the adapter; Ceph RGW is the documented open-source target, with disposable container acceptance available through `make test-ceph`. Archival is disabled by default.

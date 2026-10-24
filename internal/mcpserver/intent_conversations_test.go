@@ -51,3 +51,28 @@ func TestIntentConversationMCPDoesNotConfirmOrApply(t *testing.T) {
 		t.Fatal("unsafe path reached API")
 	}
 }
+
+func TestIntentAuditMCPPaginationKeepsScopeAndSnapshot(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Header.Get("X-Nines-Tenant") != "alpha" || r.Method != "GET" || r.URL.Path != "/api/intent-conversations/chat/audit" {
+			t.Error("unsafe audit read")
+		}
+		if calls == 2 && (r.URL.Query().Get("after") != "256" || r.URL.Query().Get("through") != "300") {
+			t.Error("audit snapshot lost")
+		}
+		_, _ = fmt.Fprint(w, `{"apiVersion":"nines.dev/v1alpha1","tenant":"alpha","conversation":"chat","integrity":"verified","events":[],"through":300}`)
+	}))
+	defer server.Close()
+	session, ctx := connect(t, Config{Server: server.URL, Tenant: "alpha"})
+	call(t, ctx, session, "get_intent_audit", map[string]any{"id": "chat"})
+	call(t, ctx, session, "get_intent_audit", map[string]any{"id": "chat", "after": 256, "through": 300})
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "get_intent_audit", Arguments: map[string]any{"id": "chat", "after": 301, "through": 300}})
+	if err == nil && !result.IsError {
+		t.Fatal("unsafe audit range accepted")
+	}
+	if calls != 2 {
+		t.Fatal("invalid range reached API", calls)
+	}
+}

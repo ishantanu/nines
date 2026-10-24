@@ -150,6 +150,9 @@ func (s *Service) ReviewRollback(ctx context.Context, id string, in v1.ReviewInt
 		if (!apply && rollback.State != "proposed") || (apply && (rollback.State != "approved" || rollback.ApprovedBy == nil || rollback.ApprovedAt == nil)) {
 			return ErrConflict
 		}
+		if apply && a.Subject == rollback.ApprovedBy.Subject {
+			return ErrForbidden
+		}
 		if e := auditRoom(r); e != nil {
 			return e
 		}

@@ -53,7 +53,7 @@ func appliedUpdate(t *testing.T, pg bool) (*Service, context.Context, v1.IntentC
 	if e != nil {
 		t.Fatal(e)
 	}
-	v, e = s.ApplyChangeSet(ctx, v.ID, reviewInput(v, v.ChangeSet.Digest, ""))
+	v, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, reviewInput(v, v.ChangeSet.Digest, ""))
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -93,7 +93,7 @@ func TestRecommendationApprovalRejectionAndAudit(t *testing.T) {
 			if e != nil || v.ChangeSet.State != "rejected" {
 				t.Fatal(v.ChangeSet, e)
 			}
-			if _, e = s.ApplyChangeSet(ctx, v.ID, reviewInput(v, oldDigest, "")); !errors.Is(e, ErrConflict) {
+			if _, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, reviewInput(v, oldDigest, "")); !errors.Is(e, ErrConflict) {
 				t.Fatal("rejected approval applied", e)
 			}
 			actual, _ := s.Platform.Store.Read(ctx, "intent-created")
@@ -143,7 +143,7 @@ func TestReviewedConfigurationRollbackAndIdempotentRetry(t *testing.T) {
 				t.Fatal(e)
 			}
 			apply := reviewInput(v, rollback.Digest, "")
-			v, e = s.ReviewRollback(ctx, v.ID, apply, true)
+			v, e = s.ReviewRollback(independentApplier(ctx), v.ID, apply, true)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -163,7 +163,7 @@ func TestReviewedConfigurationRollbackAndIdempotentRetry(t *testing.T) {
 				t.Fatal(err)
 			}
 			var stored v1.IntentApplyReceipt
-			if json.Unmarshal(receipt, &stored) != nil || stored.Evidence == nil || stored.Evidence.Operation != "rollback" || stored.Evidence.ApprovedBy.Subject != "owner" || stored.Actor.Subject != "owner" {
+			if json.Unmarshal(receipt, &stored) != nil || stored.Evidence == nil || stored.Evidence.Operation != "rollback" || stored.Evidence.ApprovedBy.Subject != "owner" || stored.Actor.Subject != "release-engineer" {
 				t.Fatal(string(receipt))
 			}
 			later := model.DefinitionFromSLO(current.SLO)
@@ -172,7 +172,7 @@ func TestReviewedConfigurationRollbackAndIdempotentRetry(t *testing.T) {
 			if _, e = s.Platform.ApplyDefinition(ctx, model.Definition{SLO: &later}, 3); e != nil {
 				t.Fatal(e)
 			}
-			if _, e = s.ReviewRollback(ctx, v.ID, apply, true); e != nil {
+			if _, e = s.ReviewRollback(independentApplier(ctx), v.ID, apply, true); e != nil {
 				t.Fatal("exact retry failed", e)
 			}
 			current, _ = s.Platform.Store.Read(ctx, "intent-created")
@@ -220,7 +220,7 @@ func TestRollbackRejectsConcurrentEditsAndNewResourceDeletion(t *testing.T) {
 			if _, e = s.Platform.ApplyDefinition(ctx, model.Definition{SLO: &next}, 2); e != nil {
 				t.Fatal(e)
 			}
-			if _, e = s.ReviewRollback(ctx, v.ID, reviewInput(v, v.ChangeSet.Rollback.Digest, ""), true); !errors.Is(e, model.ErrRevisionConflict) {
+			if _, e = s.ReviewRollback(independentApplier(ctx), v.ID, reviewInput(v, v.ChangeSet.Rollback.Digest, ""), true); !errors.Is(e, model.ErrRevisionConflict) {
 				t.Fatal("stale rollback applied", e)
 			}
 			journey, _ := s.Platform.Journeys.JourneyRevision(ctx, "checkout", 0)
@@ -236,7 +236,7 @@ func TestRollbackRejectsConcurrentEditsAndNewResourceDeletion(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			v, e = s.ApplyChangeSet(ctx, v.ID, reviewInput(v, v.ChangeSet.Digest, ""))
+			v, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, reviewInput(v, v.ChangeSet.Digest, ""))
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -290,16 +290,21 @@ func TestRollbackReceiptRecoversOriginalActorAfterConversationFailure(t *testing
 			in := reviewInput(v, v.ChangeSet.Rollback.Digest, "")
 			original := s.Repository
 			s.Repository = &failRollbackCommit{Repository: original, fail: true}
-			if _, e = s.ReviewRollback(ctx, v.ID, in, true); e == nil {
+			if _, e = s.ReviewRollback(independentApplier(ctx), v.ID, in, true); e == nil {
 				t.Fatal("fixture did not fail")
 			}
 			current, _ := s.Platform.Store.Read(ctx, "intent-created")
 			if current.SLO.Revision != 3 {
 				t.Fatal("resource transaction did not commit")
 			}
+			uncertain, err := s.Audit(ctx, v.ID)
+			if err != nil || uncertain.Events[len(uncertain.Events)-1].Outcome != "uncertain" || !strings.Contains(uncertain.Events[len(uncertain.Events)-1].Reason, "may have succeeded") {
+				t.Fatal("ambiguous rollback claimed no changes", uncertain, err)
+			}
+
 			other := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "alpha", Subject: "second-owner", Name: "Second owner", Role: "owner", Kind: "user"})
 			v, e = s.ReviewRollback(other, v.ID, in, true)
-			if e != nil || v.ChangeSet.Rollback.AppliedBy.Subject != "owner" {
+			if e != nil || v.ChangeSet.Rollback.AppliedBy.Subject != "release-engineer" {
 				t.Fatal(v.ChangeSet.Rollback, e)
 			}
 			current, _ = s.Platform.Store.Read(ctx, "intent-created")
@@ -307,7 +312,7 @@ func TestRollbackReceiptRecoversOriginalActorAfterConversationFailure(t *testing
 				t.Fatal("recovery executed rollback twice")
 			}
 			log, e := s.Audit(ctx, v.ID)
-			if e != nil || log.Integrity != "verified" || log.Events[len(log.Events)-1].Actor.Subject != "owner" {
+			if e != nil || log.Integrity != "verified" || log.Events[len(log.Events)-1].Actor.Subject != "release-engineer" {
 				t.Fatal(log, e)
 			}
 		})
@@ -370,7 +375,7 @@ func TestApprovalSupersessionIsAuditedAndAppliedHistoryCanBeRestored(t *testing.
 	if v.ChangeSet != nil || v.ChangeSetHistory[0].State != "superseded" || v.Audit[len(v.Audit)-1].Action != "change_set.superseded" {
 		t.Fatal("approval invalidation is not explicit", v)
 	}
-	if _, e = s.ApplyChangeSet(ctx, v.ID, reviewInput(v, old, "")); !errors.Is(e, ErrConflict) {
+	if _, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, reviewInput(v, old, "")); !errors.Is(e, ErrConflict) {
 		t.Fatal("superseded approval applied", e)
 	}
 	s, ctx, v = appliedUpdate(t, false)
@@ -388,7 +393,7 @@ func TestApprovalSupersessionIsAuditedAndAppliedHistoryCanBeRestored(t *testing.
 	if e != nil {
 		t.Fatal(e)
 	}
-	v, e = s.ReviewRollback(ctx, v.ID, reviewInput(v, digest, ""), true)
+	v, e = s.ReviewRollback(independentApplier(ctx), v.ID, reviewInput(v, digest, ""), true)
 	if e != nil || v.ChangeSetHistory[0].Rollback.State != "applied" {
 		t.Fatal(v, e)
 	}

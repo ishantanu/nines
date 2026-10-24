@@ -1,3 +1,4 @@
+import { ReplayLabel } from "@/components/replay-label";
 import { Brand } from "@/components/brand";
 import {
   lazy,
@@ -161,6 +162,9 @@ const SessionReplays = lazy(() =>
     default: m.SessionReplays,
   })),
 );
+const AuditLog = lazy(() =>
+  import("./components/audit-log").then((m) => ({ default: m.AuditLog })),
+);
 const navigation = [
   { id: "home" as const, label: "Home", icon: House },
   {
@@ -182,10 +186,15 @@ const navigation = [
   { id: "workflows" as const, label: "Workflows", icon: Workflow },
   { id: "alerts" as const, label: "Alert activity", icon: ShieldCheck },
   { id: "connections" as const, label: "Data sources", icon: Database },
+  { id: "audit" as const, label: "Audit log", icon: ShieldCheck },
   { id: "access" as const, label: "Access control", icon: KeyRound },
   { id: "clients" as const, label: "API and clients", icon: Terminal },
 ];
 const copy = {
+  audit: [
+    "Audit log",
+    "Search decisions, review reasons and exact proposal snapshots for this tenant.",
+  ],
   replays: [
     "Session replay",
     "Play masked sessions and link observed behavior to journeys, objectives and violations.",
@@ -632,7 +641,7 @@ export default function App() {
                     Identity subject: {auth.actor?.identitySubject}
                   </p>
                   <Button variant="outline" size="sm" onClick={signOut}>
-                    Sign out
+                    <ReplayLabel>Sign out</ReplayLabel>
                   </Button>
                   <Button
                     variant="ghost"
@@ -807,7 +816,7 @@ function TenantWorkspace({
     }
     if (
       credentialsOpen ||
-      ["access", "connections", "clients"].includes(page)
+      ["access", "connections", "clients", "audit"].includes(page)
     ) {
       nativeCapture.pause();
     } else {
@@ -844,7 +853,9 @@ function TenantWorkspace({
         },
       })),
   ];
-  const sensitivePage = ["access", "connections", "clients"].includes(page);
+  const sensitivePage = ["access", "connections", "clients", "audit"].includes(
+    page,
+  );
   useLayoutEffect(() => {
     if (
       !isDemo ||
@@ -965,7 +976,7 @@ function TenantWorkspace({
               aria-current={activePage === n.id ? "page" : undefined}
             >
               <n.icon className="size-4 shrink-0" aria-hidden="true" />
-              <span>{n.label}</span>
+              <ReplayLabel>{n.label}</ReplayLabel>
             </a>
           ))}
         </nav>
@@ -977,7 +988,7 @@ function TenantWorkspace({
             onClick={onCredentials}
           >
             <Settings2 className="size-4" aria-hidden="true" />
-            API connection
+            <ReplayLabel>API connection</ReplayLabel>
           </Button>
         </div>
       </aside>
@@ -994,7 +1005,14 @@ function TenantWorkspace({
           identityLabel={
             identityLabel ?? (isDemo ? "Demo administrator" : undefined)
           }
-          onSignOut={onSignOut ?? (isDemo ? onDemoSignOut : undefined)}
+          onSignOut={
+            onSignOut || isDemo
+              ? () => {
+                  nativeCapture.discard();
+                  (onSignOut ?? onDemoSignOut)();
+                }
+              : undefined
+          }
           darkMode={darkMode}
           onToggleTheme={onToggleTheme}
           replayConfigured={isSessionReplayConfigured()}
@@ -1016,7 +1034,7 @@ function TenantWorkspace({
               {navigation.map((n) => (
                 <SelectItem key={n.id} value={n.id}>
                   <n.icon className="size-4" aria-hidden="true" />
-                  {n.label}
+                  <ReplayLabel>{n.label}</ReplayLabel>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -1028,6 +1046,50 @@ function TenantWorkspace({
           tabIndex={-1}
           className="workspace-main outline-none"
         >
+          {nativeState.status !== "idle" ? (
+            <div
+              data-replay-block
+              role="status"
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-xs"
+            >
+              <span>
+                {nativeState.status === "ready"
+                  ? "A masked recording is ready to save."
+                  : nativeState.status === "paused"
+                    ? "Session recording paused on this screen."
+                    : "Recording this tab. Private data is masked."}
+              </span>
+              <div className="flex gap-2">
+                {nativeState.status !== "ready" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      nativeCapture.stop();
+                      navigate("replays");
+                    }}
+                  >
+                    <ReplayLabel>Stop recording</ReplayLabel>
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => navigate("replays")}
+                  >
+                    Open recording
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => nativeCapture.discard()}
+                >
+                  Discard
+                </Button>
+              </div>
+            </div>
+          ) : null}
           {data &&
           ((slo && !objectives.some((o) => o.slo.id === slo)) ||
             (selected &&
@@ -1063,7 +1125,11 @@ function TenantWorkspace({
             />
           ) : (
             <>
-              <PageHeader title={copy[page][0]} description={copy[page][1]}>
+              <PageHeader
+                replayTitle
+                title={copy[page][0]}
+                description={copy[page][1]}
+              >
                 {page === "objectives" ? (
                   canEdit(scope) ? (
                     <Suspense
@@ -1073,7 +1139,7 @@ function TenantWorkspace({
                         variant="outline"
                         onClick={() => navigate("intents")}
                       >
-                        Create from intent
+                        <ReplayLabel>Create from intent</ReplayLabel>
                       </Button>
                       <ObjectiveCreate scope={scope} onCreated={reload} />
                     </Suspense>
@@ -1105,51 +1171,7 @@ function TenantWorkspace({
                       Set API token
                     </Button>
                     <Button size="sm" variant="outline" onClick={reload}>
-                      Retry
-                    </Button>
-                  </div>
-                </div>
-              ) : null}
-              {nativeState.status !== "idle" ? (
-                <div
-                  data-replay-block
-                  role="status"
-                  className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-xs"
-                >
-                  <span>
-                    {nativeState.status === "ready"
-                      ? "A masked recording is ready to save."
-                      : nativeState.status === "paused"
-                        ? "Session recording paused on this screen."
-                        : "Recording this tab with masked text and inputs."}
-                  </span>
-                  <div className="flex gap-2">
-                    {nativeState.status !== "ready" ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          nativeCapture.stop();
-                          navigate("replays");
-                        }}
-                      >
-                        Stop recording
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => navigate("replays")}
-                      >
-                        Open recording
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => nativeCapture.discard()}
-                    >
-                      Discard
+                      <ReplayLabel>Retry</ReplayLabel>
                     </Button>
                   </div>
                 </div>
@@ -1232,7 +1254,9 @@ function TenantWorkspace({
                           ]
                       ).map((metric) => (
                         <div className="summary-metric" key={metric.label}>
-                          <dt>{metric.label}</dt>
+                          <dt>
+                            <ReplayLabel>{metric.label}</ReplayLabel>
+                          </dt>
                           <dd>{metric.value}</dd>
                         </div>
                       ))}
@@ -1275,6 +1299,12 @@ function TenantWorkspace({
                         }}
                         onJourney={openJourney}
                       />
+                    </Suspense>
+                  ) : page === "audit" ? (
+                    <Suspense
+                      fallback={<p role="status">Loading audit log…</p>}
+                    >
+                      <AuditLog key={scope.tenant} scope={scope} />
                     </Suspense>
                   ) : page === "replays" ? (
                     <Suspense

@@ -1,3 +1,4 @@
+import { ReplayLabel } from "@/components/replay-label";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { stringify } from "yaml";
 import { definitionFromSLO } from "@/lib/definitions";
@@ -68,11 +69,21 @@ export function Objectives({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="pl-6">Objective / service</TableHead>
-              <TableHead>SLI / SLO target</TableHead>
-              <TableHead>Budget remaining</TableHead>
-              <TableHead>Journeys</TableHead>
-              <TableHead>Alerts</TableHead>
+              <TableHead className="pl-6">
+                <ReplayLabel>Objective / service</ReplayLabel>
+              </TableHead>
+              <TableHead>
+                <ReplayLabel>SLI / SLO target</ReplayLabel>
+              </TableHead>
+              <TableHead>
+                <ReplayLabel>Budget remaining</ReplayLabel>
+              </TableHead>
+              <TableHead>
+                <ReplayLabel>Journeys</ReplayLabel>
+              </TableHead>
+              <TableHead>
+                <ReplayLabel>Alerts</ReplayLabel>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -124,7 +135,7 @@ export function Objectives({
                   ) : null}
                   {o.status.reliability !== null && o.status.coverage < 1 ? (
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Based on observed data
+                      <ReplayLabel>Based on observed data</ReplayLabel>
                     </div>
                   ) : null}
                 </TableCell>
@@ -155,7 +166,9 @@ export function Objectives({
           </TableBody>
         </Table>
         {!items.length ? (
-          <p className="empty-state">No objectives match this view.</p>
+          <p className="empty-state">
+            <ReplayLabel>No objectives match this view.</ReplayLabel>
+          </p>
         ) : null}
       </CardContent>
     </Card>
@@ -332,12 +345,12 @@ export function ObjectiveDetail({
         </div>
         {onReplays ? (
           <Button variant="outline" size="sm" onClick={onReplays}>
-            Session replay
+            <ReplayLabel>Session replay</ReplayLabel>
           </Button>
         ) : null}
         <Button variant="outline" size="sm" onClick={onClose}>
           <ArrowLeft className="size-4" />
-          Back
+          <ReplayLabel>Back</ReplayLabel>
         </Button>
         {objective && status ? (
           <SLIValue status={status} target={objective.slo.target} />
@@ -368,16 +381,26 @@ export function ObjectiveDetail({
       {objective?.slo.policies?.length ? (
         <Card className="gap-0 py-0">
           <div className="panel-header">
-            <h2 className="section-label">Alert policies</h2>
+            <h2 className="section-label">
+              <ReplayLabel>Alert policies</ReplayLabel>
+            </h2>
           </div>
           <CardContent className="p-4">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Policy</TableHead>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>State</TableHead>
-                  <TableHead>Burn threshold</TableHead>
+                  <TableHead>
+                    <ReplayLabel>Policy</ReplayLabel>
+                  </TableHead>
+                  <TableHead>
+                    <ReplayLabel>Severity</ReplayLabel>
+                  </TableHead>
+                  <TableHead>
+                    <ReplayLabel>State</ReplayLabel>
+                  </TableHead>
+                  <TableHead>
+                    <ReplayLabel>Burn threshold</ReplayLabel>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -434,7 +457,9 @@ export function ObjectiveDetail({
             ["Data coverage", percent(status.coverage, 1)],
           ].map(([label, value]) => (
             <div className="summary-metric" key={label}>
-              <dt>{label}</dt>
+              <dt>
+                <ReplayLabel>{label}</ReplayLabel>
+              </dt>
               <dd>{value}</dd>
             </div>
           ))}
@@ -443,14 +468,26 @@ export function ObjectiveDetail({
       {status ? <SLOHealthNotice status={status} /> : null}
       <Tabs value={tab} onValueChange={setTab} className="detail-tabs">
         <TabsList className="detail-tab-list">
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="rules">Rules</TabsTrigger>
+          <TabsTrigger value="performance">
+            <ReplayLabel>Performance</ReplayLabel>
+          </TabsTrigger>
+          <TabsTrigger value="rules">
+            <ReplayLabel>Rules</ReplayLabel>
+          </TabsTrigger>
           {!objective?.slo.providerWindow ? (
-            <TabsTrigger value="samples">Samples</TabsTrigger>
+            <TabsTrigger value="samples">
+              <ReplayLabel>Samples</ReplayLabel>
+            </TabsTrigger>
           ) : null}
-          <TabsTrigger value="history">Historical status</TabsTrigger>
-          <TabsTrigger value="ingest">Import / collect</TabsTrigger>
-          <TabsTrigger value="config">Configuration</TabsTrigger>
+          <TabsTrigger value="history">
+            <ReplayLabel>Historical status</ReplayLabel>
+          </TabsTrigger>
+          <TabsTrigger value="ingest">
+            <ReplayLabel>Import / collect</ReplayLabel>
+          </TabsTrigger>
+          <TabsTrigger value="config">
+            <ReplayLabel>Configuration</ReplayLabel>
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="performance">
           {objective ? (

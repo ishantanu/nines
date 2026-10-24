@@ -10,6 +10,7 @@ import (
 	"time"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/auditarchive"
 	rm "github.com/ishantanu/nines/internal/reviewmodel"
 )
 
@@ -34,6 +35,8 @@ type record struct {
 	InputDigest    string                  `json:"inputDigest,omitempty"`
 }
 type Repository interface {
+	auditarchive.Repository
+	Audit(context.Context, AuditSearch) ([]v1.AuditRecord, error)
 	Create(context.Context, record) (record, error)
 	Read(context.Context, string) (record, error)
 	List(context.Context, string, int) ([]v1.IntentConversationSummary, error)
@@ -79,8 +82,10 @@ func claim(r *record, token string, now time.Time) error {
 func touch(r *record, now time.Time) { r.Session.Version++; r.Session.UpdatedAt = now }
 
 type memory struct {
-	mu     sync.Mutex
-	values map[string]record
+	mu       sync.Mutex
+	values   map[string]record
+	journal  []v1.AuditRecord
+	archives map[string]archiveState
 }
 
 func NewMemory() Repository { return &memory{values: map[string]record{}} }
@@ -146,6 +151,18 @@ func (m *memory) Update(ctx context.Context, id string, fn func(*record, time.Ti
 	if !ok {
 		return record{}, ErrNotFound
 	}
+	var head *v1.AuditRecord
+	sequence, _ := lastAudit(old.Session.Audit)
+	for i := len(m.journal) - 1; i >= 0 && sequence > 0; i-- {
+		item := &m.journal[i]
+		if item.Tenant == old.Session.Tenant && item.Conversation == id && item.Event.Sequence == sequence {
+			head = item
+			break
+		}
+	}
+	if err := validJournalHead(old, head); err != nil {
+		return record{}, err
+	}
 	r := clone(old)
 	if err := fn(&r, time.Now().UTC()); err != nil {
 		return record{}, err
@@ -156,8 +173,35 @@ func (m *memory) Update(ctx context.Context, id string, fn func(*record, time.Ti
 	if ctx.Err() != nil {
 		return record{}, ctx.Err()
 	}
+	added, err := journalAppend(old, r)
+	if err != nil {
+		return record{}, err
+	}
+	m.journal = append(m.journal, clone(added)...)
 	m.values[id] = clone(r)
 	return clone(r), nil
+}
+func (m *memory) Audit(ctx context.Context, query AuditSearch) ([]v1.AuditRecord, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	out := []v1.AuditRecord{}
+	for _, event := range m.journal {
+		if auditMatches(event, query) {
+			item := clone(event)
+			if query.ID == "" {
+				item.Proposal = nil
+			}
+			out = append(out, item)
+		}
+	}
+	sortAudit(out, query.Ascending)
+	if len(out) > query.Query.Limit {
+		out = out[:query.Query.Limit]
+	}
+	return out, nil
 }
 func (m *memory) Claim(ctx context.Context, token string) (record, error) {
 	m.mu.Lock()

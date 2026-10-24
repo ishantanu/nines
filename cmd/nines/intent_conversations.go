@@ -55,6 +55,8 @@ func conversationCommand(action string, o *options) *cobra.Command {
 	namespace := f.String("namespace", "", "explicit Kubernetes export namespace")
 	digest := f.String("digest", "", "exact reviewed change-set digest")
 	cursor := f.String("cursor", "", "metadata page cursor")
+	after := f.Int64("after", 0, "Continue conversation audit after this sequence")
+	through := f.Int64("through", 0, "Freeze audit export at this sequence (zero: current)")
 	format := new(string)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
@@ -100,7 +102,7 @@ func conversationCommand(action string, o *options) *cobra.Command {
 				result, e = c.PrepareIntentChangeSet(ctx, id, in.ExpectedVersion)
 			}
 		case "audit":
-			result, e = c.IntentAudit(ctx, id)
+			result, e = c.IntentAuditPage(ctx, id, *after, *through)
 		case "reject", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject":
 			var in v1.ReviewIntentChangeSet
 			if e = conversationFile(*file, &in); e == nil {

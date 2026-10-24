@@ -5,7 +5,8 @@ These features exist in source and demos, but are outside the initial supported 
 | Feature | Present | Remaining release boundary |
 | --- | --- | --- |
 | Intent/model workflows | Provider-configurable drafting, bounded tools, SLO-owned measurements, reviewed SLO/CUJ changes, apply receipts and a [drafting and workflow evaluation harness](intent-evaluations.md) | [Real-provider acceptance (#34)](https://github.com/ishantanu/nines/issues/34), model behavior tests, cost/scale and operator experience |
-| Session replay | Consented masked app-tab capture, linked revisions, playback and portable HTML export | Browser/platform compatibility, masking/privacy review and offline-player acceptance |
+| [Session replay](session-replay.md) | Consented masked app-tab capture, linked revisions, playback and portable HTML export | Browser/platform compatibility, masking/privacy review and offline-player acceptance |
+| [Immutable audit archival](deployment/audit-archive.md) | Opt-in S3/S3-compatible Object Lock delivery, durable retries and verified receipts | Ceph/OpenBao container acceptance passed; production IAM/KMS, HA and real AWS acceptance remain; no provider configured by default |
 | Observed dependency maps | Declared links and configured service-graph evidence | Instrumentation coverage and production-scale validation |
 
 Replay masking is not anonymization. Layout, CSS/classes and retained metadata may be sensitive, and downloaded copies leave server retention/RBAC controls. Recordings are not videos of other browser tabs or the operating-system desktop.

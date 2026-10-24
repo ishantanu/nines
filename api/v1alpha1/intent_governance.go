@@ -59,6 +59,8 @@ type IntentAuditEvent struct {
 	Hash            string             `json:"hash,omitempty"`
 }
 type IntentAuditLog struct {
+	NextAfter    int64              `json:"nextAfter,omitempty"`
+	Through      int64              `json:"through"`
 	ChangeSets   []IntentChangeSet  `json:"changeSets"`
 	APIVersion   string             `json:"apiVersion"`
 	Tenant       string             `json:"tenant"`

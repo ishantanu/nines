@@ -1,17 +1,14 @@
 import { expect, test } from "vitest";
+import { replayFixture } from "./replay-test-fixtures";
 import { portableReplayHTML } from "./replay-download";
 test("portable recording embeds its own player and escapes untrusted closing tags", () => {
   const html = portableReplayHTML(
     [
+      ...replayFixture(),
       {
-        type: 2,
-        timestamp: 1,
-        data: {
-          node: {
-            type: 0,
-            childNodes: [{ textContent: "</script><script>alert(1)</script>" }],
-          },
-        },
+        type: 3,
+        timestamp: 102,
+        data: { source: 5, id: 4, text: "</script><script>alert(1)</script>" },
       },
     ],
     'console.log("trusted player")',
@@ -24,4 +21,14 @@ test("portable recording embeds its own player and escapes untrusted closing tag
   expect(html).not.toContain('src="/src/replay-player.ts"');
   expect(html).not.toContain("<script>alert(1)</script>");
   expect(html).toContain("\\u003c/script>");
+});
+test("portable replay rejects an empty player and oversized embedded recording", () => {
+  const events = replayFixture();
+  events[0].data.text = "x".repeat(3 * 1024 * 1024);
+  expect(() => portableReplayHTML(events, "player", "ab".repeat(16))).toThrow(
+    "size",
+  );
+  expect(() =>
+    portableReplayHTML(replayFixture(), " ", "ab".repeat(16)),
+  ).toThrow("player");
 });

@@ -140,3 +140,7 @@ Pause retains loaded rules and survives PostgreSQL-backed restarts and SLO edits
 ### Read recent SLO measurements
 
 `nines collect SLO_ID --recent --context CONTEXT --agent` reads a bounded recent range from the SLO's configured source using the server clock. It commits measurement data without changing the SLO definition or deploying rules. Editors and owners may collect; this is a write operation in the command catalog. Explicit `--from` and `--to` remain available for backfills and cannot be combined with `--recent`. A returned `collected: 0` means no measurement rows matched, not a successful SLI calculation. Inspect the source's metric names and labels in the portal before changing a selector.
+
+### Decision audit journal
+
+Owners/editors can search tenant decisions with `nines audit list --agent`, inspect a frozen proposal with `nines audit show RECORD_ID --agent`, or export matching full records with `nines audit export --agent` (NDJSON). All use the selected server/tenant context; offline mode rejects them. Filters include actor subject, resource, conversation, action, outcome and RFC3339 from/to dates. Check export exit status before retaining the output. Approvals require a nonempty review reason through every client, and a different owner/editor subject must apply that approval or rollback. The bundled CLI skill describes these boundaries. See [governance](public/intent-governance.md) for pagination, ambiguous apply outcomes and archive limitations.

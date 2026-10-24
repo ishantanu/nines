@@ -1,3 +1,4 @@
+import { ReplayLabel } from "@/components/replay-label";
 import { useEffect, useState } from "react";
 import { api, message, type RequestScope } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -67,7 +68,9 @@ export function IntegrationEvidence({ status }: { status: IntegrationStatus }) {
         const stage = status[key];
         return (
           <div key={key} className="min-w-0 space-y-2 p-4">
-            <h3 className="text-sm font-medium">{title}</h3>
+            <h3 className="text-sm font-medium">
+              <ReplayLabel>{title}</ReplayLabel>
+            </h3>
             <Badge
               variant={
                 stage.state === "failed" || stage.state === "blocked"
@@ -75,7 +78,7 @@ export function IntegrationEvidence({ status }: { status: IntegrationStatus }) {
                   : "outline"
               }
             >
-              {labels[stage.state] ?? "Unverified"}
+              <ReplayLabel>{labels[stage.state] ?? "Unverified"}</ReplayLabel>
             </Badge>
             <p className="break-words text-xs leading-5 text-muted-foreground">
               {stage.message}
@@ -96,7 +99,9 @@ export function IntegrationEvidence({ status }: { status: IntegrationStatus }) {
       })}
       {status.automation ? (
         <div className="col-span-full min-w-0 space-y-2 border-t p-4">
-          <h3 className="text-sm font-medium">Automatic rule deployment</h3>
+          <h3 className="text-sm font-medium">
+            <ReplayLabel>Automatic rule deployment</ReplayLabel>
+          </h3>
           <Badge
             variant={
               status.automation.state === "failed" ||
@@ -119,7 +124,9 @@ export function IntegrationEvidence({ status }: { status: IntegrationStatus }) {
       ) : null}
       {status.ruleOutput ? (
         <div className="col-span-full min-w-0 space-y-2 border-t p-4">
-          <h3 className="text-sm font-medium">Rule output in query dataset</h3>
+          <h3 className="text-sm font-medium">
+            <ReplayLabel>Rule output in query dataset</ReplayLabel>
+          </h3>
           <Badge variant="outline">
             {labels[status.ruleOutput.state] ?? "Unverified"}
           </Badge>
@@ -226,14 +233,16 @@ export function SLOIntegrationStatus({
   return (
     <Card className="gap-0 py-0">
       <div className="panel-header">
-        <h2 className="section-label">Integration status</h2>
+        <h2 className="section-label">
+          <ReplayLabel>Integration status</ReplayLabel>
+        </h2>
         <Button
           variant="outline"
           size="sm"
           disabled={busy}
           onClick={() => setRefresh((n) => n + 1)}
         >
-          {busy ? "Checking..." : "Check status"}
+          <ReplayLabel>{busy ? "Checking..." : "Check status"}</ReplayLabel>
         </Button>
       </div>
       <CardContent className="space-y-3 p-4" aria-live="polite">

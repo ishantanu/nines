@@ -172,3 +172,39 @@ func TestSSOOnlyTenantCanUseNamedOperatorConnection(t *testing.T) {
 		t.Fatal(resolved, err)
 	}
 }
+
+func TestTenantCompatibleAuditArchiveIsOptionalAndValidated(t *testing.T) {
+	lookup := func(string) string { return "synthetic-token-at-least-24-characters" }
+	withoutArchive, err := Parse([]byte(validConfig), lookup)
+	if err != nil || withoutArchive[0].Config.AuditArchive != nil {
+		t.Fatal("tenant requires no external archive by default", err)
+	}
+	body := validConfig + `  auditArchive:
+    provider: s3-compatible
+    endpoint: https://rgw.example.com
+    bucket: nines-audit
+    region: us-east-1
+    prefix: nines/audit
+    retentionDays: 365
+`
+	resolved, err := Parse([]byte(body), lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := resolved[0].Config.AuditArchive
+	if archive == nil || archive.Provider != "s3-compatible" || archive.Endpoint != "https://rgw.example.com" || archive.ExpectedBucketOwner != "" {
+		t.Fatal("gateway configuration was not retained", archive)
+	}
+	for name, invalid := range map[string]string{
+		"AWS owner required": strings.Replace(body, "provider: s3-compatible", "provider: s3", 1),
+		"obsolete provider":  strings.Replace(body, "provider: s3-compatible", "provider: minio", 1),
+		"missing endpoint":   strings.Replace(body, "    endpoint: https://rgw.example.com\n", "", 1),
+		"insecure endpoint":  strings.Replace(body, "https://rgw.example.com", "http://rgw.example.com", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Parse([]byte(invalid), lookup); err == nil {
+				t.Fatal("accepted invalid archive configuration")
+			}
+		})
+	}
+}

@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Preserve approved navigation, controls and known UI states in session replay while masking private values, with a shared server-enforced label catalog and explicit recording policy.
+
+- Harden replay scope transitions, private-region exclusion, stored-payload integrity, structural validation and visible player failures. Prevent stale save responses from changing navigation or discarding a newer capture; document the desktop/offline release acceptance matrix.
+
+- Add optional provider-neutral S3-compatible audit storage configuration and document Ceph RGW as the open-source target. Add disposable Ceph/OpenBao container acceptance for TLS, encryption, retry idempotency and COMPLIANCE retention.
+
+- Add opt-in per-tenant S3 Object Lock archival with durable delivery claims, retries, exact version/content/compliance-retention verification and portal/CLI receipt status.
+- Attach portable replay download links before clicking them and validate export/player size.
+
+- Require approval notes and a different applying identity for agent-proposed SLO changes and rollbacks. Audit proposal-preparation failures and routed malformed governance requests.
+- Add an independently retained tenant decision journal with filtered portal/API/CLI access, frozen proposal readback, paginated conversation exports and full NDJSON CLI exports.
+
+- Keep replay recording controls visible on SLO detail and missing-resource pages, report recorder startup failures, and preserve CSS layout declarations while removing generated content in browser/server masking. Add a hosted session replay guide and explicit browser/export acceptance boundaries.
+
 - Add direct recent source collection from SLO details and `nines collect --recent`, surface saved collection evidence, and browse bounded metric names/labels in the selected Prometheus or Mimir source. Report empty queries separately from connection errors without rewriting saved measurements.
 
 - Lead SLO views with observed SLI attainment and the SLO target instead of a generic unknown health badge. Show partial-window coverage, no traffic and missing measurements explicitly, with alert state and rule activation kept separate.

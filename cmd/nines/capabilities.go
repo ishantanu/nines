@@ -45,6 +45,9 @@ func commandCatalog(root *cobra.Command) any {
 			if strings.HasPrefix(path, "nines init ") || path == "nines rules generate" || strings.HasPrefix(path, "nines operator ") || strings.HasPrefix(path, "nines export ") || strings.HasSuffix(path, "conversations kubernetes") {
 				v.Artifact = "yaml"
 			}
+			if path == "nines audit export" {
+				v.Artifact = "ndjson"
+			}
 			if path == "nines skills show" {
 				v.Artifact = "markdown"
 			}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"strconv"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 )
@@ -131,10 +132,13 @@ func (c *Client) ExportIntentKubernetes(ctx context.Context, id, namespace, dige
 }
 
 func (c *Client) IntentAudit(ctx context.Context, id string) (v1.IntentAuditLog, error) {
+	return c.IntentAuditPage(ctx, id, 0, 0)
+}
+func (c *Client) IntentAuditPage(ctx context.Context, id string, after, through int64) (v1.IntentAuditLog, error) {
 	var out v1.IntentAuditLog
 	p, e := conversationPath(id)
 	if e == nil {
-		e = c.scopedRequest(ctx, "GET", p+"/audit", nil, 3<<20, &out)
+		e = c.scopedRequest(ctx, "GET", p+"/audit?after="+strconv.FormatInt(after, 10)+"&through="+strconv.FormatInt(through, 10), nil, 3<<20, &out)
 	}
 	if e == nil && out.Conversation != id {
 		e = errors.New("unexpected audit conversation identity")

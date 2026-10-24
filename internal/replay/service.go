@@ -18,7 +18,8 @@ import (
 	"github.com/ishantanu/nines/internal/tenancy"
 )
 
-const Policy = "masked-v1"
+const Policy = "selective-v2"
+const LegacyPolicy = "masked-v1"
 
 var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
@@ -101,10 +102,10 @@ func (s *Service) Create(ctx context.Context, in v1.CreateSessionReplay) (v1.Ses
 	if err != nil {
 		return v1.SessionReplay{}, err
 	}
-	if !idPattern.MatchString(in.ID) || !utf8.ValidString(in.Title) || strings.TrimSpace(in.Title) == "" || len(in.Title) > 160 || strings.ContainsRune(in.Title, 0) || !in.Consent || in.Policy != Policy {
-		return v1.SessionReplay{}, model.Invalid("provide a valid ID, title (1–160 bytes) and explicit masked-v1 consent")
+	if !idPattern.MatchString(in.ID) || !utf8.ValidString(in.Title) || strings.TrimSpace(in.Title) == "" || len(in.Title) > 160 || strings.ContainsRune(in.Title, 0) || !in.Consent || (in.Policy != Policy && in.Policy != LegacyPolicy) {
+		return v1.SessionReplay{}, model.Invalid("provide a valid ID, title (1–160 bytes) and explicit consent to a supported recording policy")
 	}
-	events, err := Sanitize(in.Events)
+	events, err := sanitize(in.Events, in.Policy == Policy)
 	if err != nil {
 		return v1.SessionReplay{}, model.Invalid("%v", err)
 	}
@@ -119,6 +120,9 @@ func (s *Service) Create(ctx context.Context, in v1.CreateSessionReplay) (v1.Ses
 		Digest     string
 	}{in.Title, actor, in.References, digest(payload)})
 	requestHash := digest(request)
+	if in.Policy != LegacyPolicy {
+		requestHash = digest(append(request, []byte(in.Policy)...))
+	}
 	// Exact immutable ingestion retries remain valid after linked resources advance.
 	if old, e := s.Repository.Read(ctx, in.ID); e == nil {
 		if old.RequestDigest != requestHash {
@@ -143,11 +147,18 @@ func (s *Service) Create(ctx context.Context, in v1.CreateSessionReplay) (v1.Ses
 	if started.Before(now.Add(-7*24*time.Hour)) || finished.After(now.Add(5*time.Minute)) {
 		return v1.SessionReplay{}, model.Invalid("recording timestamps must be within the last seven days")
 	}
-	m := v1.SessionReplay{APIVersion: v1.APIVersion, Tenant: s.Platform.TenantID, ID: in.ID, Title: in.Title, Version: 1, CreatedAt: now, ExpiresAt: now.Add(RetentionDays * 24 * time.Hour), StartedAt: started, FinishedAt: finished, DurationMillis: end.Timestamp - start.Timestamp, EventCount: len(events), SizeBytes: len(payload), Digest: digest(payload), Policy: Policy, RecordedBy: actor, References: refs}
+	m := v1.SessionReplay{APIVersion: v1.APIVersion, Tenant: s.Platform.TenantID, ID: in.ID, Title: in.Title, Version: 1, CreatedAt: now, ExpiresAt: now.Add(RetentionDays * 24 * time.Hour), StartedAt: started, FinishedAt: finished, DurationMillis: end.Timestamp - start.Timestamp, EventCount: len(events), SizeBytes: len(payload), Digest: digest(payload), Policy: in.Policy, RecordedBy: actor, References: refs}
 	r, err := s.Repository.Create(ctx, record{Meta: m, Events: events, RequestDigest: requestHash})
 	return r.Meta, err
 }
+func (s *Service) reader(ctx context.Context) bool {
+	p, ok := tenancy.FromContext(ctx)
+	return ok && p.TenantID == s.Platform.TenantID && p.Subject != "" && (p.Role == "owner" || p.Role == "editor" || p.Role == "agent" || p.Role == "viewer")
+}
 func (s *Service) read(ctx context.Context, id string) (record, error) {
+	if !s.reader(ctx) {
+		return record{}, ErrNotFound
+	}
 	if !idPattern.MatchString(id) {
 		return record{}, model.Invalid("invalid session ID")
 	}
@@ -164,10 +175,20 @@ func (s *Service) Read(ctx context.Context, id string) (v1.SessionReplay, error)
 }
 func (s *Service) Events(ctx context.Context, id string) (v1.ReplayEvents, error) {
 	r, e := s.read(ctx, id)
+	if e != nil {
+		return v1.ReplayEvents{}, e
+	}
+	payload, err := json.Marshal(r.Events)
+	if err != nil || digest(payload) != r.Meta.Digest {
+		return v1.ReplayEvents{}, ErrCorrupt
+	}
 	return v1.ReplayEvents{APIVersion: v1.APIVersion, Tenant: s.Platform.TenantID, ID: id, Digest: r.Meta.Digest, Events: r.Events}, e
 }
 func (s *Service) List(ctx context.Context, kind, id string, archived bool) (v1.SessionReplayList, error) {
 	out := v1.SessionReplayList{APIVersion: v1.APIVersion, Tenant: s.Platform.TenantID, Items: []v1.SessionReplay{}, RetentionDays: RetentionDays, MaxSessions: MaxSessions}
+	if !s.reader(ctx) {
+		return out, ErrNotFound
+	}
 	p, _ := tenancy.FromContext(ctx)
 	if archived && p.Role != "owner" {
 		return out, model.Invalid("archived sessions are visible to owners")

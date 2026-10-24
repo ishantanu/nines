@@ -1,6 +1,6 @@
 # Backup, restore and upgrades
 
-Keep the PostgreSQL database, trusted tenant/identity configuration, external rule files and referenced secrets recoverable together. The database contains tenant resources, measurements, workflow/replay state, identity sessions and authorization data. Backups can contain sensitive tenant and replay data; store them with restricted access and encryption under your normal retention policy.
+Keep the PostgreSQL database, trusted tenant/identity configuration, external rule files and referenced secrets recoverable together. The database contains tenant resources, measurements, workflow/replay state, identity sessions, authorization data, decision journals and archive delivery work/receipts. Backups can contain sensitive tenant and replay data; store them with restricted access and encryption under your normal retention policy.
 
 The MVP provides no automatic backup service or reversible migration framework. Do not assume a previous binary can read a database after a newer binary initializes it.
 
@@ -22,6 +22,8 @@ Check that `pg_dump` succeeded before treating the file as a backup. If it fails
 Back up `.env`, mounted tenant/auth YAML, `NINES_SOURCE_ENCRYPTION_KEY`, private CA files, rule destinations and secret-manager version references separately. Managed source credentials cannot be decrypted after restore without the original encryption key. Protect those copies at least as carefully as the database. PostgreSQL role definitions are managed outside a normal database dump; recreate the expected role and grants when restoring.
 
 ## Rehearse restore in an isolated database
+
+Before starting a restored Nines server for a rehearsal, remove `auditArchive` from the rehearsal tenant configuration or point it to a separately provisioned acceptance destination. A restored queue can resume external writes. An existing immutable archive is not rewound by restoring PostgreSQL; inspect post-backup decisions and their external versions before resuming production changes. See [audit archival](audit-archive.md).
 
 Use a different Compose project so the rehearsal has a new database volume. Start only its database, then restore into that fresh database:
 

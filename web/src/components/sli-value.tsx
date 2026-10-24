@@ -1,3 +1,4 @@
+import { ReplayLabel } from "@/components/replay-label";
 import { percent, type Snapshot } from "@/lib/api";
 
 export type SLIMeasurement = Pick<Snapshot, "reliability" | "dataStatus"> &
@@ -29,11 +30,13 @@ export function SLIValue({
       <span
         className={`text-sm font-medium tabular-nums${measured && target !== undefined && status.reliability! < target ? " status-degraded" : ""}`}
       >
-        {measured
-          ? `${percent(status.reliability, 3)} SLI`
-          : status.dataStatus === "no_traffic"
-            ? "No traffic"
-            : "No SLI data"}
+        {measured ? (
+          `${percent(status.reliability, 3)} SLI`
+        ) : status.dataStatus === "no_traffic" ? (
+          "No traffic"
+        ) : (
+          <ReplayLabel>No SLI data</ReplayLabel>
+        )}
       </span>
       {!compact ? (
         <span className="text-xs text-muted-foreground">
@@ -44,7 +47,9 @@ export function SLIValue({
         </span>
       ) : null}
       {compact && measured && windowLabel === "Partial window" ? (
-        <span className="text-xs text-muted-foreground">Partial window</span>
+        <span className="text-xs text-muted-foreground">
+          <ReplayLabel>Partial window</ReplayLabel>
+        </span>
       ) : null}
       {!compact && coverage !== undefined && Number.isFinite(coverage) ? (
         <span className="text-xs text-muted-foreground tabular-nums">
@@ -69,15 +74,21 @@ export function SLOAlertState({
 }) {
   if (status.alert.phase === "firing")
     return (
-      <span className="text-xs font-medium status-degraded">Alert firing</span>
+      <span className="text-xs font-medium status-degraded">
+        <ReplayLabel>Alert firing</ReplayLabel>
+      </span>
     );
   if (status.alert.phase === "pending")
     return (
-      <span className="text-xs font-medium status-at-risk">Alert pending</span>
+      <span className="text-xs font-medium status-at-risk">
+        <ReplayLabel>Alert pending</ReplayLabel>
+      </span>
     );
   return (
     <span className="text-xs text-muted-foreground">
-      {status.reliability === null ? "Not evaluated" : "No active alerts"}
+      <ReplayLabel>
+        {status.reliability === null ? "Not evaluated" : "No active alerts"}
+      </ReplayLabel>
     </span>
   );
 }

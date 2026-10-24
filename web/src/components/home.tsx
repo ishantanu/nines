@@ -1,3 +1,4 @@
+import { ReplayLabel } from "@/components/replay-label";
 import { Activity, ArrowRight, Database, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -31,7 +32,9 @@ export function Home({
           { label: "Affected journeys", value: impacted.length },
         ].map((x) => (
           <div className="summary-metric" key={x.label}>
-            <dt>{x.label}</dt>
+            <dt>
+              <ReplayLabel>{x.label}</ReplayLabel>
+            </dt>
             <dd>{x.value}</dd>
           </div>
         ))}

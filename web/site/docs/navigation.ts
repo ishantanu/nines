@@ -155,6 +155,11 @@ export const docGroups: DocGroup[] = [
         "Enable reconciliation and inspect runtime evidence or pause delivery.",
       ),
       page(
+        "deployment/audit-archive",
+        "Immutable audit archive",
+        "Configure optional S3 or compatible object storage and inspect verified delivery.",
+      ),
+      page(
         "deployment/backup-and-restore",
         "Backup and restore",
         "Preserve definitions, identities and retained evidence.",
@@ -164,6 +169,11 @@ export const docGroups: DocGroup[] = [
   {
     title: "Operate and contribute",
     pages: [
+      page(
+        "session-replay",
+        "Session replay",
+        "Record the current tab with consent, inspect masked playback and export a portable replay.",
+      ),
       page(
         "operations",
         "Operational limits",

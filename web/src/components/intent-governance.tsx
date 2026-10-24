@@ -275,7 +275,8 @@ export function IntentDecisionControls({
         <div className="text-xs">
           <p>
             Approved by {change.approvedBy?.name || "an authorized reviewer"} at{" "}
-            {change.approvedAt}.
+            {change.approvedAt}. A different owner or editor must apply this
+            approval.
           </p>
           <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
             {change.approvalReason ||
@@ -536,7 +537,8 @@ export function IntentRollbackPanel({
                 <>
                   <p className="text-xs">
                     Approved by {rollback.approvedBy?.name} at{" "}
-                    {rollback.approvedAt}: {rollback.approvalReason}
+                    {rollback.approvedAt}: {rollback.approvalReason}. A
+                    different owner or editor must apply this rollback.
                   </p>
                   <Button
                     size="sm"
@@ -690,20 +692,44 @@ export function IntentGovernanceHistory({
   }, [scope, conversation.id]);
   async function exportAudit() {
     const signal = controller.current.signal;
-    const result = await api<{
+    const base =
+      conversationBase + "/" + encodeURIComponent(conversation.id) + "/audit";
+    type Page = {
       tenant: string;
       conversation: string;
       integrity: string;
-    }>(
-      conversationBase + "/" + encodeURIComponent(conversation.id) + "/audit",
-      scope,
-      { signal },
-    );
-    if (
-      result.tenant !== scope.tenant ||
-      result.conversation !== conversation.id
-    )
-      throw new Error("Audit export scope mismatch");
+      events: IntentAuditEvent[];
+      nextAfter?: number;
+      through?: number;
+    };
+    const result = await api<Page>(base, scope, { signal });
+    const validate = (page: Page) => {
+      if (page.tenant !== scope.tenant || page.conversation !== conversation.id)
+        throw new Error("Audit export scope mismatch");
+    };
+    validate(result);
+    let after = result.nextAfter;
+    const through = result.through;
+    const seen = new Set<number>();
+    while (after) {
+      if (seen.has(after) || result.events.length >= 10000)
+        throw new Error(
+          "Audit export limit reached; use nines audit export for the complete journal.",
+        );
+      seen.add(after);
+      const page = await api<Page>(
+        base + "?after=" + after + "&through=" + through,
+        scope,
+        { signal },
+      );
+      validate(page);
+      if (page.through !== through)
+        throw new Error("Audit export snapshot changed");
+      if (page.integrity !== "verified") result.integrity = "invalid";
+      result.events.push(...page.events);
+      after = page.nextAfter;
+    }
+    delete result.nextAfter;
     if (!signal.aborted && !scope.signal.aborted)
       download(
         "nines-" + conversation.id + ".audit.json",
@@ -748,9 +774,9 @@ export function IntentGovernanceHistory({
         </div>
         <p className="text-xs text-muted-foreground">
           Records who proposed, approved, rejected, applied or restored changes.
-          The export includes frozen recommendations, definitions and an
-          integrity check. Audit records cannot be cleared through the
-          application.
+          Recent events are shown here. The export retrieves every decision page
+          and includes retained conversation definitions and an integrity check.
+          Audit records cannot be cleared through the application.
         </p>
         {conversation.audit?.length ? (
           <div className="space-y-3">
@@ -758,7 +784,7 @@ export function IntentGovernanceHistory({
             {conversation.audit.length > 5 ? (
               <details className="text-xs">
                 <summary className="cursor-pointer font-medium">
-                  Earlier decisions ({conversation.audit.length - 5})
+                  Earlier recent decisions ({conversation.audit.length - 5})
                 </summary>
                 <div className="mt-3">
                   <IntentAuditTimeline
