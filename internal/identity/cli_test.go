@@ -319,3 +319,41 @@ func TestCLINativeLDAPFormSignIn(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestCLICancellationConsumesRequestWithoutIssuingGrant(t *testing.T) {
+	svc, server, session, _ := cliIdentity(t)
+	authorization, _, _ := startCLI(t, server, "alpha")
+	parsed, _ := url.Parse(authorization)
+	ticket := parsed.Query().Get("request")
+	cancel := func(want int) *httptest.ResponseRecorder {
+		t.Helper()
+		req := httptest.NewRequest("POST", "/auth/cli/approve", strings.NewReader(url.Values{"request": {ticket}, "csrf": {hash("csrf:" + session)}, "decision": {"deny"}}.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.AddCookie(&http.Cookie{Name: svc.cookieName("session"), Value: session})
+		req.AddCookie(&http.Cookie{Name: svc.cookieName("cli_flow"), Value: ticket})
+		w := httptest.NewRecorder()
+		svc.Handler().ServeHTTP(w, req)
+		if w.Code != want {
+			t.Fatalf("cancel status %d want %d", w.Code, want)
+		}
+		return w
+	}
+	response := cancel(303)
+	callback, err := url.Parse(response.Header().Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if callback.Query().Get("error") != "access_denied" || callback.Query().Get("code") != "" {
+		t.Fatal("cancellation returned an authorization code")
+	}
+	if err := svc.repo.View(context.Background(), func(tx Tx) error {
+		rows, err := tx.List("cli_code", "global")
+		if err == nil && len(rows) != 0 {
+			t.Fatal("cancelled flow created a grant")
+		}
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	cancel(404)
+}

@@ -29,3 +29,38 @@ func TestReplayOriginPreservesStrictScriptPolicy(t *testing.T) {
 		}
 	}
 }
+
+func TestPortalDeepLinksAndAssetMisses(t *testing.T) {
+	handler := frontend()
+	for _, path := range []string{"/", "/login", "/login/?returnTo=%2Ftenants%2Falpha%2Fslos", "/tenants/alpha/home", "/tenants/alpha/slos/api-latency", "/tenants/alpha/critical-user-journeys/checkout", "/tenants/alpha/reviews/incident-1", "/tenants/alpha/intents/chat-1", "/tenants/alpha/replays/session-1", "/tenants/alpha/data-sources/", "/tenants/alpha/access-control", "/tenants/alpha/clients"} {
+		for _, method := range []string{"GET", "HEAD"} {
+			t.Run(method+path, func(t *testing.T) {
+				response := httptest.NewRecorder()
+				handler.ServeHTTP(response, httptest.NewRequest(method, path, nil))
+				if response.Code != 200 || !strings.Contains(response.Header().Get("Content-Type"), "text/html") || response.Header().Get("Cache-Control") != "no-store" {
+					t.Fatalf("%s %s: %d %v", method, path, response.Code, response.Header())
+				}
+				if method == "GET" && !strings.Contains(response.Body.String(), `id="root"`) {
+					t.Fatal("missing app shell")
+				}
+				if method == "HEAD" && response.Body.Len() != 0 {
+					t.Fatal("HEAD returned a body")
+				}
+			})
+		}
+	}
+	for _, path := range []string{"/unknown", "/api/missing", "/auth/missing", "/assets/missing.js", "/tenants/alpha/missing", "/tenants/alpha/home/extra", "/tenants/alpha/slos/a/b", "/tenants/alpha/slos/%2e%2e", "/tenants/alpha/slos/a%2fb", "/tenants/alpha/slos//"} {
+		t.Run(path, func(t *testing.T) {
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, httptest.NewRequest("GET", path, nil))
+			if response.Code != 404 {
+				t.Fatalf("%s: %d", path, response.Code)
+			}
+		})
+	}
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest("POST", "/login", nil))
+	if response.Code != 405 {
+		t.Fatalf("POST login: %d", response.Code)
+	}
+}

@@ -1,3 +1,4 @@
+import { SLIValue } from "@/components/sli-value";
 import { useEffect, useState } from "react";
 import { stringify } from "yaml";
 import {
@@ -259,7 +260,7 @@ export function JourneyDetail({
                     <TableHead>Objective</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Budget remaining</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>SLI / SLO target</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -284,7 +285,7 @@ export function JourneyDetail({
                         {percent(l.status.budgetRemainingFraction, 1)}
                       </TableCell>
                       <TableCell>
-                        <Status value={l.health} />
+                        <SLIValue status={l.status} target={l.slo.target} />
                       </TableCell>
                     </TableRow>
                   ))}

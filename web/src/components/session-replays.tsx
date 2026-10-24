@@ -1,3 +1,4 @@
+import { useResourceRoute } from "@/lib/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Play, RefreshCw, Archive, Link2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,6 @@ import {
   linkReplay,
   listReplays,
   replayEvents,
-  replayLink,
-  replayFromHash,
   type SessionReplay,
   type ReplayRef,
   type ReplayEventSet,
@@ -232,9 +231,7 @@ export function SessionReplays({
 }) {
   const state = useSyncExternalStore(capture.subscribe, capture.getSnapshot);
   const [items, setItems] = useState<SessionReplay[]>([]);
-  const [selected, setSelected] = useState(
-    () => replayFromHash(window.location.hash, scope.tenant) ?? "",
-  );
+  const [selected, setSelected] = useResourceRoute(scope.tenant, "replays");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -272,11 +269,10 @@ export function SessionReplays({
     (r) =>
       filter === "all" || r.references.some((ref) => refKey(ref) === filter),
   );
-  const chosen = visible.find((r) => r.id === selected) ?? visible[0];
+  const chosen = selected ? items.find((r) => r.id === selected) : visible[0];
   function accept(r: SessionReplay) {
     setItems((prev) => [r, ...prev.filter((p) => p.id !== r.id)]);
     setSelected(r.id);
-    window.history.replaceState(null, "", replayLink(scope.tenant, r.id));
   }
   async function start() {
     setError("");
@@ -510,11 +506,6 @@ export function SessionReplays({
                   aria-pressed={chosen?.id === r.id}
                   onClick={() => {
                     setSelected(r.id);
-                    window.history.replaceState(
-                      null,
-                      "",
-                      replayLink(scope.tenant, r.id),
-                    );
                   }}
                   className={`w-full rounded-md border p-3 text-left ${chosen?.id === r.id ? "bg-muted" : "hover:bg-muted/50"}`}
                 >
@@ -629,7 +620,9 @@ export function SessionReplays({
             ) : (
               <div className="flex min-h-72 flex-1 items-center justify-center text-muted-foreground">
                 <Play className="mr-2 size-4" />
-                Select a recording to play.
+                {selected && !loading
+                  ? "Recording not found or unavailable in this workspace."
+                  : "Select a recording to play."}
               </div>
             )}
           </CardContent>

@@ -153,3 +153,9 @@ Use the Alert policy selector on the SLO Performance tab to chart each policy's 
 On narrow screens, the navigation dropdown includes Data sources and Access control. Existing playground volumes preserve prior SLO definitions. To try the sample policies against an existing stack, review and apply `deploy/playground/sample.slo.yaml` through the YAML editor; startup does not overwrite user definitions.
 
 When updating an existing playground that used the earlier `rule-reloader` service, use the same Compose project and full file/profile selection with `up --build -d --remove-orphans`. This removes its obsolete watcher; native reviewed apply now requests reload directly. Do not run two reload owners for the same directory.
+
+## An SLO says “No SLI data”
+
+The seeded checkout SLO reads `playground_requests_total`. The generic API-availability template uses `http_requests_total`, which the playground application does not export. A healthy query connection cannot supply a metric that does not exist.
+
+Open the SLO's **Source measurements**, browse metric names and inspect the `code` labels. Review and edit its measurement to use the intended fixture if that is the service you want to measure. **Read latest measurements** refreshes the saved selectors immediately; a successful empty result is reported explicitly. Normal background collection continues every 15 seconds. See [reading source measurements](../measurements.md#read-measurements-from-a-data-source) for CLI/API examples and access requirements.

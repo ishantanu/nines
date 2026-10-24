@@ -1,3 +1,4 @@
+import { workspacePath, parseRoute } from "./navigation";
 import { api, type RequestScope } from "./api";
 import type { IntentDocument, IntentPlan, IntentBacktest } from "./intent";
 export type AuthoringScope = {
@@ -76,17 +77,18 @@ export const conversation = (scope: RequestScope, id: string) =>
     scope,
   );
 export function conversationLink(tenant: string, id = "") {
-  return `#/tenants/${encodeURIComponent(tenant)}/intents${id ? "/" + encodeURIComponent(id) : ""}`;
+  return workspacePath(tenant, "intents", id);
 }
 export function conversationFromHash(
-  hash: string,
+  path: string,
   tenant: string,
 ): string | null {
-  const base = conversationLink(tenant);
-  if (hash === base) return "";
-  if (!hash.startsWith(base + "/")) return null;
-  const id = hash.slice(base.length + 1);
-  return /^[a-z0-9][a-z0-9-]{0,62}$/.test(id) ? id : null;
+  const route = parseRoute(path.startsWith("#") ? path.slice(1) : path);
+  return route.kind === "workspace" &&
+    route.tenant === tenant &&
+    route.page === "intents"
+    ? route.id
+    : null;
 }
 export function authoringScope(goal: IntentDocument): AuthoringScope {
   return {

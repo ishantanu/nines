@@ -2,7 +2,6 @@ package model
 
 import (
 	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -215,12 +214,16 @@ type Record struct {
 	Events []AlertEvent // New events produced by this transaction only.
 }
 
+// NewID returns a cryptographically random UUIDv4 for opaque record identifiers.
+// Authentication credentials use their own higher-entropy token generator.
 func NewID() string {
 	var b [16]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		panic(err)
 	}
-	return hex.EncodeToString(b[:])
+	b[6] = b[6]&0x0f | 0x40
+	b[8] = b[8]&0x3f | 0x80
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
 func ConfigRevision(s SLO) int64 {

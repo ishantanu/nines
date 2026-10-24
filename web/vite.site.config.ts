@@ -4,12 +4,13 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { siteNotices } from "./site-notices";
 import { siteBrand } from "./site-brand";
+import { siteDocs } from "./site-docs";
 
 // Relative assets work both at /nines/ on Pages and at a custom domain root.
 export default defineConfig({
   root: fileURLToPath(new URL("./site", import.meta.url)),
   base: "./",
-  plugins: [react(), tailwindcss(), siteNotices(), siteBrand()],
+  plugins: [react(), tailwindcss(), siteNotices(), siteBrand(), siteDocs()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     host: "127.0.0.1",

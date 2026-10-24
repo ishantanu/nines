@@ -1,6 +1,16 @@
 # Product site and logo
 
-The product site is a static React page using the same shadcn/ui button and tabs as the application. The build prerenders HTML for readers and crawlers without JavaScript; hydration enables tabs and copying commands. An `llms.txt` file summarizes resource contracts and agent interfaces. It has no server, sign-in flow, analytics, replay recorder, model integration or API credentials. Product screenshots are represented by a clearly labeled illustration with synthetic values.
+The product site and documentation are static React pages using the same shadcn/ui components as the application. The build prerenders HTML for readers and crawlers without JavaScript; hydration enables tabs and copying commands. An `llms.txt` file summarizes resource contracts and agent interfaces; `llms-full.txt` contains the published guides. It has no server, sign-in flow, analytics, replay recorder, model integration or API credentials. Product screenshots are represented by a clearly labeled illustration with synthetic values.
+
+## Website-hosted documentation
+
+The **Docs** navigation opens `/docs/` on the product website. Guides are organized into Getting started, Define reliability, Work with agents, Deploy and connect, and Operate and contribute. Each page has a grouped sidebar, stable heading anchors, an on-page outline and previous/next links. Small screens use a native expandable chapter menu. Search loads its public index only when used; code blocks support copying after hydration.
+
+The Markdown in `docs/public` and `docs/cli.md` remains the source. The explicit page registry in `web/site/docs/navigation.ts` determines the published guides; it does not scan private documents or the rest of the repository. The build renders Markdown with raw HTML disabled. Links to other published guides stay on the website. Links explicitly labeled **Edit this page on GitHub** open the source for contributors.
+
+An `<!-- example: examples/request-latency.slo.yaml -->` directive includes a canonical public example during rendering. Includes are restricted to YAML/Go inside the public example tree. The same files are available as downloads. This avoids maintaining a second YAML definition in the website source. Add new public guides to the registry and the Markdown directory in the same change.
+
+Every guide is emitted as its own `index.html`, so direct visits and reloads work on GitHub Pages without a server rewrite or JavaScript router. Initial content, navigation, tables, examples and anchors work without JavaScript. Markdown parsing and the guide corpus are not shipped in the interactive browser bundle. The production checker verifies every generated HTML page, internal link, fragment and local asset.
 
 ## Examples
 
@@ -24,13 +34,13 @@ The build goes to `dist/site`, separately from the embedded application UI. All 
 
 ## GitHub Pages
 
-The product site is served at [ishantanu.github.io/nines](https://ishantanu.github.io/nines/) through GitHub Actions. Its [latest verified successful deployment](https://github.com/ishantanu/nines/actions/runs/39783586644) predates the intent evaluation update. New content reaches the live site after merge to `main` and a successful Product site deployment.
+The product site is served at [ishantanu.github.io/nines](https://ishantanu.github.io/nines/) through GitHub Actions. New content reaches the live site after merge to `main` and a successful Product site deployment.
 
 1. Review and publish the curated source export as the repository root. Keep the parent analysis directory, local profiles and historical evidence outside the repository.
 2. Set the repository's default branch to `main`.
 3. In Settings → Pages, select **GitHub Actions** as the build and deployment source.
 4. Review the `github-pages` environment and restrict deployment to `main`.
-5. Push a site change or manually run the **Product site** workflow. Its deploy job uses the verified build artifact and displays the actual deployed URL.
+5. Push a site or published documentation change, or manually run the **Product site** workflow. Its deploy job uses the verified build artifact and displays the actual deployed URL.
 
 Pull requests build and validate the site with read-only repository access. Only `main` deployments receive Pages and OIDC write permissions. The workflow uploads only `dist/site`, never the application build, parent directory, recordings, local configuration or full repository. See [GitHub's workflow documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
 

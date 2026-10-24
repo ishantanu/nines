@@ -1,7 +1,7 @@
 import { Bot, UserRound, Server, ShieldCheck, ArrowRight } from "lucide-react";
 import type { Journey } from "@/lib/api";
 import { stepLayers } from "@/lib/api";
-import { Status } from "./status";
+import { SLIValue } from "./sli-value";
 const actors = {
   agent: Bot,
   user: UserRound,
@@ -63,10 +63,14 @@ export function JourneyMap({
                             {id}
                           </span>
                           <span className="sr-only">Open SLO</span>
-                          <Status
-                            value={
+                          <SLIValue
+                            compact
+                            status={
                               journey.links.find((x) => x.link.id === id)
-                                ?.health ?? "unknown"
+                                ?.status ?? {
+                                reliability: null,
+                                dataStatus: "no_data",
+                              }
                             }
                           />
                         </button>

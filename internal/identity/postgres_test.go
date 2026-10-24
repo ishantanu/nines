@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/url"
 	"testing"
@@ -69,6 +70,22 @@ func testPostgresContract(t *testing.T, db string) {
 	mapped, err := ssoAfter.SessionActor(ctx, ssoToken)
 	if err != nil || mapped.Grants["alpha"] != "editor" || mapped.Grants["beta"] != "viewer" {
 		t.Fatal("federated grants did not survive restart", mapped, err)
+	}
+	// A persisted session cannot carry direct membership across a client change.
+	if err := reopened.Update(ctx, "tenant:alpha", func(tx Tx) error {
+		return ssoAfter.saveMember(tx, "alpha", Member{UserID: mapped.ID, Role: "owner", EffectiveRole: "owner", Version: 1})
+	}); err != nil {
+		t.Fatal(err)
+	}
+	changed := mappingFixture(t, reopened)
+	p := changed.providers["microsoft"]
+	p.config.ClientID = "replacement-app"
+	changed.providers["microsoft"] = p
+	if _, err := changed.SessionActor(ctx, ssoToken); !errors.Is(err, ErrForbidden) {
+		t.Fatal("persisted session crossed audience change", err)
+	}
+	if err := reopened.Update(ctx, "tenant:alpha", func(tx Tx) error { return tx.Delete("grant", mapped.ID, "alpha") }); err != nil {
+		t.Fatal(err)
 	}
 	mappedLogin(t, ssoAfter, "federated-user", evidence(nil, nil))
 	mapped, err = ssoAfter.SessionActor(ctx, ssoToken)

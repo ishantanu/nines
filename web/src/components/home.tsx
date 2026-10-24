@@ -2,6 +2,7 @@ import { Activity, ArrowRight, Database, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Status } from "@/components/status";
+import { SLIValue } from "@/components/sli-value";
 import { healthOf, percent, type Data } from "@/lib/api";
 export function Home({
   data,
@@ -66,7 +67,7 @@ export function Home({
                       remaining
                     </p>
                   </div>
-                  <Status value={healthOf(o.status)} />
+                  <SLIValue status={o.status} target={o.slo.target} />
                 </button>
               ))
             ) : (

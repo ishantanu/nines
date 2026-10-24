@@ -1,3 +1,4 @@
+import { workspacePath, parseRoute } from "./navigation";
 import { api, type RequestScope } from "./api";
 import type { ReplayEvent } from "./replay-capture";
 export type ReplayRef = {
@@ -92,12 +93,13 @@ export const archiveReplay = (s: RequestScope, replay: SessionReplay) =>
   );
 
 export function replayLink(tenant: string, id = "") {
-  return `#/tenants/${encodeURIComponent(tenant)}/replays${id ? "/" + encodeURIComponent(id) : ""}`;
+  return workspacePath(tenant, "replays", id);
 }
-export function replayFromHash(hash: string, tenant: string): string | null {
-  const base = replayLink(tenant);
-  if (hash === base) return "";
-  if (!hash.startsWith(base + "/")) return null;
-  const id = hash.slice(base.length + 1);
-  return /^[a-z0-9][a-z0-9-]{0,62}$/.test(id) ? id : null;
+export function replayFromHash(path: string, tenant: string): string | null {
+  const route = parseRoute(path.startsWith("#") ? path.slice(1) : path);
+  return route.kind === "workspace" &&
+    route.tenant === tenant &&
+    route.page === "replays"
+    ? route.id
+    : null;
 }

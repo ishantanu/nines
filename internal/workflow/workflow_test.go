@@ -346,7 +346,7 @@ func postgres(t *testing.T) (*store.Postgres, workflow.Repository, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	schema := "workflow_test_" + model.NewID()
+	schema := "workflow_test_" + strings.ReplaceAll(model.NewID(), "-", "")
 	if _, err = admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
 		admin.Close()
 		t.Fatal(err)

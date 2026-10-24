@@ -125,15 +125,15 @@ func TestSSOMappingPolicyChangeProviderBindingAndDirectory(t *testing.T) {
 	p.config.ClientID = "another-app"
 	s.providers["microsoft"] = p
 	current, err = s.SessionActor(ctx, token)
-	if err != nil || len(current.Grants) != 0 {
-		t.Fatal("claims crossed client boundary", current, err)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatal("session crossed client boundary", current, err)
 	}
 	p.config.ClientID = "app"
 	p.config.IssuerURL = "https://another.invalid"
 	s.providers["microsoft"] = p
 	current, err = s.SessionActor(ctx, token)
-	if err != nil || len(current.Grants) != 0 {
-		t.Fatal("claims crossed issuer boundary", current, err)
+	if !errors.Is(err, ErrForbidden) {
+		t.Fatal("session crossed issuer boundary", current, err)
 	}
 }
 func TestSSOMappingDirectOwnerAndTeamRemainIndependent(t *testing.T) {

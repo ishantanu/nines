@@ -50,6 +50,7 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 	}
 	output := new(string)
 	pathOut := flags.String("out", "", "write generated YAML to a new file")
+	recent := flags.Bool("recent", false, "collect a bounded recent range using the server clock")
 	from := flags.String("from", "", "range start RFC3339")
 	to := flags.String("to", "", "range end RFC3339")
 	rangeText := flags.String("range", "", "history duration")
@@ -415,12 +416,19 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			method = http.MethodPost
 			path = "/api/connections/" + id + "/test"
 		case "collect":
-			if *from == "" || *to == "" {
-				return fmt.Errorf("collect requires -from and -to RFC3339")
+			if *recent && (*from != "" || *to != "") {
+				return fmt.Errorf("--recent cannot be combined with --from or --to")
+			}
+			if !*recent && (*from == "" || *to == "") {
+				return fmt.Errorf("collect requires --recent or --from and --to RFC3339")
 			}
 			method = http.MethodPost
 			path = "/api/slos/" + id + "/collect"
-			body, _ = json.Marshal(map[string]string{"from": *from, "to": *to})
+			if *recent {
+				body, _ = json.Marshal(map[string]bool{"recent": true})
+			} else {
+				body, _ = json.Marshal(map[string]string{"from": *from, "to": *to})
+			}
 			media = "application/json"
 		case "rules-pause", "rules-resume":
 			if id == "" || *expected < 1 {

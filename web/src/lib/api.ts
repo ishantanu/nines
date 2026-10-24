@@ -63,6 +63,12 @@ export interface Snapshot {
   };
 }
 export interface Objective {
+  collection?: {
+    state: string;
+    points: number;
+    completedAt?: string;
+    sloRevision?: number;
+  };
   measurementHealth?: {
     state: string;
     message: string;

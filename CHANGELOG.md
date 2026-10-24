@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Add direct recent source collection from SLO details and `nines collect --recent`, surface saved collection evidence, and browse bounded metric names/labels in the selected Prometheus or Mimir source. Report empty queries separately from connection errors without rewriting saved measurements.
+
+- Lead SLO views with observed SLI attainment and the SLO target instead of a generic unknown health badge. Show partial-window coverage, no traffic and missing measurements explicitly, with alert state and rule activation kept separate.
+
+- Give the portal canonical `/login` and tenant-scoped page/resource URLs, restore views with browser Back/Forward, prevent late intent-creation responses from overriding navigation, keep deep links reloadable, and reject cross-tenant navigation without replacing it with another tenant's data. Generate UUIDv4 record IDs, keep credentials out of URL/storage return state, exclude credential forms from replay and prevent referrer disclosure.
+
+- Serve product documentation directly from the website with hierarchical chapter navigation, heading links, search, canonical example downloads and static HTML pages for GitHub Pages. Add latency-ratio, critical user journey, intent and MCP guides.
+- Pin browser and linked CLI authentication sessions to their provider identity. Removed providers and changed issuer/client or LDAP identity configuration require sign-in again; secret rotation and live tenant role checks remain independent. Pre-pinning sessions require one new sign-in after upgrade.
+
 - Automatically reconcile saved SLO recording and alert rules through owner-enabled Prometheus, Mimir or operator destinations, with persistent retry/pause controls and separate runtime evidence. The playground enables this flow without manual rule apply.
 
 - SLOs now own structured measurements directly. Portal authoring, intent review, offline rule generation, connected telemetry verification and Kubernetes reconciliation work without creating a separate measurement binding. Measurement edits follow the SLO revision and review lifecycle.

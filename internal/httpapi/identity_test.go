@@ -2,6 +2,8 @@ package httpapi
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -315,6 +317,73 @@ providers:
 	}
 	idp.SetAuthorizationClaims(map[string]any{"groups": []string{"group-engineers"}, "roles": []string{"Reliability.Reader"}})
 	editor, csrf := login()
+	// Exchange a browser-approved CLI grant after the real signed OIDC flow.
+	verifier := base64.RawURLEncoding.EncodeToString(make([]byte, 32))
+	digest := sha256.Sum256([]byte(verifier))
+	challenge := base64.RawURLEncoding.EncodeToString(digest[:])
+	startBody, _ := json.Marshal(map[string]string{"tenant": "alpha", "redirectURI": "http://127.0.0.1:54321/callback", "challenge": challenge, "state": verifier})
+	started := req(editor, "", "", "POST", "/auth/cli/start", string(startBody), 200)
+	var startedFlow struct {
+		URL string `json:"authorizationURL"`
+	}
+	if err := json.Unmarshal(started, &startedFlow); err != nil {
+		t.Fatal(err)
+	}
+	authorization, err := url.Parse(startedFlow.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	page, err := editor.Get(authorization.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pageBody, _ := io.ReadAll(page.Body)
+	_ = page.Body.Close()
+	for _, visible := range []string{public, "alpha", "editor", "http://127.0.0.1:54321/callback"} {
+		if !strings.Contains(string(pageBody), visible) {
+			t.Fatal("authorization page omitted scope", visible)
+		}
+	}
+	approval, err := editor.PostForm(public+"/auth/cli/approve", url.Values{"request": {authorization.Query().Get("request")}, "csrf": {csrf}, "decision": {"approve"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = approval.Body.Close()
+	if approval.StatusCode != 303 {
+		t.Fatal("CLI approval failed", approval.StatusCode)
+	}
+	callback, err := url.Parse(approval.Header.Get("Location"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	exchange, _ := json.Marshal(map[string]string{"code": callback.Query().Get("code"), "codeVerifier": verifier, "redirectURI": "http://127.0.0.1:54321/callback"})
+	exchanged := req(server.Client(), "", "", "POST", "/auth/cli/exchange", string(exchange), 200)
+	var credential struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(exchanged, &credential); err != nil || credential.Token == "" {
+		t.Fatal("CLI exchange failed", err)
+	}
+	cliRequest := func(tenant, path string, want int) {
+		t.Helper()
+		request, err := http.NewRequest("GET", public+path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Header.Set("Authorization", "Bearer "+credential.Token)
+		request.Header.Set("X-Nines-Tenant", tenant)
+		response, err := server.Client().Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = response.Body.Close() }()
+		if response.StatusCode != want {
+			t.Fatalf("CLI %s %s: %d want %d", tenant, path, response.StatusCode, want)
+		}
+	}
+	cliRequest("alpha", "/api/slos", 200)
+	cliRequest("alpha", "/api/team-access", 403)
+	cliRequest("beta", "/api/slos", 403)
 	req(editor, "", "alpha", "GET", "/api/slos", "", 200)
 	req(editor, "", "beta", "GET", "/api/slos", "", 200)
 	req(editor, "", "alpha", "GET", "/api/team-access", "", 403)
@@ -329,10 +398,12 @@ providers:
 	// A mapped owner passes both the HTTP role gate and transactional owner check.
 	req(owner, "", "alpha", "POST", "/api/team-access/members", `{"provider":"company","subject":"bob","role":"viewer","expectedVersion":0}`, 403)
 	req(owner, ownerCSRF, "alpha", "POST", "/api/team-access/members", `{"provider":"company","subject":"bob","role":"viewer","expectedVersion":0}`, 200)
+	cliRequest("alpha", "/api/team-access", 200)
 	// New claims replace the user's previous evidence for every existing session.
 	req(editor, "", "beta", "GET", "/api/slos", "", 403)
 	idp.SetAuthorizationClaims(map[string]any{})
 	login()
 	req(owner, "", "alpha", "GET", "/api/team-access", "", 403)
 	req(editor, "", "alpha", "GET", "/api/slos", "", 403)
+	cliRequest("alpha", "/api/slos", 401)
 }

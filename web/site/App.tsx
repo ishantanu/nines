@@ -12,10 +12,10 @@ import journey from "../../examples/checkout.journey.yaml?raw";
 import latency from "../../examples/request-latency.slo.yaml?raw";
 import intent from "../../examples/api-success.intent.yaml?raw";
 import { examples } from "./examples";
+import { documentationLink } from "./docs/navigation";
 
 const logo = "./nines.svg";
 const repo = "https://github.com/ishantanu/nines";
-const docs = `${repo}/blob/main/docs`;
 const start =
   "git clone https://github.com/ishantanu/nines.git\ncd nines\ngo run ./cmd/server -demo";
 
@@ -182,7 +182,7 @@ export function App() {
             <a href="#as-code">As code</a>
             <a href="#examples">Examples</a>
             <a href="#agents">For agents</a>
-            <a href={`${docs}/public/deployment.md`}>Docs</a>
+            <a href={"./docs/"}>Docs</a>
           </nav>
           <Button asChild variant="outline" size="sm">
             <a href={repo}>GitHub</a>
@@ -329,10 +329,7 @@ export function App() {
               <strong>Independent operator.</strong> Apply GitOps resources
               directly without the Nines server, database or a model. Standalone
               operator resources are not imported into the portal.{" "}
-              <a
-                className="text-link"
-                href={`${docs}/public/deployment/operator.md`}
-              >
+              <a className="text-link" href={"./docs/deployment/operator/"}>
                 Read the operator guide{" "}
                 <ArrowRight size={15} aria-hidden="true" />
               </a>
@@ -373,8 +370,8 @@ export function App() {
                   <dd>Plan before applying. Check the expected revision.</dd>
                 </div>
               </dl>
-              <a className="text-link" href={`${repo}/tree/main/examples`}>
-                Browse example definitions{" "}
+              <a className="text-link" href={"./docs/measurements/"}>
+                Explore SLO definitions{" "}
                 <ArrowRight size={15} aria-hidden="true" />
               </a>
             </div>
@@ -468,7 +465,7 @@ export function App() {
                   <p className="example-note">{example.note}</p>
                   <a
                     className="text-link"
-                    href={`${repo}/blob/main/${example.path}`}
+                    href={documentationLink(example.path)}
                   >
                     {example.link} <ArrowRight size={15} aria-hidden="true" />
                   </a>
@@ -542,23 +539,17 @@ export function App() {
                   </p>
                 </div>
               </article>
-              <a
-                className="text-link"
-                href={`${docs}/public/intent-evaluations.md`}
-              >
+              <a className="text-link" href={"./docs/intent-evaluations/"}>
                 Evaluate intent workflows and model support{" "}
                 <ArrowRight size={15} aria-hidden="true" />
               </a>
-              <a
-                className="text-link"
-                href={`${docs}/public/intent-governance.md`}
-              >
+              <a className="text-link" href={"./docs/intent-governance/"}>
                 Recommendation review, audit and rollback{" "}
                 <ArrowRight size={15} aria-hidden="true" />
               </a>
               <a
                 className="text-link"
-                href={`${docs}/cli.md#scripts-and-llm-skills`}
+                href={"./docs/cli/#scripts-and-llm-skills"}
               >
                 Read the CLI and skills guide{" "}
                 <ArrowRight size={15} aria-hidden="true" />
@@ -653,13 +644,13 @@ export function App() {
             <a href={`${repo}/releases`}>
               Alpha downloads <ArrowRight size={16} aria-hidden="true" />
             </a>
-            <a href={`${docs}/public/release.md`}>
+            <a href={"./docs/release/"}>
               Release checklist <ArrowRight size={16} aria-hidden="true" />
             </a>
-            <a href={`${docs}/public/operations.md`}>
+            <a href={"./docs/operations/"}>
               Operational limits <ArrowRight size={16} aria-hidden="true" />
             </a>
-            <a href={`${docs}/public/experimental.md`}>
+            <a href={"./docs/experimental/"}>
               Experimental features <ArrowRight size={16} aria-hidden="true" />
             </a>
           </div>

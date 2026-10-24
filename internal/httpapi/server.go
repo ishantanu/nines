@@ -161,6 +161,7 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
 		defer func() {
 			if x := recover(); x != nil {
 				log.ErrorContext(r.Context(), "request panic", "error", x)
@@ -294,8 +295,9 @@ func (a *Server) ingest(w http.ResponseWriter, r *http.Request) {
 }
 func (a *Server) collect(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		From time.Time `json:"from"`
-		To   time.Time `json:"to"`
+		Recent bool      `json:"recent"`
+		From   time.Time `json:"from"`
+		To     time.Time `json:"to"`
 	}
 	if err := decode(w, r, &body); err != nil {
 		a.fail(w, r, err)
@@ -303,7 +305,17 @@ func (a *Server) collect(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
-	count, err := a.Service.Collect(ctx, r.PathValue("id"), body.From, body.To)
+	if body.Recent && (!body.From.IsZero() || !body.To.IsZero()) {
+		a.fail(w, r, model.Invalid("recent cannot be combined with from or to"))
+		return
+	}
+	var count int
+	var err error
+	if body.Recent {
+		count, err = a.Service.CollectRecent(ctx, r.PathValue("id"))
+	} else {
+		count, err = a.Service.Collect(ctx, r.PathValue("id"), body.From, body.To)
+	}
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "collection failed:") {
 			a.Log.ErrorContext(r.Context(), "source collection failed", "slo", r.PathValue("id"), "error", err)

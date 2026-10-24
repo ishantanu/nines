@@ -1,16 +1,22 @@
-import { healthOf, percent, type Snapshot } from "@/lib/api";
+import { percent, type Snapshot } from "@/lib/api";
 
 export function SLOHealthNotice({ status }: { status: Snapshot }) {
-  if (healthOf(status) !== "unknown") return null;
-  const reason =
-    status.dataStatus === "no_traffic"
-      ? "Measurements contain no traffic, so attainment cannot be calculated. Check the denominator and selected population."
-      : status.coverage < 1
-        ? `Measurement coverage is ${percent(status.coverage, 1)} of the selected SLO window. Collect or backfill the missing intervals and check sample freshness. Displayed ratios use the available measurements.`
-        : "No usable attainment measurement is available for the selected window. Check the query source and collection evidence.";
+  if (status.reliability !== null && status.coverage >= 1) return null;
+  const noTraffic = status.dataStatus === "no_traffic";
+  const measured = status.reliability !== null;
+  const title = noTraffic
+    ? "No traffic. "
+    : measured
+      ? "Partial measurement window. "
+      : "No SLI data. ";
+  const reason = noTraffic
+    ? "Measurements contain no traffic, so attainment cannot be calculated. Check the denominator and selected population."
+    : measured
+      ? `SLI attainment is calculated from the available measurements, covering ${percent(status.coverage, 3)} of the selected SLO window. This is not yet a full-window compliance result. Collect or backfill missing intervals and check sample freshness.`
+      : "No usable attainment measurement is available for the selected window. Check the data source, queries and collection evidence.";
   return (
     <p role="status" className="rounded-md border p-4 text-sm leading-6">
-      <span className="font-medium">SLO health is unknown. </span>
+      <span className="font-medium">{title}</span>
       {reason} Rule activation is verified separately above.
     </p>
   );

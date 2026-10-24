@@ -1,3 +1,4 @@
+import { SLIValue } from "@/components/sli-value";
 import { useEffect, useId, useState } from "react";
 import { stringify } from "yaml";
 import { RefreshCw } from "lucide-react";
@@ -364,12 +365,7 @@ export function DependencyMaps({
                               {o.displayName}
                             </Button>
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <Status value={o.health} />
-                              <span className="text-xs tabular-nums">
-                                {o.reliability === null
-                                  ? "No measurement"
-                                  : `${(o.reliability * 100).toFixed(3)}% / ${(o.target * 100).toFixed(3)}% target`}
-                              </span>
+                              <SLIValue status={o} target={o.target} />
                             </div>
                             <p className="text-xs text-muted-foreground">
                               {o.dataStatus} · {o.freshness} · revision{" "}

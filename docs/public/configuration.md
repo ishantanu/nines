@@ -18,6 +18,8 @@ Owners administer tenant access and deployment. Editors can change definitions; 
 
 ## Identity and CLI login
 
+The browser sign-in page is `/login`. Workspace pages use `/tenants/<tenant>/<page>` and can be bookmarked or reloaded. See [portal URLs and browser sessions](deployment/identity-and-tenants.md#portal-urls-and-browser-sessions) for reverse-proxy paths, safe sign-in return handling and credential storage.
+
 Set `AUTH_CONFIG_FILE` or `-auth-file` using `examples/auth.yaml`. Use HTTPS for `publicURL` outside loopback. OIDC providers use discovery, signed ID tokens, state, nonce and PKCE. LDAP supports configured TLS/StartTLS trust. `examples/auth-entra.yaml` shows Microsoft Entra ID OIDC and explicit group/app-role mapping. Native SAML, SCIM and directory synchronization are not implemented; a SAML upstream needs an OIDC broker.
 
 Authentication alone grants no tenant access. Direct membership, teams and current verified SSO evidence determine the role on each request. OIDC claim freshness limits bound stale upstream grants; this is not continuous access evaluation. Configure a recovery owner and keep provider IDs stable.
