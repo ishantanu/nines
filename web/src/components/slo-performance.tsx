@@ -1,3 +1,4 @@
+import { ReplayLabel } from "@/components/replay-label";
 import { useEffect, useRef, useState } from "react";
 import { api, message, percent, type RequestScope, type SLO } from "@/lib/api";
 import { duration, type HistoryPoint, type SLOHistory } from "@/lib/history";
@@ -112,7 +113,9 @@ export function Timeline({
   return (
     <Card className="chart-panel gap-0 py-0">
       <CardHeader>
-        <h3 className="text-sm font-semibold">{title}</h3>
+        <h3 className="text-sm font-semibold">
+          <ReplayLabel>{title}</ReplayLabel>
+        </h3>
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
           {lines.map((l) => (
             <span key={l.name} className="inline-flex items-center gap-1.5">
@@ -122,7 +125,7 @@ export function Timeline({
                   borderTop: `2px ${l.dashed ? "dashed" : "solid"} ${l.color}`,
                 }}
               />
-              {l.name}
+              <ReplayLabel>{l.name}</ReplayLabel>
             </span>
           ))}
           <span className="inline-flex items-center gap-1.5">
@@ -382,7 +385,9 @@ export function SLOPerformance({
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <Label htmlFor="chart-range">Time range</Label>
+          <Label htmlFor="chart-range">
+            <ReplayLabel>Time range</ReplayLabel>
+          </Label>
           <select
             id="chart-range"
             className="mt-1 block h-9 rounded-md border bg-white px-3 text-sm"
@@ -415,7 +420,9 @@ export function SLOPerformance({
         </div>
         {slo.policies?.length ? (
           <div>
-            <Label htmlFor="chart-policy">Alert policy</Label>
+            <Label htmlFor="chart-policy">
+              <ReplayLabel>Alert policy</ReplayLabel>
+            </Label>
             <select
               id="chart-policy"
               className="mt-1 block h-9 rounded-md border bg-background px-3 text-sm"
@@ -431,7 +438,9 @@ export function SLOPerformance({
           </div>
         ) : null}
         <div>
-          <Label htmlFor="chart-resolution">Resolution</Label>
+          <Label htmlFor="chart-resolution">
+            <ReplayLabel>Resolution</ReplayLabel>
+          </Label>
           <select
             id="chart-resolution"
             className="mt-1 block h-9 rounded-md border bg-white px-3 text-sm"
@@ -462,7 +471,9 @@ export function SLOPerformance({
       {custom ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <Label htmlFor="chart-from">From (local time)</Label>
+            <Label htmlFor="chart-from">
+              <ReplayLabel>From (local time)</ReplayLabel>
+            </Label>
             <Input
               id="chart-from"
               type="datetime-local"
@@ -472,7 +483,9 @@ export function SLOPerformance({
             />
           </div>
           <div>
-            <Label htmlFor="chart-to">To (local time)</Label>
+            <Label htmlFor="chart-to">
+              <ReplayLabel>To (local time)</ReplayLabel>
+            </Label>
             <Input
               id="chart-to"
               type="datetime-local"
@@ -557,7 +570,9 @@ export function SLOPerformance({
             ) : (
               <Card className="chart-panel gap-0 py-0">
                 <CardHeader>
-                  <h3 className="section-label">Burn rate</h3>
+                  <h3 className="section-label">
+                    <ReplayLabel>Burn rate</ReplayLabel>
+                  </h3>
                 </CardHeader>
                 <CardContent className="empty-state">
                   No burn-rate alert policy configured.
@@ -567,7 +582,9 @@ export function SLOPerformance({
             {point ? (
               <Card className="chart-panel gap-0 py-0">
                 <CardHeader>
-                  <h3 className="section-label">Selected interval</h3>
+                  <h3 className="section-label">
+                    <ReplayLabel>Selected interval</ReplayLabel>
+                  </h3>
                   <p className="text-xs text-muted-foreground">
                     Move across a chart or use the arrow keys.
                   </p>
@@ -635,10 +652,18 @@ export function SLOPerformance({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Condition</TableHead>
-                      <TableHead>From</TableHead>
-                      <TableHead>To</TableHead>
-                      <TableHead>Buckets</TableHead>
+                      <TableHead>
+                        <ReplayLabel>Condition</ReplayLabel>
+                      </TableHead>
+                      <TableHead>
+                        <ReplayLabel>From</ReplayLabel>
+                      </TableHead>
+                      <TableHead>
+                        <ReplayLabel>To</ReplayLabel>
+                      </TableHead>
+                      <TableHead>
+                        <ReplayLabel>Buckets</ReplayLabel>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

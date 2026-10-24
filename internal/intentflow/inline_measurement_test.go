@@ -85,7 +85,7 @@ func TestInlineIntentHumanConfirmationApplyAndRollback(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			v, e = s.ApplyChangeSet(ctx, v.ID, reviewInput(v, v.ChangeSet.Digest, ""))
+			v, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, reviewInput(v, v.ChangeSet.Digest, ""))
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -101,7 +101,7 @@ func TestInlineIntentHumanConfirmationApplyAndRollback(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			v, e = s.ReviewRollback(ctx, v.ID, reviewInput(v, v.ChangeSet.Rollback.Digest, ""), true)
+			v, e = s.ReviewRollback(independentApplier(ctx), v.ID, reviewInput(v, v.ChangeSet.Rollback.Digest, ""), true)
 			if e != nil {
 				t.Fatal(e)
 			}

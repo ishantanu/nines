@@ -10,6 +10,7 @@ import (
 	"unicode/utf8"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/auditarchive"
 	"github.com/ishantanu/nines/internal/model"
 	rm "github.com/ishantanu/nines/internal/reviewmodel"
 	"github.com/ishantanu/nines/internal/service"
@@ -19,6 +20,7 @@ import (
 var identifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 type Service struct {
+	Archive    *auditarchive.Worker
 	Platform   *service.Service
 	Repository Repository
 	Model      rm.Model

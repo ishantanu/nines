@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ishantanu/nines/internal/auditarchive"
 	"github.com/ishantanu/nines/internal/datasources"
 	"github.com/ishantanu/nines/internal/identity"
 
@@ -324,6 +325,18 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 		}
 
 		runtime := tenantRuntime{ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !identityEnabled, Workflows: wf}, Repository: repository, Webhook: t.Webhook}
+		if t.Config.AuditArchive != nil {
+			if memory && !demo {
+				runtime.Close()
+				return fail(fmt.Errorf("tenant %s auditArchive requires durable PostgreSQL storage outside demo mode", t.Config.ID))
+			}
+			sink, e := auditarchive.NewS3(ctx, *t.Config.AuditArchive)
+			if e != nil {
+				runtime.Close()
+				return fail(fmt.Errorf("tenant %s audit archive initialization failed: %w", t.Config.ID, e))
+			}
+			runtime.Workspace.IntentConversations.Archive = &auditarchive.Worker{Tenant: t.Config.ID, Config: *t.Config.AuditArchive, Repository: intentRepo, Sink: sink}
+		}
 		svc.RuleManager = runtime.Workspace.Rules
 		if managed != nil {
 			runtime.Workspace.Rules.DynamicTarget = managed.Target

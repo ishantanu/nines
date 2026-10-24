@@ -252,11 +252,12 @@ func reviewAndApply(ctx context.Context, flow *intentflow.Service, value v1.Inte
 		return failed("change_set_prepare_failed")
 	}
 	agent := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "evaluation", Role: "agent", Subject: "fixture-agent", Kind: "api_token"})
-	request := v1.ReviewIntentChangeSet{ExpectedVersion: value.Version, Digest: value.ChangeSet.Digest, Confirm: true}
+	request := v1.ReviewIntentChangeSet{ExpectedVersion: value.Version, Digest: value.ChangeSet.Digest, Confirm: true, Reason: "Reviewed the fixture goal, population and preparation evidence."}
+	applier := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "evaluation", Role: "editor", Subject: "fixture-applier", Kind: "user"})
 	if _, err := flow.ApproveChangeSet(agent, value.ID, request); !errors.Is(err, intentflow.ErrForbidden) {
 		return failed("agent_approved_change_set")
 	}
-	if _, err := flow.ApplyChangeSet(ctx, value.ID, request); err == nil {
+	if _, err := flow.ApplyChangeSet(applier, value.ID, request); err == nil {
 		return failed("unapproved_apply_succeeded")
 	}
 	value, err = flow.ApproveChangeSet(ctx, value.ID, request)
@@ -278,7 +279,7 @@ func reviewAndApply(ctx context.Context, flow *intentflow.Service, value v1.Inte
 		if c.Interference == "source" {
 			flow.Platform.Collector.(*workflowTelemetry).Route = "changed-mimir-organization"
 		}
-		if _, err := flow.ApplyChangeSet(ctx, value.ID, request); !errors.Is(err, intentflow.ErrConflict) && !errors.Is(err, model.ErrRevisionConflict) {
+		if _, err := flow.ApplyChangeSet(applier, value.ID, request); !errors.Is(err, intentflow.ErrConflict) && !errors.Is(err, model.ErrRevisionConflict) {
 			return failed("stale_approval_applied")
 		}
 		if _, err := flow.Platform.Store.Read(ctx, value.Scope.Metadata.Name); !errors.Is(err, model.ErrNotFound) {
@@ -292,7 +293,7 @@ func reviewAndApply(ctx context.Context, flow *intentflow.Service, value v1.Inte
 		var dropped atomic.Bool
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			recorder := httptest.NewRecorder()
-			mux.ServeHTTP(recorder, r.WithContext(ctx))
+			mux.ServeHTTP(recorder, r.WithContext(applier))
 			if recorder.Code == 200 && !dropped.Swap(true) {
 				conn, _, err := w.(http.Hijacker).Hijack()
 				if err == nil {
@@ -322,7 +323,7 @@ func reviewAndApply(ctx context.Context, flow *intentflow.Service, value v1.Inte
 			return failed("ambiguous_apply_readback_failed")
 		}
 	} else {
-		value, err = flow.ApplyChangeSet(ctx, value.ID, request)
+		value, err = flow.ApplyChangeSet(applier, value.ID, request)
 		if err != nil {
 			return failed("reviewed_apply_failed")
 		}
@@ -330,7 +331,7 @@ func reviewAndApply(ctx context.Context, flow *intentflow.Service, value v1.Inte
 	if value.ChangeSet == nil || value.ChangeSet.State != "applied" || len(value.ChangeSet.Applied) != 2 || value.ChangeSet.AppliedAt == nil {
 		return failed("missing_apply_receipt")
 	}
-	retry, err := flow.ApplyChangeSet(ctx, value.ID, request)
+	retry, err := flow.ApplyChangeSet(applier, value.ID, request)
 	if err != nil || model.DefinitionDigest(retry.ChangeSet) != model.DefinitionDigest(value.ChangeSet) {
 		return failed("apply_retry_changed_receipt")
 	}

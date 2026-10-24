@@ -269,8 +269,89 @@ func TestSVGAndDisclosureStateSurviveWithoutActiveReferences(t *testing.T) {
 		t.Fatal(string(b))
 	}
 	count := 0
-	n, err := node(map[string]any{"type": float64(2), "id": float64(2), "tagName": "svg", "isSVG": true, "attributes": attrs, "childNodes": []any{}}, 0, &count, false)
+	n, err := node(map[string]any{"type": float64(2), "id": float64(2), "tagName": "svg", "isSVG": true, "attributes": attrs, "childNodes": []any{}}, 0, &count, false, nil, "")
 	if err != nil || n["tagName"] != "svg" || n["isSVG"] != true {
 		t.Fatal(n, err)
+	}
+}
+
+func TestCSSMaskingPreservesLayoutDeclarations(t *testing.T) {
+	style := `display:flex;justify-content:center;align-content:stretch;--tw-content:"secret; token";content:"secret; text";color:red`
+	clean := cleanCSS(style)
+	for _, declaration := range []string{"justify-content:center", "align-content:stretch", "color:red"} {
+		if !strings.Contains(clean, declaration) {
+			t.Fatalf("CSS masking corrupted layout declaration %q: %s", declaration, clean)
+		}
+	}
+	if strings.Contains(clean, "secret") || strings.Contains(clean, "--tw-;") {
+		t.Fatalf("CSS content was not safely removed: %s", clean)
+	}
+}
+
+func TestReplayReadIdentityIntegrityAndPhysicalRetention(t *testing.T) {
+	modes(t, func(t *testing.T, pg bool) {
+		s, ctx, _ := fixture(t, pg)
+		in := recording()
+		created, err := s.Create(ctx, in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, principal := range []tenancy.Principal{
+			{TenantID: "beta", Role: "owner", Subject: "owner-1"},
+			{TenantID: "alpha", Role: "viewer"},
+			{TenantID: "alpha", Role: "unknown", Subject: "other"},
+		} {
+			other := tenancy.WithPrincipal(ctx, principal)
+			if _, err := s.Events(other, created.ID); !errors.Is(err, ErrNotFound) {
+				t.Fatal("unauthorized event read", err)
+			}
+			if _, err := s.List(other, "", "", false); !errors.Is(err, ErrNotFound) {
+				t.Fatal("unauthorized list", err)
+			}
+		}
+		otherUser := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "alpha", Role: "viewer", Subject: "another-user", Kind: "user"})
+		if _, err := s.Events(otherUser, created.ID); err != nil {
+			t.Fatal("authorized same-tenant viewer could not inspect", err)
+		}
+		if _, err := s.Create(otherUser, in); err == nil {
+			t.Fatal("viewer ingested replay")
+		}
+		if _, err := s.Repository.Update(ctx, created.ID, func(r *record) error {
+			r.Events[0] = json.RawMessage(`{"type":4,"timestamp":1,"data":{"href":"/tampered"}}`)
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Events(ctx, created.ID); !errors.Is(err, ErrCorrupt) {
+			t.Fatal("corrupted stored events returned", err)
+		}
+		if _, err := s.Repository.Update(ctx, created.ID, func(r *record) error { r.Meta.ExpiresAt = time.Now().Add(-time.Second); return nil }); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.Repository.Prune(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if pg {
+			var count int
+			if err := s.Repository.(*postgres).pool.QueryRow(ctx, "SELECT count(*) FROM browser_session_replays WHERE id=$1", created.ID).Scan(&count); err != nil || count != 0 {
+				t.Fatal("expired payload still stored", count, err)
+			}
+		} else if _, exists := s.Repository.(*memory).values[created.ID]; exists {
+			t.Fatal("expired memory payload retained")
+		}
+	})
+}
+
+func TestPrivateReplaySubtreesAreExcludedOnServer(t *testing.T) {
+	for _, marker := range []string{"data-private", "data-replay-block"} {
+		count := 0
+		clean, err := node(map[string]any{"type": float64(2), "id": float64(2), "tagName": "section", "attributes": map[string]any{marker: "", "class": "private-sentinel"}, "childNodes": []any{map[string]any{"type": float64(3), "id": float64(3), "textContent": "private-sentinel"}}}, 0, &count, false, nil, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload, _ := json.Marshal(clean)
+		if strings.Contains(string(payload), "sentinel") || strings.Contains(string(payload), "textContent") {
+			t.Fatal("private subtree retained", string(payload))
+		}
 	}
 }

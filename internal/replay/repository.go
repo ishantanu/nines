@@ -11,6 +11,7 @@ import (
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 )
 
+var ErrCorrupt = errors.New("session replay integrity check failed")
 var ErrNotFound = errors.New("session replay not found")
 var ErrConflict = errors.New("session replay version or request conflicts")
 var ErrLimit = errors.New("tenant replay capacity reached; recordings expire after seven days")

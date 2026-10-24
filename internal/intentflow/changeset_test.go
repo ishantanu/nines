@@ -127,12 +127,12 @@ func TestReviewedChangesAtomicApplyRetryAndDrift(t *testing.T) {
 			if j.Revision != 1 {
 				t.Fatal("planning changed CUJ")
 			}
-			approve := v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true}
+			approve := v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."}
 			agent := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "alpha", Role: "agent", Subject: "agent", Kind: "api_token"})
 			if _, e = s.ApproveChangeSet(agent, v.ID, approve); !errors.Is(e, ErrForbidden) {
 				t.Fatal("agent approved", e)
 			}
-			if _, e = s.ApplyChangeSet(ctx, v.ID, approve); !errors.Is(e, ErrConflict) {
+			if _, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, approve); !errors.Is(e, ErrConflict) {
 				t.Fatal("unapproved apply", e)
 			}
 			v, e = s.ApproveChangeSet(ctx, v.ID, approve)
@@ -142,11 +142,11 @@ func TestReviewedChangesAtomicApplyRetryAndDrift(t *testing.T) {
 			if _, e = s.Platform.Store.Read(ctx, "intent-created"); !errors.Is(e, model.ErrNotFound) {
 				t.Fatal("approval wrote SLO", e)
 			}
-			apply := v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true}
+			apply := v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."}
 			if _, e = s.ApplyChangeSet(agent, v.ID, apply); !errors.Is(e, ErrForbidden) {
 				t.Fatal("agent applied", e)
 			}
-			v, e = s.ApplyChangeSet(ctx, v.ID, apply)
+			v, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, apply)
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -165,7 +165,7 @@ func TestReviewedChangesAtomicApplyRetryAndDrift(t *testing.T) {
 			if verified.Resources[0].Health != "unknown" {
 				t.Fatal("new SLO claimed healthy")
 			}
-			again, e := s.ApplyChangeSet(ctx, v.ID, apply)
+			again, e := s.ApplyChangeSet(independentApplier(ctx), v.ID, apply)
 			if e != nil || again.Version != v.Version {
 				t.Fatal("retry not idempotent", e)
 			}
@@ -185,7 +185,7 @@ func TestReviewedChangesAtomicApplyRetryAndDrift(t *testing.T) {
 			if e != nil || verified.Resources[0].State != "drifted" {
 				t.Fatal(verified, e)
 			}
-			if _, e = s.ApplyChangeSet(ctx, v.ID, apply); e != nil {
+			if _, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, apply); e != nil {
 				t.Fatal(e)
 			}
 			now, _ := s.Platform.Store.Read(ctx, "intent-created")
@@ -203,7 +203,7 @@ func TestChangesRollbackAndApprovalInvalidation(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			v, e = s.ApproveChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true})
+			v, e = s.ApproveChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."})
 			if e != nil {
 				t.Fatal(e)
 			}
@@ -213,7 +213,7 @@ func TestChangesRollbackAndApprovalInvalidation(t *testing.T) {
 			if _, e = s.Platform.Journeys.ApplyJourney(ctx, j, 1); e != nil {
 				t.Fatal(e)
 			}
-			if _, e = s.ApplyChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true}); !errors.Is(e, model.ErrRevisionConflict) {
+			if _, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."}); !errors.Is(e, model.ErrRevisionConflict) {
 				t.Fatal("stale CUJ applied", e)
 			}
 			if _, e = s.Platform.Store.Read(ctx, "intent-created"); !errors.Is(e, model.ErrNotFound) {
@@ -227,7 +227,7 @@ func TestChangesRollbackAndApprovalInvalidation(t *testing.T) {
 			if v.ChangeSet != nil || len(v.ChangeSetHistory) != 1 || v.ChangeSetHistory[0].Digest != old {
 				t.Fatal("approval history lost", v)
 			}
-			if _, e = s.ApplyChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: old, Confirm: true}); !errors.Is(e, ErrConflict) {
+			if _, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: old, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."}); !errors.Is(e, ErrConflict) {
 				t.Fatal("invalidated approval applied", e)
 			}
 		})
@@ -259,14 +259,14 @@ func TestApplyRecoversAfterConversationCommitFailure(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			v, e = s.ApproveChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true})
+			v, e = s.ApproveChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."})
 			if e != nil {
 				t.Fatal(e)
 			}
-			in := v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true}
+			in := v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."}
 			original := s.Repository
 			s.Repository = &failConversationCommit{Repository: original, fail: true}
-			if _, e = s.ApplyChangeSet(ctx, v.ID, in); e == nil {
+			if _, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, in); e == nil {
 				t.Fatal("failure not simulated")
 			}
 			if _, e = s.Platform.Store.Read(ctx, "intent-created"); e != nil {
@@ -283,7 +283,7 @@ func TestApplyRecoversAfterConversationCommitFailure(t *testing.T) {
 			if e != nil || v.ChangeSet.State != "applied" {
 				t.Fatal(v.ChangeSet, e)
 			}
-			if v.ChangeSet.AppliedBy == nil || v.ChangeSet.AppliedBy.Subject != "owner" {
+			if v.ChangeSet.AppliedBy == nil || v.ChangeSet.AppliedBy.Subject != "release-engineer" {
 				t.Fatal("original applying identity was lost", v.ChangeSet.AppliedBy)
 			}
 			history, e := s.Platform.Journeys.JourneyHistory(ctx, "checkout")
@@ -300,12 +300,12 @@ func TestConfiguredSourceChangeInvalidatesPendingReview(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	v, e = s.ApproveChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true})
+	v, e = s.ApproveChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."})
 	if e != nil {
 		t.Fatal(e)
 	}
 	s.Platform.Collector.(*testtelemetry.Source).Route = "another-dataset"
-	if _, e = s.ApplyChangeSet(ctx, v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true}); !errors.Is(e, ErrConflict) && !errors.Is(e, model.ErrRevisionConflict) {
+	if _, e = s.ApplyChangeSet(independentApplier(ctx), v.ID, v1.ReviewIntentChangeSet{ExpectedVersion: v.Version, Digest: v.ChangeSet.Digest, Confirm: true, Reason: "Reviewed fixture measurement, target and recorded evidence."}); !errors.Is(e, ErrConflict) && !errors.Is(e, model.ErrRevisionConflict) {
 		t.Fatal("changed source accepted", e)
 	}
 	if _, e = s.Platform.Store.Read(ctx, "intent-created"); !errors.Is(e, model.ErrNotFound) {

@@ -1,3 +1,5 @@
+import { ReplayLabel } from "@/components/replay-label";
+import { replayPolicy } from "@/lib/replay-labels";
 import { useResourceRoute } from "@/lib/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Play, RefreshCw, Archive, Link2, Download } from "lucide-react";
@@ -13,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { message, type RequestScope } from "@/lib/api";
+import { validateReplayEvents } from "@/lib/replay-validation";
 import { downloadReplay } from "@/lib/replay-download";
 import { MaskedReplayCapture } from "@/lib/replay-capture";
 import {
@@ -51,6 +54,7 @@ function ReplayPlayer({
           value.events.length > 2000
         )
           throw Error("Replay scope or digest mismatch");
+        validateReplayEvents(value.events);
         if (current) setData(value);
       })
       .catch((e) => {
@@ -68,10 +72,28 @@ function ReplayPlayer({
         e.data?.type === "nines-replay-ready"
       )
         setReady(true);
+      if (
+        e.source === frame.current?.contentWindow &&
+        e.origin === window.location.origin &&
+        e.data?.type === "nines-replay-state" &&
+        e.data.state === "error"
+      )
+        setError("This recording could not be played.");
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
   }, []);
+  useEffect(() => {
+    if (ready || error) return;
+    const timer = setTimeout(
+      () =>
+        setError(
+          "The replay player could not initialize. Reload the recording to retry.",
+        ),
+      10000,
+    );
+    return () => clearTimeout(timer);
+  }, [ready, error]);
   useEffect(() => {
     if (ready && data)
       frame.current?.contentWindow?.postMessage(
@@ -91,7 +113,7 @@ function ReplayPlayer({
       ) : (
         <>
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b p-2 text-xs">
-            <span>Recorded page · text and inputs masked</span>
+            <span>Recorded page · private data masked</span>
             <Button
               size="sm"
               variant="outline"
@@ -123,7 +145,7 @@ function ReplayPlayer({
             title="Session replay player"
             src="/replay-player.html"
             sandbox="allow-scripts allow-same-origin"
-            onLoad={() => setReady(true)}
+            onError={() => setError("The replay player could not load.")}
             className="h-[clamp(20rem,48dvh,40rem)] w-full shrink-0 rounded-md border-0"
           />
           {!data ? (
@@ -174,7 +196,7 @@ function ReplayLinks({
   return (
     <details className="shrink-0 rounded-md border p-3 text-xs">
       <summary className="cursor-pointer font-medium">
-        Edit resource links
+        <ReplayLabel>Edit resource links</ReplayLabel>
       </summary>
       <p className="mt-3 text-muted-foreground">
         Link up to ten resources or stored firing alerts. Links are
@@ -241,6 +263,13 @@ export function SessionReplays({
   const [consent, setConsent] = useState(false);
   const [title, setTitle] = useState("");
   const [pendingID, setPendingID] = useState<string | null>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const writable = scope.role !== "viewer";
   const owner = scope.role === "owner";
   useEffect(() => {
@@ -248,7 +277,10 @@ export function SessionReplays({
     setLoading(true);
     listReplays(scope, archived)
       .then((value) => {
-        if (value.tenant !== scope.tenant)
+        if (
+          value.tenant !== scope.tenant ||
+          !value.items.every((item) => item.tenant === scope.tenant)
+        )
           throw Error("Replay tenant mismatch");
         if (current) {
           setItems(value.items);
@@ -271,10 +303,13 @@ export function SessionReplays({
   );
   const chosen = selected ? items.find((r) => r.id === selected) : visible[0];
   function accept(r: SessionReplay) {
+    if (!mounted.current || scope.signal.aborted || r.tenant !== scope.tenant)
+      return;
     setItems((prev) => [r, ...prev.filter((p) => p.id !== r.id)]);
     setSelected(r.id);
   }
   async function start() {
+    setPendingID(null);
     setError("");
     try {
       await capture.start(consent);
@@ -285,6 +320,7 @@ export function SessionReplays({
     }
   }
   async function save() {
+    const recordingVersion = capture.getRecordingVersion();
     setBusy(true);
     setError("");
     const id = pendingID ?? crypto.randomUUID();
@@ -294,12 +330,14 @@ export function SessionReplays({
         id,
         title,
         consent: true,
-        policy: "masked-v1",
+        policy: replayPolicy,
         references: [],
         events: capture.export(),
       });
       if (scope.signal.aborted) return;
-      capture.discard();
+      if (r.tenant !== scope.tenant) throw Error("Replay tenant mismatch");
+      if (capture.getRecordingVersion() === recordingVersion) capture.discard();
+      if (!mounted.current) return;
       accept(r);
       setFilter("all");
       setPendingID(null);
@@ -331,14 +369,16 @@ export function SessionReplays({
         <CardContent className="space-y-3 p-4">
           <details open={state.status !== "idle"}>
             <summary className="cursor-pointer text-sm font-medium">
-              Record this tab
+              <ReplayLabel>Record this tab</ReplayLabel>
             </summary>
             <div className="mt-3 space-y-3 text-xs text-muted-foreground">
               <p>
-                Record only after consent. Text, input values, media and URLs
-                are masked or removed. Layout styles and class names are
-                retained. The recording stays in this tab until you save it to
-                this tenant. Saved sessions expire after seven days.
+                Record only after consent. Approved navigation, control labels
+                and status messages remain readable. Resource names, queries,
+                metric values and entered text are masked; media and URLs are
+                removed. Private screens pause capture. Layout styles and class
+                names are retained. The recording stays in this tab until you
+                save it to this tenant. Saved sessions expire after seven days.
               </p>
               {state.status === "idle" ? (
                 <>
@@ -350,7 +390,7 @@ export function SessionReplays({
                       onChange={(e) => setConsent(e.target.checked)}
                     />
                     <span>
-                      I agree to record this tab using the masked recording
+                      I agree to record this tab using the selective recording
                       policy.
                     </span>
                   </Label>
@@ -359,7 +399,7 @@ export function SessionReplays({
                     disabled={!writable || !consent}
                     onClick={() => void start()}
                   >
-                    Start recording
+                    <ReplayLabel>Start recording</ReplayLabel>
                   </Button>
                   <p>
                     This records this application tab from now on. Browse your
@@ -378,14 +418,14 @@ export function SessionReplays({
                   </p>
                   <div className="flex gap-2">
                     <Button size="sm" onClick={() => capture.stop()}>
-                      Stop recording
+                      <ReplayLabel>Stop recording</ReplayLabel>
                     </Button>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => capture.discard()}
                     >
-                      Discard recording
+                      <ReplayLabel>Discard recording</ReplayLabel>
                     </Button>
                   </div>
                 </>
@@ -395,7 +435,9 @@ export function SessionReplays({
                     Recording stopped. {state.eventCount} events ·{" "}
                     {(state.bytes / 1024).toFixed(0)} KiB. {state.reason}
                   </p>
-                  <Label htmlFor="replay-title">Recording title</Label>
+                  <Label htmlFor="replay-title">
+                    <ReplayLabel>Recording title</ReplayLabel>
+                  </Label>
                   <Input
                     id="replay-title"
                     value={title}
@@ -413,7 +455,7 @@ export function SessionReplays({
                       disabled={busy || !title.trim() || !writable}
                       onClick={() => void save()}
                     >
-                      Save recording
+                      <ReplayLabel>Save recording</ReplayLabel>
                     </Button>
                     <Button
                       size="sm"
@@ -424,7 +466,7 @@ export function SessionReplays({
                         setPendingID(null);
                       }}
                     >
-                      Discard recording
+                      <ReplayLabel>Discard recording</ReplayLabel>
                     </Button>
                   </div>
                 </>
@@ -436,14 +478,16 @@ export function SessionReplays({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Label htmlFor="replay-filter" className="shrink-0 text-xs">
-            Linked resource
+            <ReplayLabel>Linked resource</ReplayLabel>
           </Label>
           <Select value={filter} onValueChange={setFilter}>
             <SelectTrigger id="replay-filter" className="w-full max-w-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All sessions</SelectItem>
+              <SelectItem value="all">
+                <ReplayLabel>All sessions</ReplayLabel>
+              </SelectItem>
               {options.map((o) => (
                 <SelectItem key={refKey(o.ref)} value={refKey(o.ref)}>
                   {o.label}
@@ -460,7 +504,7 @@ export function SessionReplays({
                 checked={archived}
                 onChange={(e) => setArchived(e.target.checked)}
               />
-              Include archived
+              <ReplayLabel>Include archived</ReplayLabel>
             </Label>
           ) : null}
           <Button
@@ -484,7 +528,9 @@ export function SessionReplays({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(16rem,0.7fr)_minmax(0,2fr)]">
         <Card className="min-w-0 gap-0 py-0 xl:h-[calc(100dvh-20rem)] xl:min-h-[36rem]">
           <CardHeader className="border-b p-4">
-            <CardTitle className="text-sm">Recordings</CardTitle>
+            <CardTitle className="text-sm">
+              <ReplayLabel>Recordings</ReplayLabel>
+            </CardTitle>
             <p className="text-xs text-muted-foreground">
               Saved sessions · seven-day retention · 50 per tenant
             </p>
@@ -549,6 +595,12 @@ export function SessionReplays({
             ) : null}
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">
+            {selected && !chosen && !loading ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                This recording is unavailable or has expired. Choose another
+                session.
+              </p>
+            ) : null}
             {chosen ? (
               <>
                 {chosen.recordedBy.name === "Synthetic demo fixture" ? (
@@ -601,7 +653,7 @@ export function SessionReplays({
                 ) : null}
                 <details className="shrink-0 text-xs text-muted-foreground">
                   <summary className="cursor-pointer">
-                    Recording details
+                    <ReplayLabel>Recording details</ReplayLabel>
                   </summary>
                   <p className="mt-2 break-all">SHA-256 {chosen.digest}</p>
                   <p className="mt-1">

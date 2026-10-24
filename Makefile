@@ -1,4 +1,4 @@
-.PHONY: demo run build server cli mcp operator ui test test-integration test-mimir test-prometheus test-operator intent-eval intent-workflow-eval check release-check public-source release site site-check lint lint-go lint-python
+.PHONY: demo run build server cli mcp operator ui test test-integration test-mimir test-prometheus test-ceph test-operator intent-eval intent-workflow-eval check release-check public-source release site site-check lint lint-go lint-python
 VERSION ?= dev
 RELEASE_TARGETS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64
 ui:
@@ -31,6 +31,8 @@ test-prometheus:
 	sh integration/prometheus/run.sh
 test-mimir:
 	sh integration/mimir/run.sh
+test-ceph:
+	sh integration/ceph/run.sh
 test-operator:
 	sh integration/operator/run.sh
 check:

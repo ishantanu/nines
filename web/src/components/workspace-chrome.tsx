@@ -1,3 +1,4 @@
+import { ReplayLabel } from "@/components/replay-label";
 import { Brand } from "@/components/brand";
 import type { ReactNode } from "react";
 import { Moon, RefreshCw, Settings2, Sun, Video, VideoOff } from "lucide-react";
@@ -63,13 +64,17 @@ export function WorkspaceHeader({
         ) : null}
         {onSignOut ? (
           <Button variant="ghost" size="sm" onClick={onSignOut}>
-            Sign out
+            <ReplayLabel>Sign out</ReplayLabel>
           </Button>
         ) : null}
         <Badge variant="outline" className="capitalize">
           {role}
         </Badge>
-        {demo ? <Badge variant="secondary">Demo</Badge> : null}
+        {demo ? (
+          <Badge variant="secondary">
+            <ReplayLabel>Demo</ReplayLabel>
+          </Badge>
+        ) : null}
         <div className="flex items-center border-l pl-2">
           {demo && replayConfigured ? (
             <Button
@@ -137,10 +142,12 @@ export function WorkspaceHeader({
   );
 }
 export function PageHeader({
+  replayTitle = false,
   title,
   description,
   children,
 }: {
+  replayTitle?: boolean;
   title: string;
   description: string;
   children?: ReactNode;
@@ -149,7 +156,7 @@ export function PageHeader({
     <div className="page-header">
       <div className="min-w-0">
         <h1 className="break-words text-2xl font-semibold tracking-tight">
-          {title}
+          {replayTitle ? <ReplayLabel>{title}</ReplayLabel> : title}
         </h1>
         <p className="mt-1.5 max-w-3xl break-words text-sm leading-6 text-muted-foreground">
           {description}

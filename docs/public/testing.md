@@ -8,6 +8,8 @@ Database-dependent cases require `TEST_DATABASE_URL`, pointed at a disposable Po
 
 `make test-mimir` starts only a uniquely named disposable loopback Mimir container and removes it on exit. It tests synthetic ingestion, tenant isolation, collection and ruler destinations. The runner refuses a non-loopback `MIMIR_TEST_URL`. Tests do not contact a real identity provider, hosted model or Kubernetes cluster unless a separately reviewed harness explicitly does so.
 
+`make test-ceph` runs a disposable real Ceph RGW/OpenBao fixture with generated credentials and trusted loopback TLS. It checks encrypted audit readback, one-version conditional retries, enforced retention and protected-version deletion denial, then removes its containers and temporary files. See [archive acceptance](deployment/audit-archive.md#disposable-ceph-acceptance) for prerequisites and limits.
+
 The [Compose playground](deployment/playground.md) defaults to Prometheus. CI runs its complete management/recording-rule/alert lifecycle in a two-mode matrix: Prometheus-only and the optional dual-backend Mimir profile. The same setup and verifier select one or both workspaces from trusted Compose configuration.
 
 The first public release also requires clean-checkout CI, native CLI/browser identity verification, demo first-run verification, a reviewed dependency/license inventory, current vulnerability scans, container startup and artifact installation checks. Historical local test reports and screenshots are not substitutes for these checks.

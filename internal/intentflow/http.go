@@ -68,6 +68,7 @@ func Mount(m *http.ServeMux, s *Service) {
 			ExpectedVersion int64 `json:"expectedVersion"`
 		}
 		if e := decode(w, r, &in); e != nil {
+			s.auditFailure(r.Context(), r.PathValue("id"), "change_set.proposed", "", e)
 			fail(w, e)
 			return
 		}
@@ -77,6 +78,7 @@ func Mount(m *http.ServeMux, s *Service) {
 	m.HandleFunc("POST /api/intent-conversations/{id}/change-set/approve", func(w http.ResponseWriter, r *http.Request) {
 		var in v1.ReviewIntentChangeSet
 		if e := decode(w, r, &in); e != nil {
+			s.auditFailure(r.Context(), r.PathValue("id"), "change_set.approved", "", e)
 			fail(w, e)
 			return
 		}
@@ -86,6 +88,7 @@ func Mount(m *http.ServeMux, s *Service) {
 	m.HandleFunc("POST /api/intent-conversations/{id}/change-set/apply", func(w http.ResponseWriter, r *http.Request) {
 		var in v1.ReviewIntentChangeSet
 		if e := decode(w, r, &in); e != nil {
+			s.auditFailure(r.Context(), r.PathValue("id"), "change_set.applied", "", e)
 			fail(w, e)
 			return
 		}

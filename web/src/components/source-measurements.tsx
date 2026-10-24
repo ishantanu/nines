@@ -1,3 +1,4 @@
+import { ReplayLabel } from "@/components/replay-label";
 import { useEffect, useRef, useState } from "react";
 import {
   api,
@@ -139,16 +140,19 @@ export function SourceMeasurements({
   return (
     <Card className="gap-0 py-0">
       <div className="panel-header">
-        <h2 className="text-sm font-semibold">Source measurements</h2>
+        <h2 className="text-sm font-semibold">
+          <ReplayLabel>Source measurements</ReplayLabel>
+        </h2>
         <Button variant="outline" size="sm" onClick={onConnections}>
-          Data sources
+          <ReplayLabel>Data sources</ReplayLabel>
         </Button>
       </div>
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
             <p className="text-sm">
-              Source <span className="font-medium">{source}</span>
+              <ReplayLabel>Source</ReplayLabel>{" "}
+              <span className="font-medium">{source}</span>
               {selected ? ` · ${selected.kind}` : ""}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -161,7 +165,9 @@ export function SourceMeasurements({
             disabled={busy || !configured || !queries || !canEdit(scope)}
             onClick={() => run("collect")}
           >
-            {busy ? "Reading…" : "Read latest measurements"}
+            <ReplayLabel>
+              {busy ? "Reading…" : "Read latest measurements"}
+            </ReplayLabel>
           </Button>
         </div>
         {collection &&
@@ -209,14 +215,16 @@ export function SourceMeasurements({
         ) : null}
         <details>
           <summary className="cursor-pointer text-sm font-medium">
-            Saved measurement queries
+            <ReplayLabel>Saved measurement queries</ReplayLabel>
           </summary>
           <dl className="mt-3 space-y-3 text-xs">
             <div>
               <dt className="font-medium">
-                {slo.providerWindow
-                  ? "Good-event selector"
-                  : "Good-event query"}
+                <ReplayLabel>
+                  {slo.providerWindow
+                    ? "Good-event selector"
+                    : "Good-event query"}
+                </ReplayLabel>
               </dt>
               <dd className="mt-1 break-all font-mono">
                 {slo.providerWindow?.goodSelector ||
@@ -226,9 +234,11 @@ export function SourceMeasurements({
             </div>
             <div>
               <dt className="font-medium">
-                {slo.providerWindow
-                  ? "Total-event selector"
-                  : "Total-event query"}
+                <ReplayLabel>
+                  {slo.providerWindow
+                    ? "Total-event selector"
+                    : "Total-event query"}
+                </ReplayLabel>
               </dt>
               <dd className="mt-1 break-all font-mono">
                 {slo.providerWindow?.totalSelector ||
@@ -240,7 +250,7 @@ export function SourceMeasurements({
         </details>
         <details>
           <summary className="cursor-pointer text-sm font-medium">
-            Browse metrics in this source
+            <ReplayLabel>Browse metrics in this source</ReplayLabel>
           </summary>
           <div className="mt-3 space-y-3">
             <Label htmlFor="source-metric-prefix">

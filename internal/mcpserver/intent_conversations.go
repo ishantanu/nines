@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -15,6 +16,11 @@ type intentKubernetesExport struct {
 	ConversationID string `json:"conversationId"`
 	Namespace      string `json:"namespace"`
 	Digest         string `json:"digest"`
+}
+type intentAuditPage struct {
+	ID      string `json:"id"`
+	After   int64  `json:"after,omitempty" jsonschema:"Continue after nextAfter from the preceding page; zero starts the export"`
+	Through int64  `json:"through,omitempty" jsonschema:"Preserve the through snapshot from the first page; zero selects current sequence"`
 }
 type intentConversationPage struct {
 	Cursor string `json:"cursor,omitempty"`
@@ -44,7 +50,15 @@ func addIntentConversations(s *mcp.Server, a *apiClient, c Config) {
 		return a.request(ctx, http.MethodGet, path, nil)
 	})
 	register(s, a, "get_intent_conversation", "Read a saved intent conversation, confirmed binding, preparation evidence and SLO/CUJ proposal. Native model correlation state and credentials are not exposed.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/intent-conversations/", ""))
-	register(s, a, "get_intent_audit", "Read tenant-scoped recommendation decision events and audit chain integrity. Cannot approve, reject, apply or roll back definitions.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/intent-conversations/", "/audit"))
+	register(s, a, "get_intent_audit", "Read one tenant-scoped decision audit page and integrity result. Follow nextAfter with the same through value until nextAfter is absent; a first page may be incomplete. Cannot approve, reject, apply or roll back definitions.", true, func(ctx context.Context, in intentAuditPage) (any, error) {
+		if err := validID(in.ID); err != nil {
+			return nil, err
+		}
+		if in.After < 0 || in.Through < 0 || (in.Through > 0 && in.After > in.Through) {
+			return nil, errors.New("invalid audit sequence range")
+		}
+		return a.request(ctx, http.MethodGet, "/api/intent-conversations/"+in.ID+"/audit?after="+strconv.FormatInt(in.After, 10)+"&through="+strconv.FormatInt(in.Through, 10), nil)
+	})
 	register(s, a, "intent_workflow_capabilities", "Read the intent skill contract, tool budgets and model availability. This neither starts a run nor grants binding confirmation or apply permission.", true, func(ctx context.Context, _ emptyInput) (any, error) {
 		return a.request(ctx, http.MethodGet, "/api/intent-conversations/capabilities", nil)
 	})

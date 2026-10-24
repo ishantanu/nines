@@ -1,3 +1,4 @@
+import { validateReplayEvents } from "./lib/replay-validation";
 import { Replayer } from "@rrweb/replay";
 import playerCSS from "@rrweb/replay/dist/style.css?inline";
 const sheet = document.createElement("style");
@@ -33,15 +34,27 @@ function fit() {
   wrapper.style.transform = `scale(${scale})`;
   wrapper.style.marginLeft = `${Math.max(0, (root.clientWidth - width * scale) / 2)}px`;
 }
+function report(state: "ready" | "error") {
+  if (parent !== window)
+    parent.postMessage({ type: "nines-replay-state", state }, location.origin);
+}
+function fail() {
+  const previous = player;
+  player = undefined;
+  previous?.destroy();
+  root.replaceChildren();
+  status.textContent = "This recording could not be played.";
+  play.disabled = true;
+  pause.disabled = true;
+  seek.disabled = true;
+  report("error");
+}
 function load(events: unknown) {
   try {
-    if (
-      !Array.isArray(events) ||
-      events.length > 2000 ||
-      JSON.stringify(events).length > 3 * 1024 * 1024
-    )
-      throw Error("Recording exceeds bounds");
-    player?.destroy();
+    validateReplayEvents(events);
+    const previous = player;
+    player = undefined;
+    previous?.destroy();
     root.replaceChildren();
     player = new Replayer(events as ConstructorParameters<typeof Replayer>[0], {
       root,
@@ -62,11 +75,9 @@ function load(events: unknown) {
     seek.disabled = false;
     player.on("resize", fit);
     fit();
+    report("ready");
   } catch {
-    status.textContent = "This recording could not be played.";
-    play.disabled = true;
-    pause.disabled = true;
-    seek.disabled = true;
+    fail();
   }
 }
 window.addEventListener("message", (event) => {
@@ -83,21 +94,24 @@ if (embedded) {
   try {
     load(JSON.parse(embedded.textContent ?? "[]"));
   } catch {
-    status.textContent = "This recording could not be played.";
+    fail();
   }
 }
 play.addEventListener("click", () => {
-  player?.play(lastOffset);
+  if (!player) return;
+  player.play(lastOffset);
   status.textContent = "Playing";
 });
 pause.addEventListener("click", () => {
-  lastOffset = player?.getCurrentTime() ?? 0;
-  player?.pause();
+  if (!player) return;
+  lastOffset = player.getCurrentTime();
+  player.pause();
   status.textContent = "Paused";
 });
 seek.addEventListener("input", () => {
+  if (!player) return;
   lastOffset = Number(seek.value);
-  player?.pause(lastOffset);
+  player.pause(lastOffset);
   status.textContent = "Paused";
 });
 setInterval(() => {

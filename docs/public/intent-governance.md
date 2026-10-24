@@ -24,9 +24,9 @@ Changing the goal, measurement selection or source invalidates the existing revi
 
 The portal asks for a reviewer note and acknowledgement of the rationale, measurements, settings and limitations. Approval records the reviewer, time, note and exact digest. **Apply approved changes** checks conversation, resource, source and measurement revisions again. The SLO and explicitly proposed critical user journey link commit together or neither does.
 
-A reviewer can reject a proposal or withdraw an approval before apply, with a reason. A rejected proposal cannot be applied. Preparing a new review creates a new change-set identity; old approval is not reused. Review and apply are separate operations, but this alpha does not enforce a two-person approval policy. The same authorized owner/editor may perform both.
+A reviewer can reject a proposal or withdraw an approval before apply, with a reason. A rejected proposal cannot be applied. Preparing a new review creates a new change-set identity; old approval is not reused. Approval and apply require different authenticated subjects, both with an owner/editor role. This also applies to rollback. Reusing the approving credential to apply is rejected and audited. Two credentials held by one person are not proof of two human reviewers; use individually assigned SSO accounts and control credential issuance.
 
-The API's optional `reason` field preserves older approval clients. The portal requires a note; an older programmatic approval without one is recorded as **No reviewer note supplied by this client.** New rejection and rollback-review operations require a reason. Use explicit notes in production automation. Use individual SSO accounts for personal attribution; a shared API credential identifies that credential rather than the engineer using it.
+The server requires a nonempty review reason for approval, rejection and rollback review through every client, including CLI, API and portal. Reasons are limited to 1,000 bytes and reject recognized credential patterns. Use individual SSO accounts for personal attribution; a shared API credential identifies that credential rather than the engineer using it.
 
 Permissions come from the authenticated server role. CLI `--agent` selects deterministic machine output; it does not downgrade an owner credential. Give automated assistants the server's `agent` role rather than an owner/editor credential.
 
@@ -34,15 +34,15 @@ Definition application performs no provider writes inside its transaction. After
 
 ## Audit records
 
-The conversation's **Decision audit trail** identifies proposal, approval, rejection, application and rollback events, including authenticated actors, timestamps, conversation versions, exact digests, outcomes and review reasons. Authenticated governance denials and admitted conflicts are recorded without request bodies or raw provider errors. Invalid requests rejected before routing and infrastructure failures may only appear in operational logs.
+The conversation's **Decision audit trail** identifies proposal, approval, rejection, application and rollback events, including authenticated actors, timestamps, conversation versions, exact digests, outcomes and review reasons. Authenticated governance denials, proposal-preparation failures, admitted conflicts and malformed governance requests routed to an existing conversation are recorded without request bodies or raw provider errors. Invalid requests rejected before routing and infrastructure failures may only appear in operational logs.
 
-**Download audit JSON** exports the decision events and frozen change-set definitions/recommendations. The server verifies the event sequence/hash chain and proposal/rollback digests. A failed integrity check blocks further change-control mutations until the records are inspected. The export reports `integrity: invalid` rather than concealing a detected mismatch.
+**Download audit JSON** retrieves a stable, paginated snapshot of all decision events, with the change-set definitions/recommendations still retained in the conversation. The portal refuses an incomplete export above 10,000 events and directs you to the CLI. The independently stored journal retains proposal snapshots even when the conversation no longer contains them; use **Audit log → View** or `nines audit show RECORD_ID` to retrieve those snapshots. A new proposal snapshot records the state at the time of that event; subsequent approval/application are separate journal events. When the journal is first introduced, complete valid event chains retained in existing conversations are recovered once, with `recoveredFromConversation: true`. These reconstructed proposal snapshots preserve definition/recommendation digests but may contain later lifecycle metadata from the retained object; decision events identify the historical state. Ordinary startup does not recreate deleted journal rows. Incomplete or invalid legacy chains remain invalid and are not silently repaired. The server verifies the event sequence/hash chain and proposal/rollback digests. A failed integrity check blocks further change-control mutations until the records are inspected. The export reports `integrity: invalid` rather than concealing a detected mismatch.
 
 Successful definition transactions include approval identity, reason, operation digest and recommendation digest in their database receipt. If resource commit succeeds but conversation persistence fails, an explicit retry reads the receipt without applying twice and preserves the original applying identity. Inspect readback and retry the exact request after an ambiguous response; never assume a transport error means no change occurred.
 
-Events are append-only through the application. There is no audit-clear endpoint. They persist in PostgreSQL with their conversation, or only for the process lifetime with the explicit in-memory store. Records are bounded to 256 events per conversation and a 2 MiB conversation document; capacity errors do not prune older decisions. Export and use a new conversation before reaching those limits. Infrastructure failures or an exhausted log can prevent recording a failed attempt; successful mutations fail closed when their audit cannot be recorded.
+Events are append-only through the application. There is no audit-clear endpoint. They persist in a separate PostgreSQL journal, in the same transaction as each conversation update. The explicit in-memory store retains them only for the process lifetime. Conversations keep the latest 256 events for display; older events and proposal snapshots remain in the journal. The 2 MiB conversation size and bounded proposal history still apply, but the recent-event display limit no longer blocks reviews. Infrastructure failures or a full conversation document can prevent recording an attempt. Review transitions and journal inserts commit together. Resource application has a separate durable transaction receipt: if resource commit succeeds but conversation/journal persistence fails, the response is ambiguous. When possible, the journal records `uncertain`, never a claim that definitions were unchanged. An exact authorized retry recovers the receipt and the original applying identity without applying twice. No retention job removes journal rows. Monitor database size and include the journal in backups.
 
-This is an application integrity check, not signed storage or an externally protected immutable archive. A database administrator can modify or remove database contents. Include the database in backups and keep exports under your organization's retention/access policy. Exported actor names, review notes and configuration leave server-side access and retention controls.
+This is an application integrity check, not signed storage or an externally protected immutable archive. A database administrator can modify or remove database contents. Include the database in backups and keep exports under your organization's retention/access policy. An optional owner-configured [S3 Object Lock archive](deployment/audit-archive.md) delivers journal records in the background after verified version/content/retention readback. It is disabled by default. Export to a private temporary file, check the command exit status, then move the complete result into your organization's separately managed archive. Do not treat the application hash chain as an external trust anchor. Exported actor names, review notes and configuration leave server-side access and retention controls.
 
 ## Reviewed configuration rollback
 
@@ -75,8 +75,9 @@ nines intent conversations audit CONVERSATION --context production --agent
 # reason: "Reviewed population, excluded traffic, target impact and available history."
 nines intent conversations approve CONVERSATION --context production -f approval.yaml --agent
 
-# Apply uses the new conversation version returned by approval.
-nines intent conversations apply CONVERSATION --context production -f apply.yaml --agent
+# Apply uses the returned conversation version and a different owner/editor identity.
+# Both contexts must point to the same server and tenant.
+nines intent conversations apply CONVERSATION --context production-applier -f apply.yaml --agent
 ```
 
 For rollback, `rollback-plan` takes the original applied change-set digest and a reason. `rollback-approve` takes the returned rollback digest and a reviewer reason. `rollback-apply` takes that rollback digest and the latest approved conversation version. Each request contains `confirm: true`; new rollback reviews never reuse original approval.
@@ -89,7 +90,20 @@ nines intent conversations rollback-apply CONVERSATION --context production -f r
 nines intent conversations rollback-reject CONVERSATION --context production -f rollback-rejection.yaml --agent
 ```
 
-The Go client exposes `IntentAudit`, `RejectIntentChangeSet`, `PrepareIntentRollback`, `ApproveIntentRollback`, `ApplyIntentRollback`, `RejectIntentRollback` and `ExportIntentRollbackKubernetes`. The MCP adapter exposes audit reads and existing read-only conversation evidence; it does not offer approval, apply or rollback mutation tools.
+Tenant-wide search is available to owners/editors under **Audit log**, at `/tenants/TENANT/audit`, and through `GET /api/audit`. Conversation-level audit reads retain existing conversation read permissions. Search supports exact actor subject, resource name, conversation, action, outcome and RFC3339 time range. The default range is the last 30 days; a request can span at most 366 days. Page size is 1–100, and a cursor is bound to the same tenant, filters and frozen time range. It is a pagination marker, not authorization.
+
+```sh
+nines audit list --context production --resource api-availability --agent
+nines audit list --context production --outcome denied --from 2026-10-01T00:00:00Z --to 2026-10-24T23:59:59Z --agent
+nines audit show RECORD_ID --context production --agent
+# Full matching records, including proposal snapshots, as NDJSON.
+# Redirect into a private temporary file and check success before archiving.
+(umask 077; nines audit export --context production --from 2026-10-01T00:00:00Z --to 2026-10-24T23:59:59Z > decisions.partial.ndjson) && mv decisions.partial.ndjson decisions.ndjson
+```
+
+`GET /api/audit/{recordID}` returns one tenant-scoped record and its frozen proposal when present. Tenant-wide list responses omit the large proposal bodies. `GET /api/intent-conversations/{id}/audit` returns at most 256 events, `through` and an optional `nextAfter`; continue with `?after=NEXT_AFTER&through=THROUGH` until `nextAfter` is absent. The server verifies each page and its link to the preceding event. Do not retain only the first page as a complete history. The portal handles this pagination automatically.
+
+The Go client exposes `Audit`, `AuditRecord`, `IntentAuditPage`, `IntentAudit`, `RejectIntentChangeSet`, `PrepareIntentRollback`, `ApproveIntentRollback`, `ApplyIntentRollback`, `RejectIntentRollback` and `ExportIntentRollbackKubernetes`. The MCP adapter exposes paginated `get_intent_audit` reads (`id`, optional `after` and `through`) and existing read-only conversation evidence; it does not offer approval, apply or rollback mutation tools.
 
 ## Kubernetes operator and GitOps
 

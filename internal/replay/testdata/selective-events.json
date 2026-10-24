@@ -1,0 +1,287 @@
+[
+  {
+    "type": 4,
+    "timestamp": 100,
+    "data": {
+      "href": "/?secret",
+      "width": 800,
+      "height": 600
+    }
+  },
+  {
+    "type": 2,
+    "timestamp": 101,
+    "data": {
+      "node": {
+        "type": 0,
+        "id": 1,
+        "childNodes": [
+          {
+            "type": 2,
+            "id": 2,
+            "tagName": "body",
+            "attributes": {},
+            "childNodes": [
+              {
+                "type": 2,
+                "id": 3,
+                "tagName": "span",
+                "attributes": {
+                  "data-replay-label": "Home"
+                },
+                "childNodes": [
+                  {
+                    "type": 3,
+                    "id": 4,
+                    "textContent": "Home"
+                  }
+                ]
+              },
+              {
+                "type": 3,
+                "id": 5,
+                "textContent": "Home"
+              },
+              {
+                "type": 2,
+                "id": 6,
+                "tagName": "span",
+                "attributes": {
+                  "data-replay-label": "Home"
+                },
+                "childNodes": [
+                  {
+                    "type": 3,
+                    "id": 7,
+                    "textContent": "customer-secret"
+                  }
+                ]
+              },
+              {
+                "type": 2,
+                "id": 8,
+                "tagName": "span",
+                "attributes": {
+                  "data-replay-label": "customer-secret"
+                },
+                "childNodes": [
+                  {
+                    "type": 3,
+                    "id": 9,
+                    "textContent": "customer-secret"
+                  }
+                ]
+              },
+              {
+                "type": 2,
+                "id": 10,
+                "tagName": "span",
+                "attributes": {
+                  "data-replay-label": "Home",
+                  "data-private": ""
+                },
+                "childNodes": [
+                  {
+                    "type": 3,
+                    "id": 11,
+                    "textContent": "Home"
+                  }
+                ]
+              },
+              {
+                "type": 2,
+                "id": 12,
+                "tagName": "input",
+                "attributes": {
+                  "data-replay-label": "Home"
+                },
+                "childNodes": [
+                  {
+                    "type": 3,
+                    "id": 13,
+                    "textContent": "Home"
+                  }
+                ]
+              },
+              {
+                "type": 2,
+                "id": 14,
+                "tagName": "span",
+                "attributes": {
+                  "data-replay-label": "No SLI data"
+                },
+                "childNodes": [
+                  {
+                    "type": 3,
+                    "id": 15,
+                    "textContent": "No SLI data"
+                  }
+                ]
+              },
+              {
+                "type": 2,
+                "id": 16,
+                "tagName": "span",
+                "attributes": {
+                  "data-replay-label": "Rules"
+                },
+                "childNodes": [
+                  {
+                    "type": 3,
+                    "id": 17,
+                    "textContent": "Rules"
+                  }
+                ]
+              },
+              {
+                "type": 2,
+                "id": 30,
+                "tagName": "span",
+                "attributes": {
+                  "data-replay-label": "Home"
+                },
+                "childNodes": [
+                  {
+                    "type": 2,
+                    "id": 31,
+                    "tagName": "span",
+                    "attributes": {},
+                    "childNodes": [
+                      {
+                        "type": 3,
+                        "id": 32,
+                        "textContent": "Home"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "initialOffset": {
+        "left": 0,
+        "top": 0
+      }
+    }
+  },
+  {
+    "type": 3,
+    "timestamp": 102,
+    "data": {
+      "source": 0,
+      "texts": [
+        {
+          "id": 4,
+          "value": "Home"
+        },
+        {
+          "id": 5,
+          "value": "Home"
+        },
+        {
+          "id": 7,
+          "value": "secret-after-mutation"
+        },
+        {
+          "id": 15,
+          "value": "No SLI data"
+        }
+      ],
+      "attributes": [
+        {
+          "id": 5,
+          "attributes": {
+            "data-replay-label": "Home",
+            "title": "secret"
+          }
+        }
+      ],
+      "removes": [],
+      "adds": [
+        {
+          "parentId": 16,
+          "nextId": null,
+          "node": {
+            "type": 3,
+            "id": 18,
+            "textContent": "Rules"
+          }
+        },
+        {
+          "parentId": 2,
+          "nextId": null,
+          "node": {
+            "type": 3,
+            "id": 19,
+            "textContent": "Home"
+          }
+        },
+        {
+          "parentId": 2,
+          "nextId": null,
+          "node": {
+            "type": 3,
+            "id": 4,
+            "textContent": "Home"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "type": 3,
+    "timestamp": 103,
+    "data": {
+      "source": 5,
+      "id": 4,
+      "text": "Home"
+    }
+  },
+  {
+    "type": 2,
+    "timestamp": 104,
+    "data": {
+      "node": {
+        "type": 0,
+        "id": 1,
+        "childNodes": [
+          {
+            "type": 2,
+            "id": 2,
+            "tagName": "body",
+            "attributes": {},
+            "childNodes": [
+              {
+                "type": 3,
+                "id": 4,
+                "textContent": "Home"
+              }
+            ]
+          }
+        ]
+      },
+      "initialOffset": {
+        "left": 0,
+        "top": 0
+      }
+    }
+  },
+  {
+    "type": 3,
+    "timestamp": 105,
+    "data": {
+      "source": 0,
+      "texts": [
+        {
+          "id": 4,
+          "value": "Home"
+        }
+      ],
+      "attributes": [],
+      "removes": [],
+      "adds": []
+    }
+  }
+]

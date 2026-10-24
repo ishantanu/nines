@@ -203,3 +203,101 @@ test("shadcn layout attributes survive without arbitrary data fields", () => {
     },
   ]);
 });
+
+test("an unavailable recorder fails visibly and clears its recording timer", async () => {
+  vi.useFakeTimers();
+  mocks.record.mockReturnValue(undefined);
+  const capture = new MaskedReplayCapture();
+  await expect(capture.start(true)).rejects.toThrow("could not start");
+  expect(capture.getSnapshot().status).toBe("idle");
+  expect(capture.getSnapshot().eventCount).toBe(0);
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+test("a synchronous masking failure releases the newly initialized recorder", async () => {
+  vi.useFakeTimers();
+  mocks.record.mockImplementation((options) => {
+    options.emit({ type: 2, timestamp: 100, data: { node: { type: 99 } } });
+    return mocks.stop;
+  });
+  const capture = new MaskedReplayCapture();
+  await capture.start(true);
+  expect(capture.getSnapshot().status).toBe("ready");
+  expect(capture.getSnapshot().reason).toContain("could not be masked");
+  expect(mocks.stop).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
+  expect(() => capture.export()).toThrow("full snapshot");
+  capture.discard();
+});
+
+test("CSS masking removes generated text without corrupting layout or quoted values", () => {
+  const event = sanitizeReplayEvent({
+    type: 3,
+    timestamp: 100,
+    data: {
+      source: 0,
+      attributes: [
+        {
+          id: 1,
+          attributes: {
+            style:
+              'display:flex;justify-content:center;align-content:stretch;--tw-content:"secret; token";content:"secret; text";color:red',
+          },
+        },
+      ],
+    },
+  });
+  const attrs = (
+    event!.data.attributes as { attributes: { style: string } }[]
+  )[0].attributes;
+  expect(attrs.style).toContain("justify-content:center");
+  expect(attrs.style).toContain("align-content:stretch");
+  expect(attrs.style).toContain("color:red");
+  expect(attrs.style).not.toContain("secret");
+  expect(attrs.style).not.toContain("--tw-;");
+});
+
+test("private-region markers remove the complete subtree before transport", () => {
+  for (const marker of ["data-private", "data-replay-block"]) {
+    const incoming = structuredClone(snapshot);
+    const body = incoming.data.node.childNodes[0];
+    body.attributes = { ...body.attributes, [marker]: "" };
+    const serialized = JSON.stringify(sanitizeReplayEvent(incoming));
+    expect(serialized).not.toContain("textContent");
+    expect(serialized).not.toContain("secret");
+    expect(serialized).toContain('"childNodes":[]');
+  }
+});
+
+// Run the identical adversarial stream through the browser and Go sanitizers.
+import selectiveEvents from "../../../internal/replay/testdata/selective-events.json";
+import { publicReplayText } from "./replay-labels";
+test("only catalogued, directly annotated labels survive snapshots and mutations", () => {
+  const labels = new Map<number, string>();
+  const clean = selectiveEvents.map((e) => sanitizeReplayEvent(e, labels)!);
+  const body = (clean[1].data.node as any).childNodes[0].childNodes;
+  expect(body[0].childNodes[0].textContent).toBe("Home");
+  expect(body[1].textContent).toBe("****");
+  expect(body[4].childNodes).toEqual([]);
+  expect(body[5].childNodes[0].textContent).toBe("****");
+  expect(body[6].childNodes[0].textContent).toBe("No SLI data");
+  expect(body[8].childNodes[0].childNodes[0].textContent).toBe("****");
+  expect((clean[2].data.texts as any[]).map((t) => t.value)).toEqual([
+    "Home",
+    "****",
+    "*********************",
+    "No SLI data",
+  ]);
+  expect((clean[2].data.adds as any[]).map((t) => t.node.textContent)).toEqual([
+    "Rules",
+    "****",
+    "****",
+  ]);
+  expect(clean[3].data.text).toBe("****");
+  expect(JSON.stringify(clean[4])).not.toContain('"Home"');
+  expect((clean[5].data.texts as any[])[0].value).toBe("****");
+  expect(JSON.stringify(clean)).not.toContain("secret");
+  const again = new Map<number, string>();
+  expect(clean.map((e) => sanitizeReplayEvent(e, again))).toEqual(clean);
+  expect(publicReplayText("Home secret", "Home")).toBe("**** ******");
+});

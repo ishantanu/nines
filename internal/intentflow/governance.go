@@ -21,10 +21,18 @@ var auditDigestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 func auditChainValid(events []v1.IntentAuditEvent) bool {
 	previous := ""
+	first := int64(1)
+	if len(events) > 0 && events[0].Sequence > 1 {
+		first = events[0].Sequence
+		previous = events[0].PreviousHash
+		if !auditDigestPattern.MatchString(previous) {
+			return false
+		}
+	}
 	for i, event := range events {
 		expected := event.Hash
 		event.Hash = ""
-		if event.Sequence != int64(i+1) || event.PreviousHash != previous || hash(event) != expected {
+		if event.Sequence != first+int64(i) || event.PreviousHash != previous || hash(event) != expected {
 			return false
 		}
 		previous = expected
@@ -62,18 +70,22 @@ func auditRoom(r *record) error {
 	if err != nil {
 		return err
 	}
-	if len(r.Session.Audit) >= maxAuditEvents || len(b) > maxDocument-16384 {
+	if len(b) > maxDocument-16384 {
 		return ErrLimit
 	}
 	return nil
 }
 func audit(r *record, a v1.InvestigationActor, action, outcome, digest, reason string, now time.Time) {
-	e := v1.IntentAuditEvent{Sequence: int64(len(r.Session.Audit) + 1), At: now, Actor: a, Action: action, Outcome: outcome, ChangeSetDigest: digest, Reason: reason, Version: r.Session.Version}
+	sequence, _ := lastAudit(r.Session.Audit)
+	e := v1.IntentAuditEvent{Sequence: sequence + 1, At: now, Actor: a, Action: action, Outcome: outcome, ChangeSetDigest: digest, Reason: reason, Version: r.Session.Version}
 	if n := len(r.Session.Audit); n > 0 {
 		e.PreviousHash = r.Session.Audit[n-1].Hash
 	}
 	e.Hash = hash(e)
 	r.Session.Audit = append(r.Session.Audit, e)
+	if len(r.Session.Audit) > maxAuditEvents {
+		r.Session.Audit = r.Session.Audit[len(r.Session.Audit)-maxAuditEvents:]
+	}
 }
 func (s *Service) reviewReason(in v1.ReviewIntentChangeSet, required bool) error {
 	if (required || in.Reason != "") && (!text(in.Reason, 1000) || s.sensitiveInput(in.Reason)) {
@@ -104,6 +116,12 @@ func (s *Service) auditFailure(ctx context.Context, id, action, digest string, c
 	if !auditDigestPattern.MatchString(digest) || s.sensitiveInput(digest) {
 		digest = ""
 	}
+	reason := "Request did not change definitions; inspect current revisions, permissions and review state."
+	var invalid *model.ValidationError
+	if (action == "change_set.applied" || action == "rollback.applied") && outcome == "failed" && !errors.As(cause, &invalid) {
+		outcome = "uncertain"
+		reason = "Request did not complete; definition commit may have succeeded. Inspect readback and the exact retry receipt before retrying."
+	}
 	// Do not persist provider errors, request bodies or potentially credential-bearing reasons.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
@@ -114,11 +132,14 @@ func (s *Service) auditFailure(ctx context.Context, id, action, digest string, c
 		if err := auditRoom(r); err != nil {
 			return err
 		}
-		audit(r, v1.InvestigationActor{Subject: p.Subject, Name: p.Name, Kind: p.Kind}, action, outcome, digest, "Request did not change definitions; inspect current revisions, permissions and review state.", now)
+		audit(r, v1.InvestigationActor{Subject: p.Subject, Name: p.Name, Kind: p.Kind}, action, outcome, digest, reason, now)
 		return nil
 	})
 }
 func (s *Service) Audit(ctx context.Context, id string) (v1.IntentAuditLog, error) {
+	return s.AuditPage(ctx, id, 0, 0)
+}
+func (s *Service) AuditPage(ctx context.Context, id string, after, through int64) (v1.IntentAuditLog, error) {
 	principal, ok := tenancy.FromContext(ctx)
 	if !ok || principal.TenantID != s.Platform.TenantID || (principal.Role != "owner" && principal.Role != "editor" && principal.Role != "agent" && principal.Role != "viewer") {
 		return v1.IntentAuditLog{}, ErrForbidden
@@ -138,9 +159,59 @@ func (s *Service) Audit(ctx context.Context, id string) (v1.IntentAuditLog, erro
 	if out.ChangeSets == nil {
 		out.ChangeSets = []v1.IntentChangeSet{}
 	}
-	out.Events = r.Audit
-	if out.Events == nil {
-		out.Events = []v1.IntentAuditEvent{}
+	last, _ := lastAudit(r.Audit)
+	if after < 0 || through < 0 || after > last || through > last || (through > 0 && after > through) {
+		return out, model.Invalid("invalid audit sequence range")
+	}
+	if through == 0 {
+		through = last
+	}
+	out.Through = through
+	rows, err := s.Repository.Audit(ctx, AuditSearch{Tenant: s.Platform.TenantID, Query: v1.AuditQuery{Conversation: id, Limit: maxAuditEvents + 1}, AfterSequence: after, ThroughSequence: through, Ascending: true})
+	if err != nil {
+		return out, err
+	}
+	if len(rows) > maxAuditEvents {
+		rows = rows[:maxAuditEvents]
+		out.NextAfter = rows[len(rows)-1].Event.Sequence
+	}
+	for _, row := range rows {
+		out.Events = append(out.Events, row.Event)
+	}
+	expected := after + 1
+	for _, event := range out.Events {
+		if event.Sequence != expected {
+			out.Integrity = "invalid"
+		}
+		expected++
+	}
+	if !auditChainValid(out.Events) || (out.NextAfter == 0 && expected-1 != through) {
+		out.Integrity = "invalid"
+	}
+	if after > 0 && len(out.Events) > 0 {
+		anchor, err := s.Repository.Audit(ctx, AuditSearch{Tenant: s.Platform.TenantID, Query: v1.AuditQuery{Conversation: id, Limit: 1}, AfterSequence: after - 1, ThroughSequence: after, Ascending: true})
+		if err != nil {
+			return out, err
+		}
+		if len(anchor) != 1 || anchor[0].Event.Hash != out.Events[0].PreviousHash {
+			out.Integrity = "invalid"
+		}
+	}
+	// Compare the conversation's bounded view against the independently stored tail.
+	if len(r.Audit) > 0 {
+		tail, err := s.Repository.Audit(ctx, AuditSearch{Tenant: s.Platform.TenantID, Query: v1.AuditQuery{Conversation: id, Limit: len(r.Audit)}, AfterSequence: r.Audit[0].Sequence - 1, ThroughSequence: last, Ascending: true})
+		if err != nil {
+			return out, err
+		}
+		if len(tail) != len(r.Audit) {
+			out.Integrity = "invalid"
+		} else {
+			for i := range tail {
+				if hash(tail[i].Event) != hash(r.Audit[i]) {
+					out.Integrity = "invalid"
+				}
+			}
+		}
 	}
 	return out, nil
 }
@@ -282,7 +353,7 @@ func (s *Service) RecordDenied(ctx context.Context, path string) {
 	if len(parts) != 2 || !identifier.MatchString(parts[0]) {
 		return
 	}
-	actions := map[string]string{"change-set/approve": "change_set.approved", "change-set/apply": "change_set.applied", "change-set/reject": "change_set.rejected", "change-set/rollback": "rollback.proposed", "change-set/rollback/approve": "rollback.approved", "change-set/rollback/apply": "rollback.applied", "change-set/rollback/reject": "rollback.rejected"}
+	actions := map[string]string{"change-set": "change_set.proposed", "change-set/approve": "change_set.approved", "change-set/apply": "change_set.applied", "change-set/reject": "change_set.rejected", "change-set/rollback": "rollback.proposed", "change-set/rollback/approve": "rollback.approved", "change-set/rollback/apply": "rollback.applied", "change-set/rollback/reject": "rollback.rejected"}
 	if action := actions[parts[1]]; action != "" {
 		s.auditFailure(ctx, parts[0], action, "", ErrForbidden)
 	}

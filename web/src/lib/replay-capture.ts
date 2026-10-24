@@ -1,3 +1,4 @@
+import { publicReplayText, replayLabels } from "./replay-labels";
 // Shared by the application and the standalone browser recorder bundle.
 // No credentials, endpoint, telemetry or automatic upload is built into this recorder.
 export type ReplayEvent = {
@@ -62,7 +63,11 @@ const css = (s: string) =>
   s.length > 256 * 1024
     ? ""
     : s
-        .replace(/url\s*\([^)]*\)|@import[^;]*;|content\s*:[^;}]*/gis, "")
+        .replace(/url\s*\([^)]*\)|@import[^;]*;/gis, "")
+        .replace(
+          /(^|[;{])\s*(?:--tw-)?content\s*:(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^;}"'])*/gis,
+          "$1",
+        )
         .replace(/https?:\/\/[^\s"'<>;)]+/gi, "");
 function attrs(value: unknown) {
   const out: Record<string, string | null> = {};
@@ -74,6 +79,10 @@ function attrs(value: unknown) {
       continue;
     }
     if (typeof v !== "string") continue;
+    if (key === "data-replay-label" && replayLabels.has(v)) {
+      out[key] = v;
+      continue;
+    }
     if (presentation[key]?.includes(v)) {
       out[key] = v;
       continue;
@@ -131,15 +140,31 @@ function node(
   value: unknown,
   depth = 0,
   style = false,
+  labels = new Map<number, string>(),
+  publicLabel = "",
 ): Record<string, unknown> {
   if (depth > 60) throw Error("Snapshot is too deep");
   const m = value as Record<string, unknown>;
   const type = Number(m.type);
+  labels.delete(Number(m.id));
   const out: Record<string, unknown> = { type, id: Number(m.id) };
+  let childLabel = "";
   if (type === 0 || type === 2) {
     let tag = String(m.tagName ?? "").toLowerCase();
     if (tag === "link") tag = "style";
     if (type === 2) {
+      const attributes = (m.attributes ?? {}) as Record<string, unknown>;
+      if (
+        Object.hasOwn(attributes, "data-private") ||
+        Object.hasOwn(attributes, "data-replay-block")
+      )
+        return {
+          type: 2,
+          id: Number(m.id),
+          tagName: "div",
+          attributes: {},
+          childNodes: [],
+        };
       if (!allowedTags.has(tag))
         return {
           type: 2,
@@ -157,11 +182,22 @@ function node(
           } as Record<string, string>
         )[tag] ?? tag;
       out.attributes = attrs(m.attributes);
+      const candidate = attributes["data-replay-label"];
+      if (
+        tag === "span" &&
+        typeof candidate === "string" &&
+        replayLabels.has(candidate)
+      ) {
+        childLabel = candidate;
+        labels.set(Number(m.id), candidate);
+      }
       if (m.isSVG === true) out.isSVG = true;
       if (typeof m.isShadow === "boolean") out.isShadow = m.isShadow;
     }
     out.childNodes = Array.isArray(m.childNodes)
-      ? m.childNodes.map((c) => node(c, depth + 1, tag === "style"))
+      ? m.childNodes.map((c) =>
+          node(c, depth + 1, tag === "style", labels, childLabel),
+        )
       : [];
   } else if (type === 1) {
     out.name = "html";
@@ -169,25 +205,30 @@ function node(
     out.systemId = "";
   } else if ([3, 4, 5].includes(type)) {
     out.type = 3;
+    if (publicLabel) labels.set(Number(m.id), publicLabel);
     out.textContent = style
       ? css(String(m.textContent ?? ""))
-      : mask(String(m.textContent ?? ""));
+      : publicReplayText(String(m.textContent ?? ""), publicLabel);
   } else throw Error("Unsupported snapshot node");
   return out;
 }
-export function sanitizeReplayEvent(value: unknown): ReplayEvent | null {
+export function sanitizeReplayEvent(
+  value: unknown,
+  labels = new Map<number, string>(),
+): ReplayEvent | null {
   const e = value as ReplayEvent;
   if (!e || !Number.isFinite(e.timestamp) || !e.data)
     throw Error("Invalid replay event");
   const d = e.data;
   let data: Record<string, unknown> = {};
   if (e.type === 4) data = { ...pick(d, ["width", "height"]), href: "/" };
-  else if (e.type === 2)
+  else if (e.type === 2) {
+    labels.clear();
     data = {
-      node: node(d.node),
+      node: node(d.node, 0, false, labels),
       initialOffset: pick(d.initialOffset, ["left", "top"]),
     };
-  else if (e.type === 3) {
+  } else if (e.type === 3) {
     const source = Number(d.source);
     data.source = source;
     if (source === 0) {
@@ -199,11 +240,30 @@ export function sanitizeReplayEvent(value: unknown): ReplayEvent | null {
           .map<Record<string, unknown>>((m) => ({
             ...pick(m, ["id", "parentId", "nextId", "previousId", "isShadow"]),
             ...(key === "texts"
-              ? { value: mask(String(m.value ?? "")) }
+              ? {
+                  value: publicReplayText(
+                    String(m.value ?? ""),
+                    labels.get(Number(m.id)),
+                  ),
+                }
               : key === "attributes"
-                ? { attributes: attrs(m.attributes) }
+                ? {
+                    attributes: Object.fromEntries(
+                      Object.entries(attrs(m.attributes)).filter(
+                        ([key]) => key !== "data-replay-label",
+                      ),
+                    ),
+                  }
                 : key === "adds"
-                  ? { node: node(m.node) }
+                  ? {
+                      node: node(
+                        m.node,
+                        0,
+                        false,
+                        labels,
+                        labels.get(Number(m.parentId)),
+                      ),
+                    }
                   : {}),
           }))
           .filter(
@@ -250,6 +310,8 @@ export class MaskedReplayCapture {
   private listeners = new Set<() => void>();
   private stopSegment: (() => void) | undefined;
   private generation = 0;
+  private recordingVersion = 0;
+  getRecordingVersion = () => this.recordingVersion;
   private timer: ReturnType<typeof setInterval> | undefined;
   private started = 0;
   private state: CaptureState = {
@@ -274,6 +336,7 @@ export class MaskedReplayCapture {
     if (!consent) throw Error("Explicit recording consent is required");
     if (this.state.status !== "idle")
       throw Error("Finish or discard the current recording");
+    this.recordingVersion++;
     this.started = Date.now();
     this.update({ status: "paused", reason: "" });
     this.timer = setInterval(() => {
@@ -298,46 +361,58 @@ export class MaskedReplayCapture {
     const { record } = await import("@rrweb/record");
     if (gen !== this.generation || this.state.status !== "paused") return;
     this.update({ status: "recording" });
-    this.stopSegment =
-      record({
-        emit: (value) => {
-          if (gen !== this.generation || this.state.status !== "recording")
+    const labels = new Map<number, string>();
+    const stopSegment = record({
+      emit: (value) => {
+        if (gen !== this.generation || this.state.status !== "recording")
+          return;
+        try {
+          const event = sanitizeReplayEvent(value, labels);
+          if (!event) return;
+          const size = new TextEncoder().encode(
+            JSON.stringify(event),
+          ).byteLength;
+          if (this.events.length >= 2000 || this.bytes + size > 1900000) {
+            this.stop("Recording size limit reached.");
             return;
-          try {
-            const event = sanitizeReplayEvent(value);
-            if (!event) return;
-            const size = new TextEncoder().encode(
-              JSON.stringify(event),
-            ).byteLength;
-            if (this.events.length >= 2000 || this.bytes + size > 1900000) {
-              this.stop("Recording size limit reached.");
-              return;
-            }
-            this.events.push(event);
-            this.bytes += size;
-          } catch {
-            this.stop(
-              "Recording stopped because an event could not be masked.",
-            );
           }
-        },
-        maskAllInputs: true,
-        maskTextSelector: "*",
-        blockSelector:
-          '[data-replay-block], [data-private], iframe, video, audio, canvas, input[type="password"]',
-        inlineStylesheet: true,
-        recordCanvas: false,
-        recordCrossOriginIframes: false,
-        collectFonts: false,
-        slimDOMOptions: "all",
-        sampling: { mousemove: 100, scroll: 200, input: "last" },
-      }) ?? undefined;
+          this.events.push(event);
+          this.bytes += size;
+        } catch {
+          this.stop("Recording stopped because an event could not be masked.");
+        }
+      },
+      maskAllInputs: true,
+      maskTextSelector: "*",
+      maskTextFn: (text, element) =>
+        publicReplayText(
+          text,
+          element?.tagName === "SPAN" &&
+            !element.closest(
+              "[data-private], [data-replay-block], input, textarea, select, option",
+            )
+            ? (element.getAttribute("data-replay-label") ?? "")
+            : "",
+        ),
+      blockSelector:
+        '[data-replay-block], [data-private], iframe, video, audio, canvas, input[type="password"]',
+      inlineStylesheet: true,
+      recordCanvas: false,
+      recordCrossOriginIframes: false,
+      collectFonts: false,
+      slimDOMOptions: "all",
+      sampling: { mousemove: 100, scroll: 200, input: "last" },
+    });
     if (gen !== this.generation) {
-      this.stopSegment?.();
-      this.stopSegment = undefined;
+      stopSegment?.();
+      return;
     }
-    if (gen === this.generation)
-      this.update({ eventCount: this.events.length, bytes: this.bytes });
+    if (!stopSegment)
+      throw Error(
+        "This browser could not start the replay recorder. Try again or use a supported browser.",
+      );
+    this.stopSegment = stopSegment;
+    this.update({ eventCount: this.events.length, bytes: this.bytes });
   }
   pause() {
     if (this.state.status !== "recording" && this.state.status !== "paused")
@@ -363,6 +438,7 @@ export class MaskedReplayCapture {
     });
   }
   discard() {
+    this.recordingVersion++;
     ++this.generation;
     this.stopSegment?.();
     this.stopSegment = undefined;

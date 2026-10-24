@@ -14,6 +14,7 @@ export const pagePaths = {
   alerts: "alerts",
   workflows: "workflows",
   connections: "data-sources",
+  audit: "audit",
   access: "access-control",
   clients: "clients",
 } as const;

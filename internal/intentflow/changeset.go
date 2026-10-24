@@ -44,7 +44,8 @@ func invalidateChangeSet(r *record, a v1.InvestigationActor, reason string, now 
 	r.Session.ChangeSet = nil
 	return nil
 }
-func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64) (v1.IntentConversation, error) {
+func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64) (out v1.IntentConversation, e error) {
+	defer func() { s.auditFailure(ctx, id, "change_set.proposed", "", e) }()
 	a, e := actor(ctx, s.Platform.TenantID)
 	if e != nil {
 		return v1.IntentConversation{}, e
@@ -147,7 +148,7 @@ func human(ctx context.Context, tenant string) (v1.InvestigationActor, error) {
 }
 func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (out v1.IntentConversation, e error) {
 	defer func() { s.auditFailure(ctx, id, "change_set.approved", in.Digest, e) }()
-	if e = s.reviewReason(in, false); e != nil {
+	if e = s.reviewReason(in, true); e != nil {
 		return out, e
 	}
 	a, e := human(ctx, s.Platform.TenantID)
@@ -178,7 +179,7 @@ func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewI
 			return err
 		}
 		c.ApprovedBy = &a
-		c.ApprovalReason = reasonOrDefault(in.Reason)
+		c.ApprovalReason = in.Reason
 		c.ApprovedAt = &now
 		c.State = "approved"
 		touch(r, now)
@@ -189,7 +190,7 @@ func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewI
 }
 func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (out v1.IntentConversation, e error) {
 	defer func() { s.auditFailure(ctx, id, "change_set.applied", in.Digest, e) }()
-	_, e = human(ctx, s.Platform.TenantID)
+	a, e := human(ctx, s.Platform.TenantID)
 	if e != nil {
 		return v1.IntentConversation{}, e
 	}
@@ -211,6 +212,9 @@ func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewInt
 		}
 		if active(*r) || r.Session.Version != in.ExpectedVersion || c.State != "approved" || c.ApprovedBy == nil || c.ApprovedAt == nil || r.Session.Goal == nil || hash(*r.Session.Goal) != c.IntentDigest {
 			return ErrConflict
+		}
+		if a.Subject == c.ApprovedBy.Subject {
+			return ErrForbidden
 		}
 		if err := auditRoom(r); err != nil {
 			return err
