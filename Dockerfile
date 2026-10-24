@@ -9,6 +9,9 @@ ENV VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST}
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
+# The UI imports the same replay privacy catalog and test vectors as Go.
+COPY internal/replay/public-labels.json /internal/replay/public-labels.json
+COPY internal/replay/testdata/ /internal/replay/testdata/
 COPY docs/public/brand/ /docs/public/brand/
 RUN npm run build
 
