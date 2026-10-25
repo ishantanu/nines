@@ -144,3 +144,22 @@ func TestDescribeSLOUsesOneMatchingRead(t *testing.T) {
 		t.Fatal(requests, out.String())
 	}
 }
+
+func TestOfflineLifecycleAndTrafficGuardCLI(t *testing.T) {
+	var out bytes.Buffer
+	if err := run([]string{"init", "slo", "--name", "api", "--lifecycle", "experimental", "--min-events", "100"}, &out); err != nil {
+		t.Fatal(err)
+	}
+	d, err := model.ParseSLODefinition(out.Bytes())
+	if err != nil || d.Spec.Lifecycle != "experimental" || d.Spec.Policy == nil || d.Spec.Policy.MinEvents != 100 {
+		t.Fatal(out.String(), err)
+	}
+	out.Reset()
+	if err = run([]string{"init", "slo", "--name", "api", "--target", "0.9", "--burn-rate", "14.4"}, &out); err == nil {
+		t.Fatal("unreachable threshold accepted offline")
+	}
+	out.Reset()
+	if err = run([]string{"init", "slo", "--name", "api", "--lifecycle", "active"}, &out); err == nil {
+		t.Fatal("unknown lifecycle accepted offline")
+	}
+}

@@ -80,6 +80,29 @@ test("source management is explicitly disabled until the server enables it", () 
   const html = renderToStaticMarkup(
     <DataSourceForm scope={scope} enabled={false} onSaved={() => {}} />,
   );
-  expect(html).toContain("Add data source");
+  expect(html).toContain("Add telemetry connection");
   expect(html).toContain("disabled");
+});
+
+test("policy editor exposes a count guard without implying confidence", () => {
+  const html = renderToStaticMarkup(
+    <PolicyEditor
+      policies={[
+        {
+          name: "fast",
+          severity: "critical",
+          shortWindowSeconds: 60,
+          longWindowSeconds: 300,
+          burnRate: 2,
+          forSeconds: 60,
+          minCoverage: 1,
+          minEvents: 100,
+        },
+      ]}
+      onChange={() => {}}
+    />,
+  );
+  expect(html).toContain("Minimum events per alert window");
+  expect(html).toContain('value="100"');
+  expect(html).toContain("not statistical confidence");
 });

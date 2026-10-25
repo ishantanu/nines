@@ -165,6 +165,42 @@ func TestRealOperatorControllerConformance(t *testing.T) {
 		}
 		return f.get("slo", name)
 	}
+	// Admission must retain the shared fields, and reconciliation must replace
+	// the complete rule group when paging is enabled or disabled.
+	lifecycleResource := f.desired("lifecycle-guard", "primary")
+	var lifecycleSpec v1.SLOSpec
+	if err := json.Unmarshal(lifecycleResource.Spec, &lifecycleSpec); err != nil {
+		t.Fatal(err)
+	}
+	lifecycleSpec.Policy.MinEvents = 150
+	lifecycleSpec.Quality = &v1.MeasurementQualityPolicy{MinEvents: 100, CohortLabels: []string{"region"}}
+	lifecycleSpec.ErrorBudgetPolicy = &v1.ErrorBudgetPolicy{Owner: "oncall", RunbookURL: "https://example.test/runbook", ReviewBelow: .25}
+	for _, lifecycle := range []v1.SLOLifecycle{v1.LifecycleAspirational, v1.LifecycleCommitted} {
+		lifecycleSpec.Lifecycle = lifecycle
+		lifecycleResource.Spec, _ = json.Marshal(lifecycleSpec)
+		f.apply(lifecycleResource)
+		saved := reconcile("lifecycle-guard")
+		native, err := operator.Native(saved)
+		if err != nil || native.SLO.Spec.Lifecycle != lifecycle || native.SLO.Spec.Policy.MinEvents != 150 || native.SLO.Spec.Quality.MinEvents != 100 || native.SLO.Spec.ErrorBudgetPolicy.Owner != "oncall" {
+			t.Fatal("admission pruned lifecycle or count", native, err)
+		}
+		child := f.get("prometheusrule", operator.RuleName("lifecycle-guard"))
+		var groups rules.File
+		if err = json.Unmarshal(child.Spec, &groups); err != nil {
+			t.Fatal(err)
+		}
+		alertCount := 0
+		for _, group := range groups.Groups {
+			for _, rule := range group.Rules {
+				if rule.Alert != "" {
+					alertCount++
+				}
+			}
+		}
+		if (alertCount == 1) != (lifecycle == v1.LifecycleCommitted) {
+			t.Fatal("operator paging lifecycle mismatch", lifecycle, alertCount)
+		}
+	}
 	f.apply(f.desired("live-checkout", "primary"))
 	current := reconcile("live-checkout")
 	if !isReady(current, "RulesConfigured") || current.Status.Evaluation == nil || current.Status.Evaluation.State != "unknown" {

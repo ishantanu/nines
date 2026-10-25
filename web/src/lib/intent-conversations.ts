@@ -101,7 +101,56 @@ export function authoringScope(goal: IntentDocument): AuthoringScope {
   };
 }
 
+export type IntentSafetyCheck = {
+  burnState?: string;
+  state: string;
+  message: string;
+  checkedAt: string;
+  quality?: import("./api").MeasurementQuality;
+  budget?: import("./api").ErrorBudgetDecision;
+};
+export type IntentOutcome = {
+  burnState?: string;
+  tenant: string;
+  conversation: string;
+  changeSetDigest: string;
+  operation: string;
+  operationDigest: string;
+  sloId: string;
+  revision: number;
+  state: string;
+  code: string;
+  message: string;
+  startedAt: string;
+  checkedAt: string;
+  warmupUntil: string;
+  deadlineAt: string;
+  healthySince?: string;
+  nextCheckAt?: string;
+  reliability?: number;
+  baselineReliability?: number;
+  comparison: string;
+  rollbackStatus: string;
+  limitations: string[];
+  quality?: import("./api").MeasurementQuality;
+  budget?: import("./api").ErrorBudgetDecision;
+  deployment?: { state: string; message: string };
+  evaluation?: { state: string; message: string };
+  ruleOutput?: { state: string; message: string };
+};
 export type IntentChangeSet = {
+  observationPolicy?: {
+    warmupSeconds: number;
+    observeSeconds: number;
+    deadlineSeconds: number;
+  };
+  safetyException?: {
+    reason: string;
+    approvedBy: { subject: string; name: string };
+    expiresAt: string;
+  };
+  safetyCheck?: IntentSafetyCheck;
+  outcome?: IntentOutcome;
   id: string;
   digest: string;
   state: "proposed" | "approved" | "applied" | "rejected" | "superseded";
@@ -129,6 +178,7 @@ export type IntentChangeSet = {
   applied?: { kind: string; name: string; revision: number; digest: string }[];
 };
 export type IntentVerification = {
+  outcome?: IntentOutcome;
   operation?: "apply" | "rollback";
   rollbackDigest?: string;
   sourceState: string;
@@ -146,6 +196,7 @@ export type IntentVerification = {
 };
 
 export type IntentRecommendation = {
+  budgetDecision?: import("./api").ErrorBudgetDecision;
   measurementDigest?: string;
   requestedBy?: { subject: string; name: string; kind: string };
   compilerVersion?: string;
@@ -209,6 +260,8 @@ export type IntentAuditEvent = {
   hash: string;
 };
 export type IntentRollback = {
+  outcome?: IntentOutcome;
+  safetyCheck?: IntentSafetyCheck;
   id: string;
   digest: string;
   originalDigest: string;

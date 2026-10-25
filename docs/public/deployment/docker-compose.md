@@ -48,7 +48,7 @@ The example queries require suitable instrumentation and a configured source to 
 
 Legacy single-source evaluation reads `PROMETHEUS_URL` or `MIMIR_URL` from `.env`; configure one, then recreate the server. A provider on the host is not reachable as `localhost` inside the container. Use a reachable service name or an explicitly configured host gateway.
 
-For owner-managed query connections, set `NINES_SOURCE_HOSTS` to exact approved hostnames in `.env`, recreate `platform`, then use **Data sources → Add data source**. `scripts/setup-local.py` supplies the private encryption key used for saved bearer tokens. Keep this key with your protected recovery material. Mimir organizations must also be authorized in trusted tenant configuration. Saving a source does not deploy rules or create an upstream metrics tenant.
+For owner-managed query connections, set `NINES_SOURCE_HOSTS` to exact approved hostnames in `.env`, recreate `platform`, then use **Telemetry connections → Add telemetry connection**. `scripts/setup-local.py` supplies the private encryption key used for saved bearer tokens. Keep this key with your protected recovery material. Mimir organizations must also be authorized in trusted tenant configuration. Saving a source does not deploy rules or create an upstream metrics tenant.
 
 For a complete example with rule volumes, reloads, Mimir ingestion and two severity policies, use the separate [integration playground](playground.md).
 
@@ -91,7 +91,7 @@ Stopping or running `docker compose down` without `--volumes` retains database s
 ## Confirm the install
 
 1. Sign in, create a viewer under **Access control → Users**, and verify its restricted access in a separate browser session.
-2. Add or configure a data source and test it. Apply an SLO whose queries match real metrics.
+2. Add or configure a telemetry connection and test it. Apply an SLO whose queries match real metrics.
 3. Open its Integration status and Performance tabs. Review the Rules plan before applying it, then confirm external evaluation.
 4. Restart `platform` and confirm accounts, definitions and history are retained.
 

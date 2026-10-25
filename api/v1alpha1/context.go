@@ -40,6 +40,9 @@ type EvidenceReference struct {
 	Href     string `json:"href"`
 }
 type CollectionHealth struct {
+	SourceDigest  string         `json:"sourceDigest,omitempty"`
+	SourceFrom    time.Time      `json:"sourceFrom,omitempty"`
+	SourceTo      time.Time      `json:"sourceTo,omitempty"`
 	Measurement   *BindingHealth `json:"measurement,omitempty"`
 	State         string         `json:"state"`
 	AttemptedAt   time.Time      `json:"attemptedAt,omitempty"`
@@ -59,6 +62,7 @@ type Freshness struct {
 	StaleAfterSeconds       int64      `json:"staleAfterSeconds"`
 }
 type Measurement struct {
+	AlertSuppressedReason   string     `json:"alertSuppressedReason,omitempty"`
 	ShortBurnRate           *float64   `json:"shortBurnRate"`
 	LongBurnRate            *float64   `json:"longBurnRate"`
 	ShortCoverage           *float64   `json:"shortCoverage"`
@@ -77,6 +81,7 @@ type Measurement struct {
 	LastAlertEvaluation     *time.Time `json:"lastAlertEvaluation,omitempty"`
 }
 type SLOParameters struct {
+	Lifecycle          SLOLifecycle      `json:"lifecycle,omitempty"`
 	Intent             *IntentSpec       `json:"intent,omitempty"`
 	MeasurementMode    string            `json:"measurementMode"`
 	CoverageBasis      string            `json:"coverageBasis"`
@@ -88,19 +93,21 @@ type SLOParameters struct {
 	Policy             *BurnRatePolicy   `json:"policy,omitempty"`
 }
 type SLOContext struct {
-	MeasurementHealth *BindingHealth      `json:"measurementHealth,omitempty"`
-	Definition        SLOParameters       `json:"definition"`
-	APIVersion        string              `json:"apiVersion"`
-	Tenant            string              `json:"tenant"`
-	ObservedAt        time.Time           `json:"observedAt"`
-	TextTrust         string              `json:"textTrust"`
-	Resource          ResourceSummary     `json:"resource"`
-	Health            string              `json:"health"`
-	Measurement       Measurement         `json:"measurement"`
-	Freshness         Freshness           `json:"freshness"`
-	Collection        CollectionHealth    `json:"collection"`
-	Evidence          []EvidenceReference `json:"evidence"`
-	Warnings          []string            `json:"warnings"`
+	BudgetDecision    *ErrorBudgetDecision `json:"budgetDecision,omitempty"`
+	Quality           *MeasurementQuality  `json:"quality,omitempty"`
+	MeasurementHealth *BindingHealth       `json:"measurementHealth,omitempty"`
+	Definition        SLOParameters        `json:"definition"`
+	APIVersion        string               `json:"apiVersion"`
+	Tenant            string               `json:"tenant"`
+	ObservedAt        time.Time            `json:"observedAt"`
+	TextTrust         string               `json:"textTrust"`
+	Resource          ResourceSummary      `json:"resource"`
+	Health            string               `json:"health"`
+	Measurement       Measurement          `json:"measurement"`
+	Freshness         Freshness            `json:"freshness"`
+	Collection        CollectionHealth     `json:"collection"`
+	Evidence          []EvidenceReference  `json:"evidence"`
+	Warnings          []string             `json:"warnings"`
 }
 type LinkedSLOContext struct {
 	Link    JourneySLO    `json:"link"`

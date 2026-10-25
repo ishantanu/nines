@@ -18,6 +18,13 @@ func rollbackDigest(tenant, conversation string, r v1.IntentRollback) string {
 		Blockers                                   []string
 	}{tenant, conversation, r.ID, r.OriginalDigest, r.Reason, r.Changes, r.Expected, r.Blockers})
 }
+func rollbackApprovalDigest(r v1.IntentRollback) string {
+	return hash(struct {
+		Digest, Reason string
+		Actor          *v1.InvestigationActor
+		At             *time.Time
+	}{r.Digest, r.ApprovalReason, r.ApprovedBy, r.ApprovedAt})
+}
 func findChangeSet(r *record, digest string, rollback bool) *v1.IntentChangeSet {
 	match := func(c *v1.IntentChangeSet) bool {
 		return (!rollback && c.Digest == digest) || (rollback && c.Rollback != nil && c.Rollback.Digest == digest)
@@ -129,6 +136,13 @@ func (s *Service) ReviewRollback(ctx context.Context, id string, in v1.ReviewInt
 	if !identifier.MatchString(id) || !in.Confirm || in.ExpectedVersion < 1 || len(in.Digest) != 64 {
 		return out, model.Invalid("confirm the reviewed rollback digest and version")
 	}
+	var proofs map[string]bool
+	if apply {
+		proofs, e = s.approvalProofs(ctx, id, in.Digest, "rollback.approved")
+		if e != nil {
+			return out, e
+		}
+	}
 	r, e := s.Repository.Update(ctx, id, func(r *record, now time.Time) error {
 		if r.Session.Tenant != s.Platform.TenantID {
 			return ErrNotFound
@@ -149,6 +163,12 @@ func (s *Service) ReviewRollback(ctx context.Context, id string, in v1.ReviewInt
 		}
 		if (!apply && rollback.State != "proposed") || (apply && (rollback.State != "approved" || rollback.ApprovedBy == nil || rollback.ApprovedAt == nil)) {
 			return ErrConflict
+		}
+		if apply && (rollback.ApprovalDigest == "" || rollback.ApprovalDigest != rollbackApprovalDigest(*rollback) || !proofs[rollback.ApprovalDigest]) {
+			return ErrConflict
+		}
+		if apply && s.AuthorizeReview != nil && s.AuthorizeReview(ctx, *rollback.ApprovedBy, false) != nil {
+			return ErrForbidden
 		}
 		if apply && a.Subject == rollback.ApprovedBy.Subject {
 			return ErrForbidden
@@ -171,19 +191,30 @@ func (s *Service) ReviewRollback(ctx context.Context, id string, in v1.ReviewInt
 			rollback.AppliedBy = &receipt.Actor
 			rollback.AppliedAt = &receipt.At
 			rollback.Applied = receipt.Resources
+			if receipt.Evidence != nil {
+				rollback.SafetyCheck = receipt.Evidence.SafetyCheck
+			}
+			rollback.Outcome = newOutcome(r.Session, *c, "rollback", rollback.Digest, receipt.At, receipt.Resources)
 			a = receipt.Actor
 		} else {
 			rollback.State = "approved"
 			rollback.ApprovedBy = &a
 			rollback.ApprovedAt = &now
 			rollback.ApprovalReason = in.Reason
+			rollback.ApprovalDigest = rollbackApprovalDigest(*rollback)
 		}
 		touch(r, now)
 		eventReason := in.Reason
 		if apply {
 			eventReason = rollback.ApprovalReason
 		}
-		audit(r, a, action, "succeeded", rollback.Digest, reasonOrDefault(eventReason), now)
+		var proof []any
+		if apply {
+			proof = []any{rollback.SafetyCheck}
+		} else {
+			proof = []any{rollback.ApprovalDigest}
+		}
+		audit(r, a, action, "succeeded", rollback.Digest, reasonOrDefault(eventReason), now, proof...)
 		return nil
 	})
 	return r.Session, e

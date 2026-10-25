@@ -44,5 +44,5 @@ func (s *Service) CompileMeasurement(ctx context.Context, manifest v1.ServiceLev
 	return out, err
 }
 func inlineIntentManifest(goal v1.SLOIntent) v1.ServiceLevelObjective {
-	return v1.NewSLO(goal.Metadata.Name, goal.Metadata.Project, v1.SLOSpec{Measurement: goal.Spec.Measurement, Intent: &goal.Spec, DisplayName: goal.Metadata.Name, Service: goal.Spec.Service, Source: goal.Spec.Source, Target: goal.Spec.Target, WindowSeconds: goal.Spec.WindowSeconds, StepSeconds: goal.Spec.StepSeconds, Policies: goal.Spec.Policies, Policy: goal.Spec.Policy})
+	return v1.NewSLO(goal.Metadata.Name, goal.Metadata.Project, v1.SLOSpec{ErrorBudgetPolicy: goal.Spec.ErrorBudgetPolicy, Quality: goal.Spec.Quality, Lifecycle: goal.Spec.Lifecycle, Measurement: goal.Spec.Measurement, Intent: &goal.Spec, DisplayName: goal.Metadata.Name, Service: goal.Spec.Service, Source: goal.Spec.Source, Target: goal.Spec.Target, WindowSeconds: goal.Spec.WindowSeconds, StepSeconds: goal.Spec.StepSeconds, Policies: goal.Spec.Policies, Policy: goal.Spec.Policy})
 }

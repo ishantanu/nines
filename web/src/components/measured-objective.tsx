@@ -17,6 +17,9 @@ import {
 } from "@/lib/measurement";
 import { duration } from "@/lib/history";
 import { MeasurementFields } from "./measurement-editor";
+import { BudgetPolicyEditor } from "./budget-policy-editor";
+import { QualityPolicyEditor } from "./quality-policy-editor";
+import { SLOLifecycleSelect } from "./slo-lifecycle";
 import { PolicyEditor } from "./policy-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +38,7 @@ export function MeasurementSummary({
         <dd className="break-words">
           {s.service} / {definition.metadata.project}
         </dd>
-        <dt className="text-muted-foreground">Data source</dt>
+        <dt className="text-muted-foreground">Telemetry connection</dt>
         <dd className="break-words">{s.source}</dd>
         <dt className="text-muted-foreground">Metric</dt>
         <dd className="break-all font-mono">{s.metric}</dd>
@@ -99,6 +102,13 @@ export function MeasuredObjective({
       },
     });
   });
+  const [errorBudgetPolicy, setErrorBudgetPolicy] = useState<
+    SLO["errorBudgetPolicy"]
+  >(resource?.errorBudgetPolicy);
+  const [quality, setQuality] = useState<SLO["quality"]>(resource?.quality);
+  const [lifecycle, setLifecycle] = useState<NonNullable<SLO["lifecycle"]>>(
+    resource?.lifecycle ?? "committed",
+  );
   const [target, setTarget] = useState(
     String((resource?.target ?? 0.999) * 100),
   );
@@ -157,6 +167,10 @@ export function MeasuredObjective({
     setPreview(null);
     try {
       const manifest = sloFromMeasurementDraft(draft, target, window, policies);
+      manifest.spec.quality = quality;
+      manifest.spec.errorBudgetPolicy = errorBudgetPolicy;
+      if (lifecycle !== "committed" || resource?.lifecycle)
+        manifest.spec.lifecycle = lifecycle;
       const p = await prepareInlineObjective(
         scope,
         manifest,
@@ -226,6 +240,21 @@ export function MeasuredObjective({
           />
         </div>
       </div>
+      <BudgetPolicyEditor
+        value={errorBudgetPolicy}
+        disabled={busy}
+        onChange={(value) => change(() => setErrorBudgetPolicy(value))}
+      />
+      <QualityPolicyEditor
+        value={quality}
+        disabled={busy}
+        onChange={(value) => change(() => setQuality(value))}
+      />
+      <SLOLifecycleSelect
+        value={lifecycle}
+        disabled={busy}
+        onChange={(value) => change(() => setLifecycle(value))}
+      />
       <PolicyEditor
         policies={policies}
         disabled={busy}

@@ -55,6 +55,20 @@ func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string,
 			}
 
 		}
+		var operation v1.IntentOperationEvidence
+		if len(evidence) > 0 {
+			operation = evidence[0]
+		}
+		if commit {
+			if operation.Operation != "apply" || operation.ChangeSetDigest != digest || operation.ApprovedBy.Subject == "" {
+				return nil, model.Invalid("an approved intent operation is required")
+			}
+			check, err := scope.intentSafety(ctx, plans[0].Name, plans[0].ExpectedRevision, operation.SafetyException, false)
+			if err != nil {
+				return nil, err
+			}
+			operation.SafetyCheck = &check
+		}
 		out := []v1.IntentAppliedResource{}
 		if goal.Spec.Journey != nil && len(plans) != 2 {
 			return nil, model.Invalid("the selected CUJ link must be included in the change set")
@@ -76,7 +90,7 @@ func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string,
 				if goal.Spec.Measurement != nil {
 					bindingInvalid = ref != nil || model.DefinitionDigest(def.SLO.Spec.Measurement) != model.DefinitionDigest(goal.Spec.Measurement) || def.SLO.Spec.StepSeconds != goal.Spec.StepSeconds
 				}
-				if bindingInvalid || def.SLO.Spec.Target != goal.Spec.Target || def.SLO.Spec.WindowSeconds != goal.Spec.WindowSeconds || (model.DefinitionDigest(def.SLO.Spec.Policy) != model.DefinitionDigest(goal.Spec.Policy) || model.DefinitionDigest(def.SLO.Spec.Policies) != model.DefinitionDigest(goal.Spec.Policies)) {
+				if bindingInvalid || model.DefinitionDigest(def.SLO.Spec.ErrorBudgetPolicy) != model.DefinitionDigest(goal.Spec.ErrorBudgetPolicy) || model.DefinitionDigest(def.SLO.Spec.Quality) != model.DefinitionDigest(goal.Spec.Quality) || def.SLO.Spec.Lifecycle.Effective() != goal.Spec.Lifecycle.Effective() || def.SLO.Spec.Target != goal.Spec.Target || def.SLO.Spec.WindowSeconds != goal.Spec.WindowSeconds || (model.DefinitionDigest(def.SLO.Spec.Policy) != model.DefinitionDigest(goal.Spec.Policy) || model.DefinitionDigest(def.SLO.Spec.Policies) != model.DefinitionDigest(goal.Spec.Policies)) {
 					return nil, model.Invalid("compiled SLO differs from the reviewed intent or measurement")
 				}
 			}
@@ -96,7 +110,10 @@ func (s *Service) IntentDefinitionBatch(ctx context.Context, key, digest string,
 		principal, _ := tenancy.FromContext(ctx)
 		receipt := v1.IntentApplyReceipt{Resources: out, Actor: v1.InvestigationActor{Subject: principal.Subject, Name: principal.Name, Kind: principal.Kind}, At: s.Now().UTC()}
 		if len(evidence) > 0 {
-			receipt.Evidence = &evidence[0]
+			receipt.Evidence = &operation
+		}
+		if expectedSource != s.SourceFingerprint(goal.Spec.Source) {
+			return nil, model.ErrRevisionConflict
 		}
 		return json.Marshal(receipt)
 	})

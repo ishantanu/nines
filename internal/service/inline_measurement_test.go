@@ -39,9 +39,15 @@ func TestInlineMeasurementNeedsNoCatalogAndVersionsWithSLO(t *testing.T) {
 		t.Fatal("compile wrote an SLO")
 	}
 	goal := v1.SLOIntent{APIVersion: v1.APIVersion, Kind: v1.IntentKind, Metadata: manifest.Metadata, Spec: v1.IntentSpec{Description: "API requests should succeed", Service: "api", Source: "primary", Outcome: "availability", Population: map[string]string{"service": "api"}, Target: .999, WindowSeconds: 3600, StepSeconds: 60, Measurement: manifest.Spec.Measurement, NoDataPolicy: "unknown"}}
+	goal.Spec.Lifecycle = v1.LifecycleAspirational
+	goal.Spec.Quality = &v1.MeasurementQualityPolicy{MinEvents: 100, CohortLabels: []string{"region"}}
+	goal.Spec.ErrorBudgetPolicy = &v1.ErrorBudgetPolicy{Owner: "oncall", RunbookURL: "https://example.test/runbook", ReviewBelow: .25}
 	p, e := s.PlanIntent(ctx, v1.PlanIntentInput{Intent: goal})
 	if e != nil || p.Status != "ready" || p.Compiled == nil {
 		t.Fatal(p, e)
+	}
+	if p.Compiled.Manifest.Spec.Lifecycle != v1.LifecycleAspirational || p.Compiled.Manifest.Spec.Quality.MinEvents != 100 || p.Compiled.Manifest.Spec.ErrorBudgetPolicy.Owner != "oncall" || p.Compiled.Manifest.Spec.Intent.Lifecycle != v1.LifecycleAspirational {
+		t.Fatal("inline intent lifecycle lost", p.Compiled)
 	}
 	raw, _ := json.Marshal(p.Compiled)
 	if strings.Contains(string(raw), `"binding":`) || strings.Contains(string(raw), `"definition":`) {

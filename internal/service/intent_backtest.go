@@ -39,6 +39,9 @@ func (s *Service) BacktestIntent(ctx context.Context, in v1.IntentBacktestInput)
 	def := model.SLODefinition(plan.Compiled.Manifest)
 	config := def.SLO()
 	config.Revision = 1
+	if !config.AlertsEnabled() {
+		out.Warnings = append(out.Warnings, "This lifecycle disables burn alerts. Threshold crossings below are measurement previews, not alert episodes or notifications.")
+	}
 	if !aligned(in.From, config.StepSeconds) || !aligned(in.To, config.StepSeconds) || in.ResolutionSeconds%config.StepSeconds != 0 || in.To.After(s.evaluationAt(config)) {
 		return out, model.Invalid("range and resolution must align to stepSeconds and end at a completed provider cutoff")
 	}
@@ -99,7 +102,7 @@ func (s *Service) BacktestIntent(ctx context.Context, in v1.IntentBacktestInput)
 			p.LongCoverage = long.Coverage
 			p.ShortBurn = short.BurnRate
 			p.LongBurn = long.BurnRate
-			breach := short.Coverage >= policy.MinCoverage && long.Coverage >= policy.MinCoverage && short.BurnRate != nil && long.BurnRate != nil && *short.BurnRate >= policy.BurnRate && *long.BurnRate >= policy.BurnRate
+			breach := short.Coverage >= policy.MinCoverage && long.Coverage >= policy.MinCoverage && short.Total >= policy.MinEvents && long.Total >= policy.MinEvents && short.BurnRate != nil && long.BurnRate != nil && *short.BurnRate >= policy.BurnRate && *long.BurnRate >= policy.BurnRate
 			if breach {
 				p.BurnThresholdExceeded = true
 				if policy.Name != "" {

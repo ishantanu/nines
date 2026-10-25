@@ -5,6 +5,9 @@ export interface SLODefinition {
   kind: "ServiceLevelObjective";
   metadata: { name: string; project: string };
   spec: {
+    lifecycle?: SLO["lifecycle"];
+    quality?: SLO["quality"];
+    errorBudgetPolicy?: SLO["errorBudgetPolicy"];
     measurement?: SLO["measurement"];
     intent?: SLO["intent"];
     providerWindow?: SLO["providerWindow"];
@@ -37,6 +40,11 @@ export function definitionFromSLO(slo: SLO): SLODefinition {
         ? { measurementBinding: slo.measurementBinding }
         : {}),
       ...(slo.source ? { source: slo.source } : {}),
+      ...(slo.lifecycle ? { lifecycle: slo.lifecycle } : {}),
+      ...(slo.quality ? { quality: slo.quality } : {}),
+      ...(slo.errorBudgetPolicy
+        ? { errorBudgetPolicy: slo.errorBudgetPolicy }
+        : {}),
       displayName: slo.name,
       service: slo.service,
       target: slo.target,

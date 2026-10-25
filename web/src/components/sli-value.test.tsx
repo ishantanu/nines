@@ -140,3 +140,21 @@ test("compact journey-map values retain the partial-window qualification", () =>
   expect(html).toContain("99.950% SLI");
   expect(html).toContain("Partial window");
 });
+
+test("lifecycle suppression remains separate from measured attainment", () => {
+  const html = renderToStaticMarkup(
+    <SLIValue
+      status={{
+        ...snapshot,
+        alert: {
+          phase: "inactive",
+          suppressedReason: "lifecycle_aspirational",
+        },
+      }}
+      target={0.999}
+    />,
+  );
+  expect(html).toContain("99.950% SLI");
+  expect(html).toContain("Alerts disabled");
+  expect(html).not.toContain("No active alerts");
+});

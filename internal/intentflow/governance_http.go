@@ -70,7 +70,7 @@ func mountGovernance(m *http.ServeMux, s *Service) {
 		reply(w, out, e, 200)
 	})
 	reviews := map[string]func(context.Context, string, v1.ReviewIntentChangeSet) (v1.IntentConversation, error){
-		"reject": s.RejectChangeSet, "rollback": s.PrepareRollback, "rollback/reject": s.RejectRollback,
+		"observe": s.ObserveChangeSet, "reject": s.RejectChangeSet, "rollback": s.PrepareRollback, "rollback/reject": s.RejectRollback,
 		"rollback/approve": func(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (v1.IntentConversation, error) {
 			return s.ReviewRollback(ctx, id, in, false)
 		},
@@ -82,7 +82,7 @@ func mountGovernance(m *http.ServeMux, s *Service) {
 		m.HandleFunc("POST /api/intent-conversations/{id}/change-set/"+path, func(w http.ResponseWriter, r *http.Request) {
 			var in v1.ReviewIntentChangeSet
 			if e := decode(w, r, &in); e != nil {
-				action := map[string]string{"reject": "change_set.rejected", "rollback": "rollback.proposed", "rollback/reject": "rollback.rejected", "rollback/approve": "rollback.approved", "rollback/apply": "rollback.applied"}[path]
+				action := map[string]string{"observe": "change_set.observed", "reject": "change_set.rejected", "rollback": "rollback.proposed", "rollback/reject": "rollback.rejected", "rollback/approve": "rollback.approved", "rollback/apply": "rollback.applied"}[path]
 				s.auditFailure(r.Context(), r.PathValue("id"), action, "", e)
 				fail(w, e)
 				return

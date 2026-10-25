@@ -144,7 +144,7 @@ export function SourceMeasurements({
           <ReplayLabel>Source measurements</ReplayLabel>
         </h2>
         <Button variant="outline" size="sm" onClick={onConnections}>
-          <ReplayLabel>Data sources</ReplayLabel>
+          <ReplayLabel>Telemetry connections</ReplayLabel>
         </Button>
       </div>
       <CardContent className="space-y-4 p-5">
@@ -182,14 +182,14 @@ export function SourceMeasurements({
         ) : null}
         {collection?.state === "failed" ? (
           <p role="status" className="text-sm text-destructive">
-            The latest source read failed. Check the data source connection,
-            query permissions and saved measurement.
+            The latest source read failed. Check the telemetry connection
+            connection, query permissions and saved measurement.
           </p>
         ) : null}
         {!configured ? (
           <p className="text-sm text-muted-foreground">
-            Configure a Prometheus or Mimir data source for this SLO to read
-            metrics.
+            Configure a Prometheus or Mimir telemetry connection for this SLO to
+            read metrics.
           </p>
         ) : !queries ? (
           <p className="text-sm text-muted-foreground">

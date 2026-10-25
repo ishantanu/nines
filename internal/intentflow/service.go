@@ -20,11 +20,12 @@ import (
 var identifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 type Service struct {
-	Archive    *auditarchive.Worker
-	Platform   *service.Service
-	Repository Repository
-	Model      rm.Model
-	Authorize  func(context.Context, v1.InvestigationActor) error
+	Archive         *auditarchive.Worker
+	Platform        *service.Service
+	Repository      Repository
+	Model           rm.Model
+	Authorize       func(context.Context, v1.InvestigationActor) error
+	AuthorizeReview func(context.Context, v1.InvestigationActor, bool) error
 }
 
 func New(p *service.Service, r Repository) *Service { return &Service{Platform: p, Repository: r} }

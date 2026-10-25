@@ -15,6 +15,10 @@ func AdvanceAllRecord(r model.Record, at time.Time) (model.AlertState, []model.A
 		return state, nil
 	}
 	result := model.AlertState{Phase: "inactive", Policies: map[string]model.AlertState{}}
+	result = r.SLO.LifecycleAlertState(result)
+	if result.Policies == nil {
+		result.Policies = map[string]model.AlertState{}
+	}
 	var events []model.AlertEvent
 	for _, policy := range r.SLO.Policies {
 		one := r

@@ -2,6 +2,8 @@
 
 Nines manages service level objectives and critical user journeys as code. Define successful events, connect a Prometheus or Mimir source, and inspect reliability, error budgets and burn alerts through the portal, CLI or Go client. Agent workflows help prepare changes; deterministic measurement and explicit review remain the basis for applying them.
 
+Read [measurement quality](measurement-quality.md), [error-budget policies](error-budget-policy.md) and [provider adapters](provider-adapters.md) for operational evidence and backend support.
+
 ## Try the complete flow
 
 The [local playground](deployment/playground.md) runs Nines, PostgreSQL, Prometheus and a synthetic checkout service. It automatically deploys the sample SLO's recording and alert rules, and includes a verifier that introduces failures and checks recovery.

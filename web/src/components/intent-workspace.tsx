@@ -1,3 +1,4 @@
+import { IntentOutcomePanel } from "./intent-outcome";
 import { useResourceRoute } from "@/lib/navigation";
 import { useEffect, useRef, useState } from "react";
 import { stringify } from "yaml";
@@ -221,6 +222,17 @@ export function IntentWorkspace({
         const latest = r.runs.at(-1);
         if (latest?.status === "queued" || latest?.status === "running")
           timer = setTimeout(load, 1000);
+        else if (
+          [
+            ...(r.changeSetHistory ?? []),
+            ...(r.changeSet ? [r.changeSet] : []),
+          ].some(
+            (c) =>
+              (c.rollback?.state === "applied" ? c.rollback.outcome : c.outcome)
+                ?.state === "pending",
+          )
+        )
+          timer = setTimeout(load, 10000);
       } catch (e) {
         if (alive && !scope.signal.aborted) {
           setError(message(e));
@@ -337,8 +349,12 @@ export function IntentWorkspace({
     applied = false,
   ) {
     return action(async () => {
-      const result = await mutate(suffix, body);
-      if (applied && result && !scope.signal.aborted) onApplied();
+      try {
+        const result = await mutate(suffix, body);
+        if (applied && result && !scope.signal.aborted) onApplied();
+      } finally {
+        if (!scope.signal.aborted) setPollEpoch((v) => v + 1);
+      }
     });
   }
   async function prepare() {
@@ -1090,6 +1106,13 @@ export function IntentWorkspace({
                             configuration. Source connection:{" "}
                             {verification.sourceState}
                           </p>
+                        ) : null}
+                        {verification?.outcome ? (
+                          <IntentOutcomePanel
+                            report={verification.outcome}
+                            scope={scope}
+                            conversation={value.id}
+                          />
                         ) : null}
                         {verification?.resources.map((r) => (
                           <p className="text-xs" key={r.kind + r.name}>

@@ -155,18 +155,25 @@ func (s *Service) sloContextFromRecord(rec model.Record, now, requested time.Tim
 		current = s.recordEvaluationAt(rec, now)
 	}
 	if at.Equal(current) {
-		snapshot.Alert = rec.Alert
+		snapshot.Alert = c.LifecycleAlertState(rec.Alert)
 	} else {
 		snapshot.Alert = model.AlertState{Phase: "historical"}
 	}
-	out := v1.SLOContext{APIVersion: v1.APIVersion, Tenant: s.TenantID, ObservedAt: now, TextTrust: resourceTextTrust, Resource: store.SLOSummary(c), Health: SLOHealth(snapshot), Collection: rec.Collection, Warnings: []string{}, Definition: v1.SLOParameters{Intent: c.Intent, MeasurementBinding: c.MeasurementBinding, Source: c.Source, WindowSeconds: c.WindowSeconds, StepSeconds: c.StepSeconds, Policies: c.Policies, Policy: c.Policy}}
+	out := v1.SLOContext{APIVersion: v1.APIVersion, Tenant: s.TenantID, ObservedAt: now, TextTrust: resourceTextTrust, Resource: store.SLOSummary(c), Health: SLOHealth(snapshot), Collection: rec.Collection, Warnings: []string{}, Definition: v1.SLOParameters{Lifecycle: c.Lifecycle.Effective(), Intent: c.Intent, MeasurementBinding: c.MeasurementBinding, Source: c.Source, WindowSeconds: c.WindowSeconds, StepSeconds: c.StepSeconds, Policies: c.Policies, Policy: c.Policy}}
 	out.Definition.MeasurementMode = "interval_counts"
 	out.Definition.CoverageBasis = "interval_presence"
 	if c.ProviderWindow != nil {
 		out.Definition.MeasurementMode = "provider_window"
 		out.Definition.CoverageBasis = "scrape_density"
 	}
-	out.Measurement = v1.Measurement{EvaluatedAt: snapshot.At, WindowStart: snapshot.From, Target: c.Target, Reliability: snapshot.Reliability, Good: snapshot.Good, Total: snapshot.Total, Coverage: snapshot.Coverage, DataStatus: snapshot.DataStatus, BudgetRemainingFraction: snapshot.BudgetRemainingFraction, BurnRate: snapshot.BurnRate, AlertPhase: snapshot.Alert.Phase, LastAlertEvaluation: snapshot.Alert.LastEvaluated}
+	if !c.AlertsEnabled() {
+		out.Warnings = append(out.Warnings, "burn_alerts_disabled_by_lifecycle")
+	}
+	quality := s.qualityFromRecord(rec, snapshot, now, !requested.IsZero())
+	out.Quality = &quality
+	decision := s.budgetFromEvidence(c, snapshot, quality, !requested.IsZero())
+	out.BudgetDecision = &decision
+	out.Measurement = v1.Measurement{EvaluatedAt: snapshot.At, WindowStart: snapshot.From, Target: c.Target, Reliability: snapshot.Reliability, Good: snapshot.Good, Total: snapshot.Total, Coverage: snapshot.Coverage, DataStatus: snapshot.DataStatus, BudgetRemainingFraction: snapshot.BudgetRemainingFraction, BurnRate: snapshot.BurnRate, AlertPhase: snapshot.Alert.Phase, AlertSuppressedReason: snapshot.Alert.SuppressedReason, LastAlertEvaluation: snapshot.Alert.LastEvaluated}
 	if health, ok := s.measurementHealth(rec); ok {
 		out.MeasurementHealth = &health
 		if health.State != "compatible" {

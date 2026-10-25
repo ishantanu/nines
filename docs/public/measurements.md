@@ -7,14 +7,55 @@ There is no separate measurement to name, save or version in the default flow. M
 ## Create an SLO in the portal
 
 1. Open **Service level objectives → Define objective → Measurement**.
-2. Enter the SLO identity, project, service and configured data source. Choose the metric and the labels selecting eligible events.
+2. Enter the SLO identity, project, service and configured telemetry connection. Choose the metric and the labels selecting eligible events.
 3. Choose successful-event labels, or a classic histogram and latency threshold. State where events are observed and what that observation misses. Set measurement and scrape intervals.
-4. Set the target percentage, rolling window and any burn-rate alert policies. Each policy has its own severity, short and long windows, threshold and pending duration.
+4. Set the target percentage, rolling window, lifecycle and any burn-rate alert policies. Only committed SLOs emit burn alerts; other lifecycles keep measuring. Each policy has its own severity, short and long windows, threshold and pending duration.
 5. Select **Verify telemetry and review SLO**. Nines checks recent metric metadata and observed series and generates one SLO YAML definition. Nothing is saved by this preview.
 6. Review the exact definition, telemetry interval and warnings, acknowledge the measurement semantics, then select **Save reviewed SLO**.
-7. The data source policy controls delivery: with **automatic deployment** enabled, saving queues its rules without another apply action. Otherwise use **Rules → Apply reviewed rules**. Inspect configuration and runtime evidence separately. See [automatic deployment](deployment/automatic-rules.md).
+7. The telemetry connection policy controls delivery: with **automatic deployment** enabled, saving queues its rules without another apply action. Otherwise use **Rules → Apply reviewed rules**. Inspect configuration and runtime evidence separately. See [automatic deployment](deployment/automatic-rules.md).
 
 Edit an existing structured measurement in the same **Measurement** tab. The reviewed update keeps `metadata.name`, increments its revision and resets active measurement evidence when semantics change. A manual edit through this form omits earlier intent provenance; earlier revisions retain it. Use an intent conversation for a new agent-assisted proposal with fresh confirmation and approval.
+
+See [measurement quality](measurement-quality.md) for count/freshness requirements and cohort inspection, and [error-budget response policies](error-budget-policy.md) for operational decisions.
+
+## Lifecycle and alert eligibility
+
+`spec.lifecycle` accepts `experimental`, `aspirational`, `committed` or `deprecated`. Omitting it preserves committed behavior. Choose experimental while validating instrumentation, aspirational for a target you are working toward, committed for an operational commitment, and deprecated while retiring an objective.
+
+All four lifecycles retain SLI measurements, error-budget arithmetic, history and recording rules. Only committed generates burn alert rules and emits Nines burn events. Noncommitted objectives display **Alerts disabled** instead of suggesting a successful alert evaluation. Lifecycle changes create ordinary reviewed revisions. They preserve measurement evidence; a change of population, source or measurement semantics still starts fresh coverage. Promoting to committed produces a review warning.
+
+A definition save does not instantly disable alerts in an external evaluator. With automatic rule delivery, wait for the revised group to be loaded and evaluated. In manual mode, apply the reviewed rules. Until that succeeds, the previous Prometheus/Mimir group can still alert. Nines does not manage existing Alertmanager notifications or silences.
+
+Each burn policy may set `minEvents` to a nonnegative count. Both its short and long windows must contain at least this many eligible events, in addition to sufficient coverage and nonzero traffic. Omit it or use zero for the existing behavior. This is a traffic guard, not a statistical confidence interval; scrape-based counter increases can be fractional estimates. Choose it from the service's traffic and response needs rather than copying a universal value.
+
+For example, add these fields to the complete YAML below:
+
+```yaml
+spec:
+  lifecycle: experimental
+  policies:
+    - name: fast-burn
+      severity: critical
+      shortWindowSeconds: 300
+      longWindowSeconds: 3600
+      burnRate: 14.4
+      forSeconds: 120
+      minCoverage: 1
+      minEvents: 100
+```
+
+This excerpt illustrates the optional fields; it is not a complete SLO. Thresholds above `1 / (1 - target)` are rejected because even 100% failed events cannot reach them. For a 90% target, the maximum burn rate is 10, so a copied 14.4 threshold would never fire.
+
+The offline CLI accepts the same fields. For a single-policy starter:
+
+```sh
+nines init slo --name api --lifecycle experimental --min-events 100 --out api.slo.yaml
+nines validate --offline -f api.slo.yaml
+```
+
+Edit named `policies` in YAML; single-policy override flags deliberately reject ambiguous updates to a list. `--no-policy` removes either form. When an SLO retains intent provenance, its lifecycle and policy fields must agree with that reviewed intent.
+
+Historical burn crossings remain numerical previews even when lifecycle disables alerts. In Nines, insufficient coverage or traffic interrupts pending and never establishes recovery of a firing episode. Prometheus/Mimir use their native alert-state behavior: an absent alert expression can resolve an alert. Validate external notification routing and missing-data monitoring separately.
 
 ## One YAML definition
 
@@ -97,7 +138,7 @@ The portal shows the measured SLI percentage next to the SLO target in objective
 
 `No SLI data` means usable measurements are missing. `No traffic` means samples were received but their total eligible-event count is zero, so no attainment percentage can be calculated. Missing budget data is not displayed as an exhausted progress bar. Alert state and recording-rule deployment are separate from measured attainment. Showing partial measurements does not weaken alert coverage requirements or establish full-window compliance.
 
-## Read measurements from a data source
+## Read measurements from a telemetry connection
 
 Nines reads existing application metrics through the configured Prometheus or Mimir query API. The background collector runs every 15 seconds for SLOs with a source and saved measurement queries. Nines is not a replacement for scraping applications or sending telemetry into those systems.
 

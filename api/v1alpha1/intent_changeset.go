@@ -21,33 +21,39 @@ type IntentAppliedResource struct {
 	Digest   string `json:"digest"`
 }
 type IntentChangeSet struct {
-	RollbackHistory []IntentRollback         `json:"rollbackHistory,omitempty"`
-	Recommendation  *IntentRecommendation    `json:"recommendation,omitempty"`
-	ApprovalReason  string                   `json:"approvalReason,omitempty"`
-	RejectedBy      *InvestigationActor      `json:"rejectedBy,omitempty"`
-	RejectedAt      *time.Time               `json:"rejectedAt,omitempty"`
-	RejectionReason string                   `json:"rejectionReason,omitempty"`
-	Rollback        *IntentRollback          `json:"rollback,omitempty"`
-	SourceDigest    string                   `json:"sourceDigest"`
-	AppliedBy       *InvestigationActor      `json:"appliedBy,omitempty"`
-	ID              string                   `json:"id"`
-	Digest          string                   `json:"digest"`
-	State           string                   `json:"state"`
-	CreatedAt       time.Time                `json:"createdAt"`
-	CreatedBy       InvestigationActor       `json:"createdBy"`
-	IntentDigest    string                   `json:"intentDigest"`
-	Binding         IntentSelection          `json:"binding"`
-	Changes         []IntentDefinitionChange `json:"changes"`
-	ApprovedBy      *InvestigationActor      `json:"approvedBy,omitempty"`
-	ApprovedAt      *time.Time               `json:"approvedAt,omitempty"`
-	AppliedAt       *time.Time               `json:"appliedAt,omitempty"`
-	Applied         []IntentAppliedResource  `json:"applied,omitempty"`
+	ApprovalDigest    string                   `json:"approvalDigest,omitempty"`
+	ObservationPolicy *IntentObservationPolicy `json:"observationPolicy,omitempty"`
+	SafetyException   *IntentSafetyException   `json:"safetyException,omitempty"`
+	SafetyCheck       *IntentSafetyCheck       `json:"safetyCheck,omitempty"`
+	Outcome           *IntentOutcome           `json:"outcome,omitempty"`
+	RollbackHistory   []IntentRollback         `json:"rollbackHistory,omitempty"`
+	Recommendation    *IntentRecommendation    `json:"recommendation,omitempty"`
+	ApprovalReason    string                   `json:"approvalReason,omitempty"`
+	RejectedBy        *InvestigationActor      `json:"rejectedBy,omitempty"`
+	RejectedAt        *time.Time               `json:"rejectedAt,omitempty"`
+	RejectionReason   string                   `json:"rejectionReason,omitempty"`
+	Rollback          *IntentRollback          `json:"rollback,omitempty"`
+	SourceDigest      string                   `json:"sourceDigest"`
+	AppliedBy         *InvestigationActor      `json:"appliedBy,omitempty"`
+	ID                string                   `json:"id"`
+	Digest            string                   `json:"digest"`
+	State             string                   `json:"state"`
+	CreatedAt         time.Time                `json:"createdAt"`
+	CreatedBy         InvestigationActor       `json:"createdBy"`
+	IntentDigest      string                   `json:"intentDigest"`
+	Binding           IntentSelection          `json:"binding"`
+	Changes           []IntentDefinitionChange `json:"changes"`
+	ApprovedBy        *InvestigationActor      `json:"approvedBy,omitempty"`
+	ApprovedAt        *time.Time               `json:"approvedAt,omitempty"`
+	AppliedAt         *time.Time               `json:"appliedAt,omitempty"`
+	Applied           []IntentAppliedResource  `json:"applied,omitempty"`
 }
 type ReviewIntentChangeSet struct {
-	Reason          string `json:"reason,omitempty"`
-	ExpectedVersion int64  `json:"expectedVersion"`
-	Digest          string `json:"digest"`
-	Confirm         bool   `json:"confirm"`
+	SafetyExceptionReason string `json:"safetyExceptionReason,omitempty"`
+	Reason                string `json:"reason,omitempty"`
+	ExpectedVersion       int64  `json:"expectedVersion"`
+	Digest                string `json:"digest"`
+	Confirm               bool   `json:"confirm"`
 }
 
 type IntentResourceVerification struct {
@@ -58,6 +64,7 @@ type IntentResourceVerification struct {
 	Health          string `json:"health"`
 }
 type IntentChangeSetVerification struct {
+	Outcome        *IntentOutcome               `json:"outcome,omitempty"`
 	Operation      string                       `json:"operation,omitempty"`
 	RollbackDigest string                       `json:"rollbackDigest,omitempty"`
 	SourceState    string                       `json:"sourceState"`

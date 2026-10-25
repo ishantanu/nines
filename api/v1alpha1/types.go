@@ -23,21 +23,51 @@ type ProviderWindow struct {
 	TotalSelector         string `json:"totalSelector" yaml:"totalSelector"`
 	ScrapeIntervalSeconds int64  `json:"scrapeIntervalSeconds" yaml:"scrapeIntervalSeconds"`
 }
+
+// SLOLifecycle separates measurement maturity from paging commitments.
+// An omitted lifecycle retains committed behavior.
+type SLOLifecycle string
+
+const (
+	LifecycleExperimental SLOLifecycle = "experimental"
+	LifecycleAspirational SLOLifecycle = "aspirational"
+	LifecycleCommitted    SLOLifecycle = "committed"
+	LifecycleDeprecated   SLOLifecycle = "deprecated"
+)
+
+func (l SLOLifecycle) Effective() SLOLifecycle {
+	if l == "" {
+		return LifecycleCommitted
+	}
+	return l
+}
+func (l SLOLifecycle) Valid() bool {
+	switch l.Effective() {
+	case LifecycleExperimental, LifecycleAspirational, LifecycleCommitted, LifecycleDeprecated:
+		return true
+	default:
+		return false
+	}
+}
+
 type SLOSpec struct {
-	Measurement        *MeasurementSpec  `json:"measurement,omitempty" yaml:"measurement,omitempty"`
-	Intent             *IntentSpec       `json:"intent,omitempty" yaml:"intent,omitempty"`
-	ProviderWindow     *ProviderWindow   `json:"providerWindow,omitempty" yaml:"providerWindow,omitempty"`
-	MeasurementBinding *BindingReference `json:"measurementBinding,omitempty" yaml:"measurementBinding,omitempty"`
-	Source             string            `json:"source,omitempty" yaml:"source,omitempty"`
-	DisplayName        string            `json:"displayName" yaml:"displayName"`
-	Service            string            `json:"service" yaml:"service"`
-	Target             float64           `json:"target" yaml:"target"`
-	WindowSeconds      int64             `json:"windowSeconds" yaml:"windowSeconds"`
-	StepSeconds        int64             `json:"stepSeconds" yaml:"stepSeconds"`
-	GoodQuery          string            `json:"goodQuery,omitempty" yaml:"goodQuery,omitempty"`
-	TotalQuery         string            `json:"totalQuery,omitempty" yaml:"totalQuery,omitempty"`
-	Policies           []BurnRatePolicy  `json:"policies,omitempty" yaml:"policies,omitempty"`
-	Policy             *BurnRatePolicy   `json:"policy,omitempty" yaml:"policy,omitempty"`
+	ErrorBudgetPolicy  *ErrorBudgetPolicy        `json:"errorBudgetPolicy,omitempty" yaml:"errorBudgetPolicy,omitempty"`
+	Quality            *MeasurementQualityPolicy `json:"quality,omitempty" yaml:"quality,omitempty"`
+	Lifecycle          SLOLifecycle              `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`
+	Measurement        *MeasurementSpec          `json:"measurement,omitempty" yaml:"measurement,omitempty"`
+	Intent             *IntentSpec               `json:"intent,omitempty" yaml:"intent,omitempty"`
+	ProviderWindow     *ProviderWindow           `json:"providerWindow,omitempty" yaml:"providerWindow,omitempty"`
+	MeasurementBinding *BindingReference         `json:"measurementBinding,omitempty" yaml:"measurementBinding,omitempty"`
+	Source             string                    `json:"source,omitempty" yaml:"source,omitempty"`
+	DisplayName        string                    `json:"displayName" yaml:"displayName"`
+	Service            string                    `json:"service" yaml:"service"`
+	Target             float64                   `json:"target" yaml:"target"`
+	WindowSeconds      int64                     `json:"windowSeconds" yaml:"windowSeconds"`
+	StepSeconds        int64                     `json:"stepSeconds" yaml:"stepSeconds"`
+	GoodQuery          string                    `json:"goodQuery,omitempty" yaml:"goodQuery,omitempty"`
+	TotalQuery         string                    `json:"totalQuery,omitempty" yaml:"totalQuery,omitempty"`
+	Policies           []BurnRatePolicy          `json:"policies,omitempty" yaml:"policies,omitempty"`
+	Policy             *BurnRatePolicy           `json:"policy,omitempty" yaml:"policy,omitempty"`
 }
 
 type BurnRatePolicy struct {
@@ -48,6 +78,8 @@ type BurnRatePolicy struct {
 	BurnRate           float64 `json:"burnRate" yaml:"burnRate"`
 	ForSeconds         int64   `json:"forSeconds" yaml:"forSeconds"`
 	MinCoverage        float64 `json:"minCoverage" yaml:"minCoverage"`
+	// MinEvents gates both windows by observed count, not statistical confidence.
+	MinEvents float64 `json:"minEvents,omitempty" yaml:"minEvents,omitempty"`
 }
 
 type CriticalUserJourney struct {

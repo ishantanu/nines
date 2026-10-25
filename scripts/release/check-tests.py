@@ -55,9 +55,13 @@ anchors = {
     "mimir": [
         "TestRealMimirTenantCollection",
         "TestRealMimirRuleDestinations",
+        "TestRealMimirLifecycleAndMinEvents",
         "TestRealMimirIndependentAlertLifecycle",
     ],
-    "prometheus": ["TestRealPrometheusReviewedActivation"],
+    "prometheus": [
+        "TestRealPrometheusReviewedActivation",
+        "TestRealPrometheusLifecycleAndMinEvents",
+    ],
     "operator": [
         "TestRealOperatorRuleSelectors",
         "TestRealOperatorControllerConformance",

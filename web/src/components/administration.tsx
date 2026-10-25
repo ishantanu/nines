@@ -235,8 +235,8 @@ export function Connections({ scope }: { scope: RequestScope }) {
       </div>
       {!value.managedConnectionsEnabled ? (
         <p className="text-xs text-muted-foreground">
-          Source management is disabled. A server administrator must configure
-          NINES_SOURCE_HOSTS and an encryption key for credentials.
+          Connection management is disabled. A server administrator must
+          configure NINES_SOURCE_HOSTS and an encryption key for credentials.
         </p>
       ) : null}
       {value.connections.length ? (
@@ -244,9 +244,7 @@ export function Connections({ scope }: { scope: RequestScope }) {
           {value.connections.map((c) => (
             <Card className="gap-0 py-0" key={c.id}>
               <div className="panel-header">
-                <h2 className="text-sm font-semibold">
-                  Metrics source: {c.id}
-                </h2>
+                <h2 className="text-sm font-semibold">Connection: {c.id}</h2>
                 <Badge variant="secondary" className="capitalize">
                   {c.kind}
                 </Badge>
@@ -331,7 +329,7 @@ export function Connections({ scope }: { scope: RequestScope }) {
           <CardContent className="empty-state">
             <PlugZap className="mx-auto mb-3 size-6" />
             <h2 className="font-semibold text-foreground">
-              No data source connected
+              No telemetry connection connected
             </h2>
             <p className="mt-2">
               Connect Prometheus or Mimir to collect SLO measurements. Manual
@@ -354,8 +352,8 @@ export function Connections({ scope }: { scope: RequestScope }) {
           </p>
           <pre className="code-block">{`# Inside a tenant in your server configuration:\nconnections:\n  - name: production\n    kind: mimir\n    url: https://mimir.example.com/prometheus\n    mimirOrgID: production\n    bearerTokenEnv: MIMIR_READ_TOKEN\n    rules:\n      namespace: nines\n      rulerURL: https://mimir-ruler.example.com/prometheus\n      bearerTokenEnv: MIMIR_RULES_TOKEN\n\n# In the SLO YAML: spec.source: production\n# Prometheus: kind: prometheus; rules.directory: /etc/prometheus/rules\n# Apply server configuration and restart to change routing.`}</pre>
           <p className="text-xs text-muted-foreground">
-            This example is for server-managed connections. Use Add data source
-            above to save a managed connection.
+            This example is for server-managed connections. Use Add telemetry
+            connection above to save a managed connection.
           </p>
         </CardContent>
       </Card>

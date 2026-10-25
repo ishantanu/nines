@@ -184,7 +184,7 @@ export function WorkspaceFooter({
   return (
     <footer className="workspace-footer" aria-label="Workspace status">
       <span>
-        Data source:{" "}
+        Telemetry connection:{" "}
         <span className="font-medium text-foreground">{source}</span>
       </span>
       <span className={error ? "status-at-risk" : undefined}>

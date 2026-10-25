@@ -162,7 +162,7 @@ func historyWith(s model.SLO, from, to time.Time, resolution int64, evaluate fun
 			p.LongCoverage = long.Coverage
 			p.ShortBurnRate = short.BurnRate
 			p.LongBurnRate = long.BurnRate
-			p.BurnThresholdBreached = short.BurnRate != nil && long.BurnRate != nil && short.Coverage >= policy.MinCoverage && long.Coverage >= policy.MinCoverage && *short.BurnRate >= policy.BurnRate && *long.BurnRate >= policy.BurnRate
+			p.BurnThresholdBreached = short.BurnRate != nil && long.BurnRate != nil && short.Coverage >= policy.MinCoverage && long.Coverage >= policy.MinCoverage && short.Total >= policy.MinEvents && long.Total >= policy.MinEvents && *short.BurnRate >= policy.BurnRate && *long.BurnRate >= policy.BurnRate
 		}
 		out.Points = append(out.Points, p)
 	}

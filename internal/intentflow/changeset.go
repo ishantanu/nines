@@ -17,8 +17,9 @@ func changeDigest(tenant, id string, c v1.IntentChangeSet) string {
 		Tenant, Conversation, ID, Intent, Source string
 		Binding                                  v1.IntentSelection
 		Changes                                  []v1.IntentDefinitionChange
-		Recommendation                           *v1.IntentRecommendation `json:"Recommendation,omitempty"`
-	}{tenant, id, c.ID, c.IntentDigest, c.SourceDigest, c.Binding, c.Changes, c.Recommendation})
+		Recommendation                           *v1.IntentRecommendation    `json:"Recommendation,omitempty"`
+		ObservationPolicy                        *v1.IntentObservationPolicy `json:"ObservationPolicy,omitempty"`
+	}{tenant, id, c.ID, c.IntentDigest, c.SourceDigest, c.Binding, c.Changes, c.Recommendation, c.ObservationPolicy})
 }
 func invalidateChangeSet(r *record, a v1.InvestigationActor, reason string, now time.Time) error {
 	if r.Session.ChangeSet == nil {
@@ -116,7 +117,16 @@ func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64
 			}
 			c.Changes = append(c.Changes, v1.IntentDefinitionChange{Kind: v1.JourneyKind, Name: p.Journey.Manifest.Metadata.Name, Action: action, ExpectedRevision: p.Journey.ExpectedRevision, Digest: p.Journey.Digest, Manifest: manifest, Previous: previous})
 		}
+		c.ObservationPolicy = observationPolicy(def.Spec.StepSeconds)
 		c.Recommendation = recommendation(r, c)
+		if p.ExpectedRevision > 0 {
+			decision, err := s.Platform.ErrorBudgetDecision(ctx, def.Metadata.Name, p.ExpectedRevision)
+			if err != nil {
+				return err
+			}
+			c.Recommendation.BudgetDecision = &decision
+			c.Recommendation.Limitations = append(c.Recommendation.Limitations, "The frozen budget decision describes evidence at proposal preparation. Read a fresh decision before a release; human approval and deployment authorization remain separate.")
+		}
 		if s.sensitiveInput(c.Recommendation) {
 			return model.Invalid("recommendation evidence contains configured credentials")
 		}
@@ -152,6 +162,7 @@ func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewI
 		return out, e
 	}
 	a, e := human(ctx, s.Platform.TenantID)
+
 	if e != nil {
 		return v1.IntentConversation{}, e
 	}
@@ -167,6 +178,13 @@ func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewI
 			return ErrConflict
 		}
 		if c.State == "approved" {
+			granted := ""
+			if c.SafetyException != nil {
+				granted = c.SafetyException.Reason
+			}
+			if in.SafetyExceptionReason != granted {
+				return ErrConflict
+			}
 			return nil
 		}
 		if c.State != "proposed" {
@@ -178,24 +196,51 @@ func (s *Service) ApproveChangeSet(ctx context.Context, id string, in v1.ReviewI
 		if err := auditRoom(r); err != nil {
 			return err
 		}
+		if in.SafetyExceptionReason != "" {
+			principal, _ := tenancy.FromContext(ctx)
+			if principal.Role != "owner" {
+				return ErrForbidden
+			}
+			if !text(in.SafetyExceptionReason, 1000) || s.sensitiveInput(in.SafetyExceptionReason) {
+				return model.Invalid("provide an explicit corrective-work reason without credentials (maximum 1000 bytes)")
+			}
+			at := s.Platform.Now().UTC()
+			c.SafetyException = &v1.IntentSafetyException{Reason: in.SafetyExceptionReason, ApprovedBy: a, ApprovedAt: at, ExpiresAt: at.Add(30 * time.Minute)}
+		}
 		c.ApprovedBy = &a
 		c.ApprovalReason = in.Reason
 		c.ApprovedAt = &now
 		c.State = "approved"
+		c.ApprovalDigest = approvalDigest(*c)
 		touch(r, now)
-		audit(r, a, "change_set.approved", "succeeded", c.Digest, c.ApprovalReason, now)
+		audit(r, a, "change_set.approved", "succeeded", c.Digest, c.ApprovalReason, now, c.ApprovalDigest)
 		return nil
 	})
 	return r.Session, e
 }
+func approvalDigest(c v1.IntentChangeSet) string {
+	return hash(struct {
+		Digest, Reason string
+		Actor          *v1.InvestigationActor
+		At             *time.Time
+		Exception      *v1.IntentSafetyException
+	}{c.Digest, c.ApprovalReason, c.ApprovedBy, c.ApprovedAt, c.SafetyException})
+}
 func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (out v1.IntentConversation, e error) {
 	defer func() { s.auditFailure(ctx, id, "change_set.applied", in.Digest, e) }()
+	if in.SafetyExceptionReason != "" {
+		return out, model.Invalid("safety exceptions must be approved separately by an owner, never supplied during apply")
+	}
 	a, e := human(ctx, s.Platform.TenantID)
 	if e != nil {
 		return v1.IntentConversation{}, e
 	}
 	if !identifier.MatchString(id) || !in.Confirm || in.ExpectedVersion < 1 || len(in.Digest) != 64 {
 		return v1.IntentConversation{}, model.Invalid("explicitly apply the approved digest and conversation revision")
+	}
+	proofs, err := s.approvalProofs(ctx, id, in.Digest, "change_set.approved")
+	if err != nil {
+		return out, err
 	}
 	r, e := s.Repository.Update(ctx, id, func(r *record, now time.Time) error {
 		c := r.Session.ChangeSet
@@ -213,6 +258,12 @@ func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewInt
 		if active(*r) || r.Session.Version != in.ExpectedVersion || c.State != "approved" || c.ApprovedBy == nil || c.ApprovedAt == nil || r.Session.Goal == nil || hash(*r.Session.Goal) != c.IntentDigest {
 			return ErrConflict
 		}
+		if c.ApprovalDigest == "" || c.ApprovalDigest != approvalDigest(*c) || !proofs[c.ApprovalDigest] {
+			return ErrConflict
+		}
+		if s.AuthorizeReview != nil && s.AuthorizeReview(ctx, *c.ApprovedBy, c.SafetyException != nil) != nil {
+			return ErrForbidden
+		}
 		if a.Subject == c.ApprovedBy.Subject {
 			return ErrForbidden
 		}
@@ -220,6 +271,7 @@ func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewInt
 			return err
 		}
 		evidence := v1.IntentOperationEvidence{Operation: "apply", ChangeSetDigest: c.Digest, ApprovedBy: *c.ApprovedBy, ApprovedAt: *c.ApprovedAt, Reason: c.ApprovalReason}
+		evidence.SafetyException = c.SafetyException
 		if c.Recommendation != nil {
 			evidence.RecommendationDigest = hash(c.Recommendation)
 		}
@@ -228,11 +280,15 @@ func (s *Service) ApplyChangeSet(ctx context.Context, id string, in v1.ReviewInt
 			return err
 		}
 		c.Applied = applied.Resources
+		if applied.Evidence != nil {
+			c.SafetyCheck = applied.Evidence.SafetyCheck
+		}
 		c.AppliedAt = &applied.At
 		c.AppliedBy = &applied.Actor
 		c.State = "applied"
+		c.Outcome = newOutcome(r.Session, *c, "apply", c.Digest, applied.At, c.Applied)
 		touch(r, now)
-		audit(r, applied.Actor, "change_set.applied", "succeeded", c.Digest, "Approved definitions committed atomically. External rules were not deployed.", now)
+		audit(r, applied.Actor, "change_set.applied", "succeeded", c.Digest, "Approved definitions committed atomically with action-time safety evidence. Rule deployment and runtime verification are tracked separately.", now, c.SafetyCheck)
 		return nil
 	})
 	return r.Session, e
@@ -248,6 +304,7 @@ func (s *Service) VerifyChangeSet(ctx context.Context, id string) (v1.IntentChan
 		return out, model.Invalid("apply a reviewed change set before verification")
 	}
 	out.Digest = c.Digest
+	out.Outcome = clone(c.Outcome)
 	out.SourceState = "matches"
 	if c.SourceDigest != s.Platform.SourceFingerprint(r.Scope.Source) {
 		out.SourceState = "changed"
@@ -257,6 +314,7 @@ func (s *Service) VerifyChangeSet(ctx context.Context, id string) (v1.IntentChan
 	if rollback := c.Rollback; rollback != nil && rollback.State == "applied" {
 		out.Operation = "rollback"
 		out.RollbackDigest = rollback.Digest
+		out.Outcome = clone(rollback.Outcome)
 		for _, restored := range rollback.Applied {
 			for i, original := range appliedResources {
 				if original.Kind == restored.Kind && original.Name == restored.Name {

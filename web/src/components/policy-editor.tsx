@@ -69,6 +69,7 @@ export function PolicyEditor({
                 ["burnRate", "Burn threshold"],
                 ["forSeconds", "Pending duration (seconds)"],
                 ["minCoverage", "Minimum coverage (0 to 1)"],
+                ["minEvents", "Minimum events per alert window"],
               ] as const
             ).map(([key, label]) => (
               <div key={key}>
@@ -78,7 +79,7 @@ export function PolicyEditor({
                   type="number"
                   step="any"
                   min="0"
-                  value={policy[key]}
+                  value={policy[key] ?? 0}
                   onChange={(e) => update(index, key, Number(e.target.value))}
                 />
               </div>
@@ -114,6 +115,8 @@ export function PolicyEditor({
       <p className="text-xs text-muted-foreground">
         Each policy has independent pending, firing and recovery state. Windows
         must fit within the SLO window and align with its measurement step.
+        Minimum events gates both windows by observed event count; it is not
+        statistical confidence. Zero keeps the nonzero-traffic requirement.
       </p>
     </div>
   );

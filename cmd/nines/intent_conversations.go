@@ -119,12 +119,15 @@ func conversationCommand(action string, o *options) *cobra.Command {
 					result, e = c.RejectIntentRollback(ctx, id, in)
 				}
 			}
-		case "approve", "apply":
+		case "approve", "apply", "observe":
 			var in v1.ReviewIntentChangeSet
 			if e = conversationFile(*file, &in); e == nil {
-				if action == "approve" {
+				switch action {
+				case "observe":
+					result, e = c.ObserveIntentChangeSet(ctx, id, in)
+				case "approve":
 					result, e = c.ApproveIntentChangeSet(ctx, id, in)
-				} else {
+				default:
 					result, e = c.ApplyIntentChangeSet(ctx, id, in)
 				}
 			}
@@ -163,7 +166,7 @@ func conversationCommand(action string, o *options) *cobra.Command {
 				result, e = c.CancelIntentFlowRun(ctx, id, in.ExpectedVersion)
 			}
 		default:
-			return fmt.Errorf("use intent conversations list|show|create|message|run|confirm|cancel|changes|approve|reject|apply|audit|verify|rollback-plan|rollback-approve|rollback-apply|rollback-reject|kubernetes|rollback-kubernetes")
+			return fmt.Errorf("use intent conversations list|show|create|message|run|confirm|cancel|changes|approve|reject|apply|audit|verify|observe|rollback-plan|rollback-approve|rollback-apply|rollback-reject|kubernetes|rollback-kubernetes")
 		}
 		if e != nil {
 			return e

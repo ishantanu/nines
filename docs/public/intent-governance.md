@@ -30,7 +30,7 @@ The server requires a nonempty review reason for approval, rejection and rollbac
 
 Permissions come from the authenticated server role. CLI `--agent` selects deterministic machine output; it does not downgrade an owner credential. Give automated assistants the server's `agent` role rather than an owner/editor credential.
 
-Definition application performs no provider writes inside its transaction. After commit, an owner-configured automatic data source reconciles its recording/alert rules in the background, including after reviewed rollback. A manual data source still requires separate reviewed apply in **Rules** or the CLI. This policy does not authorize the agent to confirm or approve changes. See [automatic rule deployment](deployment/automatic-rules.md). A stored definition or receipt does not prove rule evaluation, SLO attainment or notification delivery.
+Definition application performs no provider writes inside its transaction. After commit, an owner-configured automatic telemetry connection reconciles its recording/alert rules in the background, including after reviewed rollback. A manual telemetry connection still requires separate reviewed apply in **Rules** or the CLI. This policy does not authorize the agent to confirm or approve changes. See [automatic rule deployment](deployment/automatic-rules.md). A stored definition or receipt does not prove rule evaluation, SLO attainment or notification delivery.
 
 ## Audit records
 
@@ -43,6 +43,64 @@ Successful definition transactions include approval identity, reason, operation 
 Events are append-only through the application. There is no audit-clear endpoint. They persist in a separate PostgreSQL journal, in the same transaction as each conversation update. The explicit in-memory store retains them only for the process lifetime. Conversations keep the latest 256 events for display; older events and proposal snapshots remain in the journal. The 2 MiB conversation size and bounded proposal history still apply, but the recent-event display limit no longer blocks reviews. Infrastructure failures or a full conversation document can prevent recording an attempt. Review transitions and journal inserts commit together. Resource application has a separate durable transaction receipt: if resource commit succeeds but conversation/journal persistence fails, the response is ambiguous. When possible, the journal records `uncertain`, never a claim that definitions were unchanged. An exact authorized retry recovers the receipt and the original applying identity without applying twice. No retention job removes journal rows. Monitor database size and include the journal in backups.
 
 This is an application integrity check, not signed storage or an externally protected immutable archive. A database administrator can modify or remove database contents. Include the database in backups and keep exports under your organization's retention/access policy. An optional owner-configured [S3 Object Lock archive](deployment/audit-archive.md) delivers journal records in the background after verified version/content/retention readback. It is disabled by default. Export to a private temporary file, check the command exit status, then move the complete result into your organization's separately managed archive. Do not treat the application hash chain as an external trust anchor. Exported actor names, review notes and configuration leave server-side access and retention controls.
+
+## Action-time safety checks
+
+Applying a reviewed intent refreshes safety evidence inside the same transaction that commits the SLO and critical user journey changes. The server checks the current definition revision, source fingerprint, saved measurement quality and the existing SLO's error-budget response policy. It also revalidates the approver's current access. The applying identity is authorized through the normal tenant middleware and must differ from the approver.
+
+An existing SLO needs usable quantitative evidence. A configured budget policy must return `proceed`, and a confirmed burn-rate alert must not be firing. An omitted policy adds no budget permission; the quality and human-review requirements still apply. A new definition has no baseline and is explicitly recorded as `initial_definition`; approval permits creation without claiming health. Its lack of a configuration rollback baseline remains visible before approval.
+
+The check does not call a model, collect fresh provider data or perform provider writes inside the database transaction. Collection and measurement verification must already have supplied current evidence. Stale, incomplete or mismatched evidence blocks normal apply, and its sanitized quality/budget report is retained in the independent audit journal. Exact retries recover the original transaction receipt and safety evidence rather than repeating an operation against a later state.
+
+### Corrective-work exceptions
+
+A tenant owner can separately approve corrective work despite adverse measurement or budget evidence. In the portal, expand **Approve corrective work despite adverse evidence** and provide a specific justification. The CLI/API equivalent adds `safetyExceptionReason` to the approval request:
+
+```yaml
+expectedVersion: 17
+digest: REPLACE_WITH_REVIEWED_CHANGE_SET_DIGEST
+confirm: true
+reason: Reviewed the exact measurement correction and recovery risks.
+safetyExceptionReason: Correct the instrumentation definition while collection is being repaired.
+```
+
+The exception expires after 30 minutes and requires a different **tenant owner** to apply. Editors and agents cannot grant it. The applying client cannot introduce an exception in the apply request. The approval snapshot, expiry, justification, adverse evidence and whether the exception was actually used remain auditable. Exceptions never bypass revision checks, source identity, tenant isolation or current authorization. Withdraw an approval and obtain a new review if an exception expires while it is still needed.
+
+An independently approved configuration rollback records fresh quality and budget evidence but remains available during depleted budgets or incomplete measurements. This explicit recovery path retains all source, revision and authorization fences; it is not an automatic exception for an agent-supplied payload.
+
+## Post-change observation
+
+A new proposal freezes its observation policy into the reviewed digest. Defaults are a warmup of `max(120, 2 × stepSeconds)` seconds, followed by `max(300, 5 × stepSeconds)` seconds of qualifying checks. The deadline is warmup plus observation plus 3,600 seconds. These durations are visible before approval; they are operational checks, not a statistical-confidence estimate.
+
+After a successful apply or rollback, the server resumes a durable, read-only observer. It scans conversations in bounded batches every 30 seconds and uses time-limited provider reads against administrator-configured destinations. It checks the exact saved definition and source identity, current owned rule storage, recent successful evaluation, revision-specific output visible in the query dataset, and usable saved SLI evidence. Prometheus, Mimir and portal-managed operator destinations use the same inspection path. The observer never deploys/reloads rules, collects samples, changes targets or applies rollback.
+
+A firing burn-rate alert requires owner review even when rolling attainment meets the target. A pending burn alert resets the qualifying period. A single successful measurement cannot complete verification. Qualifying SLI cutoffs must span the observation period; missing evidence or a gap between checks greater than `max(90, 2 × stepSeconds)` seconds resets that period. Large numbers of pending operations or slow backends can therefore produce insufficient evidence rather than success. This is a bounded single-server observer, not an HA scheduling claim.
+
+| Outcome | Meaning |
+| --- | --- |
+| `pending` | Warmup, runtime activation, saved measurement evidence or the full observation period is incomplete. |
+| `verified` | Current rule storage, evaluation/output and qualifying SLI checks meet the recorded requirements. |
+| `regressed` | Attainment decreased from a usable baseline with the same measurement, rolling window and source. Review correlation before deciding on rollback. |
+| `target_not_met` | Fresh measured SLI remains below target after warmup. |
+| `review_required` | Current evidence requires a response under the configured error-budget policy. |
+| `drifted` | The applied definition is missing, its revision changed, or the source changed. |
+| `insufficient_evidence` | The deadline elapsed without enough evidence to verify the operation. |
+
+Rolling-window comparisons may include traffic from before the change and cannot establish causality. A changed measurement/window has no comparable baseline. The observer does not average percentages across SLOs or claim end-to-end journey success. Terminal reports describe that observation period; they are not a permanent certification of current health.
+
+The portal shows **Post-change verification** with runtime stages, measured/baseline SLI, quality, revision, timestamps and limitations. Pending reports refresh automatically. Use **Check runtime and record outcome** to request a bounded check immediately, or:
+
+```sh
+# Read configuration drift and the most recently saved outcome; no provider query.
+nines intent conversations verify CONVERSATION --context production --agent
+# observe.yaml contains expectedVersion, the applied change-set or rollback digest,
+# and confirm: true. Fetch the latest version because the observer also records updates.
+nines intent conversations observe CONVERSATION --context production -f observe.yaml --agent
+```
+
+`POST /api/intent-conversations/{id}/change-set/observe` and `ObserveIntentChangeSet` in the Go client use that explicit request. The existing read-only `verify_intent_changes` MCP tool returns saved outcomes. It cannot approve exceptions, actuate changes or invoke rollback. Each recorded safety/outcome report is bound to its audit event by an evidence digest and survives conversation updates in the independent journal.
+
+On regression or uncertainty, inspect the evidence and use the separate **Prepare rollback review** flow. Rule activation following an approved restore remains subject to the connection's existing automatic/manual deployment policy. A rollback creates a new tracked observation period; it cannot erase the original result or restore spent budget.
 
 ## Reviewed configuration rollback
 
@@ -107,7 +165,7 @@ The Go client exposes `Audit`, `AuditRecord`, `IntentAuditPage`, `IntentAudit`, 
 
 ## Kubernetes operator and GitOps
 
-For portal-managed operator destinations, apply the reviewed configuration rollback first, then review/publish its new SLO revision through **Rules**. The operator reconciles the new desired configuration; configuration persistence, rule activation and output evidence remain distinct.
+For portal-managed operator destinations, apply the reviewed configuration rollback first. Owner-enabled automatic destinations reconcile the new revision; manual destinations require review/publication through **Rules**. The operator reconciles the new desired configuration; configuration persistence, rule activation and output evidence remain distinct.
 
 For standalone operator/GitOps users, the rollback panel or CLI can export the exact restore definitions with the original/rollback digest annotations:
 
@@ -117,3 +175,5 @@ nines intent conversations rollback-kubernetes CONVERSATION \
 ```
 
 This only creates a local artifact for a separate GitOps review. It does not connect to Kubernetes, apply resources, rewind Kubernetes generations or take ownership of portal-managed resources. Keep the existing GitOps revision and provider status evidence as part of the review.
+
+Standalone GitOps exports are definitions for an external review/deployment system. Applying exported YAML directly to Kubernetes does not run the Nines server's transaction-bound safety gate or outcome observer. Enforce equivalent current-evidence checks and human approval in that GitOps pipeline; do not treat an export annotation as approval or a successful rollout.

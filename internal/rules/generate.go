@@ -155,9 +155,14 @@ func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
 		add("nines:slo_coverage:ratio", coverage, window)
 		add("nines:slo_budget_remaining:ratio", "1 - ("+burn+")", window)
 	}
-	for _, p := range s.AlertPolicies() {
+	for _, p := range s.AlertingPolicies() {
 		join := " on(nines_tenant,nines_source,nines_slo,nines_resource_uid,nines_revision) "
 		expr := fmt.Sprintf("(nines:slo_burn_rate:ratio{%s,window=%q} >= %g) and%s(nines:slo_burn_rate:ratio{%s,window=%q} >= %g) and%s(nines:slo_coverage:ratio{%s,window=%q} >= %g) and%s(nines:slo_coverage:ratio{%s,window=%q} >= %g)", selector, fmt.Sprintf("%ds", p.ShortWindowSeconds), p.BurnRate, join, selector, fmt.Sprintf("%ds", p.LongWindowSeconds), p.BurnRate, join, selector, fmt.Sprintf("%ds", p.ShortWindowSeconds), p.MinCoverage, join, selector, fmt.Sprintf("%ds", p.LongWindowSeconds), p.MinCoverage)
+		if p.MinEvents > 0 {
+			for _, window := range []int64{p.ShortWindowSeconds, p.LongWindowSeconds} {
+				expr += fmt.Sprintf(" and%s(sum_over_time(nines:sli_total:interval{%s}[%ds] offset %ds) >= %g)", join, selector, window, s.StepSeconds, p.MinEvents)
+			}
+		}
 		alertLabels := labels(0)
 		if p.Name != "" {
 			alertLabels["nines_policy"] = p.Name

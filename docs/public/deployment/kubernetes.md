@@ -54,7 +54,7 @@ Back up the external database, identity data, configuration and secrets before u
 
 Reference: Kubernetes [Recreate deployment strategy](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#recreate-deployment).
 
-## Data sources and deployment checks
+## Telemetry connections and deployment checks
 
 Add `NINES_SOURCE_HOSTS` and a private base64 32-byte `NINES_SOURCE_ENCRYPTION_KEY` to `nines-runtime` to enable managed source connections. Generate the key with `openssl rand -base64 32`; retain it separately with recovery secrets. Use Kubernetes service DNS names in endpoints. Mimir organization boundaries still come from trusted tenant YAML, and Prometheus recording files need a writable shared volume plus provider-side loading and reloads.
 

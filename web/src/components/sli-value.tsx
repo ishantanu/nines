@@ -59,7 +59,8 @@ export function SLIValue({
       ) : null}
       {showAlerts &&
       status.alert &&
-      ["firing", "pending"].includes(status.alert.phase) ? (
+      (status.alert.suppressedReason ||
+        ["firing", "pending"].includes(status.alert.phase)) ? (
         <SLOAlertState
           status={{ alert: status.alert, reliability: status.reliability }}
         />
@@ -72,6 +73,24 @@ export function SLOAlertState({
 }: {
   status: Pick<Snapshot, "alert" | "reliability">;
 }) {
+  const lifecycleLabel = (
+    {
+      lifecycle_experimental: "Experimental",
+      lifecycle_aspirational: "Aspirational",
+      lifecycle_deprecated: "Deprecated",
+    } as Record<string, string>
+  )[status.alert.suppressedReason ?? ""];
+  if (status.alert.suppressedReason)
+    return (
+      <span className="text-xs text-muted-foreground">
+        {lifecycleLabel ? (
+          <>
+            <ReplayLabel>{lifecycleLabel}</ReplayLabel> ·{" "}
+          </>
+        ) : null}
+        <ReplayLabel>Alerts disabled</ReplayLabel>
+      </span>
+    );
   if (status.alert.phase === "firing")
     return (
       <span className="text-xs font-medium status-degraded">

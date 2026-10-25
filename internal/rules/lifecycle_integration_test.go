@@ -31,7 +31,7 @@ func TestRealMimirIndependentAlertLifecycle(t *testing.T) {
 	if ip := net.ParseIP(u.Hostname()); u.Hostname() != "localhost" && (ip == nil || !ip.IsLoopback()) {
 		t.Fatal("refusing non-loopback writes")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
 	defer cancel()
 	target := Target{Connection: "production", Kind: "mimir", QueryURL: base + "/prometheus", RulerURL: base + "/prometheus", MimirOrgID: "nines-policy-acceptance", Namespace: fmt.Sprintf("policy-%d", time.Now().UnixNano())}
 	sourceGroup := Group{Name: "synthetic-input", Interval: "1s"}
@@ -69,14 +69,18 @@ func TestRealMimirIndependentAlertLifecycle(t *testing.T) {
 	slo := fixture()
 	slo.ID = "independent-policies"
 	slo.Revision = 3
-	slo.StepSeconds = 1
+	// Give the distributed ruler/query/ingestion path a completed five-second
+	// interval. At a one-second cadence, transient visibility gaps reset strict
+	// full-coverage alerts and make pending/recovery timing nondeterministic.
+	// Keep MinCoverage=1: this fixture must never relax the production guard.
+	slo.StepSeconds = 5
 	slo.WindowSeconds = 60
 	slo.GoodQuery = fmt.Sprintf(`sum(fixture:nines_good:interval{run=%q})`, target.Namespace)
 	slo.TotalQuery = fmt.Sprintf(`sum(fixture:nines_total:interval{run=%q})`, target.Namespace)
 	slo.Policy = nil
 	slo.Policies = []model.Policy{
-		{Name: "critical", Severity: "critical", ShortWindowSeconds: 2, LongWindowSeconds: 4, BurnRate: 8, ForSeconds: 6, MinCoverage: 1},
-		{Name: "warning", Severity: "warning", ShortWindowSeconds: 4, LongWindowSeconds: 8, BurnRate: 2, ForSeconds: 14, MinCoverage: 1},
+		{Name: "critical", Severity: "critical", ShortWindowSeconds: 10, LongWindowSeconds: 20, BurnRate: 8, ForSeconds: 10, MinCoverage: 1},
+		{Name: "warning", Severity: "warning", ShortWindowSeconds: 20, LongWindowSeconds: 40, BurnRate: 2, ForSeconds: 30, MinCoverage: 1},
 	}
 	manager := Manager{Tenant: "acceptance", Targets: map[string]Target{"production": target}}
 	plan, err := manager.Plan(slo)
@@ -87,6 +91,9 @@ func TestRealMimirIndependentAlertLifecycle(t *testing.T) {
 		t.Fatal(result, err)
 	}
 	type liveRule struct {
+		Health         string            `json:"health"`
+		LastError      string            `json:"lastError"`
+		Query          string            `json:"query"`
 		State          string            `json:"state"`
 		Labels         map[string]string `json:"labels"`
 		Duration       float64           `json:"duration"`
@@ -125,6 +132,9 @@ func TestRealMimirIndependentAlertLifecycle(t *testing.T) {
 				t.Fatal("runtime escaped requested group or namespace")
 			}
 			for _, rule := range group.Rules {
+				if rule.LastError != "" || rule.Health == "err" {
+					t.Fatalf("fixture rule evaluation failed: %s", rule.LastError)
+				}
 				policy := rule.Labels["nines_policy"]
 				if policy == "" {
 					continue
@@ -158,13 +168,25 @@ func TestRealMimirIndependentAlertLifecycle(t *testing.T) {
 	}
 	wait := func(phase string, condition func(map[string]liveRule) bool) {
 		t.Helper()
+		// Each phase needs its own window. Startup and earlier pending timers must
+		// not consume the recovery window that this phase is required to prove.
+		phaseCtx, stop := context.WithTimeout(ctx, 3*time.Minute)
+		defer stop()
+		checks := 0
 		for {
+			checks++
+			if strings.HasPrefix(phase, "critical recovers") && checks == 50 {
+				for _, metric := range []string{"nines:slo_burn_rate:ratio", "nines:slo_coverage:ratio", "nines:sli_good:interval", "nines:sli_total:interval", "fixture:nines_good:interval"} {
+					_, body, err := rulerRequest(ctx, target, http.MethodGet, "/api/v1/query?query="+url.QueryEscape(metric), nil)
+					t.Logf("fixture diagnostics %s: %s (%v)", metric, body, err)
+				}
+			}
 			if condition(read()) {
 				t.Log("Verified phase:", phase)
 				return
 			}
 			select {
-			case <-ctx.Done():
+			case <-phaseCtx.Done():
 				t.Fatal("alert lifecycle timed out in phase", phase)
 			case <-time.After(400 * time.Millisecond):
 			}
@@ -174,7 +196,7 @@ func TestRealMimirIndependentAlertLifecycle(t *testing.T) {
 		if len(r) != 2 || r["critical"].State != "inactive" || r["warning"].State != "inactive" {
 			return false
 		}
-		expression := fmt.Sprintf(`nines:slo_coverage:ratio{nines_tenant="acceptance",nines_source="production",nines_slo=%q,window="8s"} == 1`, slo.ID)
+		expression := fmt.Sprintf(`nines:slo_coverage:ratio{nines_tenant="acceptance",nines_source="production",nines_slo=%q,window="40s"} == 1`, slo.ID)
 		code, body, err := rulerRequest(ctx, target, http.MethodGet, "/api/v1/query?query="+url.QueryEscape(expression), nil)
 		var response struct {
 			Status string `json:"status"`
@@ -205,7 +227,7 @@ func TestRealMimirIndependentAlertLifecycle(t *testing.T) {
 		if recovered.IsZero() {
 			recovered = r["critical"].LastEvaluation
 		}
-		return r["critical"].LastEvaluation.Sub(recovered) >= 2*time.Second
+		return r["critical"].LastEvaluation.Sub(recovered) >= 2*time.Duration(slo.StepSeconds)*time.Second
 	})
 	setGood(100)
 	wait("warning recovers independently after healthy input", func(r map[string]liveRule) bool {

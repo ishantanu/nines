@@ -41,7 +41,11 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 	searchCursor := flags.String("cursor", "", "opaque next-page cursor")
 	contextAt := flags.String("at", "", "context requested wall clock RFC3339")
 	server, tenant := &o.Server, &o.Tenant
-	expected := flags.Int64("expected-revision", -1, "0 creates; current revision updates")
+	revisionUsage := "0 creates; current revision updates"
+	if action == "quality" || action == "budget" {
+		revisionUsage = "require this positive current definition revision (omit for latest)"
+	}
+	expected := flags.Int64("expected-revision", -1, revisionUsage)
 	digest := flags.String("expected-digest", "", "reviewed rule plan digest")
 	flags.StringVar(&id, "id", id, "SLO identifier")
 	outputDefault := "json"
@@ -50,6 +54,8 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 	}
 	output := new(string)
 	pathOut := flags.String("out", "", "write generated YAML to a new file")
+	budgetCheck := flags.Bool("check", false, "exit 7 unless the configured error-budget decision is proceed")
+	cohorts := flags.Bool("cohorts", false, "explicitly query bounded cohort counts from the configured provider")
 	recent := flags.Bool("recent", false, "collect a bounded recent range using the server clock")
 	from := flags.String("from", "", "range start RFC3339")
 	to := flags.String("to", "", "range end RFC3339")
@@ -69,6 +75,8 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 	threshold := flags.Float64("burn-rate", 14.4, "both-window burn threshold")
 	pending := flags.String("for", "2m", "pending duration")
 	coverage := flags.Float64("min-coverage", 1, "minimum coverage fraction")
+	minEvents := flags.Float64("min-events", 0, "minimum eligible events in each burn window (not statistical confidence)")
+	lifecycle := flags.String("lifecycle", "", "experimental, aspirational, committed (default) or deprecated")
 	good := flags.String("good-query", "", "good interval-count expression")
 	total := flags.String("total-query", "", "total interval-count expression")
 	noPolicy := flags.Bool("no-policy", false, "omit burn-rate alert policy")
@@ -165,6 +173,9 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 					*field.destination = v
 				}
 			}
+			if visited["lifecycle"] {
+				d.Spec.Lifecycle = v1.SLOLifecycle(*lifecycle)
+			}
 			if visited["target"] {
 				d.Spec.Target = *target
 			}
@@ -177,7 +188,10 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			if visited["total-query"] {
 				d.Spec.TotalQuery = *total
 			}
-			for _, key := range []string{"short-window", "long-window", "burn-rate", "for", "min-coverage"} {
+			for _, key := range []string{"short-window", "long-window", "burn-rate", "for", "min-coverage", "min-events"} {
+				if visited[key] && len(d.Spec.Policies) > 0 {
+					return usage("single-policy override flags cannot edit named policies; edit the YAML policies instead")
+				}
 				if visited[key] && d.Spec.Policy == nil {
 					d.Spec.Policy = &model.Policy{ShortWindowSeconds: min(300, d.Spec.WindowSeconds), LongWindowSeconds: min(3600, d.Spec.WindowSeconds), BurnRate: 14.4, MinCoverage: 1}
 				}
@@ -198,11 +212,15 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 				if visited["burn-rate"] {
 					p.BurnRate = *threshold
 				}
+				if visited["min-events"] {
+					p.MinEvents = *minEvents
+				}
 				if visited["min-coverage"] {
 					p.MinCoverage = *coverage
 				}
 			}
 			if *noPolicy {
+				d.Spec.Policies = nil
 				d.Spec.Policy = nil
 			}
 			if err := d.Validate(); err != nil {
@@ -374,6 +392,33 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			if len(q) > 0 {
 				path += "?" + q.Encode()
 			}
+		case "budget":
+			q := url.Values{}
+			if visited["expected-revision"] {
+				if *expected < 1 {
+					return usage("expected-revision must be positive")
+				}
+				q.Set("expectedRevision", strconv.FormatInt(*expected, 10))
+			}
+			path = "/api/slos/" + id + "/budget"
+			if len(q) > 0 {
+				path += "?" + q.Encode()
+			}
+		case "quality":
+			q := url.Values{}
+			if *cohorts {
+				q.Set("cohorts", "true")
+			}
+			if visited["expected-revision"] {
+				if *expected < 1 {
+					return usage("expected-revision must be positive")
+				}
+				q.Set("expectedRevision", strconv.FormatInt(*expected, 10))
+			}
+			path = "/api/slos/" + id + "/quality"
+			if len(q) > 0 {
+				path += "?" + q.Encode()
+			}
 		case "status":
 			path = "/api/slos/" + id + "/status"
 		case "history":
@@ -528,7 +573,16 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 		if action == "get" || action == "connections-list" {
 			return render(out, value, *output, kind)
 		}
-		return render(out, value, *output, action)
+		if err := render(out, value, *output, action); err != nil {
+			return err
+		}
+		if action == "budget" && *budgetCheck {
+			var decision v1.ErrorBudgetDecision
+			if err := json.Unmarshal(data, &decision); err != nil || decision.APIVersion != v1.APIVersion || decision.SLOID != id || decision.Tenant != *tenant || decision.Revision < 1 || (visited["expected-revision"] && decision.Revision != *expected) || decision.DefinitionDigest == "" || decision.PolicyDigest == "" || decision.State != "proceed" || decision.QualityState != "usable" || decision.SourceDigest == "" || decision.Evidence == nil || decision.Evidence.Coverage != 1 || decision.Evidence.Total <= 0 || decision.Evidence.Total < decision.Evidence.MinimumEvents || decision.Evidence.Freshness.State != "fresh" {
+				return &cliError{Code: "budget_policy", Message: "error-budget policy does not permit proceeding; review the decision evidence", Exit: 7}
+			}
+		}
+		return nil
 	}
 	return cmd
 }

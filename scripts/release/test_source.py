@@ -109,13 +109,20 @@ class RequiredIntegrationTests(unittest.TestCase):
             for n in [
                 "TestRealMimirTenantCollection",
                 "TestRealMimirRuleDestinations",
+                "TestRealMimirLifecycleAndMinEvents",
                 "TestRealMimirIndependentAlertLifecycle",
             ]
         ]
         self.assertEqual(self.run_gate(rows, "mimir"), 0)
-        self.assertNotEqual(self.run_gate(rows[:2], "mimir"), 0)
-        rows[0]["Action"] = "skip"
-        self.assertNotEqual(self.run_gate(rows, "mimir"), 0)
+        for index in range(len(rows)):
+            with self.subTest(missing=rows[index]["Test"]):
+                self.assertNotEqual(
+                    self.run_gate(rows[:index] + rows[index + 1 :], "mimir"), 0
+                )
+            with self.subTest(skipped=rows[index]["Test"]):
+                skipped = [dict(row) for row in rows]
+                skipped[index]["Action"] = "skip"
+                self.assertNotEqual(self.run_gate(skipped, "mimir"), 0)
 
     def test_operator_requires_real_selector_case(self):
         rows = [

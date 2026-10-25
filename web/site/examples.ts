@@ -84,7 +84,7 @@ nines:rule_definition:info{nines_tenant="prometheus",nines_slo="checkout-success
 
 # Active critical or warning burn alerts
 ALERTS{alertname="NinesSLOBurnRate",alertstate="firing"}`,
-    note: "Use localhost:19090/query and /rules. Prometheus's /metrics endpoint exposes its own instrumentation, not recording-rule results. Use nines integration SLO_ID --agent for stage-specific diagnostics, query-dataset output verification and next steps. The playground automatically reconciles saved SLO rules and reloads Prometheus. Other data sources opt in with rules.autoDeploy: true. File written, activation and runtime evaluation are separate results. The configuration marker does not verify traffic coverage or alert delivery. Configured alerts can be inactive while traffic is healthy.",
+    note: "Use localhost:19090/query and /rules. Prometheus's /metrics endpoint exposes its own instrumentation, not recording-rule results. Use nines integration SLO_ID --agent for stage-specific diagnostics, query-dataset output verification and next steps. The playground automatically reconciles saved SLO rules and reloads Prometheus. Other telemetry connections opt in with rules.autoDeploy: true. File written, activation and runtime evaluation are separate results. The configuration marker does not verify traffic coverage or alert delivery. Configured alerts can be inactive while traffic is healthy.",
     path: "docs/public/deployment/metrics-and-rules.md",
     link: "Metrics and rule destinations",
   },

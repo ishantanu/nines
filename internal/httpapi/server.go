@@ -139,6 +139,8 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 	api.HandleFunc("GET /api/slos/{id}", a.sloGet)
 	api.HandleFunc("POST /api/slos", a.create)
 	api.HandleFunc("GET /api/slos/{id}/status", a.status)
+	api.HandleFunc("GET /api/slos/{id}/quality", a.measurementQuality)
+	api.HandleFunc("GET /api/slos/{id}/budget", a.budgetDecision)
 	api.HandleFunc("GET /api/slos/{id}/samples", a.samples)
 	api.HandleFunc("GET /api/slos/{id}/history", a.history)
 	api.HandleFunc("POST /api/slos/{id}/samples", a.ingest)

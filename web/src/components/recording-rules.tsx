@@ -137,7 +137,7 @@ export function RecordingRules({
           <div className="panel-header">
             <h2 className="section-label">Rule destination</h2>
             <Button variant="ghost" size="sm" onClick={onConnections}>
-              Data sources
+              Telemetry connections
             </Button>
           </div>
           <CardContent className="space-y-3 p-5">
@@ -288,7 +288,7 @@ export function RecordingRules({
               {error}
               {stale
                 ? " Refresh the plan before retrying."
-                : " Review the selected connection and SLO queries in Data sources and Configuration."}
+                : " Review the selected connection and SLO queries in Telemetry connections and Configuration."}
             </p>
           ) : null}
           {result ? <RuleApplyEvidence result={result} /> : null}
@@ -428,8 +428,8 @@ export function RecordingRules({
               {scope.role !== "owner" ? (
                 <p className="text-xs text-muted-foreground">
                   An owner role is required for manual deployment and automation
-                  controls. Automatic deployment follows the data source policy
-                  for saved definitions.
+                  controls. Automatic deployment follows the telemetry
+                  connection policy for saved definitions.
                 </p>
               ) : null}
             </>

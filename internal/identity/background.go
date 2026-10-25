@@ -7,6 +7,13 @@ import "context"
 func (s *Service) AuthorizeBackground(ctx context.Context, tenant, subject, kind string) error {
 	return s.authorizeBackground(ctx, tenant, subject, kind, rank("agent"))
 }
+func (s *Service) AuthorizeBackgroundReview(ctx context.Context, tenant, subject, kind string, owner bool) error {
+	minimum := rank("editor")
+	if owner {
+		minimum = rank("owner")
+	}
+	return s.authorizeBackground(ctx, tenant, subject, kind, minimum)
+}
 func (s *Service) AuthorizeBackgroundRead(ctx context.Context, tenant, subject, kind string) error {
 	return s.authorizeBackground(ctx, tenant, subject, kind, rank("viewer"))
 }

@@ -55,6 +55,15 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	if err := s.validateBindingReference(ctx, d.SLO.SLO()); err != nil {
 		return p, err
 	}
+	if !d.SLO.SLO().AlertsEnabled() {
+		p.Warnings = append(p.Warnings, "Lifecycle "+string(d.SLO.Spec.Lifecycle)+": measurements and recording rules remain enabled; Nines and generated provider burn alerts are disabled.")
+	}
+	for _, policy := range d.SLO.SLO().AlertPolicies() {
+		if policy.MinEvents > 0 {
+			p.Warnings = append(p.Warnings, "minEvents gates both alert windows by observed traffic count; it does not establish statistical confidence.")
+			break
+		}
+	}
 	if s.RuleManager != nil {
 		if target, ok := s.RuleManager.TargetFor(d.SLO.SLO()); ok && target.AutoDeploy {
 			p.Warnings = append(p.Warnings, "Saving this definition queues automatic recording and alert rule deployment under the data source policy. Activation and runtime evaluation are reported separately.")
@@ -66,6 +75,9 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	}
 	if err != nil {
 		return p, err
+	}
+	if !old.SLO.AlertsEnabled() && d.SLO.SLO().AlertsEnabled() {
+		p.Warnings = append(p.Warnings, "Promoting this SLO to committed enables its configured burn alerts. Review the thresholds, traffic guard and rule destination before applying.")
 	}
 	manifest := model.DefinitionFromSLO(old.SLO)
 	p.ExpectedRevision = model.ConfigRevision(old.SLO)

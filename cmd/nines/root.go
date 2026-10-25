@@ -138,16 +138,19 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 			core(g, a, k, use, "server", "read", g.Short, min, max)
 		}
 	}
-	for _, a := range []string{"status", "integration", "history", "collect", "events", "search"} {
+	for _, a := range []string{"status", "quality", "budget", "integration", "history", "collect", "events", "search"} {
 		use, min, max := a+" ID", 1, 1
 		effect := "read"
 		if a == "events" || a == "search" {
 			use, min, max = a, 0, 0
 		}
+		if a == "quality" {
+			effect = "provider-read"
+		}
 		if a == "collect" {
 			effect = "write"
 		}
-		core(r, a, "", use, "server", effect, map[string]string{"integration": "Check definition, collection, rule deployment and external evaluation", "status": "Show current SLO calculation", "history": "Read SLI, SLO and burn-rate history", "collect": "Collect a bounded measurement range", "events": "List alert transitions", "search": "Search tenant resource metadata"}[a], min, max)
+		core(r, a, "", use, "server", effect, map[string]string{"budget": "Read the error-budget response decision; optionally gate CI with --check", "quality": "Explain measurement freshness, coverage, traffic and optional cohort evidence", "integration": "Check definition, collection, rule deployment and external evaluation", "status": "Show current SLO calculation", "history": "Read SLI, SLO and burn-rate history", "collect": "Collect a bounded measurement range", "events": "List alert transitions", "search": "Search tenant resource metadata"}[a], min, max)
 	}
 	g = group(r, "connections", "Inspect configured data sources")
 	core(g, "connections-list", "", "list", "server", "read", "List configured sources", 0, 0)
@@ -172,7 +175,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 		intent.AddCommand(mark(intentCommand(a, o), "server", effect, map[string]string{"draft": "Draft using the configured model", "plan": "Compile a reviewed measurement selection", "backtest": "Backtest a selection against provider telemetry"}[a]))
 	}
 	g = group(intent, "conversations", "Durable preparation, review, apply and verification")
-	for _, a := range []string{"list", "show", "create", "message", "run", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
+	for _, a := range []string{"list", "show", "create", "message", "run", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "observe", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
 		use, min, max := a+" ID", 1, 1
 		effect := "write"
 		if a == "list" || a == "create" {
@@ -184,7 +187,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 		if a == "run" {
 			effect = "model-call"
 		}
-		g.AddCommand(mark(position(conversationCommand(a, o), use, min, max), "server", effect, map[string]string{"list": "List saved conversations", "show": "Read one conversation", "create": "Create a preparation conversation", "message": "Append a clarification", "run": "Prepare with explicit model consent", "confirm": "Confirm a measurement revision", "cancel": "Cancel preparation", "changes": "Freeze exact SLO and journey changes", "approve": "Approve an exact change-set digest", "reject": "Reject changes or withdraw approval with a reason", "audit": "Read the decision audit log", "rollback-plan": "Prepare a revision-fenced configuration rollback", "rollback-approve": "Approve an exact rollback digest", "rollback-apply": "Apply an approved configuration rollback", "rollback-reject": "Reject or withdraw rollback approval", "rollback-kubernetes": "Export reviewed rollback definitions for GitOps", "apply": "Atomically apply approved definitions", "verify": "Verify applied revisions and source identity", "kubernetes": "Export exact definitions for GitOps review"}[a]))
+		g.AddCommand(mark(position(conversationCommand(a, o), use, min, max), "server", effect, map[string]string{"list": "List saved conversations", "show": "Read one conversation", "create": "Create a preparation conversation", "message": "Append a clarification", "run": "Prepare with explicit model consent", "confirm": "Confirm a measurement revision", "cancel": "Cancel preparation", "changes": "Freeze exact SLO and journey changes", "approve": "Approve an exact change-set digest", "reject": "Reject changes or withdraw approval with a reason", "audit": "Read the decision audit log", "rollback-plan": "Prepare a revision-fenced configuration rollback", "rollback-approve": "Approve an exact rollback digest", "rollback-apply": "Apply an approved configuration rollback", "rollback-reject": "Reject or withdraw rollback approval", "rollback-kubernetes": "Export reviewed rollback definitions for GitOps", "apply": "Atomically apply approved definitions", "observe": "Inspect runtime and persist post-change outcome evidence", "verify": "Read applied revisions and recorded outcome evidence", "kubernetes": "Export exact definitions for GitOps review"}[a]))
 	}
 	for _, name := range []string{"telemetry", "bindings", "dependencies"} {
 		g := group(r, name, map[string]string{"telemetry": "Discover configured source measurements", "bindings": "Review and compile measurement bindings", "dependencies": "Read service dependency maps"}[name])
@@ -239,8 +242,8 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	return r
 }
 func exposeCoreFlags(c *cobra.Command, fs *pflag.FlagSet, a string) {
-	def := "file window step target source short-window long-window burn-rate for min-coverage good-query total-query no-policy"
-	allowed := map[string]string{"init": "out name project service display-name " + strings.ReplaceAll(def, "file ", ""), "validate": def, "plan": def, "apply": def + " expected-revision", "get": "", "export": "out", "describe": "", "context": "expected-revision at limit cursor", "search": "kind query project limit cursor linked-slo", "status": "", "integration": "", "history": "from to range resolution revision", "collect": "from to recent", "events": "id", "connections-list": "", "connections-test": "", "rules-generate": "out " + def, "rules-plan": "id", "rules-apply": "id expected-digest", "rules-pause": "id expected-revision", "rules-resume": "id expected-revision", "rules-withdraw": "id expected-digest"}[a]
+	def := "file window step target source lifecycle short-window long-window burn-rate for min-coverage min-events good-query total-query no-policy"
+	allowed := map[string]string{"init": "out name project service display-name " + strings.ReplaceAll(def, "file ", ""), "validate": def, "plan": def, "apply": def + " expected-revision", "get": "", "export": "out", "describe": "", "context": "expected-revision at limit cursor", "search": "kind query project limit cursor linked-slo", "status": "", "quality": "cohorts expected-revision", "budget": "check expected-revision", "integration": "", "history": "from to range resolution revision", "collect": "from to recent", "events": "id", "connections-list": "", "connections-test": "", "rules-generate": "out " + def, "rules-plan": "id", "rules-apply": "id expected-digest", "rules-pause": "id expected-revision", "rules-resume": "id expected-revision", "rules-withdraw": "id expected-digest"}[a]
 	for _, name := range strings.Fields(allowed) {
 		c.Flags().AddFlag(fs.Lookup(name))
 	}

@@ -104,7 +104,7 @@ func TestAgentContextEvaluationFixtures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"search_resources", "slo_context", "journey_context"} {
+	for _, name := range []string{"search_resources", "slo_context", "journey_context", "slo_quality", "slo_budget_decision"} {
 		found := false
 		for _, tool := range tools.Tools {
 			if tool.Name == name {

@@ -148,6 +148,7 @@ func run(log *slog.Logger) error {
 		workers.Go(func() { svc.RunRuleReconciler(ctx, ruleManager, tenantLog) })
 		intentConversations := runtime.Workspace.IntentConversations
 		workers.Go(func() { intentConversations.RunWorker(ctx, tenantLog) })
+		workers.Go(func() { intentConversations.RunOutcomeObserver(ctx, tenantLog) })
 		if intentConversations.Archive != nil {
 			workers.Go(func() { intentConversations.Archive.Run(ctx, tenantLog) })
 		}

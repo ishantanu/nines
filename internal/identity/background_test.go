@@ -42,3 +42,23 @@ func TestBackgroundAuthorizationRechecksSSOClaimsAndAccountRevocation(t *testing
 		t.Fatal("expired SSO evidence retained background access")
 	}
 }
+
+func TestBackgroundReviewRequiresCurrentHumanRole(t *testing.T) {
+	ctx := context.Background()
+	s := mappingFixture(t, NewMemory())
+	_, editor := mappedLogin(t, s, "editor", evidence([]string{"group-engineers"}, nil))
+	if err := s.AuthorizeBackgroundReview(ctx, "alpha", editor.ID, "user", false); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.AuthorizeBackgroundReview(ctx, "alpha", editor.ID, "user", true); err == nil {
+		t.Fatal("editor authorized owner exception")
+	}
+	_, owner := mappedLogin(t, s, "owner", evidence(nil, []string{"Reliability.Admin"}))
+	if err := s.AuthorizeBackgroundReview(ctx, "alpha", owner.ID, "user", true); err != nil {
+		t.Fatal(err)
+	}
+	mappedLogin(t, s, "owner", evidence(nil, []string{"Reliability.Reader"}))
+	if err := s.AuthorizeBackgroundReview(ctx, "alpha", owner.ID, "user", true); err == nil {
+		t.Fatal("downgraded approver retained owner authorization")
+	}
+}

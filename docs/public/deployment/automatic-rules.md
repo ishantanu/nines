@@ -1,6 +1,6 @@
 # Automatic rule deployment
 
-An owner can enable automatic rule deployment for a data source. Creating or editing an SLO through the portal, CLI or an approved intent workflow then queues its recording and burn-rate alert rules automatically. The same policy applies to a reviewed configuration rollback. The SLO save is a database operation; provider calls happen afterward in the reconciler. A failed deployment does not undo or conceal the saved definition.
+An owner can enable automatic rule deployment for a telemetry connection. Creating or editing an SLO through the portal, CLI or an approved intent workflow then queues its recording and burn-rate alert rules automatically. The same policy applies to a reviewed configuration rollback. The SLO save is a database operation; provider calls happen afterward in the reconciler. A failed deployment does not undo or conceal the saved definition.
 
 The Compose playground enables this policy for Prometheus and its optional Mimir workspace. Other sources remain manual until explicitly enabled. Owners should review this delegation: it covers existing and future saved SLOs using the source. The agent role still cannot save arbitrary definitions, confirm intent measurements or approve/apply intent change sets. Automatic delivery does not approve an agent recommendation.
 
@@ -48,7 +48,7 @@ For portal publishing through the operator, set `rules.mode: operator`, the trus
 
 ## Configure in the portal
 
-Under **Data sources**, an owner can enable rule deployment and **Deploy rules automatically after SLO saves** for a managed connection. Prometheus reload is required and enabled while automatic deployment is selected. The managed rule directory and allowed provider hosts/organizations remain server configuration. Static YAML sources are edited through their server configuration.
+Under **Telemetry connections**, an owner can enable rule deployment and **Deploy rules automatically after SLO saves** for a managed connection. Prometheus reload is required and enabled while automatic deployment is selected. The managed rule directory and allowed provider hosts/organizations remain server configuration. Static YAML sources are edited through their server configuration.
 
 Open an SLO's **Integration status** to see automatic deployment as pending, applying, applied, failed, overdue or paused. Rule configuration, backend activation, runtime evaluation, query-output visibility and SLO attainment remain independent evidence. A written file or accepted ruler POST does not mean the rules are evaluating. Reload failures remain visible and retain the written file for recovery.
 

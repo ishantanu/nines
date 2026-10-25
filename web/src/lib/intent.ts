@@ -4,6 +4,9 @@ import { durationSeconds } from "./history";
 import type { SLO, Manifest, MeasurementSpec } from "./api";
 import type { BindingManifest } from "./topology";
 export interface IntentSpec {
+  lifecycle?: SLO["lifecycle"];
+  quality?: SLO["quality"];
+  errorBudgetPolicy?: SLO["errorBudgetPolicy"];
   measurement?: MeasurementSpec;
   stepSeconds?: number;
   description: string;

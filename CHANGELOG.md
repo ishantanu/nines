@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Enforce transaction-bound measurement-quality and error-budget safety checks before reviewed intent changes, with current reviewer authorization and separately approved, expiring corrective-work exceptions.
+- Persist post-apply/rollback runtime and SLI observation, require sustained evidence, detect drift or observed regressions, and bind safety/outcome reports into the independent audit journal. Expose outcomes through the portal, CLI, Go client and read-only MCP verification.
+
+- Add revision-bound measurement-quality reports, configurable count/freshness requirements and explicit bounded cohort inspection for Prometheus/Mimir.
+- Add SLO-owned error-budget response policies, fail-closed CLI CI checks and frozen budget evidence in agent proposal reviews.
+- Document provider extension interfaces and the current lack of native New Relic/Datadog adapters.
+
+- Added optional SLO/intent lifecycle across server, CLI, portal, agent context and Kubernetes CRDs. Noncommitted objectives retain measurements and recording rules while suppressing burn alerts.
+- Added per-policy minimum traffic counts for both burn windows and validation rejecting unreachable burn thresholds.
+- Lifecycle edits retain measurement evidence, use revision checks and show promotion warnings in reviewed plans.
+- Credited both editions of *Site Reliability Engineering* alongside Sloth and Pyrra.
+
+- Rename the portal connection area to Telemetry connections, retaining legacy bookmarks and API/YAML contracts. Add responsive SLO timelines with shared pointer/keyboard inspection, UTC axes, dark-theme colors and an explicit-apply custom time-range picker.
+
 - Preserve approved navigation, controls and known UI states in session replay while masking private values, with a shared server-enforced label catalog and explicit recording policy.
 
 - Harden replay scope transitions, private-region exclusion, stored-payload integrity, structural validation and visible player failures. Prevent stale save responses from changing navigation or discarding a newer capture; document the desktop/offline release acceptance matrix.
