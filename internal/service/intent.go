@@ -115,6 +115,9 @@ func (s *Service) planIntent(ctx context.Context, in v1.PlanIntentInput, include
 
 	}
 	compiled.Manifest.Spec.Intent = &in.Intent.Spec
+	compiled.Manifest.Spec.Lifecycle = in.Intent.Spec.Lifecycle
+	compiled.Manifest.Spec.Quality = in.Intent.Spec.Quality
+	compiled.Manifest.Spec.ErrorBudgetPolicy = in.Intent.Spec.ErrorBudgetPolicy
 	def := model.SLODefinition(compiled.Manifest)
 	if err = def.Validate(); err != nil {
 		return out, err
@@ -209,7 +212,9 @@ func (s *Service) intentJourney(ctx context.Context, in v1.SLOIntent) (*v1.Inten
 }
 
 func (s *Service) SourceFingerprint(source string) string {
-	c := s.CollectorFor(model.SLO{Source: source})
+	return collectorFingerprint(s.CollectorFor(model.SLO{Source: source}), source)
+}
+func collectorFingerprint(c Collector, source string) string {
 	if described, ok := c.(interface{ SourceFingerprint() string }); ok {
 		return described.SourceFingerprint()
 	}

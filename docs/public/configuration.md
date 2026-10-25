@@ -38,9 +38,9 @@ A configured `local` provider enables server-authenticated username/password sig
 
 Tenant owners use **Access control → Users** to create local identities and tenant membership, edit profiles/passwords, change roles and remove tenant access. External-provider passwords remain with that provider. Shared local profile/password edits require ownership of every tenant the user can access; last-owner protections and revision checks apply. Usernames are unique per local provider across the server. The API does not delete a shared global identity when removing one tenant membership.
 
-## Managed data sources
+## Managed telemetry connections
 
-Set `NINES_SOURCE_HOSTS` to a comma-separated list of exact approved hostnames to enable **Data sources → Add data source** for tenant owners. Set a private base64 32-byte `NINES_SOURCE_ENCRYPTION_KEY` to permit bearer credentials; keep it outside source control and back it up separately from the database. The encrypted tokens are never included in GET responses. Leaving a token blank on edit preserves it; clearing it is explicit. Managed sources are stored in the tenant's PostgreSQL schema and restored on startup.
+Set `NINES_SOURCE_HOSTS` to a comma-separated list of exact approved hostnames to enable **Telemetry connections → Add telemetry connection** for tenant owners. Set a private base64 32-byte `NINES_SOURCE_ENCRYPTION_KEY` to permit bearer credentials; keep it outside source control and back it up separately from the database. The encrypted tokens are never included in GET responses. Leaving a token blank on edit preserves it; clearing it is explicit. Managed sources are stored in the tenant's PostgreSQL schema and restored on startup.
 
 Mimir organization IDs must already be authorized by the tenant's trusted YAML source configuration. Clients cannot select an arbitrary upstream organization. Managed Prometheus rule files use only `NINES_MANAGED_RULE_DIRECTORY`; callers cannot choose filesystem paths. Rule namespaces are server-assigned. Configure a shared mount, `rule_files` and a reload mechanism as described in the metrics guide. The playground includes that mechanism.
 

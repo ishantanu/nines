@@ -44,7 +44,7 @@ Sign in at `/login`, for example `https://slo.example.com/login`. The root `/` s
 | Reliability reviews | `/tenants/commerce/reviews/<record-id>` |
 | Intent conversations | `/tenants/commerce/intents/<record-id>` |
 | Session replay | `/tenants/commerce/replays/<record-id>` |
-| Data sources | `/tenants/commerce/data-sources` |
+| Telemetry connections | `/tenants/commerce/telemetry-connections` |
 | Access control | `/tenants/commerce/access-control` |
 
 Browser Back/Forward and macOS swipe navigation restore the URL's page, resource and authorized tenant. Navigation links support opening a new tab. Reloading a known page serves the portal shell; unknown API and asset paths remain 404. Previous hash links for reviews, intents and replays still resolve and are replaced with canonical paths when opened. A nonexistent resource shows an unavailable-resource message. A link to an unauthorized tenant shows an access error and a choice of authorized workspaces; it does not substitute another tenant's data.

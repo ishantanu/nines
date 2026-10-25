@@ -13,6 +13,7 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/store"
 	"github.com/ishantanu/nines/internal/tenancy"
+	"github.com/ishantanu/nines/internal/testtelemetry"
 )
 
 func reviewInput(v v1.IntentConversation, digest, reason string) v1.ReviewIntentChangeSet {
@@ -31,6 +32,7 @@ func updatedChangeFixture(t *testing.T, pg bool) (*Service, context.Context, v1.
 	if _, e = s.Platform.ApplyDefinition(ctx, old, 0); e != nil {
 		t.Fatal(e)
 	}
+	collectFreshBaseline(t, s, ctx, old.SLO.Metadata.Name)
 	_, e = s.Repository.Update(ctx, v.ID, func(r *record, now time.Time) error { r.Session.Plan.ExpectedRevision = 1; touch(r, now); return nil })
 	if e != nil {
 		t.Fatal(e)
@@ -430,5 +432,57 @@ func TestHistoricalRecommendationTamperingBlocksNewApproval(t *testing.T) {
 	current, err := s.Platform.Store.Read(ctx, "intent-created")
 	if err != nil || current.SLO.Target != .99 {
 		t.Fatal("integrity failure changed SLO", err)
+	}
+}
+
+func TestRecommendationMakesImplicitPagingPromotionExplicit(t *testing.T) {
+	s, ctx, v := updatedChangeFixture(t, false)
+	if err := s.Platform.Store.Update(ctx, "intent-created", func(r *model.Record) error {
+		r.SLO.Lifecycle = v1.LifecycleAspirational
+		r.SLO.Intent.Lifecycle = v1.LifecycleAspirational
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	v, err := s.PrepareChangeSet(ctx, v.ID, v.Version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range v.ChangeSet.Recommendation.Fields {
+		if field.Field == "spec.lifecycle" {
+			if string(field.Before) != `"aspirational"` || string(field.After) != `"committed"` || !strings.Contains(field.Impact, "enables configured burn alerts") {
+				t.Fatal(field)
+			}
+			return
+		}
+	}
+	t.Fatal("implicit paging promotion absent from frozen recommendation")
+}
+
+type collectingTelemetry struct{ *testtelemetry.Source }
+
+func (s *collectingTelemetry) CollectWindows(ctx context.Context, c model.SLO, from, to time.Time) ([]model.WindowObservation, error) {
+	return s.CollectWindowRange(ctx, c, from, to, c.StepSeconds)
+}
+func collectFreshBaseline(t *testing.T, s *Service, ctx context.Context, id string) {
+	t.Helper()
+	if c, ok := s.Platform.Collector.(*testtelemetry.Source); ok {
+		s.Platform.Collector = &collectingTelemetry{c}
+	}
+	r, err := s.Platform.Store.Read(ctx, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := time.Duration(r.SLO.StepSeconds) * time.Second
+	to := s.Platform.Now().UTC().Truncate(step)
+	if _, err = s.Platform.Collect(ctx, id, to.Add(-2*step), to); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Platform.CheckMeasurement(ctx, id); err != nil {
+		t.Fatal(err)
+	}
+	q, err := s.Platform.MeasurementQuality(ctx, id, 0, false)
+	if err != nil || q.State != "usable" {
+		t.Fatalf("fixture has no usable baseline: %+v %v", q, err)
 	}
 }

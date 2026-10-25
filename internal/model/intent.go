@@ -19,6 +19,15 @@ func ValidateIntent(in v1.SLOIntent) error {
 	return ValidateIntentSpec(in.Spec)
 }
 func ValidateIntentSpec(s v1.IntentSpec) error {
+	if err := validateBudgetPolicy(s.ErrorBudgetPolicy); err != nil {
+		return err
+	}
+	if err := validateQuality(s.Quality, s.StepSeconds); err != nil {
+		return err
+	}
+	if !s.Lifecycle.Valid() {
+		return Invalid("invalid intent lifecycle")
+	}
 	if !validText(s.Description, 2000) || !validText(s.Service, 200) || !identifier.MatchString(s.Source) {
 		return Invalid("description, service and configured source are required")
 	}
@@ -40,6 +49,12 @@ func ValidateIntentSpec(s v1.IntentSpec) error {
 	}
 	if !Finite(s.Target) || s.Target <= 0 || s.Target >= 1 || s.WindowSeconds < 1 || s.WindowSeconds > 31*86400 {
 		return Invalid("target must be between 0 and 1 exclusively and windowSeconds within 31 days")
+	}
+	if s.StepSeconds < 0 || s.StepSeconds > 3600 {
+		return Invalid("intent stepSeconds must be 1–3600 when supplied")
+	}
+	if err := validateBurnPolicies(SLO{Target: s.Target, WindowSeconds: s.WindowSeconds, StepSeconds: s.StepSeconds, Policies: s.Policies, Policy: s.Policy}); err != nil {
+		return err
 	}
 	if s.NoDataPolicy != "unknown" {
 		return Invalid("noDataPolicy must explicitly be unknown; missing data cannot establish success")
@@ -86,6 +101,15 @@ func validateSLOIntent(s SLO) error {
 		return err
 	}
 	i := s.Intent
+	if DefinitionDigest(i.ErrorBudgetPolicy) != DefinitionDigest(s.ErrorBudgetPolicy) {
+		return Invalid("SLO error-budget policy must agree with its reviewed intent")
+	}
+	if DefinitionDigest(i.Quality) != DefinitionDigest(s.Quality) {
+		return Invalid("SLO quality policy must agree with its reviewed intent")
+	}
+	if i.Lifecycle.Effective() != s.Lifecycle.Effective() {
+		return Invalid("SLO lifecycle must agree with its reviewed intent")
+	}
 	if s.Measurement != nil && (i.StepSeconds != s.StepSeconds || DefinitionDigest(i.Measurement) != DefinitionDigest(s.Measurement)) {
 		return Invalid("SLO measurement and stepSeconds must agree with its reviewed intent")
 	}

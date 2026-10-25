@@ -1,3 +1,4 @@
+import { useChartSize } from "@/lib/use-chart-size";
 import { ReplayLabel } from "@/components/replay-label";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { stringify } from "yaml";
@@ -31,6 +32,8 @@ import {
 } from "@/lib/api";
 import { SLIValue, SLOAlertState } from "./sli-value";
 import { SLOIntegrationStatus } from "./integration-status";
+import { BudgetDecisionPanel } from "./budget-decision";
+import { MeasurementQualityPanel } from "./measurement-quality";
 import { SLOHealthNotice } from "./slo-health-notice";
 import { PageHeader } from "./workspace-chrome";
 const SourceMeasurements = lazy(() =>
@@ -175,6 +178,7 @@ export function Objectives({
   );
 }
 function SamplePlot({ points }: { points: Point[] }) {
+  const { ref, width, height } = useChartSize();
   const values = points.filter((p) => p.total > 0);
   if (!values.length) return <p className="empty-state">No traffic to plot.</p>;
   const start = Date.parse(values[0].time),
@@ -195,27 +199,35 @@ function SamplePlot({ points }: { points: Point[] }) {
   const coords = plot
     .map(
       (p) =>
-        `${20 + ((Date.parse(p.time) - start) / Math.max(1, end - start)) * 760},${120 - ((p.good / p.total - low) / (high - low)) * 100}`,
+        `${12 + ((Date.parse(p.time) - start) / Math.max(1, end - start)) * Math.max(1, width - 24)},${height - 16 - ((p.good / p.total - low) / (high - low)) * Math.max(1, height - 32)}`,
     )
     .join(" ");
   return (
     <div className="rounded-md border bg-slate-50 p-3">
-      <svg
-        viewBox="0 0 800 140"
-        className="w-full"
-        role="img"
-        aria-label="Interval reliability over retained samples"
-      >
-        <line x1="20" y1="120" x2="780" y2="120" stroke="#cbd5e1" />
-        <polyline
-          points={coords}
-          fill="none"
-          stroke="#0d9488"
-          strokeWidth="2"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-      <div className="flex justify-between text-xs text-muted-foreground">
+      <div ref={ref} className="h-44 min-w-0 sm:h-56">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="size-full"
+          role="img"
+          aria-label="Interval reliability over retained samples"
+        >
+          <line
+            x1={12}
+            y1={height - 16}
+            x2={width - 12}
+            y2={height - 16}
+            stroke="var(--border)"
+          />
+          <polyline
+            points={coords}
+            fill="none"
+            stroke="#0d9488"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      </div>
+      <div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground">
         <span>{new Date(start).toLocaleString()}</span>
         <span>Scale {percent(low, 2)} to 100%</span>
         <span>{new Date(end).toLocaleString()}</span>
@@ -419,6 +431,16 @@ export function ObjectiveDetail({
             </Table>
           </CardContent>
         </Card>
+      ) : null}
+      {objective?.budgetDecision && objective.slo.errorBudgetPolicy ? (
+        <BudgetDecisionPanel decision={objective.budgetDecision} />
+      ) : null}
+      {objective?.quality ? (
+        <MeasurementQualityPanel
+          report={objective.quality}
+          scope={scope}
+          cohortLabels={objective.slo.quality?.cohortLabels}
+        />
       ) : null}
       {objective?.measurementHealth ? (
         <Card className="gap-0 py-0">

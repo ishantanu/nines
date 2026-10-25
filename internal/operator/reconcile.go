@@ -352,7 +352,7 @@ func (c *Controller) intent(ctx context.Context, r k.Resource, status k.Status) 
 		platform.Sources = map[string]service.MetricSource{goal.Spec.Source: {Kind: source.Kind, Collector: collector}}
 		var compiled v1.CompiledBinding
 		if goal.Spec.Measurement != nil {
-			manifest := v1.NewSLO(goal.Metadata.Name, goal.Metadata.Project, v1.SLOSpec{Measurement: goal.Spec.Measurement, Intent: &goal.Spec, DisplayName: goal.Metadata.Name, Service: goal.Spec.Service, Source: goal.Spec.Source, Target: goal.Spec.Target, WindowSeconds: goal.Spec.WindowSeconds, StepSeconds: goal.Spec.StepSeconds, Policies: goal.Spec.Policies, Policy: goal.Spec.Policy})
+			manifest := v1.NewSLO(goal.Metadata.Name, goal.Metadata.Project, v1.SLOSpec{ErrorBudgetPolicy: goal.Spec.ErrorBudgetPolicy, Quality: goal.Spec.Quality, Lifecycle: goal.Spec.Lifecycle, Measurement: goal.Spec.Measurement, Intent: &goal.Spec, DisplayName: goal.Metadata.Name, Service: goal.Spec.Service, Source: goal.Spec.Source, Target: goal.Spec.Target, WindowSeconds: goal.Spec.WindowSeconds, StepSeconds: goal.Spec.StepSeconds, Policies: goal.Spec.Policies, Policy: goal.Spec.Policy})
 			inline, err := platform.CompileMeasurement(ctx, manifest)
 			e = err
 			compiled.Manifest = inline.Manifest
@@ -363,6 +363,9 @@ func (c *Controller) intent(ctx context.Context, r k.Resource, status k.Status) 
 			return status, e
 		}
 		compiled.Manifest.Spec.Intent = &goal.Spec
+		compiled.Manifest.Spec.Lifecycle = goal.Spec.Lifecycle
+		compiled.Manifest.Spec.Quality = goal.Spec.Quality
+		compiled.Manifest.Spec.ErrorBudgetPolicy = goal.Spec.ErrorBudgetPolicy
 		definition := model.SLODefinition(compiled.Manifest)
 		if e = definition.Validate(); e != nil {
 			return status, e

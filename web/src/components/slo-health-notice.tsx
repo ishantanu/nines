@@ -13,7 +13,7 @@ export function SLOHealthNotice({ status }: { status: Snapshot }) {
     ? "Measurements contain no traffic, so attainment cannot be calculated. Check the denominator and selected population."
     : measured
       ? `SLI attainment is calculated from the available measurements, covering ${percent(status.coverage, 3)} of the selected SLO window. This is not yet a full-window compliance result. Collect or backfill missing intervals and check sample freshness.`
-      : "No usable attainment measurement is available for the selected window. Check the data source, queries and collection evidence.";
+      : "No usable attainment measurement is available for the selected window. Check the telemetry connection, queries and collection evidence.";
   return (
     <p role="status" className="rounded-md border p-4 text-sm leading-6">
       <span className="font-medium">{title}</span>

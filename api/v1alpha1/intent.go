@@ -13,20 +13,23 @@ type SLOIntent struct {
 	Spec       IntentSpec `json:"spec" yaml:"spec"`
 }
 type IntentSpec struct {
-	Measurement      *MeasurementSpec  `json:"measurement,omitempty" yaml:"measurement,omitempty"`
-	StepSeconds      int64             `json:"stepSeconds,omitempty" yaml:"stepSeconds,omitempty"`
-	Description      string            `json:"description" yaml:"description"`
-	Service          string            `json:"service" yaml:"service"`
-	Source           string            `json:"source" yaml:"source"`
-	Outcome          string            `json:"outcome" yaml:"outcome"`
-	Population       map[string]string `json:"population" yaml:"population"`
-	ThresholdSeconds *float64          `json:"thresholdSeconds,omitempty" yaml:"thresholdSeconds,omitempty"`
-	Target           float64           `json:"target" yaml:"target"`
-	WindowSeconds    int64             `json:"windowSeconds" yaml:"windowSeconds"`
-	NoDataPolicy     string            `json:"noDataPolicy" yaml:"noDataPolicy"`
-	Policies         []BurnRatePolicy  `json:"policies,omitempty" yaml:"policies,omitempty"`
-	Policy           *BurnRatePolicy   `json:"policy,omitempty" yaml:"policy,omitempty"`
-	Journey          *IntentJourney    `json:"journey,omitempty" yaml:"journey,omitempty"`
+	ErrorBudgetPolicy *ErrorBudgetPolicy        `json:"errorBudgetPolicy,omitempty" yaml:"errorBudgetPolicy,omitempty"`
+	Quality           *MeasurementQualityPolicy `json:"quality,omitempty" yaml:"quality,omitempty"`
+	Lifecycle         SLOLifecycle              `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`
+	Measurement       *MeasurementSpec          `json:"measurement,omitempty" yaml:"measurement,omitempty"`
+	StepSeconds       int64                     `json:"stepSeconds,omitempty" yaml:"stepSeconds,omitempty"`
+	Description       string                    `json:"description" yaml:"description"`
+	Service           string                    `json:"service" yaml:"service"`
+	Source            string                    `json:"source" yaml:"source"`
+	Outcome           string                    `json:"outcome" yaml:"outcome"`
+	Population        map[string]string         `json:"population" yaml:"population"`
+	ThresholdSeconds  *float64                  `json:"thresholdSeconds,omitempty" yaml:"thresholdSeconds,omitempty"`
+	Target            float64                   `json:"target" yaml:"target"`
+	WindowSeconds     int64                     `json:"windowSeconds" yaml:"windowSeconds"`
+	NoDataPolicy      string                    `json:"noDataPolicy" yaml:"noDataPolicy"`
+	Policies          []BurnRatePolicy          `json:"policies,omitempty" yaml:"policies,omitempty"`
+	Policy            *BurnRatePolicy           `json:"policy,omitempty" yaml:"policy,omitempty"`
+	Journey           *IntentJourney            `json:"journey,omitempty" yaml:"journey,omitempty"`
 }
 type IntentJourney struct {
 	Name             string `json:"name" yaml:"name"`

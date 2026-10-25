@@ -58,6 +58,17 @@ func (s *Service) RestoreIntentDefinitions(ctx context.Context, key, digest stri
 				return nil, model.Invalid("unsupported rollback resource")
 			}
 		}
+		if commit {
+			for _, want := range expected {
+				if want.Kind == v1.SLOKind {
+					check, err := scope.intentSafety(ctx, want.Name, want.Revision, nil, true)
+					if err != nil {
+						return nil, err
+					}
+					evidence.SafetyCheck = &check
+				}
+			}
+		}
 		receipt := v1.IntentApplyReceipt{Resources: []v1.IntentAppliedResource{}, At: s.Now().UTC(), Evidence: &evidence}
 		principal, _ := tenancy.FromContext(ctx)
 		receipt.Actor = v1.InvestigationActor{Subject: principal.Subject, Name: principal.Name, Kind: principal.Kind}
@@ -85,6 +96,9 @@ func (s *Service) RestoreIntentDefinitions(ctx context.Context, key, digest stri
 				return nil, e
 			}
 			receipt.Resources = append(receipt.Resources, v1.IntentAppliedResource{Kind: def.Kind(), Name: def.Metadata().Name, Revision: result.Revision, Digest: result.Digest})
+		}
+		if sourceDigest != s.SourceFingerprint(source) {
+			return nil, model.ErrRevisionConflict
 		}
 		return json.Marshal(receipt)
 	})

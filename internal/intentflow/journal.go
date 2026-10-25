@@ -80,7 +80,28 @@ func journalAppend(old, next record) ([]v1.AuditRecord, error) {
 			for _, resource := range change.Changes {
 				item.Resources = append(item.Resources, v1.IntentAppliedResource{Kind: resource.Kind, Name: resource.Name, Revision: resource.ExpectedRevision, Digest: resource.Digest})
 			}
-			if event.Action == "change_set.proposed" || event.Action == "rollback.proposed" {
+			if event.Action == "change_set.approved" {
+				item.ApprovalDigest = change.ApprovalDigest
+			}
+			if event.Action == "rollback.approved" && change.Rollback != nil {
+				item.ApprovalDigest = change.Rollback.ApprovalDigest
+			}
+			if event.Action == "change_set.applied" && event.EvidenceDigest != "" {
+				item.SafetyCheck = clone(change.SafetyCheck)
+			}
+			if event.Action == "rollback.applied" && event.EvidenceDigest != "" && change.Rollback != nil {
+				item.SafetyCheck = clone(change.Rollback.SafetyCheck)
+			}
+			if event.Action == "change_set.applied" && event.Outcome == "blocked" && event.EvidenceDigest != "" {
+				item.SafetyCheck = clone(change.SafetyCheck)
+			}
+			if event.Action == "change_set.observed" {
+				item.Outcome = clone(change.Outcome)
+			}
+			if event.Action == "rollback.observed" && change.Rollback != nil {
+				item.Outcome = clone(change.Rollback.Outcome)
+			}
+			if event.Action == "change_set.proposed" || event.Action == "rollback.proposed" || event.Action == "change_set.approved" || event.Action == "rollback.approved" {
 				frozen := clone(change)
 				item.Proposal = &frozen
 			}
@@ -261,10 +282,53 @@ func validateJournalRecord(item v1.AuditRecord) error {
 			return model.Invalid("audit proposal digest mismatch")
 		}
 	}
+	if item.SafetyCheck != nil && hash(item.SafetyCheck) != item.Event.EvidenceDigest {
+		return model.Invalid("audit safety evidence digest mismatch")
+	}
+	if item.Outcome != nil && hash(item.Outcome) != item.Event.EvidenceDigest {
+		return model.Invalid("audit outcome evidence digest mismatch")
+	}
+	if item.Event.EvidenceDigest != "" && item.SafetyCheck == nil && item.Outcome == nil {
+		valid := item.ApprovalDigest != "" && hash(item.ApprovalDigest) == item.Event.EvidenceDigest && (item.Event.Action == "change_set.approved" || item.Event.Action == "rollback.approved")
+		if valid && item.Proposal != nil {
+			if item.Event.Action == "change_set.approved" {
+				valid = approvalDigest(*item.Proposal) == item.ApprovalDigest
+			}
+			if item.Event.Action == "rollback.approved" {
+				valid = item.Proposal.Rollback != nil && rollbackApprovalDigest(*item.Proposal.Rollback) == item.ApprovalDigest
+			}
+		}
+		if !valid {
+			return model.Invalid("audit evidence is missing or changed")
+		}
+	}
 	unsigned := item.Event
 	unsigned.Hash = ""
 	if !auditChainValid([]v1.IntentAuditEvent{item.Event}) || hash(unsigned) != item.Event.Hash || (item.Proposal != nil && !frozenReviewsValid(v1.IntentConversation{Tenant: item.Tenant, IntentConversationSummary: v1.IntentConversationSummary{ID: item.Conversation}, ChangeSet: item.Proposal})) {
 		return model.Invalid("audit record integrity check failed")
 	}
 	return nil
+}
+
+// Approval evidence is read from the independent journal, not trusted solely from
+// mutable conversation metadata. It is fetched before the conversation lock.
+func (s *Service) approvalProofs(ctx context.Context, id, digest, action string) (map[string]bool, error) {
+	rows, err := s.Repository.Audit(ctx, AuditSearch{Tenant: s.Platform.TenantID, Query: v1.AuditQuery{Conversation: id, Action: action, Limit: 100}})
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for _, row := range rows {
+		if row.Event.ChangeSetDigest != digest || row.Event.Outcome != "succeeded" {
+			continue
+		}
+		if err := validateJournalRecord(row); err != nil {
+			return nil, err
+		}
+		proof := row.ApprovalDigest
+		if proof != "" && hash(proof) == row.Event.EvidenceDigest {
+			out[proof] = true
+		}
+	}
+	return out, nil
 }

@@ -49,6 +49,21 @@ export const docGroups: DocGroup[] = [
         "Define successful events, targets and rolling windows in one YAML resource.",
       ),
       page(
+        "measurement-quality",
+        "Measurement quality",
+        "Inspect freshness, event counts, observation limits and failing cohorts.",
+      ),
+      page(
+        "error-budget-policy",
+        "Error-budget policies",
+        "Define responsible owners and evidence-based operational responses.",
+      ),
+      page(
+        "provider-adapters",
+        "Provider adapters",
+        "Understand supported backends and the boundaries for native provider extensions.",
+      ),
+      page(
         "latency-slos",
         "Latency SLOs",
         "Measure requests within a duration threshold using histogram buckets.",

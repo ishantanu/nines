@@ -143,3 +143,10 @@ func TestPendingCannotSkipEvaluationsOrMoveBackwards(t *testing.T) {
 		t.Fatal("historical evaluation altered alert state")
 	}
 }
+
+func TestAllGoodTrafficKeepsFullBudgetAtNearOneTarget(t *testing.T) {
+	s := config()
+	s.Target = math.Nextafter(1, 0)
+	result := Evaluate(s, map[int64]model.Point{epoch.Unix(): {Time: epoch, Good: 10000, Total: 10000}}, epoch, 60)
+	closeTo(t, result.BudgetRemainingFraction, 1)
+}

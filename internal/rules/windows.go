@@ -28,7 +28,7 @@ func generateWindows(s model.SLO, tenant, ownerUID string) (Group, error) {
 	}
 	add("nines:slo_target:ratio", "vector("+strconv.FormatFloat(s.Target, 'g', -1, 64)+")", 0)
 	add("nines:slo_evaluation_timestamp:seconds", fmt.Sprintf("floor(vector(time()) / %d) * %d - %d", s.StepSeconds, s.StepSeconds, s.StepSeconds), 0)
-	burns, coverages := map[int64]string{}, map[int64]string{}
+	burns, coverages, totals := map[int64]string{}, map[int64]string{}, map[int64]string{}
 	for _, w := range s.Windows() {
 		// The step-sized observation is for chart detail only; it never contributes
 		// to another window, so burst boundary errors cannot accumulate.
@@ -49,9 +49,13 @@ func generateWindows(s model.SLO, tenant, ownerUID string) (Group, error) {
 		add("nines:slo_budget_remaining:ratio", "1 - ("+burn+")", w)
 		burns[w] = burn
 		coverages[w] = cov
+		totals[w] = total
 	}
-	for _, p := range s.AlertPolicies() {
+	for _, p := range s.AlertingPolicies() {
 		expr := fmt.Sprintf("((%s) >= %g) and on() ((%s) >= %g) and on() ((%s) >= %g) and on() ((%s) >= %g)", burns[p.ShortWindowSeconds], p.BurnRate, burns[p.LongWindowSeconds], p.BurnRate, coverages[p.ShortWindowSeconds], p.MinCoverage, coverages[p.LongWindowSeconds], p.MinCoverage)
+		if p.MinEvents > 0 {
+			expr += fmt.Sprintf(" and on() ((%s) >= %g) and on() ((%s) >= %g)", totals[p.ShortWindowSeconds], p.MinEvents, totals[p.LongWindowSeconds], p.MinEvents)
+		}
 		alertLabels := labels(0)
 		if p.Name != "" {
 			alertLabels["nines_policy"] = p.Name

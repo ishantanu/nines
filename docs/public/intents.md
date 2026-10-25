@@ -4,6 +4,8 @@ An intent expresses the reliability outcome you want to measure. Nines can help 
 
 Model-assisted drafting and tool-driven preparation remain experimental. The guided path and offline CLI do not require a model.
 
+Intent YAML can set `spec.lifecycle` and policy `minEvents`. The compiler preserves them in the SLO and its intent provenance. Review shows lifecycle changes and their paging impact. Agent context includes lifecycle and suppression separately from measured reliability; a disabled alert is not evidence that an objective is healthy. See [lifecycle and traffic guards](measurements.md#lifecycle-and-alert-eligibility).
+
 ## Define a goal and measurement
 
 An intent includes the service, source, target, window and SLO-owned measurement. These are reviewable inputs, not values a model may silently change during deployment.
@@ -19,7 +21,7 @@ An intent includes the service, source, target, window and SLO-owned measurement
 3. **Confirm the measurement.** An owner/editor confirms the exact goal and measurement digests. A model or agent role cannot perform this confirmation.
 4. **Prepare the changes.** Inspect the proposed SLO, optional critical user journey link, parameter diff, rationale, assumptions and available backtest evidence.
 5. **Approve the exact change set.** Record a reason and review its limits. Edits to the goal, measurement, source or affected revisions invalidate the previous approval.
-6. **Apply and verify.** The SLO and proposed journey change commit atomically. Rule delivery then follows the data source's automatic or manual policy. Check measurement coverage, backend evaluation and output separately.
+6. **Apply and verify.** The SLO and proposed journey change commit atomically. Rule delivery then follows the telemetry connection's automatic or manual policy. Check measurement coverage, backend evaluation and output separately.
 
 A successful model response is not permission to write production configuration. The workflow model has no approval or direct resource-write tool.
 

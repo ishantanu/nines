@@ -131,7 +131,7 @@ export function Home({
           {[
             {
               page: "connections" as const,
-              label: "Data sources",
+              label: "Telemetry connections",
               detail: data.workspace.source.configured
                 ? (data.workspace.source.connectionCount ?? 1) > 1
                   ? `${data.workspace.source.connectionCount} configured connections`

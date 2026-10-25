@@ -75,11 +75,14 @@ func auditRoom(r *record) error {
 	}
 	return nil
 }
-func audit(r *record, a v1.InvestigationActor, action, outcome, digest, reason string, now time.Time) {
+func audit(r *record, a v1.InvestigationActor, action, outcome, digest, reason string, now time.Time, evidence ...any) {
 	sequence, _ := lastAudit(r.Session.Audit)
 	e := v1.IntentAuditEvent{Sequence: sequence + 1, At: now, Actor: a, Action: action, Outcome: outcome, ChangeSetDigest: digest, Reason: reason, Version: r.Session.Version}
 	if n := len(r.Session.Audit); n > 0 {
 		e.PreviousHash = r.Session.Audit[n-1].Hash
+	}
+	if len(evidence) > 0 {
+		e.EvidenceDigest = hash(evidence[0])
 	}
 	e.Hash = hash(e)
 	r.Session.Audit = append(r.Session.Audit, e)
@@ -122,6 +125,11 @@ func (s *Service) auditFailure(ctx context.Context, id, action, digest string, c
 		outcome = "uncertain"
 		reason = "Request did not complete; definition commit may have succeeded. Inspect readback and the exact retry receipt before retrying."
 	}
+	var safety *service.IntentSafetyError
+	if errors.As(cause, &safety) {
+		outcome = "blocked"
+		reason = safety.Check.Message
+	}
 	// Do not persist provider errors, request bodies or potentially credential-bearing reasons.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 2*time.Second)
 	defer cancel()
@@ -132,7 +140,16 @@ func (s *Service) auditFailure(ctx context.Context, id, action, digest string, c
 		if err := auditRoom(r); err != nil {
 			return err
 		}
-		audit(r, v1.InvestigationActor{Subject: p.Subject, Name: p.Name, Kind: p.Kind}, action, outcome, digest, reason, now)
+		if safety != nil {
+			if c := r.Session.ChangeSet; c != nil && c.Digest == digest {
+				c.SafetyCheck = &safety.Check
+			}
+		}
+		var proof []any
+		if safety != nil {
+			proof = []any{safety.Check}
+		}
+		audit(r, v1.InvestigationActor{Subject: p.Subject, Name: p.Name, Kind: p.Kind}, action, outcome, digest, reason, now, proof...)
 		return nil
 	})
 }
@@ -274,6 +291,9 @@ func recommendation(r *record, c v1.IntentChangeSet) *v1.IntentRecommendation {
 		spec, _ := after["spec"].(map[string]any)
 		prior, _ := before["spec"].(map[string]any)
 		for _, field := range []struct{ name, impact string }{
+			{"errorBudgetPolicy", "Changing the owner, runbook, review threshold or exhaustion response changes operational guidance. It grants no deployment permission."},
+			{"quality", "Quality requirements control evidence sufficiency and cohort inspection. They do not change the SLI population, target or event counts."},
+			{"lifecycle", "Committed enables configured burn alerts. Experimental, aspirational and deprecated retain measurements while suppressing Nines and generated provider alerts."},
 			{"service", "Service changes start a new measurement revision with fresh coverage; previous evidence remains archived."},
 			{"source", "Source changes require fresh measurement evidence and a separate rule-destination review; operator route changes require withdrawal first."},
 			{"measurement", "Changing the SLO-owned measurement starts fresh coverage; the previous contract and evidence remain archived."},
@@ -290,6 +310,16 @@ func recommendation(r *record, c v1.IntentChangeSet) *v1.IntentRecommendation {
 			{"steps", "Review the exact journey step and required SLO links."},
 		} {
 			a, old := spec[field.name], prior[field.name]
+			// Display effective defaults so removal of an aspirational value
+			// cannot conceal that the proposed revision enables paging.
+			if field.name == "lifecycle" && change.Kind == v1.SLOKind {
+				if a == nil {
+					a = string(v1.LifecycleCommitted)
+				}
+				if old == nil && prior != nil {
+					old = string(v1.LifecycleCommitted)
+				}
+			}
 			if hash(a) == hash(old) {
 				continue
 			}

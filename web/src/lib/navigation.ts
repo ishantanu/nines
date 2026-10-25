@@ -13,7 +13,7 @@ export const pagePaths = {
   agents: "agent-evidence",
   alerts: "alerts",
   workflows: "workflows",
-  connections: "data-sources",
+  connections: "telemetry-connections",
   audit: "audit",
   access: "access-control",
   clients: "clients",
@@ -55,7 +55,11 @@ export function parseRoute(path: string): Route {
   const [, , tenant, segment, id = ""] = parts;
   const page =
     (Object.keys(pagePaths) as Page[]).find((p) => pagePaths[p] === segment) ??
-    (segment === "investigations" ? "investigations" : undefined);
+    (segment === "investigations"
+      ? "investigations"
+      : segment === "data-sources"
+        ? "connections"
+        : undefined);
   if (
     !identifier.test(tenant) ||
     !page ||

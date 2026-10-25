@@ -33,6 +33,27 @@ spec:
                         properties:
                             displayName:
                                 type: string
+                            errorBudgetPolicy:
+                                nullable: true
+                                properties:
+                                    onExhausted:
+                                        enum:
+                                            - blocked
+                                            - review_required
+                                        type: string
+                                    owner:
+                                        type: string
+                                    reviewBelow:
+                                        maximum: 1
+                                        minimum: 0
+                                        type: number
+                                    runbookURL:
+                                        type: string
+                                required:
+                                    - owner
+                                    - runbookURL
+                                    - reviewBelow
+                                type: object
                             goodQuery:
                                 type: string
                             intent:
@@ -40,6 +61,27 @@ spec:
                                 properties:
                                     description:
                                         type: string
+                                    errorBudgetPolicy:
+                                        nullable: true
+                                        properties:
+                                            onExhausted:
+                                                enum:
+                                                    - blocked
+                                                    - review_required
+                                                type: string
+                                            owner:
+                                                type: string
+                                            reviewBelow:
+                                                maximum: 1
+                                                minimum: 0
+                                                type: number
+                                            runbookURL:
+                                                type: string
+                                        required:
+                                            - owner
+                                            - runbookURL
+                                            - reviewBelow
+                                        type: object
                                     journey:
                                         nullable: true
                                         properties:
@@ -58,6 +100,13 @@ spec:
                                             - expectedRevision
                                             - required
                                         type: object
+                                    lifecycle:
+                                        enum:
+                                            - experimental
+                                            - aspirational
+                                            - committed
+                                            - deprecated
+                                        type: string
                                     measurement:
                                         nullable: true
                                         properties:
@@ -109,6 +158,10 @@ spec:
                                                     type: integer
                                                 minCoverage:
                                                     type: number
+                                                minEvents:
+                                                    maximum: 1e+18
+                                                    minimum: 0
+                                                    type: number
                                                 name:
                                                     type: string
                                                 severity:
@@ -138,6 +191,10 @@ spec:
                                                 type: integer
                                             minCoverage:
                                                 type: number
+                                            minEvents:
+                                                maximum: 1e+18
+                                                minimum: 0
+                                                type: number
                                             name:
                                                 type: string
                                             severity:
@@ -156,6 +213,27 @@ spec:
                                         additionalProperties:
                                             type: string
                                         maxProperties: 1000
+                                        type: object
+                                    quality:
+                                        nullable: true
+                                        properties:
+                                            cohortLabels:
+                                                items:
+                                                    pattern: ^[a-zA-Z_][a-zA-Z0-9_]{0,99}$
+                                                    type: string
+                                                maxItems: 3
+                                                type: array
+                                                x-kubernetes-list-type: set
+                                            maxSampleAgeSeconds:
+                                                format: int64
+                                                maximum: 2.6784e+06
+                                                minimum: 0
+                                                type: integer
+                                            minEvents:
+                                                maximum: 1e+18
+                                                minimum: 0
+                                                type: number
+                                        required: []
                                         type: object
                                     service:
                                         type: string
@@ -182,6 +260,13 @@ spec:
                                     - windowSeconds
                                     - noDataPolicy
                                 type: object
+                            lifecycle:
+                                enum:
+                                    - experimental
+                                    - aspirational
+                                    - committed
+                                    - deprecated
+                                type: string
                             measurement:
                                 nullable: true
                                 properties:
@@ -244,6 +329,10 @@ spec:
                                             type: integer
                                         minCoverage:
                                             type: number
+                                        minEvents:
+                                            maximum: 1e+18
+                                            minimum: 0
+                                            type: number
                                         name:
                                             type: string
                                         severity:
@@ -273,6 +362,10 @@ spec:
                                         type: integer
                                     minCoverage:
                                         type: number
+                                    minEvents:
+                                        maximum: 1e+18
+                                        minimum: 0
+                                        type: number
                                     name:
                                         type: string
                                     severity:
@@ -301,6 +394,27 @@ spec:
                                     - goodSelector
                                     - totalSelector
                                     - scrapeIntervalSeconds
+                                type: object
+                            quality:
+                                nullable: true
+                                properties:
+                                    cohortLabels:
+                                        items:
+                                            pattern: ^[a-zA-Z_][a-zA-Z0-9_]{0,99}$
+                                            type: string
+                                        maxItems: 3
+                                        type: array
+                                        x-kubernetes-list-type: set
+                                    maxSampleAgeSeconds:
+                                        format: int64
+                                        maximum: 2.6784e+06
+                                        minimum: 0
+                                        type: integer
+                                    minEvents:
+                                        maximum: 1e+18
+                                        minimum: 0
+                                        type: number
+                                required: []
                                 type: object
                             service:
                                 type: string
@@ -582,6 +696,27 @@ spec:
                         properties:
                             description:
                                 type: string
+                            errorBudgetPolicy:
+                                nullable: true
+                                properties:
+                                    onExhausted:
+                                        enum:
+                                            - blocked
+                                            - review_required
+                                        type: string
+                                    owner:
+                                        type: string
+                                    reviewBelow:
+                                        maximum: 1
+                                        minimum: 0
+                                        type: number
+                                    runbookURL:
+                                        type: string
+                                required:
+                                    - owner
+                                    - runbookURL
+                                    - reviewBelow
+                                type: object
                             journey:
                                 nullable: true
                                 properties:
@@ -600,6 +735,13 @@ spec:
                                     - expectedRevision
                                     - required
                                 type: object
+                            lifecycle:
+                                enum:
+                                    - experimental
+                                    - aspirational
+                                    - committed
+                                    - deprecated
+                                type: string
                             measurement:
                                 nullable: true
                                 properties:
@@ -662,6 +804,10 @@ spec:
                                             type: integer
                                         minCoverage:
                                             type: number
+                                        minEvents:
+                                            maximum: 1e+18
+                                            minimum: 0
+                                            type: number
                                         name:
                                             type: string
                                         severity:
@@ -691,6 +837,10 @@ spec:
                                         type: integer
                                     minCoverage:
                                         type: number
+                                    minEvents:
+                                        maximum: 1e+18
+                                        minimum: 0
+                                        type: number
                                     name:
                                         type: string
                                     severity:
@@ -709,6 +859,27 @@ spec:
                                 additionalProperties:
                                     type: string
                                 maxProperties: 1000
+                                type: object
+                            quality:
+                                nullable: true
+                                properties:
+                                    cohortLabels:
+                                        items:
+                                            pattern: ^[a-zA-Z_][a-zA-Z0-9_]{0,99}$
+                                            type: string
+                                        maxItems: 3
+                                        type: array
+                                        x-kubernetes-list-type: set
+                                    maxSampleAgeSeconds:
+                                        format: int64
+                                        maximum: 2.6784e+06
+                                        minimum: 0
+                                        type: integer
+                                    minEvents:
+                                        maximum: 1e+18
+                                        minimum: 0
+                                        type: number
+                                required: []
                                 type: object
                             service:
                                 type: string

@@ -7,6 +7,7 @@ import (
 
 // IntentRecommendation is an evidence summary for review, not hidden model reasoning.
 type IntentRecommendation struct {
+	BudgetDecision    *ErrorBudgetDecision   `json:"budgetDecision,omitempty"`
 	MeasurementDigest string                 `json:"measurementDigest,omitempty"`
 	RequestedBy       InvestigationActor     `json:"requestedBy"`
 	RollbackStatus    string                 `json:"rollbackStatus"`
@@ -47,6 +48,7 @@ type IntentBacktestSummary struct {
 	Digest            string    `json:"digest"`
 }
 type IntentAuditEvent struct {
+	EvidenceDigest  string             `json:"evidenceDigest,omitempty"`
 	Sequence        int64              `json:"sequence"`
 	At              time.Time          `json:"at"`
 	Actor           InvestigationActor `json:"actor"`
@@ -69,6 +71,9 @@ type IntentAuditLog struct {
 	Events       []IntentAuditEvent `json:"events"`
 }
 type IntentRollback struct {
+	ApprovalDigest string                   `json:"approvalDigest,omitempty"`
+	SafetyCheck    *IntentSafetyCheck       `json:"safetyCheck,omitempty"`
+	Outcome        *IntentOutcome           `json:"outcome,omitempty"`
 	ID             string                   `json:"id"`
 	Digest         string                   `json:"digest"`
 	OriginalDigest string                   `json:"originalDigest"`
@@ -89,10 +94,12 @@ type IntentRollback struct {
 
 // IntentOperationEvidence is committed with the resource transaction receipt.
 type IntentOperationEvidence struct {
-	Operation            string             `json:"operation"`
-	ChangeSetDigest      string             `json:"changeSetDigest"`
-	ApprovedBy           InvestigationActor `json:"approvedBy"`
-	ApprovedAt           time.Time          `json:"approvedAt"`
-	Reason               string             `json:"reason"`
-	RecommendationDigest string             `json:"recommendationDigest,omitempty"`
+	SafetyCheck          *IntentSafetyCheck     `json:"safetyCheck,omitempty"`
+	SafetyException      *IntentSafetyException `json:"safetyException,omitempty"`
+	Operation            string                 `json:"operation"`
+	ChangeSetDigest      string                 `json:"changeSetDigest"`
+	ApprovedBy           InvestigationActor     `json:"approvedBy"`
+	ApprovedAt           time.Time              `json:"approvedAt"`
+	Reason               string                 `json:"reason"`
+	RecommendationDigest string                 `json:"recommendationDigest,omitempty"`
 }

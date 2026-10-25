@@ -62,7 +62,7 @@ func addIntentConversations(s *mcp.Server, a *apiClient, c Config) {
 	register(s, a, "intent_workflow_capabilities", "Read the intent skill contract, tool budgets and model availability. This neither starts a run nor grants binding confirmation or apply permission.", true, func(ctx context.Context, _ emptyInput) (any, error) {
 		return a.request(ctx, http.MethodGet, "/api/intent-conversations/capabilities", nil)
 	})
-	register(s, a, "verify_intent_changes", "Read back definitions from an applied intent change set and report drift and observed health. Does not query providers or change resources.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/intent-conversations/", "/change-set/verification"))
+	register(s, a, "verify_intent_changes", "Read back applied definitions, drift and the saved post-change runtime/SLI outcome, including any review or rollback recommendation. This read does not query providers, approve exceptions or change resources.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/intent-conversations/", "/change-set/verification"))
 	register(s, a, "export_intent_kubernetes", "Render an exact saved SLO/CUJ change-set digest as Kubernetes YAML in an explicit namespace for GitOps review. This is an offline artifact; it does not connect to Kubernetes or authorize deployment.", true, func(ctx context.Context, in intentKubernetesExport) (any, error) {
 		if e := validID(in.ConversationID); e != nil {
 			return nil, e

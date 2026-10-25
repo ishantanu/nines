@@ -30,24 +30,27 @@ func Invalid(format string, args ...any) error { return &ValidationError{fmt.Spr
 type Policy = v1alpha1.BurnRatePolicy
 
 type SLO struct {
-	Measurement        *v1alpha1.MeasurementSpec  `json:"measurement,omitempty"`
-	Intent             *v1alpha1.IntentSpec       `json:"intent,omitempty"`
-	ProviderWindow     *v1alpha1.ProviderWindow   `json:"providerWindow,omitempty"`
-	MeasurementBinding *v1alpha1.BindingReference `json:"measurementBinding,omitempty"`
-	Source             string                     `json:"source,omitempty"`
-	Revision           int64                      `json:"revision,omitempty"`
-	ID                 string                     `json:"id"`
-	Project            string                     `json:"project"`
-	Service            string                     `json:"service"`
-	Name               string                     `json:"name"`
-	Target             float64                    `json:"target"`
-	WindowSeconds      int64                      `json:"windowSeconds"`
-	StepSeconds        int64                      `json:"stepSeconds"`
-	GoodQuery          string                     `json:"goodQuery,omitempty"`
-	TotalQuery         string                     `json:"totalQuery,omitempty"`
-	Policies           []Policy                   `json:"policies,omitempty"`
-	Policy             *Policy                    `json:"policy,omitempty"`
-	CreatedAt          time.Time                  `json:"createdAt"`
+	ErrorBudgetPolicy  *v1alpha1.ErrorBudgetPolicy        `json:"errorBudgetPolicy,omitempty"`
+	Quality            *v1alpha1.MeasurementQualityPolicy `json:"quality,omitempty"`
+	Lifecycle          v1alpha1.SLOLifecycle              `json:"lifecycle,omitempty"`
+	Measurement        *v1alpha1.MeasurementSpec          `json:"measurement,omitempty"`
+	Intent             *v1alpha1.IntentSpec               `json:"intent,omitempty"`
+	ProviderWindow     *v1alpha1.ProviderWindow           `json:"providerWindow,omitempty"`
+	MeasurementBinding *v1alpha1.BindingReference         `json:"measurementBinding,omitempty"`
+	Source             string                             `json:"source,omitempty"`
+	Revision           int64                              `json:"revision,omitempty"`
+	ID                 string                             `json:"id"`
+	Project            string                             `json:"project"`
+	Service            string                             `json:"service"`
+	Name               string                             `json:"name"`
+	Target             float64                            `json:"target"`
+	WindowSeconds      int64                              `json:"windowSeconds"`
+	StepSeconds        int64                              `json:"stepSeconds"`
+	GoodQuery          string                             `json:"goodQuery,omitempty"`
+	TotalQuery         string                             `json:"totalQuery,omitempty"`
+	Policies           []Policy                           `json:"policies,omitempty"`
+	Policy             *Policy                            `json:"policy,omitempty"`
+	CreatedAt          time.Time                          `json:"createdAt"`
 }
 
 var counterSelector = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*(\{([a-zA-Z_][a-zA-Z0-9_]*="([^"\\]|\\.)*"(,[a-zA-Z_][a-zA-Z0-9_]*="([^"\\]|\\.)*")*)?\})?$`)
@@ -56,6 +59,15 @@ var identifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 func (s SLO) HasQueries() bool { return s.ProviderWindow != nil || s.GoodQuery != "" }
 func (s SLO) Validate() error {
+	if err := validateBudgetPolicy(s.ErrorBudgetPolicy); err != nil {
+		return err
+	}
+	if err := validateQuality(s.Quality, s.StepSeconds); err != nil {
+		return err
+	}
+	if !s.Lifecycle.Valid() {
+		return Invalid("lifecycle must be experimental, aspirational, committed or deprecated")
+	}
 	if s.Measurement != nil {
 		if err := ValidateInlineSLO(s); err != nil {
 			return err
@@ -119,23 +131,7 @@ func (s SLO) Validate() error {
 			}
 		}
 	}
-	if len(s.Policies) > 8 || (s.Policy != nil && len(s.Policies) > 0) {
-		return Invalid("use either policy or up to eight named policies")
-	}
-	seenPolicies := map[string]bool{}
-	for _, p := range s.AlertPolicies() {
-		if len(s.Policies) > 0 && (!identifier.MatchString(p.Name) || seenPolicies[p.Name] || (p.Severity != "critical" && p.Severity != "warning" && p.Severity != "info")) {
-			return Invalid("policies require unique names and critical, warning or info severity")
-		}
-		seenPolicies[p.Name] = true
-		if p.ShortWindowSeconds < s.StepSeconds || p.LongWindowSeconds < p.ShortWindowSeconds || p.LongWindowSeconds > s.WindowSeconds || p.ShortWindowSeconds%s.StepSeconds != 0 || p.LongWindowSeconds%s.StepSeconds != 0 {
-			return Invalid("alert windows must be aligned multiples of stepSeconds within the SLO window")
-		}
-		if !Finite(p.BurnRate) || p.BurnRate <= 0 || !Finite(p.MinCoverage) || p.MinCoverage <= 0 || p.MinCoverage > 1 || p.ForSeconds < 0 || p.ForSeconds > 31*86400 {
-			return Invalid("invalid burn-rate, coverage or pending duration")
-		}
-	}
-	return nil
+	return validateBurnPolicies(s)
 }
 
 // A point contains event counts over (time-step,time], never cumulative counters.
@@ -157,13 +153,14 @@ func (p Point) Validate(step int64) error {
 }
 
 type AlertState struct {
-	Policies      map[string]AlertState `json:"policies,omitempty"`
-	Policy        string                `json:"policy,omitempty"`
-	Severity      string                `json:"severity,omitempty"`
-	PolicyDigest  string                `json:"policyDigest,omitempty"`
-	Phase         string                `json:"phase"`
-	PendingSince  *time.Time            `json:"pendingSince,omitempty"`
-	LastEvaluated *time.Time            `json:"lastEvaluated,omitempty"`
+	SuppressedReason string                `json:"suppressedReason,omitempty"`
+	Policies         map[string]AlertState `json:"policies,omitempty"`
+	Policy           string                `json:"policy,omitempty"`
+	Severity         string                `json:"severity,omitempty"`
+	PolicyDigest     string                `json:"policyDigest,omitempty"`
+	Phase            string                `json:"phase"`
+	PendingSince     *time.Time            `json:"pendingSince,omitempty"`
+	LastEvaluated    *time.Time            `json:"lastEvaluated,omitempty"`
 }
 type Snapshot struct {
 	SLOID                   string     `json:"sloId"`

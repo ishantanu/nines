@@ -159,7 +159,7 @@ test("new-resource rollback remains visibly blocked and cannot expose a partial 
   );
   expect(html).toContain("Rollback unavailable. No resources changed.");
   expect(html).toContain(
-    "Existing external rules require a separate Rules review",
+    "Owner-enabled automatic rule destinations reconcile the restored",
   );
   expect(html).not.toContain("Approve rollback");
   expect(html).not.toContain("Download rollback Kubernetes YAML");
@@ -206,4 +206,39 @@ test("intent definition form explains its read-only preview and approval handoff
   expect(html).toContain("Start conversation from this goal");
   expect(html).not.toContain("Apply reviewed SLO");
   expect(html).not.toContain("Apply reviewed journey link");
+});
+
+test("corrective exception apply is disabled for editors", () => {
+  const value = {
+    ...conversation,
+    changeSet: {
+      ...conversation.changeSet!,
+      state: "approved" as const,
+      safetyCheck: {
+        state: "blocked",
+        message: "A firing burn alert needs review.",
+        checkedAt: "2026-10-25T12:00:00Z",
+        burnState: "firing",
+      },
+      safetyException: {
+        reason: "Correct measurement",
+        approvedBy: { subject: "owner", name: "Owner" },
+        expiresAt: "2026-10-25T12:30:00Z",
+      },
+    },
+  };
+  const html = renderToStaticMarkup(
+    <IntentDecisionControls
+      scope={createTenantSession("key", "alpha", "editor")}
+      conversation={value}
+      busy={false}
+      onAction={async () => {}}
+    />,
+  );
+  expect(html).toContain("A different tenant owner");
+  expect(html).toContain("Burn-rate alert: firing");
+  const button = html.match(
+    /<button[^>]*>Apply approved changes<\/button>/,
+  )?.[0];
+  expect(button).toContain("disabled");
 });

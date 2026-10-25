@@ -185,7 +185,11 @@ const navigation = [
   { id: "agents" as const, label: "Agent evidence", icon: Bot },
   { id: "workflows" as const, label: "Workflows", icon: Workflow },
   { id: "alerts" as const, label: "Alert activity", icon: ShieldCheck },
-  { id: "connections" as const, label: "Data sources", icon: Database },
+  {
+    id: "connections" as const,
+    label: "Telemetry connections",
+    icon: Database,
+  },
   { id: "audit" as const, label: "Audit log", icon: ShieldCheck },
   { id: "access" as const, label: "Access control", icon: KeyRound },
   { id: "clients" as const, label: "API and clients", icon: Terminal },
@@ -217,7 +221,7 @@ const copy = {
   ],
   home: ["Overview", "Tenant reliability, journey impact and configuration."],
   connections: [
-    "Data sources",
+    "Telemetry connections",
     "Manage metrics connections and recording-rule destinations.",
   ],
   access: [

@@ -146,6 +146,24 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 				return nil, fmt.Errorf("intent conversations require an independent tenant repository")
 			}
 			intentRepos[flow.Repository] = true
+			flow.AuthorizeReview = func(ctx context.Context, actor v1.InvestigationActor, owner bool) error {
+				if actor.Kind == "api_token" {
+					for _, g := range workspace.Grants {
+						sum := sha256.Sum256([]byte("Bearer " + g.Token))
+						if actor.Subject == "token:"+hex.EncodeToString(sum[:8]) && (g.Role == "owner" || (!owner && g.Role == "editor")) {
+							return nil
+						}
+					}
+					return intentflow.ErrForbidden
+				}
+				if actor.Kind == "anonymous" && actor.Subject == "anonymous" && workspace.Anonymous && auth == nil {
+					return nil
+				}
+				if auth == nil {
+					return intentflow.ErrForbidden
+				}
+				return auth.AuthorizeBackgroundReview(ctx, workspace.ID, actor.Subject, actor.Kind, owner)
+			}
 			flow.Authorize = func(ctx context.Context, actor v1.InvestigationActor) error {
 				if actor.Kind == "api_token" {
 					for _, g := range workspace.Grants {

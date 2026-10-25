@@ -10,7 +10,7 @@ const recorder = vi.hoisted(() => ({ stop: vi.fn(), record: vi.fn() }));
 vi.mock("@rrweb/record", () => ({ record: recorder.record }));
 vi.mock("./components/administration", () => ({
   AccessControl: () => <h1 data-private>Access control</h1>,
-  Connections: () => <h1 data-private>Data sources</h1>,
+  Connections: () => <h1 data-private>Telemetry connections</h1>,
   Clients: () => <h1 data-private>API and clients</h1>,
 }));
 vi.mock("./components/audit-log", () => ({
@@ -132,9 +132,7 @@ test("the recording indicator and stop action remain available on SLO details an
   );
   await act(async () => button("Start recording").click());
   await until(() =>
-    host.textContent!.includes(
-      "Recording this tab. Private data is masked.",
-    ),
+    host.textContent!.includes("Recording this tab. Private data is masked."),
   );
   await act(async () =>
     navigateTo(workspacePath("alpha", "objectives", "api")),
@@ -172,9 +170,7 @@ async function recordTab() {
   );
   await act(async () => button("Start recording").click());
   await until(() =>
-    host.textContent!.includes(
-      "Recording this tab. Private data is masked.",
-    ),
+    host.textContent!.includes("Recording this tab. Private data is masked."),
   );
 }
 test("sensitive pages pause capture and an eligible page resumes a fresh segment", async () => {
@@ -190,9 +186,7 @@ test("sensitive pages pause capture and an eligible page resumes a fresh segment
     navigateTo(workspacePath("alpha", "objectives", "api")),
   );
   await until(() =>
-    host.textContent!.includes(
-      "Recording this tab. Private data is masked.",
-    ),
+    host.textContent!.includes("Recording this tab. Private data is masked."),
   );
   expect(recorder.record).toHaveBeenCalledTimes(2);
 });

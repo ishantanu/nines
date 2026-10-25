@@ -273,7 +273,7 @@ func TestRuleDeploymentRequiresBothFlagsAndReviewedDigest(t *testing.T) {
 	call(t, ctx, ordinary, "test_connection", map[string]any{"id": "production"})
 	enabled, enabledctx := connect(t, Config{Server: api.URL, Tenant: "commerce", AllowWrites: true, AllowRuleDeployment: true})
 	tools, err = enabled.ListTools(enabledctx, nil)
-	if err != nil || len(tools.Tools) != 57 || !hasTool(tools.Tools, "deploy_slo_rules") {
+	if err != nil || len(tools.Tools) != 59 || !hasTool(tools.Tools, "deploy_slo_rules") {
 		t.Fatal(tools, err)
 	}
 	if hasTool(tools.Tools, "approve_workflow") || hasTool(tools.Tools, "reject_workflow") {

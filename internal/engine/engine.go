@@ -45,7 +45,7 @@ func Evaluate(s model.SLO, points map[int64]model.Point, at time.Time, window in
 		// residual at exact exhaustion. Treat only that representational noise
 		// as zero, rather than reporting a negative-zero budget.
 		tolerance := 8 * (math.Nextafter(r.Total, math.Inf(1)) - r.Total)
-		if math.Abs(remaining) <= tolerance {
+		if r.Bad > 0 && math.Abs(remaining) <= tolerance {
 			remaining = 0
 		}
 		fraction := remaining / allowed
@@ -71,6 +71,10 @@ func Advance(s model.SLO, points map[int64]model.Point, previous model.AlertStat
 	return advanceWith(s, previous, at, func(window int64) model.Snapshot { return Evaluate(s, points, at, window) })
 }
 func advanceWith(s model.SLO, previous model.AlertState, at time.Time, evaluate func(int64) model.Snapshot) (model.AlertState, *model.AlertEvent) {
+	if !s.AlertsEnabled() {
+		return s.LifecycleAlertState(previous), nil
+	}
+	previous.SuppressedReason = ""
 	if previous.Phase == "" {
 		previous.Phase = "inactive"
 	}
@@ -86,7 +90,7 @@ func advanceWith(s model.SLO, previous model.AlertState, at time.Time, evaluate 
 	p := s.Policy
 	short := evaluate(p.ShortWindowSeconds)
 	long := evaluate(p.LongWindowSeconds)
-	sufficient := short.BurnRate != nil && long.BurnRate != nil && short.Coverage >= p.MinCoverage && long.Coverage >= p.MinCoverage
+	sufficient := short.BurnRate != nil && long.BurnRate != nil && short.Coverage >= p.MinCoverage && long.Coverage >= p.MinCoverage && short.Total >= p.MinEvents && long.Total >= p.MinEvents
 	if !sufficient {
 		if previous.Phase != "firing" {
 			next.Phase = "inactive"

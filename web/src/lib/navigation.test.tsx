@@ -231,3 +231,15 @@ test("modified link clicks preserve native open-in-new-tab behavior", async () =
   await act(async () => host.querySelector("a")!.dispatchEvent(event));
   expect(window.location.pathname).toBe("/");
 });
+
+test("telemetry connection routes are canonical and old data-source bookmarks remain usable", () => {
+  expect(workspacePath("alpha", "connections")).toBe(
+    "/tenants/alpha/telemetry-connections",
+  );
+  expect(parseRoute("/tenants/alpha/data-sources")).toEqual(
+    parseRoute("/tenants/alpha/telemetry-connections"),
+  );
+  expect(safeReturnPath("/tenants/alpha/data-sources")).toBe(
+    "/tenants/alpha/telemetry-connections",
+  );
+});

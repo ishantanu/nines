@@ -66,3 +66,78 @@ test("switching a saved measurement to custom queries explicitly detaches proven
   expect(objectiveDefinition(before, draft).spec.intent).toBeUndefined();
   expect(before.spec.measurementBinding).toBeDefined();
 });
+
+test("lifecycle edits preserve identity, optional defaults and intent provenance", () => {
+  const before = definitionFromSLO({
+    id: "api",
+    project: "p",
+    service: "api",
+    name: "API",
+    target: 0.99,
+    windowSeconds: 3600,
+    stepSeconds: 60,
+  });
+  expect(objectiveDraft(before).lifecycle).toBe("committed");
+  expect(
+    objectiveDefinition(before, objectiveDraft(before)).spec.lifecycle,
+  ).toBeUndefined();
+  before.spec.lifecycle = "aspirational";
+  before.spec.intent = {
+    lifecycle: "aspirational",
+    description: "API requests succeed",
+    service: "api",
+    source: "primary",
+    outcome: "availability",
+    population: { service: "api" },
+    target: 0.99,
+    windowSeconds: 3600,
+    noDataPolicy: "unknown",
+  };
+  const draft = objectiveDraft(before);
+  expect(draft.lifecycle).toBe("aspirational");
+  draft.lifecycle = "committed";
+  const edited = objectiveDefinition(before, draft);
+  expect(edited.metadata.name).toBe("api");
+  expect(edited.spec.lifecycle).toBe("committed");
+  expect(edited.spec.intent?.lifecycle).toBe("committed");
+  expect(before.spec.lifecycle).toBe("aspirational");
+});
+
+test("quality and budget edits preserve measurement and intent agreement", () => {
+  const before = definitionFromSLO({
+    id: "api",
+    project: "p",
+    service: "api",
+    name: "API",
+    target: 0.99,
+    windowSeconds: 3600,
+    stepSeconds: 60,
+    quality: { minEvents: 100, cohortLabels: ["region"] },
+    errorBudgetPolicy: {
+      owner: "oncall",
+      runbookURL: "https://example.test/runbook",
+      reviewBelow: 0.25,
+    },
+    intent: {
+      description: "API success",
+      service: "api",
+      source: "primary",
+      outcome: "availability",
+      population: { service: "api" },
+      target: 0.99,
+      windowSeconds: 3600,
+      noDataPolicy: "unknown",
+    },
+  });
+  const draft = objectiveDraft(before);
+  draft.quality = { minEvents: 200, cohortLabels: ["region", "tier"] };
+  draft.errorBudgetPolicy = { ...draft.errorBudgetPolicy!, owner: "new-owner" };
+  const after = objectiveDefinition(before, draft);
+  expect(after.metadata).toEqual(before.metadata);
+  expect(after.spec.quality?.minEvents).toBe(200);
+  expect(after.spec.intent?.quality).toEqual(after.spec.quality);
+  expect(after.spec.intent?.errorBudgetPolicy).toEqual(
+    after.spec.errorBudgetPolicy,
+  );
+  expect(before.spec.quality?.minEvents).toBe(100);
+});

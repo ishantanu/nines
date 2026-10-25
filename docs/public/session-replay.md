@@ -7,7 +7,7 @@ Session replay captures the current Nines application tab after consent. It pres
 1. Open **Session replay** in your tenant and expand **Record this tab**.
 2. Read the recording policy, select the consent checkbox, then choose **Start recording**.
 3. Navigate through the workspace. The recording indicator and **Stop recording** control remain available on SLO details and other pages.
-4. Recording pauses on access-control, data-source and API/client screens, and while the API credential dialog is open. It resumes when you return to an eligible workspace page.
+4. Recording pauses on access-control, telemetry-connection and API/client screens, and while the API credential dialog is open. It resumes when you return to an eligible workspace page.
 5. Choose **Stop recording**. Nines opens Session replay with the local recording ready to save. Enter a title and choose **Save recording** to upload it to the current tenant.
 
 Starting a recording does not upload it. Unsaved events stay in the tab. **Discard** clears the local recording; changing tenant or signing out also discards local capture immediately, including while the logout request is pending. A recorder initialization or masking failure stops capture and explains the problem. An older save response cannot discard a newer recording or move you back after navigating away.
@@ -71,7 +71,7 @@ Open `http://127.0.0.1:18221/login` and use the displayed demo credentials, `adm
 Run the following in **each** supported desktop browser, recording the browser version and OS:
 
 1. Check that **Start recording** is disabled until consent is selected. Start, visit the SLO list and an SLO detail, scroll, type a synthetic value into an ordinary search field, and open a dialog/disclosure. Confirm the recording indicator remains present.
-2. Switch light/dark theme and resize the window between wide and narrow sizes. Open **API connection**, enter only a synthetic sentinel such as `replay-test-secret`, close without connecting, then visit **Data sources** and return. The sensitive screens must pause recording and eligible screens must resume it.
+2. Switch light/dark theme and resize the window between wide and narrow sizes. Open **API connection**, enter only a synthetic sentinel such as `replay-test-secret`, close without connecting, then visit **Telemetry connections** and return. The sensitive screens must pause recording and eligible screens must resume it.
 3. Stop from the SLO detail, save with a synthetic title, and verify play/pause/seek reconstruct the pages you visited. Check that approved navigation, SLO table headers and detail tabs are readable, while SLO names, queries, metric values and input values are masked, geometry follows viewport/theme changes and the credential dialog/sentinel are absent. The synthetic checkout fixture is not evidence of current-tab capture.
 4. Choose **Download replay (.html)** and confirm that a file actually appears in Downloads. Stop this demo with Ctrl-C, make the browser/network unavailable, and open the downloaded file directly. Play, pause and seek across the recording. It must need no server, remote asset, browser extension or permitted network request. Record any console/CSP error or blank view as a failure.
 5. Restart the demo for the next browser. In a separate capture, switch tenants or sign out and back in; no unsaved capture or consent may survive. Do not confuse demo sign-out with the separately tested server session-expiry boundary.

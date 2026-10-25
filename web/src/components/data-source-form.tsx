@@ -106,7 +106,9 @@ export function DataSourceForm({
           disabled={!enabled || scope.role !== "owner"}
           onClick={open}
         >
-          {connection ? "Edit data source" : "Add data source"}
+          {connection
+            ? "Edit telemetry connection"
+            : "Add telemetry connection"}
         </Button>
         {connection ? (
           <Button
@@ -118,7 +120,7 @@ export function DataSourceForm({
               setRemove(true);
             }}
           >
-            Delete data source
+            Delete telemetry connection
           </Button>
         ) : null}
       </div>
@@ -131,7 +133,9 @@ export function DataSourceForm({
         <DialogContent className="max-h-[90svh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {connection ? "Edit data source" : "Add data source"}
+              {connection
+                ? "Edit telemetry connection"
+                : "Add telemetry connection"}
             </DialogTitle>
             <DialogDescription>
               Connection endpoints and Mimir organizations must be allowed by
@@ -328,7 +332,7 @@ export function DataSourceForm({
                   Cancel
                 </Button>
                 <Button disabled={busy}>
-                  {busy ? "Saving..." : "Save data source"}
+                  {busy ? "Saving..." : "Save telemetry connection"}
                 </Button>
               </div>
             </form>
@@ -343,7 +347,7 @@ export function DataSourceForm({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete data source</DialogTitle>
+            <DialogTitle>Delete telemetry connection</DialogTitle>
             <DialogDescription>
               Delete {connection?.id} from this tenant. Connections referenced
               by an SLO or measurement binding cannot be deleted. This does not
@@ -368,7 +372,7 @@ export function DataSourceForm({
               disabled={busy}
               onClick={removeSource}
             >
-              Delete data source
+              Delete telemetry connection
             </Button>
           </div>
         </DialogContent>

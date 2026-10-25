@@ -103,6 +103,17 @@ func (c *Client) ApplyIntentChangeSet(ctx context.Context, id string, in v1.Revi
 	}
 	return c.conversationWrite(ctx, p+"/change-set/apply", in)
 }
+func (c *Client) ObserveIntentChangeSet(ctx context.Context, id string, in v1.ReviewIntentChangeSet) (v1.IntentConversation, error) {
+	p, e := conversationPath(id)
+	if e != nil {
+		return v1.IntentConversation{}, e
+	}
+	out, err := c.conversationWrite(ctx, p+"/change-set/observe", in)
+	if err == nil && out.ID != id {
+		err = errors.New("unexpected conversation identity")
+	}
+	return out, err
+}
 func (c *Client) VerifyIntentChangeSet(ctx context.Context, id string) (v1.IntentChangeSetVerification, error) {
 	var out v1.IntentChangeSetVerification
 	p, e := conversationPath(id)

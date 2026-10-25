@@ -1,3 +1,5 @@
+import { IntentOutcomePanel } from "./intent-outcome";
+import { BudgetDecisionPanel } from "./budget-decision";
 import { useEffect, useId, useRef, useState } from "react";
 import { stringify } from "yaml";
 import { api, canEdit, type RequestScope } from "@/lib/api";
@@ -53,6 +55,9 @@ export function IntentRecommendationReport({
     >
       <h3 className="text-sm font-medium">Why this recommendation</h3>
       <p className="text-sm">{report.summary}</p>
+      {report.budgetDecision ? (
+        <BudgetDecisionPanel decision={report.budgetDecision} frozen />
+      ) : null}
       {report.rollbackStatus === "creation_has_no_baseline" ? (
         <p className="text-xs font-medium">
           This proposal creates a resource. Configuration rollback cannot undo
@@ -61,8 +66,8 @@ export function IntentRecommendationReport({
       ) : report.rollbackStatus === "restorable_updates" ? (
         <p className="text-xs text-muted-foreground">
           Prior definitions can be restored through a separate rollback review
-          if no later edits intervene. External rules require separate
-          deployment.
+          if no later edits intervene. Owner-enabled automatic rule destinations
+          reconcile saved revisions; activation is verified separately.
         </p>
       ) : report.rollbackStatus === "no_definition_change" ? (
         <p className="text-xs text-muted-foreground">
@@ -236,8 +241,10 @@ export function IntentDecisionControls({
   const [reason, setReason] = useState(""),
     [ack, setAck] = useState(false);
   const id = useId();
+  const [exceptionReason, setExceptionReason] = useState("");
   useEffect(() => {
     setReason("");
+    setExceptionReason("");
     setAck(false);
   }, [change?.digest, change?.state, conversation.id]);
   if (!change || change.state === "applied") return null;
@@ -247,6 +254,9 @@ export function IntentDecisionControls({
       digest: change.digest,
       confirm: true,
       reason,
+      ...(suffix === "/change-set/approve" && exceptionReason.trim()
+        ? { safetyExceptionReason: exceptionReason.trim() }
+        : {}),
     });
   if (change.state === "rejected")
     return (
@@ -271,12 +281,49 @@ export function IntentDecisionControls({
     );
   return (
     <div className="space-y-3">
+      {change.observationPolicy ? (
+        <p className="text-xs text-muted-foreground">
+          Apply refreshes quality and budget evidence. Post-change checks allow{" "}
+          {change.observationPolicy.warmupSeconds}s warmup, then require{" "}
+          {change.observationPolicy.observeSeconds}s of qualifying observations,
+          with a {change.observationPolicy.deadlineSeconds}s deadline.
+        </p>
+      ) : null}
+      {change.safetyCheck ? (
+        <div className="space-y-2 rounded-md border p-3">
+          <p className="text-xs font-medium">
+            Last action-time check:{" "}
+            {change.safetyCheck.state.replaceAll("_", " ")}
+          </p>
+          <p className="text-xs">{change.safetyCheck.message}</p>
+          {["pending", "firing"].includes(
+            change.safetyCheck.burnState ?? "",
+          ) ? (
+            <p className="text-xs font-medium">
+              Burn-rate alert: {change.safetyCheck.burnState}.
+            </p>
+          ) : null}
+          {change.safetyCheck.budget ? (
+            <BudgetDecisionPanel decision={change.safetyCheck.budget} frozen />
+          ) : null}
+        </div>
+      ) : null}
+      {change.safetyException ? (
+        <p className="text-xs">
+          Corrective-work exception: {change.safetyException.reason}. Expires{" "}
+          {change.safetyException.expiresAt}. A different tenant owner must
+          apply it.
+        </p>
+      ) : null}
       {change.state === "approved" ? (
         <div className="text-xs">
           <p>
             Approved by {change.approvedBy?.name || "an authorized reviewer"} at{" "}
-            {change.approvedAt}. A different owner or editor must apply this
-            approval.
+            {change.approvedAt}.{" "}
+            {change.safetyException
+              ? "A different tenant owner"
+              : "A different owner or editor"}{" "}
+            must apply this approval.
           </p>
           <p className="mt-1 whitespace-pre-wrap text-muted-foreground">
             {change.approvalReason ||
@@ -285,7 +332,11 @@ export function IntentDecisionControls({
           <Button
             className="mt-3"
             size="sm"
-            disabled={!canEdit(scope) || busy}
+            disabled={
+              !canEdit(scope) ||
+              busy ||
+              (!!change.safetyException && scope.role !== "owner")
+            }
             onClick={() =>
               void onAction(
                 "/change-set/apply",
@@ -318,6 +369,29 @@ export function IntentDecisionControls({
           placeholder="Record the evidence reviewed, accepted trade-offs or concerns."
         />
       </div>
+      {change.state === "proposed" && scope.role === "owner" ? (
+        <details className="space-y-2 text-xs">
+          <summary className="cursor-pointer font-medium">
+            Approve corrective work despite adverse evidence
+          </summary>
+          <p className="mt-2 text-muted-foreground">
+            Use only after reviewing the risks of exhausted budgets or
+            insufficient measurements. This 30-minute exception requires a
+            different owner to apply and cannot bypass source, revision or
+            access checks.
+          </p>
+          <Label htmlFor={id + "-exception"}>
+            Corrective-work justification
+          </Label>
+          <Textarea
+            id={id + "-exception"}
+            value={exceptionReason}
+            maxLength={1000}
+            disabled={busy}
+            onChange={(e) => setExceptionReason(e.target.value)}
+          />
+        </details>
+      ) : null}
       {change.state === "proposed" ? (
         <Label className="flex items-start gap-2 text-xs">
           <input
@@ -467,14 +541,37 @@ export function IntentRollbackPanel({
       className="space-y-3 rounded-md border p-3"
       aria-label={`Configuration rollback for ${change.id}`}
     >
+      <IntentOutcomePanel
+        report={
+          rollback?.state === "applied" ? rollback.outcome : change.outcome
+        }
+        scope={scope}
+        conversation={conversation.id}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy || !canEdit(scope)}
+        onClick={() =>
+          void onAction("/change-set/observe", {
+            expectedVersion: conversation.version,
+            digest:
+              rollback?.state === "applied" ? rollback.digest : change.digest,
+            confirm: true,
+          })
+        }
+      >
+        Check runtime and record outcome
+      </Button>
       <h3 className="text-sm font-medium">Configuration rollback</h3>
       <p className="break-all text-xs text-muted-foreground">
         Original change: {change.digest}
       </p>
       <p className="text-xs text-muted-foreground">
         Restores earlier definitions as new revisions. Later edits block
-        rollback. Existing external rules require a separate Rules review and
-        deployment. Consumed error budget cannot be restored.
+        rollback. Owner-enabled automatic rule destinations reconcile the
+        restored revision; manual destinations need a separate Rules apply.
+        Consumed error budget cannot be restored.
       </p>
       {!rollback || rollback.state === "rejected" ? (
         <>
@@ -563,8 +660,8 @@ export function IntentRollbackPanel({
                     onChange={(e) => setAck(e.target.checked)}
                   />
                   <span>
-                    I reviewed the restore diff and the data source rule
-                    delivery policy.
+                    I reviewed the restore diff and the telemetry connection
+                    rule delivery policy.
                   </span>
                 </Label>
               )}
@@ -628,9 +725,9 @@ export function IntentRollbackPanel({
                 </p>
               ))}
               <p className="text-muted-foreground">
-                Check rule deployment under the data source policy: automatic
-                reconciliation when enabled, otherwise reviewed apply. Recollect
-                coverage for the restored configuration.
+                Check rule deployment under the telemetry connection policy:
+                automatic reconciliation when enabled, otherwise reviewed apply.
+                Recollect coverage for the restored configuration.
               </p>
             </div>
           ) : null}

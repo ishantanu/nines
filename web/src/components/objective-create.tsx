@@ -1,5 +1,8 @@
 import { SLORevisionHistory } from "./slo-revision-history";
 import { MeasuredObjective } from "./measured-objective";
+import { BudgetPolicyEditor } from "./budget-policy-editor";
+import { QualityPolicyEditor } from "./quality-policy-editor";
+import { SLOLifecycleSelect } from "./slo-lifecycle";
 import { PolicyEditor } from "./policy-editor";
 import { useEffect, useState } from "react";
 import { parse, stringify } from "yaml";
@@ -21,6 +24,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 type Draft = {
+  errorBudgetPolicy?: SLO["errorBudgetPolicy"];
+  quality?: SLO["quality"];
+  lifecycle: NonNullable<SLO["lifecycle"]>;
   customMeasurement: boolean;
   policies: NonNullable<SLO["policies"]>;
   providerWindow: boolean;
@@ -49,6 +55,9 @@ export function objectiveDraft(
   const window = d.spec.providerWindow ?? derived;
   const p = d.spec.policy;
   return {
+    lifecycle: d.spec.lifecycle ?? "committed",
+    quality: d.spec.quality,
+    errorBudgetPolicy: d.spec.errorBudgetPolicy,
     customMeasurement: false,
     providerWindow: !!window,
     scrape: String(window?.scrapeIntervalSeconds ?? 15),
@@ -89,6 +98,12 @@ export function objectiveDefinition(
     throw new Error("Add an alert policy or disable burn-rate alerts.");
   const spec = {
     ...base.spec,
+    quality: d.quality,
+    errorBudgetPolicy: d.errorBudgetPolicy,
+    lifecycle:
+      d.lifecycle === "committed" && !base.spec.lifecycle
+        ? undefined
+        : d.lifecycle,
     displayName: d.displayName,
     service: d.service,
     target: Number(d.target),
@@ -124,6 +139,9 @@ export function objectiveDefinition(
   if (base.spec.intent && !d.customMeasurement)
     spec.intent = {
       ...base.spec.intent,
+      lifecycle: spec.lifecycle,
+      quality: spec.quality,
+      errorBudgetPolicy: spec.errorBudgetPolicy,
       service: spec.service,
       source: spec.source ?? "",
       target: spec.target,
@@ -320,7 +338,7 @@ export function ObjectiveCreate({
           </DialogTitle>
           <DialogDescription>
             {resource
-              ? "Edit the objective, measurement and burn-rate policies, then review the new revision. Measurement changes archive existing evidence and require fresh coverage. Rule delivery follows the data source policy."
+              ? "Edit the objective, measurement and burn-rate policies, then review the new revision. Measurement changes archive existing evidence and require fresh coverage. Rule delivery follows the telemetry connection policy."
               : "Define what counts as success, choose a target and window, then review before applying. Use advanced queries or YAML for custom measurements."}
           </DialogDescription>
         </DialogHeader>
@@ -413,6 +431,21 @@ export function ObjectiveCreate({
                     ) : null}
                   </div>
                 ) : null}
+                <BudgetPolicyEditor
+                  value={draft.errorBudgetPolicy}
+                  disabled={busy}
+                  onChange={(value) => setField("errorBudgetPolicy", value)}
+                />
+                <QualityPolicyEditor
+                  value={draft.quality}
+                  disabled={busy}
+                  onChange={(value) => setField("quality", value)}
+                />
+                <SLOLifecycleSelect
+                  value={draft.lifecycle}
+                  disabled={busy}
+                  onChange={(value) => setField("lifecycle", value)}
+                />
                 <div className="grid gap-3 sm:grid-cols-2">
                   {fields.map((f) => (
                     <div key={f.key}>

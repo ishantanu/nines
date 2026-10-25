@@ -25,6 +25,11 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 :root {
+  --chart-interval: #657b9d;
+  --chart-sli: #0f766e;
+  --chart-partial: #a16207;
+  --chart-short: #b45309;
+  --chart-long: #6d28d9;
   --background: #f7f6f2;
   --foreground: #292638;
   --card: #fffefa;
@@ -58,6 +63,11 @@
   -webkit-font-smoothing: antialiased;
 }
 .dark {
+  --chart-interval: #9cb3d4;
+  --chart-sli: #4bd0b4;
+  --chart-partial: #f6c45c;
+  --chart-short: #ffbc66;
+  --chart-long: #b5a0ff;
   color-scheme: dark;
   --background: #1c1c1e;
   --foreground: #f5f5f7;
@@ -212,11 +222,14 @@
 .detail-panel {
   @apply rounded-md border bg-card p-5;
 }
+.performance-grid {
+  @apply grid min-w-0 items-stretch gap-4 xl:grid-cols-2;
+}
 .chart-panel {
-  @apply h-[304px] min-w-0 gap-0 py-0;
+  @apply h-[clamp(24rem,32vw,28rem)] min-w-0 gap-0 overflow-hidden py-0;
 }
 .chart-panel > [data-slot="card-header"] {
-  @apply min-h-20 content-center gap-2 border-b px-5 py-3;
+  @apply min-h-24 content-start gap-2 border-b px-4 py-4;
 }
 .chart-panel > [data-slot="card-content"] {
   @apply min-h-0 flex-1 px-4 py-2;

@@ -1,3 +1,7 @@
+import { BudgetPolicyEditor } from "./budget-policy-editor";
+import { QualityPolicyEditor } from "./quality-policy-editor";
+import type { MeasurementQualityPolicy } from "@/lib/api";
+import { SLOLifecycleSelect } from "./slo-lifecycle";
 import { useEffect, useState } from "react";
 import { stringify } from "yaml";
 import { api, message, type Journey, type RequestScope } from "@/lib/api";
@@ -30,6 +34,7 @@ import {
 } from "@/components/ui/select";
 
 type Draft = {
+  lifecycle: NonNullable<IntentDocument["spec"]["lifecycle"]>;
   name: string;
   project: string;
   service: string;
@@ -45,8 +50,10 @@ type Draft = {
   burn: string;
   pending: string;
   coverage: string;
+  minEvents: string;
 };
 const initial: Draft = {
+  lifecycle: "committed",
   name: "",
   project: "",
   service: "",
@@ -62,6 +69,7 @@ const initial: Draft = {
   burn: "",
   pending: "2m",
   coverage: "1",
+  minEvents: "0",
 };
 export function IntentAuthoring({
   scope,
@@ -73,6 +81,9 @@ export function IntentAuthoring({
   onStartConversation?: (goal: IntentDocument) => void;
 }) {
   const [draft, setDraft] = useState(initial);
+  const [errorBudgetPolicy, setErrorBudgetPolicy] =
+    useState<import("@/lib/api").ErrorBudgetPolicy>();
+  const [quality, setQuality] = useState<MeasurementQualityPolicy>();
   const [measurement, setMeasurement] = useState<MeasurementDraft>(() => ({
     ...measurementDraft(),
     metric: "",
@@ -134,6 +145,11 @@ export function IntentAuthoring({
         kind: "ServiceLevelObjectiveIntent",
         metadata: { name: draft.name, project: draft.project },
         spec: {
+          ...(draft.lifecycle !== "committed"
+            ? { lifecycle: draft.lifecycle }
+            : {}),
+          ...(quality ? { quality } : {}),
+          ...(errorBudgetPolicy ? { errorBudgetPolicy } : {}),
           description: draft.description,
           service: draft.service,
           source: draft.source,
@@ -152,6 +168,9 @@ export function IntentAuthoring({
                   burnRate: Number(draft.burn),
                   forSeconds: durationSeconds(draft.pending),
                   minCoverage: Number(draft.coverage),
+                  ...(Number(draft.minEvents) !== 0
+                    ? { minEvents: Number(draft.minEvents) }
+                    : {}),
                 },
               }
             : {}),
@@ -276,6 +295,27 @@ export function IntentAuthoring({
         </CardHeader>
         <CardContent>
           <fieldset disabled={busy} className="space-y-5">
+            <BudgetPolicyEditor
+              value={errorBudgetPolicy}
+              disabled={busy}
+              onChange={(value) => {
+                setErrorBudgetPolicy(value);
+                invalidate();
+              }}
+            />
+            <QualityPolicyEditor
+              value={quality}
+              disabled={busy}
+              onChange={(value) => {
+                setQuality(value);
+                invalidate();
+              }}
+            />
+            <SLOLifecycleSelect
+              value={draft.lifecycle}
+              disabled={busy}
+              onChange={(value) => field("lifecycle", value)}
+            />
             <div className="grid gap-4 md:grid-cols-3">
               {input("name", "SLO ID", "checkout-success")}
               {input("project", "Project", "commerce")}
@@ -298,7 +338,7 @@ export function IntentAuthoring({
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               <div className="grid gap-2">
-                <Label htmlFor="intent-source">Data source</Label>
+                <Label htmlFor="intent-source">Telemetry connection</Label>
                 <Select
                   value={draft.source}
                   onValueChange={(v) => field("source", v)}
@@ -473,12 +513,13 @@ export function IntentAuthoring({
                 {input("burn", "Burn-rate threshold", "Enter a threshold")}
                 {input("pending", "Pending duration")}
                 {input("coverage", "Minimum coverage (0 to 1)")}
+                {input("minEvents", "Minimum events per alert window")}
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
                 No alert policy will be added. Recording and alert rules are
-                deployed according to the data source policy after the SLO is
-                saved.
+                deployed according to the telemetry connection policy after the
+                SLO is saved.
               </p>
             )}
             <div className="space-y-2 border-t pt-4">

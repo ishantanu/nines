@@ -1,6 +1,6 @@
 # Edit an SLO without changing its name
 
-An SLO's name is its stable identity for critical user journey links and clients. Targets, rolling windows, alert policies, service, source, sampling interval and queries can be edited as new configuration revisions. Correcting a counter selector does not require a new SLO name.
+An SLO's name is its stable identity for critical user journey links and clients. Targets, rolling windows, lifecycle, alert policies, service, source, sampling interval and queries can be edited as new configuration revisions. Correcting a counter selector does not require a new SLO name.
 
 ## Portal review and apply
 
@@ -8,7 +8,7 @@ An SLO's name is its stable identity for critical user journey links and clients
 2. Edit its structured measurement in **Measurement**, use **Settings** for custom queries, or edit **YAML**. Keep the same `metadata.name`.
 3. Select **Validate and plan**. The plan shows the expected/current revision and the resulting definition.
 4. If the measurement changes, review the reset warning and acknowledge that coverage starts fresh, then select **Apply definition**.
-5. Check the data source deployment policy. Automatic mode queues the new revision after save; manual mode requires **Rules → Apply reviewed rules**. Check runtime evaluation separately.
+5. Check the telemetry connection deployment policy. Automatic mode queues the new revision after save; manual mode requires **Rules → Apply reviewed rules**. Check runtime evaluation separately.
 
 The API/CLI uses the same revision checks. A stale editor or client receives a conflict instead of overwriting another change. A matching definition is a no-op and does not create an archive or reset coverage.
 

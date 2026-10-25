@@ -125,6 +125,9 @@ func DecodeResource(body []byte) (k.Resource, error) {
 	return r, e
 }
 func schemaFor(t reflect.Type) map[string]any {
+	if t == reflect.TypeOf(domain.SLOLifecycle("")) {
+		return map[string]any{"type": "string", "enum": []string{"experimental", "aspirational", "committed", "deprecated"}}
+	}
 	if t.Kind() == reflect.Pointer {
 		v := schemaFor(t.Elem())
 		v["nullable"] = true
@@ -165,6 +168,27 @@ func schemaFor(t reflect.Type) map[string]any {
 				name = f.Name
 			}
 			properties[name] = schemaFor(f.Type)
+			if t == reflect.TypeOf(domain.MeasurementQualityPolicy{}) {
+				switch name {
+				case "minEvents":
+					properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 1e18}
+				case "maxSampleAgeSeconds":
+					properties[name] = map[string]any{"type": "integer", "format": "int64", "minimum": 0, "maximum": 31 * 86400}
+				case "cohortLabels":
+					properties[name] = map[string]any{"type": "array", "maxItems": 3, "x-kubernetes-list-type": "set", "items": map[string]any{"type": "string", "pattern": model.LabelName.String()}}
+				}
+			}
+			if t == reflect.TypeOf(domain.ErrorBudgetPolicy{}) {
+				switch name {
+				case "reviewBelow":
+					properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 1}
+				case "onExhausted":
+					properties[name] = map[string]any{"type": "string", "enum": []string{"blocked", "review_required"}}
+				}
+			}
+			if t == reflect.TypeOf(domain.BurnRatePolicy{}) && name == "minEvents" {
+				properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 1e18}
+			}
 			if !strings.Contains(opts, "omitempty") {
 				required = append(required, name)
 			}

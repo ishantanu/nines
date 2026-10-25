@@ -108,10 +108,12 @@ func (s *Service) Status(ctx context.Context, id string, at time.Time) (model.Sn
 
 // SLOView pairs a definition and status calculated from the same stored record.
 type SLOView struct {
-	Collection        *v1.CollectionHealth `json:"collection,omitempty"`
-	MeasurementHealth *v1.BindingHealth    `json:"measurementHealth,omitempty"`
-	SLO               model.SLO            `json:"slo"`
-	Status            model.Snapshot       `json:"status"`
+	BudgetDecision    *v1.ErrorBudgetDecision `json:"budgetDecision,omitempty"`
+	Quality           *v1.MeasurementQuality  `json:"quality,omitempty"`
+	Collection        *v1.CollectionHealth    `json:"collection,omitempty"`
+	MeasurementHealth *v1.BindingHealth       `json:"measurementHealth,omitempty"`
+	SLO               model.SLO               `json:"slo"`
+	Status            model.Snapshot          `json:"status"`
 }
 
 func (s *Service) ReadSLO(ctx context.Context, id string) (SLOView, error) {
@@ -123,7 +125,9 @@ func (s *Service) ReadSLO(ctx context.Context, id string) (SLOView, error) {
 	if err != nil {
 		return SLOView{}, err
 	}
-	view := SLOView{SLO: r.SLO, Status: status}
+	quality := s.qualityFromRecord(r, status, s.Now(), false)
+	decision := s.budgetFromEvidence(r.SLO, status, quality, false)
+	view := SLOView{SLO: r.SLO, Status: status, Quality: &quality, BudgetDecision: &decision}
 	if r.Collection.State != "" {
 		collection := r.Collection
 		view.Collection = &collection
@@ -156,7 +160,7 @@ func (s *Service) statusFromRecord(r model.Record, at time.Time) (model.Snapshot
 	}
 	// Historical evaluations do not attach today's alert state to past data.
 	if result.At.Equal(current) {
-		result.Alert = r.Alert
+		result.Alert = r.SLO.LifecycleAlertState(r.Alert)
 	} else {
 		result.Alert = model.AlertState{Phase: "historical"}
 	}
@@ -181,6 +185,11 @@ func (s *Service) Ingest(ctx context.Context, id string, points []model.Point) e
 	return s.Store.Update(ctx, id, func(r *model.Record) error {
 		if r.SLO.ProviderWindow != nil {
 			return model.Invalid("provider-window SLOs require collection, not interval ingestion")
+		}
+		if r.SLO.HasQueries() {
+			r.Collection.SourceDigest = ""
+			r.Collection.SourceFrom = time.Time{}
+			r.Collection.SourceTo = time.Time{}
 		}
 		return s.apply(r, points, nil)
 	})
@@ -267,7 +276,9 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 		return 0, err
 	}
 	c := r.SLO
-	if s.CollectorFor(c) == nil {
+	collector := s.CollectorFor(c)
+	sourceDigest := collectorFingerprint(collector, c.Source)
+	if collector == nil {
 		return 0, model.ErrUnavailable
 	}
 	if !c.HasQueries() {
@@ -289,16 +300,19 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 	if blocked {
 		err = errMeasurementContract
 	} else if c.ProviderWindow != nil {
-		collector, ok := s.CollectorFor(c).(WindowCollector)
+		windowCollector, ok := collector.(WindowCollector)
 		if !ok {
 			err = fmt.Errorf("source does not support provider-window collection")
 		} else {
-			windows, err = collector.CollectWindows(ctx, c, from, to)
+			windows, err = windowCollector.CollectWindows(ctx, c, from, to)
 		}
 	} else {
-		points, err = s.CollectorFor(c).Collect(ctx, c, from, to)
+		points, err = collector.Collect(ctx, c, from, to)
 	}
-	health := v1.CollectionHealth{State: "succeeded", AttemptedAt: attempted, CompletedAt: s.Now().UTC(), From: from, To: to, Source: c.Source, SLORevision: model.ConfigRevision(c), Points: len(points) + len(windows)}
+	health := v1.CollectionHealth{SourceDigest: sourceDigest, SourceFrom: from, SourceTo: to, State: "succeeded", AttemptedAt: attempted, CompletedAt: s.Now().UTC(), From: from, To: to, Source: c.Source, SLORevision: model.ConfigRevision(c), Points: len(points) + len(windows)}
+	if c.ProviderWindow != nil {
+		health.SourceFrom = from.Add(time.Duration(c.StepSeconds-c.WindowSeconds) * time.Second)
+	}
 	failure := func(code string, cause error) (int, error) {
 		health.State = "failed"
 		health.ErrorCode = code
@@ -310,6 +324,7 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 				return nil // A late failure belongs to the old definition, not the new measurement.
 			}
 			if !r.Collection.AttemptedAt.After(health.AttemptedAt) {
+				health.SourceDigest, health.SourceFrom, health.SourceTo = r.Collection.SourceDigest, r.Collection.SourceFrom, r.Collection.SourceTo
 				health.LastSuccessAt = r.Collection.LastSuccessAt
 				health.Measurement = r.Collection.Measurement
 				r.Collection = health
@@ -331,12 +346,28 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 			return failure("invalid_provider_samples", fmt.Errorf("collector returned samples outside requested interval"))
 		}
 	}
+	if s.SourceFingerprint(c.Source) != sourceDigest {
+		return failure("measurement_source_changed", model.ErrRevisionConflict)
+	}
 	rangeToReplace := [2]time.Time{from, to}
 	err = s.Store.Update(ctx, id, func(r *model.Record) error {
 		if check, ok := s.measurementHealth(*r); ok && check.EvaluationBlocked {
 			return errMeasurementContract
 		}
 		if !r.Collection.AttemptedAt.After(health.AttemptedAt) {
+			previous := r.Collection
+			if previous.SourceDigest == sourceDigest && !previous.SourceFrom.IsZero() && !previous.SourceTo.IsZero() {
+				if !health.SourceFrom.After(previous.SourceTo) && !health.SourceTo.Before(previous.SourceFrom) {
+					if previous.SourceFrom.Before(health.SourceFrom) {
+						health.SourceFrom = previous.SourceFrom
+					}
+					if previous.SourceTo.After(health.SourceTo) {
+						health.SourceTo = previous.SourceTo
+					}
+				} else if previous.SourceTo.After(health.SourceTo) {
+					health.SourceFrom, health.SourceTo = previous.SourceFrom, previous.SourceTo
+				}
+			}
 			health.LastSuccessAt = health.CompletedAt
 			health.Measurement = r.Collection.Measurement
 			r.Collection = health

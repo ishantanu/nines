@@ -9,6 +9,8 @@ Manage service level objectives and critical user journeys as code.
 
 Nines connects reliability goals to the user journeys they protect. Define SLOs and journey links in versioned YAML, measure them with Prometheus or Mimir, and inspect SLI, error budget and burn-rate history in a web workspace. Use the CLI offline for validation and rule generation, or connect it to a tenant-scoped server for review and apply.
 
+[Measurement-quality checks](https://ishantanu.github.io/nines/docs/measurement-quality/) explain freshness, population counts and cohort failures. [Error-budget response policies](https://ishantanu.github.io/nines/docs/error-budget-policy/) connect that evidence to owner review and deterministic CI gates. Native providers are currently Prometheus and Mimir; see [provider extension boundaries](https://ishantanu.github.io/nines/docs/provider-adapters/).
+
 **Status: pre-release MVP, under active development.** Expect regular features and fixes as the platform develops. APIs use `nines.dev/v1alpha1` and may change before a stable release. Use the MVP for evaluation and early feedback; production-scale readiness has not been established. Report bugs and request features through [GitHub Issues](https://github.com/ishantanu/nines/issues). The [release checklist](https://ishantanu.github.io/nines/docs/release/) records the checks required before publication.
 
 ## Login credentials
@@ -49,7 +51,7 @@ docker compose -p nines-playground -f compose.playground.yaml up --build -d
 docker compose -p nines-playground -f compose.playground.yaml run --rm verify
 ```
 
-Open [localhost:18080](http://127.0.0.1:18080) and sign in as `admin` with password `admin`. API-token access remains available with the local-only token `nines-local-playground-owner-token`. The **Playground Prometheus** workspace uses synthetic checkout metrics. Mimir is available through an [optional profile](https://ishantanu.github.io/nines/docs/deployment/playground/#optional-mimir-profile). The SLO detail shows separate saved, collected, deployed and evaluating states. Definitions and their rules are reconciled automatically in the playground. The verifier checks automatic deployment, exercises users/data sources/RBAC, and checks critical/warning alert firing and recovery in Prometheus. See the [playground guide](https://ishantanu.github.io/nines/docs/deployment/playground/) for the complete flow and automated burn-alert/recovery test.
+Open [localhost:18080](http://127.0.0.1:18080) and sign in as `admin` with password `admin`. API-token access remains available with the local-only token `nines-local-playground-owner-token`. The **Playground Prometheus** workspace uses synthetic checkout metrics. Mimir is available through an [optional profile](https://ishantanu.github.io/nines/docs/deployment/playground/#optional-mimir-profile). The SLO detail shows separate saved, collected, deployed and evaluating states. Definitions and their rules are reconciled automatically in the playground. The verifier checks automatic deployment, exercises users/telemetry connections/RBAC, and checks critical/warning alert firing and recovery in Prometheus. See the [playground guide](https://ishantanu.github.io/nines/docs/deployment/playground/) for the complete flow and automated burn-alert/recovery test.
 
 ## Use the CLI without a server
 
@@ -101,6 +103,8 @@ Compose enables local account login. OIDC SSO and LDAP use server-owned identity
 | Kubernetes operator | GitOps reconciliation, namespaced RBAC, lease-based standby, PrometheusRule/Mimir destinations and generation-scoped diagnostics |
 | Identity | Local accounts, API/service-account keys, configured OIDC/LDAP, tenant roles and teams |
 
+Reviewed intent updates refresh measurement quality and budget evidence at apply time. A durable observer then checks current rule activation/output and SLI evidence; regressions and uncertainty lead to a separate human rollback review. See [agent change safety and verification](https://ishantanu.github.io/nines/docs/intent-governance/#action-time-safety-checks).
+
 Optional model-assisted intent/review workflows and session replay are **experimental**. They remain available for evaluation but are outside the initial supported deployment path. Models are optional and provider-configurable. No hosted LLM account is required. See [experimental features and limits](https://ishantanu.github.io/nines/docs/experimental/).
 
 ## Documentation
@@ -142,6 +146,8 @@ The development UI proxies to a Go API on `127.0.0.1:8189`. Run the server with 
 ## Acknowledgements
 
 Nines takes inspiration from [Sloth](https://github.com/slok/sloth) for SLOs as code and Prometheus rule generation, and [Pyrra](https://github.com/pyrra-dev/pyrra) for approachable SLO workflows and visualization. Thank you to their maintainers and contributors.
+
+The SLO lifecycle, measurement and operational practices in Nines are informed by *Site Reliability Engineering: How Google Runs Production Systems*, [first edition (2016)](https://sre.google/sre-book/table-of-contents/) and [second edition (2026)](https://sre.google/books/). We thank the editors and contributors to both editions.
 
 ## License
 

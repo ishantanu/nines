@@ -1,6 +1,9 @@
 import { observedFetch } from "./observability";
 export type Health = "healthy" | "at_risk" | "unknown" | "degraded";
+export type SLOLifecycle =
+  "experimental" | "aspirational" | "committed" | "deprecated";
 export interface BurnRatePolicy {
+  minEvents?: number;
   name?: string;
   severity?: "critical" | "warning" | "info";
   shortWindowSeconds: number;
@@ -19,7 +22,95 @@ export type MeasurementSpec = {
   scrapeIntervalSeconds: number;
   observationPoint: string;
 };
+export interface MeasurementQualityPolicy {
+  minEvents?: number;
+  maxSampleAgeSeconds?: number;
+  cohortLabels?: string[];
+}
+export interface MeasurementQuality {
+  collectedSourceDigest?: string;
+  sourceFrom?: string;
+  sourceTo?: string;
+  apiVersion: string;
+  tenant: string;
+  sloId: string;
+  revision: number;
+  definitionDigest: string;
+  sourceDigest: string;
+  observedAt: string;
+  evaluatedAt: string;
+  state: "usable" | "limited" | "unavailable";
+  good: number;
+  total: number;
+  coverage: number;
+  minimumEvents: number;
+  observationPoint?: string;
+  freshness: {
+    state: string;
+    lastSampleAt?: string;
+    ageAtObservationSeconds?: number;
+    staleAfterSeconds: number;
+  };
+  checks: { code: string; state: string; message: string }[];
+  limitations: string[];
+  cohorts?: {
+    state: string;
+    message: string;
+    at: string;
+    windowSeconds: number;
+    labels: string[];
+    matchesAggregate: boolean;
+    items: {
+      labels: Record<string, string>;
+      good: number | null;
+      total: number;
+      reliability: number | null;
+      burnRate: number | null;
+      state: string;
+    }[];
+  };
+}
+export interface ErrorBudgetPolicy {
+  owner: string;
+  runbookURL: string;
+  reviewBelow: number;
+  onExhausted?: "blocked" | "review_required";
+}
+export interface ErrorBudgetDecision {
+  evidence?: {
+    coverage: number;
+    total: number;
+    minimumEvents: number;
+    freshness: MeasurementQuality["freshness"];
+    checks: MeasurementQuality["checks"];
+  };
+  apiVersion: string;
+  tenant: string;
+  sloId: string;
+  revision: number;
+  definitionDigest: string;
+  sourceDigest: string;
+  policyDigest?: string;
+  observedAt: string;
+  evaluatedAt: string;
+  state:
+    | "not_configured"
+    | "insufficient_evidence"
+    | "review_required"
+    | "blocked"
+    | "proceed";
+  reasonCodes: string[];
+  message: string;
+  owner?: string;
+  runbookURL?: string;
+  budgetRemainingFraction: number | null;
+  qualityState: string;
+  advisory: boolean;
+}
 export interface SLO {
+  errorBudgetPolicy?: ErrorBudgetPolicy;
+  quality?: MeasurementQualityPolicy;
+  lifecycle?: SLOLifecycle;
   intent?: import("./intent").IntentSpec;
   measurement?: MeasurementSpec;
   providerWindow?: {
@@ -55,6 +146,7 @@ export interface Snapshot {
   burnRate: number | null;
   dataStatus: string;
   alert: {
+    suppressedReason?: string;
     phase: string;
     policies?: Record<
       string,
@@ -63,6 +155,8 @@ export interface Snapshot {
   };
 }
 export interface Objective {
+  budgetDecision?: ErrorBudgetDecision;
+  quality?: MeasurementQuality;
   collection?: {
     state: string;
     points: number;

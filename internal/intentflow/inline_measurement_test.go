@@ -38,6 +38,7 @@ func TestInlineIntentHumanConfirmationApplyAndRollback(t *testing.T) {
 			if _, e := s.Platform.ApplyDefinition(ctx, model.Definition{SLO: (*model.SLODefinition)(&before)}, 0); e != nil {
 				t.Fatal(e)
 			}
+			collectFreshBaseline(t, s, ctx, in.Scope.Metadata.Name)
 			v, e := s.Create(ctx, in)
 			if e != nil {
 				t.Fatal(e)
