@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add `make test-identity` and a dedicated CI job for real OpenLDAP LDAPS/StartTLS, disposable PostgreSQL and native CLI/browser authorization, including durable sessions, role changes, explicit revocation, directory failure and exact consent checks. Document the real-Entra acceptance boundary and effective SSO session lifetime.
+
 - Enforce transaction-bound measurement-quality and error-budget safety checks before reviewed intent changes, with current reviewer authorization and separately approved, expiring corrective-work exceptions.
 - Persist post-apply/rollback runtime and SLI observation, require sustained evidence, detect drift or observed regressions, and bind safety/outcome reports into the independent audit journal. Expose outcomes through the portal, CLI, Go client and read-only MCP verification.
 

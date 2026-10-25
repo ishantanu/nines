@@ -124,6 +124,35 @@ class RequiredIntegrationTests(unittest.TestCase):
                 skipped[index]["Action"] = "skip"
                 self.assertNotEqual(self.run_gate(skipped, "mimir"), 0)
 
+    def test_identity_requires_real_directory_and_native_cli_cases(self):
+        rows = [
+            {"Action": "pass", "Test": name, "Package": "app/integration/identity"}
+            for name in [
+                "TestRealIdentityOIDCBrowserCLIRevocation",
+                "TestRealIdentityOIDCClaimsBoundaries",
+                "TestRealIdentityOIDCClaimExpiry",
+                "TestRealIdentityTeamsAndProviderBinding",
+                "TestRealIdentityCLIApprovalCancellation",
+                "TestRealIdentityOpenLDAPTLSAndFailureBoundaries",
+            ]
+        ]
+        self.assertEqual(self.run_gate(rows, "identity"), 0)
+        for index in range(len(rows)):
+            with self.subTest(missing=rows[index]["Test"]):
+                self.assertNotEqual(
+                    self.run_gate(rows[:index] + rows[index + 1 :], "identity"), 0
+                )
+        rows.append(
+            {
+                "Action": "skip",
+                "Test": "TestRealIdentityOpenLDAPTLSAndFailureBoundaries/starttls",
+                "Package": "app/integration/identity",
+            }
+        )
+        self.assertNotEqual(self.run_gate(rows, "identity"), 0)
+        rows[-1] = {"Action": "fail", "Package": "app/integration/identity"}
+        self.assertNotEqual(self.run_gate(rows, "identity"), 0)
+
     def test_operator_requires_real_selector_case(self):
         rows = [
             {"Action": "pass", "Test": name, "Package": "app/integration/operator"}

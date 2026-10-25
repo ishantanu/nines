@@ -9,7 +9,9 @@ from pathlib import Path
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("result", type=Path)
 p.add_argument(
-    "--required", choices=["database", "mimir", "operator", "prometheus"], required=True
+    "--required",
+    choices=["database", "mimir", "operator", "prometheus", "identity"],
+    required=True,
 )
 a = p.parse_args()
 rows = [
@@ -20,6 +22,13 @@ rows = [
 failures = [r for r in rows if r.get("Action") == "fail"]
 skips = []
 seen = False
+
+prefixes = {
+    "mimir": "TestRealMimir",
+    "operator": "TestRealOperator",
+    "prometheus": "TestRealPrometheus",
+    "identity": "TestRealIdentity",
+}
 for row in rows:
     test = row.get("Test", "")
     package = row.get("Package", "")
@@ -33,15 +42,7 @@ for row in rows:
             and "Postgres" in test
         )
         if a.required == "database"
-        else (
-            "TestRealOperator" in test
-            if a.required == "operator"
-            else (
-                "TestRealPrometheus" in test
-                if a.required == "prometheus"
-                else "TestRealMimir" in test
-            )
-        )
+        else test.startswith(prefixes[a.required])
     )
     if required:
         seen = True
@@ -61,6 +62,14 @@ anchors = {
     "prometheus": [
         "TestRealPrometheusReviewedActivation",
         "TestRealPrometheusLifecycleAndMinEvents",
+    ],
+    "identity": [
+        "TestRealIdentityOIDCBrowserCLIRevocation",
+        "TestRealIdentityOIDCClaimsBoundaries",
+        "TestRealIdentityOIDCClaimExpiry",
+        "TestRealIdentityTeamsAndProviderBinding",
+        "TestRealIdentityCLIApprovalCancellation",
+        "TestRealIdentityOpenLDAPTLSAndFailureBoundaries",
     ],
     "operator": [
         "TestRealOperatorRuleSelectors",
