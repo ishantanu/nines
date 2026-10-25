@@ -107,6 +107,8 @@ Reviewed intent updates refresh measurement quality and budget evidence at apply
 
 Optional model-assisted intent/review workflows and session replay are **experimental**. They remain available for evaluation but are outside the initial supported deployment path. Models are optional and provider-configurable. No hosted LLM account is required. See [experimental features and limits](https://ishantanu.github.io/nines/docs/experimental/).
 
+Identity and tenant acceptance is reproducible with `make test-identity`, using disposable PostgreSQL, real OpenLDAP with LDAPS/StartTLS, signed OIDC fixtures and the native CLI. See the [identity acceptance guide](https://ishantanu.github.io/nines/docs/deployment/identity-acceptance/) for prerequisites and real-Entra verification limits.
+
 ## Documentation
 
 [Read the product documentation](https://ishantanu.github.io/nines/docs/) with chapter navigation, worked examples and deployment guides.

@@ -1,6 +1,31 @@
 # Identity acceptance
 
-This guide separates controlled-provider evidence from verification of your own identity deployment. Fixtures use loopback OIDC issuers with generated signing keys and encrypted LDAP servers with disposable certificates. They do not contact Microsoft or a corporate directory.
+This guide separates controlled-provider evidence from verification of your own identity deployment. The full runner uses a loopback OIDC issuer with generated signing keys, real OpenLDAP with disposable certificates, a dedicated PostgreSQL database and the native Nines CLI. Go-only tests also use smaller protocol fixtures. They do not contact Microsoft or a corporate directory.
+
+## Run the complete acceptance fixture
+
+```sh
+make test-identity
+```
+
+Requires Go 1.27.3, Docker, OpenSSL and Python 3. The command builds a disposable OpenLDAP image from a pinned official Debian image and Debian-maintained packages, starts it alongside PostgreSQL 17, and generates new credentials and a short-lived local CA. Ports bind only to random loopback addresses. No existing playground, directory, Nines context or API key is used. Containers, their storage, generated image, certificates, temporary CLI profiles and binaries are removed on completion or interruption.
+
+The runner executes the existing rejection/RBAC tests with its dedicated database, then the upstream acceptance suite. It writes an ignored `identity-test-results.json` report and rejects failed, missing or skipped required cases. The CI **identity** job runs the same command.
+
+| Scenario | Evidence |
+| --- | --- |
+| Encrypted directory | Real OpenLDAP LDAPS and StartTLS; untrusted CA rejected after a successful trusted control |
+| Stable directory identity | Renaming a user's DN/login retains its `entryUUID`, Nines user ID and explicit tenant grant |
+| Directory failures | Invalid passwords, escaped search input and reader-bind failure cannot create a new session |
+| Native CLI | Actual `nines login --no-browser`, private 0600 credentials, tenant-bound `auth status`, cancellation without saved credentials |
+| Durable identity | Browser and CLI access survive closing and reopening the PostgreSQL identity repository |
+| Live permissions | Owner/editor/viewer restrictions, exact claims, group-overage denial, team removal, direct membership removal and identity-provider client changes |
+| Revocation | Fresh verified claims update old sessions; claim expiry and explicit logout-all deny existing browser/CLI access |
+| Consent | Exact server, tenant, identity, current role and return address appear before approval; CSRF, callback changes and consumed requests are rejected |
+
+The browser steps use HTTP clients with cookie jars through the production authentication and tenant handlers. This exercises redirects, signed token validation, cookies, CSRF and consent; it does not certify desktop browser rendering or Microsoft conditional access. The OIDC issuer supplies Entra-shaped signed claims. OpenLDAP checks run against the Debian-packaged upstream server. Microsoft tenant verification uses the procedure below. No provider token is handed to the CLI.
+
+An upstream outage or directory credential change blocks new authentication. Nines does not poll the directory on every existing-session request. The fixture verifies this distinction and then proves that Nines logout-all revokes the existing CLI credential even while directory authentication is failing. Use application-side revocation for immediate removal of existing access.
 
 ## Run the controlled-provider checks
 
@@ -38,4 +63,4 @@ Disabling an upstream account is enforced at the next provider authentication; N
 
 ## Remaining acceptance
 
-Real Entra deployment and organization-specific directory policy require an administrator-run acceptance exercise. These fixtures do not certify conditional access, group-claim configuration, provider logout, native SAML/SCIM, every directory implementation or browser interoperability. Native SAML remains supported only through an OIDC broker. Issue #22 stays open until its remaining acceptance evidence is recorded.
+Real Entra deployment and organization-specific directory policy require an administrator-run acceptance exercise. These fixtures do not certify conditional access, group-claim configuration, provider logout, native SAML/SCIM, every directory implementation or browser interoperability. Native SAML remains supported only through an OIDC broker. The controlled suite and environment-specific acceptance are separate evidence. The latter requires your administrator and should record the deployed source commit; fixture success does not certify a production Entra tenant or directory policy.
