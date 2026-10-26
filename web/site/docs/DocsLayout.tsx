@@ -1,4 +1,3 @@
-import { useDeferredValue, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, ChevronDown, Search } from "lucide-react";
 import { Input } from "../../src/components/ui/input";
 import { Button } from "../../src/components/ui/button";
@@ -18,11 +17,6 @@ export interface DocumentationData {
   page: DocPage;
   root: string;
   headings: Heading[];
-}
-interface SearchEntry {
-  slug: string;
-  title: string;
-  text: string;
 }
 function Navigation({ page, root }: { page: DocPage; root: string }) {
   return (
@@ -47,42 +41,7 @@ function Navigation({ page, root }: { page: DocPage; root: string }) {
     </nav>
   );
 }
-function DocumentSearch({ root }: { root: string }) {
-  const [query, setQuery] = useState("");
-  const [index, setIndex] = useState<SearchEntry[] | null>(null);
-  const [error, setError] = useState(false);
-  const term = useDeferredValue(query.trim().slice(0, 200));
-  const active = term.length > 1;
-  useEffect(() => {
-    if (!active || index) return;
-    const controller = new AbortController();
-    void fetch(root + "docs/search.json", { signal: controller.signal })
-      .then((response) => {
-        if (!response.ok) throw new Error("Search unavailable");
-        return response.json() as Promise<SearchEntry[]>;
-      })
-      .then((value) => {
-        if (!controller.signal.aborted) {
-          setIndex(value);
-          setError(false);
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setError(true);
-      });
-    return () => controller.abort();
-  }, [active, index, root]);
-  const words = term.toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  const results =
-    active && index
-      ? index
-          .filter((item) =>
-            words.every((word) =>
-              `${item.title} ${item.text}`.toLocaleLowerCase().includes(word),
-            ),
-          )
-          .slice(0, 8)
-      : [];
+function DocumentSearch() {
   return (
     <div className="docs-search">
       <label className="sr-only" htmlFor="docs-search">
@@ -92,32 +51,19 @@ function DocumentSearch({ root }: { root: string }) {
       <Input
         id="docs-search"
         type="search"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
         placeholder="Search documentation"
         maxLength={200}
-        aria-controls={active ? "docs-search-results" : undefined}
+        disabled
+        aria-describedby="docs-search-help"
       />
-      {active ? (
-        <div id="docs-search-results" className="docs-search-results">
-          <p role="status">
-            {error
-              ? "Search is unavailable. Browse the chapters below."
-              : !index
-                ? "Loading search..."
-                : results.length
-                  ? `${results.length} matching pages`
-                  : "No matching pages"}
-          </p>
-          <ul>
-            {results.map((item) => (
-              <li key={item.slug}>
-                <a href={root + docPath(item)}>{item.title}</a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+      <span id="docs-search-help" className="sr-only">
+        Search becomes available when JavaScript loads. All chapters are listed
+        in the navigation.
+      </span>
+      <div id="docs-search-results" className="docs-search-results" hidden>
+        <p role="status" />
+        <ul />
+      </div>
     </div>
   );
 }
@@ -133,42 +79,6 @@ export function DocsLayout({
   const position = docPages.findIndex((item) => item.slug === page.slug);
   const previous = docPages[position - 1],
     next = docPages[position + 1];
-  useEffect(() => {
-    const article = document.getElementById("doc-content");
-    if (!article) return;
-    let disposed = false;
-    const timers = new Set<ReturnType<typeof setTimeout>>();
-    const copy = async (event: MouseEvent) => {
-      const button =
-        event.target instanceof Element
-          ? event.target.closest<HTMLButtonElement>("button[data-copy-code]")
-          : null;
-      if (!button || !article.contains(button)) return;
-      const code = button
-        .closest(".docs-code-block")
-        ?.querySelector("pre")?.textContent;
-      if (code == null) return;
-      try {
-        await navigator.clipboard.writeText(code);
-        if (disposed) return;
-        button.textContent = "Copied";
-      } catch {
-        if (disposed) return;
-        button.textContent = "Select code to copy";
-      }
-      const timer = setTimeout(() => {
-        button.textContent = "Copy";
-        timers.delete(timer);
-      }, 2200);
-      timers.add(timer);
-    };
-    article.addEventListener("click", copy);
-    return () => {
-      disposed = true;
-      article.removeEventListener("click", copy);
-      for (const timer of timers) clearTimeout(timer);
-    };
-  }, [page.slug]);
   return (
     <div className="documentation">
       <a href="#main" className="skip-link">
@@ -182,7 +92,7 @@ export function DocsLayout({
           <a href={root + "docs/"} className="docs-header-label">
             Documentation
           </a>
-          <DocumentSearch root={root} />
+          <DocumentSearch />
           <Button asChild variant="outline" size="sm">
             <a href={repository}>GitHub</a>
           </Button>
@@ -199,7 +109,7 @@ export function DocsLayout({
         <aside className="docs-sidebar">
           <Navigation page={page} root={root} />
         </aside>
-        <main id="main" className="docs-main">
+        <main id="main" className="docs-main" tabIndex={-1}>
           <nav className="docs-breadcrumb" aria-label="Breadcrumb">
             <a href={root + "docs/"}>Docs</a>
             <span aria-hidden="true">/</span>
