@@ -77,14 +77,18 @@ type flow struct {
 	Expires  time.Time `json:"expiresAt"`
 }
 type Actor struct {
-	ID              string            `json:"id"`
-	Kind            string            `json:"kind"`
-	Name            string            `json:"name"`
-	Provider        string            `json:"provider,omitempty"`
-	IdentitySubject string            `json:"identitySubject,omitempty"`
-	Grants          map[string]string `json:"-"`
-	Session         bool              `json:"-"`
-	Expires         time.Time         `json:"expiresAt,omitempty"`
+	sessionHash       string
+	PlatformAdmin     bool `json:"platformAdmin,omitempty"`
+	platformOperation bool
+	platformReason    string
+	ID                string            `json:"id"`
+	Kind              string            `json:"kind"`
+	Name              string            `json:"name"`
+	Provider          string            `json:"provider,omitempty"`
+	IdentitySubject   string            `json:"identitySubject,omitempty"`
+	Grants            map[string]string `json:"-"`
+	Session           bool              `json:"-"`
+	Expires           time.Time         `json:"expiresAt,omitempty"`
 }
 type Audit struct {
 	ID        string    `json:"id"`
@@ -108,17 +112,22 @@ type limitEntry struct {
 	at      time.Time
 }
 type Service struct {
-	repo       Repository
-	config     Config
-	providers  map[string]provider
-	tenants    map[string]bool
-	Now        func() time.Time
-	limitMu    sync.Mutex
-	limits     map[string]limitEntry
-	loginSlots chan struct{}
+	platformTenants map[string]PlatformTenant
+	platformGuards  []func([]byte) bool
+	repo            Repository
+	config          Config
+	providers       map[string]provider
+	tenants         map[string]bool
+	Now             func() time.Time
+	limitMu         sync.Mutex
+	limits          map[string]limitEntry
+	loginSlots      chan struct{}
 }
 
 func New(ctx context.Context, c Config, repo Repository, tenants map[string]bool) (*Service, error) {
+	if err := validatePlatformAdmins(c); err != nil {
+		return nil, err
+	}
 	s := &Service{repo: repo, config: c, providers: map[string]provider{}, tenants: tenants, Now: time.Now, limits: map[string]limitEntry{}, loginSlots: make(chan struct{}, 8)}
 	for _, cfg := range c.Providers {
 		if err := validateMappings(&cfg); err != nil {
@@ -288,7 +297,7 @@ func (s *Service) sessionActorTx(tx Tx, h string) (Actor, error) {
 	if e != nil {
 		return Actor{}, e
 	}
-	return Actor{ID: u.ID, Kind: "user", Name: u.Name, Provider: u.Provider, IdentitySubject: u.Subject, Grants: g, Session: true, Expires: v.Expires}, nil
+	return Actor{sessionHash: h, PlatformAdmin: s.isPlatformIdentity(u), ID: u.ID, Kind: "user", Name: u.Name, Provider: u.Provider, IdentitySubject: u.Subject, Grants: g, Session: true, Expires: v.Expires}, nil
 }
 
 type grant struct {
@@ -324,6 +333,9 @@ func validRole(role string, owner bool) bool { return rank(role) > 0 && (owner |
 func (s *Service) checkOwner(tx Tx, tenant string, a Actor) error {
 	if !s.tenants[tenant] {
 		return ErrForbidden
+	}
+	if a.platformOperation {
+		return s.platformAdminTx(tx, a)
 	}
 	if a.Kind == "api_token" && a.Grants[tenant] == "owner" {
 		return nil
@@ -425,7 +437,10 @@ func (s *Service) Grant(ctx context.Context, a Actor, tenant, providerID, subjec
 			return err
 		}
 		result, err = read[Member](tx, "member", tenant, u.ID)
-		return err
+		if err != nil {
+			return err
+		}
+		return s.recordPlatform(tx, a, "membership.save", tenant+"/"+u.ID, "succeeded", result)
 	})
 	return result, err
 }
@@ -480,7 +495,10 @@ func (s *Service) RemoveMember(ctx context.Context, a Actor, tenant, user string
 		if err = tx.Delete("member", tenant, user); err != nil {
 			return err
 		}
-		return tx.Delete("grant", user, tenant)
+		if err := tx.Delete("grant", user, tenant); err != nil {
+			return err
+		}
+		return s.recordPlatform(tx, a, "membership.remove", tenant+"/"+user, "succeeded", map[string]any{"expectedVersion": expected})
 	})
 }
 func (s *Service) SaveTeam(ctx context.Context, a Actor, tenant string, t Team, expected int64) (Team, error) {
@@ -729,7 +747,7 @@ func (s *Service) EnsureAdministration(ctx context.Context, legacy map[string]bo
 					owner = true
 				}
 			}
-			if !owner {
+			if !owner && len(s.config.PlatformAdmins) == 0 {
 				return fmt.Errorf("tenant %s has no owner: configure an exact-subject bootstrap owner or a legacy owner grant", tenant)
 			}
 		}

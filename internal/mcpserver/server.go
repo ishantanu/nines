@@ -94,6 +94,7 @@ func New(c Config) (*mcp.Server, error) {
 	addSessionReplays(s, a)
 	addIntentConversations(s, a, c)
 	addTelemetryOperations(s, a)
+	addSLOTemplates(s, a)
 	if c.AllowWrites {
 		register(s, a, "create_slo", "Create an SLO in the configured tenant. Requires operator-enabled writes.", false, func(ctx context.Context, in createInput) (any, error) {
 			if _, err := model.ParseSLODefinition([]byte(in.Manifest)); err != nil {

@@ -285,9 +285,10 @@ func verifyBindingEvidence(b model.MeasurementBinding, d v1.TelemetryDiscovery) 
 	if meta.Type != "histogram" || !strings.HasSuffix(s.Metric, "_seconds") || (meta.Unit != "" && meta.Unit != "seconds") {
 		return model.Invalid("latency requires a classic histogram with a _seconds name and seconds units")
 	}
-	// Every population must expose both a count and the exact canonical threshold bucket.
+	// Every population must expose a count and exactly one canonical spelling of the threshold bucket.
 	// This rejects missing boundaries instead of interpolating or converting a quantile.
 	groups := map[string]int{}
+	boundaryCounts := map[string]int{}
 	boundary := strconv.FormatFloat(*s.ThresholdSeconds, 'g', -1, 64)
 	for _, series := range d.Series {
 		labels := map[string]string{}
@@ -302,8 +303,12 @@ func verifyBindingEvidence(b model.MeasurementBinding, d v1.TelemetryDiscovery) 
 		case s.Metric + "_count":
 			flag = 1
 		case s.Metric + "_bucket":
-			if series["le"] == boundary {
-				flag = 2
+			for _, label := range model.HistogramBoundaryLabels(*s.ThresholdSeconds) {
+				if series["le"] == label {
+					flag = 2
+					boundaryCounts[key]++
+					break
+				}
 			}
 			if series["le"] == "+Inf" {
 				flag = 4
@@ -311,8 +316,8 @@ func verifyBindingEvidence(b model.MeasurementBinding, d v1.TelemetryDiscovery) 
 		}
 		groups[key] |= flag
 	}
-	for _, flags := range groups {
-		if flags != 7 {
+	for key, flags := range groups {
+		if flags != 7 || boundaryCounts[key] != 1 {
 			return model.Invalid("every histogram population needs _count, +Inf and the exact threshold bucket %s; native histograms and interpolated boundaries are unsupported", boundary)
 		}
 	}

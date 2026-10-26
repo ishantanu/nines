@@ -89,6 +89,10 @@ var portalIdentifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 // Keep the canonical route vocabulary aligned with web/src/lib/navigation.ts.
 func portalPath(path string) bool {
+	switch path {
+	case "/admin", "/admin/", "/admin/tenants", "/admin/tenants/", "/admin/users", "/admin/users/", "/admin/audit", "/admin/audit/":
+		return true
+	}
 	if path == "/" || path == "/login" || path == "/login/" {
 		return true
 	}

@@ -7,27 +7,30 @@ import (
 
 // IntentRecommendation is an evidence summary for review, not hidden model reasoning.
 type IntentRecommendation struct {
-	BudgetDecision    *ErrorBudgetDecision   `json:"budgetDecision,omitempty"`
-	MeasurementDigest string                 `json:"measurementDigest,omitempty"`
-	RequestedBy       InvestigationActor     `json:"requestedBy"`
-	RollbackStatus    string                 `json:"rollbackStatus"`
-	CompilerVersion   string                 `json:"compilerVersion"`
-	Summary           string                 `json:"summary"`
-	Explanation       string                 `json:"explanation,omitempty"`
-	Basis             []string               `json:"basis"`
-	Limitations       []string               `json:"limitations"`
-	RunID             string                 `json:"runId,omitempty"`
-	Mode              string                 `json:"mode"`
-	ModelRoute        *ReviewModelRoute      `json:"modelRoute,omitempty"`
-	DraftRoute        *ReviewModelRoute      `json:"draftRoute,omitempty"`
-	Skill             *ReviewSkillRef        `json:"skill,omitempty"`
-	Binding           BindingReference       `json:"binding"`
-	SourceDigest      string                 `json:"sourceDigest"`
-	EvidenceDigest    string                 `json:"evidenceDigest"`
-	ObservedFrom      time.Time              `json:"observedFrom"`
-	ObservedTo        time.Time              `json:"observedTo"`
-	Fields            []IntentFieldChange    `json:"fields"`
-	Backtest          *IntentBacktestSummary `json:"backtest,omitempty"`
+	SystemOne         *SystemOneAssessment     `json:"systemOne,omitempty"`
+	SystemOneRoute    *SystemOneRoute          `json:"systemOneRoute,omitempty"`
+	Template          *IntentTemplateSelection `json:"template,omitempty"`
+	BudgetDecision    *ErrorBudgetDecision     `json:"budgetDecision,omitempty"`
+	MeasurementDigest string                   `json:"measurementDigest,omitempty"`
+	RequestedBy       InvestigationActor       `json:"requestedBy"`
+	RollbackStatus    string                   `json:"rollbackStatus"`
+	CompilerVersion   string                   `json:"compilerVersion"`
+	Summary           string                   `json:"summary"`
+	Explanation       string                   `json:"explanation,omitempty"`
+	Basis             []string                 `json:"basis"`
+	Limitations       []string                 `json:"limitations"`
+	RunID             string                   `json:"runId,omitempty"`
+	Mode              string                   `json:"mode"`
+	ModelRoute        *ReviewModelRoute        `json:"modelRoute,omitempty"`
+	DraftRoute        *ReviewModelRoute        `json:"draftRoute,omitempty"`
+	Skill             *ReviewSkillRef          `json:"skill,omitempty"`
+	Binding           BindingReference         `json:"binding"`
+	SourceDigest      string                   `json:"sourceDigest"`
+	EvidenceDigest    string                   `json:"evidenceDigest"`
+	ObservedFrom      time.Time                `json:"observedFrom"`
+	ObservedTo        time.Time                `json:"observedTo"`
+	Fields            []IntentFieldChange      `json:"fields"`
+	Backtest          *IntentBacktestSummary   `json:"backtest,omitempty"`
 }
 type IntentFieldChange struct {
 	Resource string          `json:"resource"`

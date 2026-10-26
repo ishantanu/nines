@@ -1,0 +1,23 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+    name: agent-evaluation-pass
+    project: production
+spec:
+    lifecycle: experimental
+    measurement:
+        type: availability
+        metric: agent_evaluations_total
+        labels:
+            service: agent
+        successLabels:
+            verdict: pass
+        countFrom: counter
+        scrapeIntervalSeconds: 15
+        observationPoint: All tasks selected for the declared evaluation cohort with terminal verdicts. Pin rubric, evaluator and sampling policy using bounded labels. Failed and unevaluable verdicts stay in the denominator. Track evaluation completion coverage separately.
+    source: primary
+    displayName: Agent outcome evaluation
+    service: agent
+    target: 0.99
+    windowSeconds: 2419200
+    stepSeconds: 60

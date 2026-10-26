@@ -108,6 +108,11 @@ const JourneyDetail = lazy(() =>
     default: m.JourneyDetail,
   })),
 );
+const PlatformConsole = lazy(() =>
+  import("@/components/platform-console").then((m) => ({
+    default: m.PlatformConsole,
+  })),
+);
 const Login = lazy(() =>
   import("@/components/login").then((m) => ({ default: m.Login })),
 );
@@ -364,7 +369,7 @@ export default function App() {
         const allowed = await discoverTenants(token, controller.signal);
         if (controller.signal.aborted) return;
         setTenants(allowed);
-        if (!allowed.length)
+        if (!allowed.length && !info.actor?.platformAdmin)
           throw new Error(
             "You have no workspace memberships. Ask a workspace owner to grant access using the identity below.",
           );
@@ -373,6 +378,26 @@ export default function App() {
             window.location.search +
             window.location.hash,
         );
+        const returnRoute = parseRoute(loginReturnPath() ?? "/");
+        if (
+          info.actor?.platformAdmin &&
+          !token &&
+          (current.kind === "platform" ||
+            returnRoute.kind === "platform" ||
+            !allowed.length)
+        ) {
+          navigateTo(
+            current.kind === "platform"
+              ? "/admin/" + current.page
+              : returnRoute.kind === "platform"
+                ? "/admin/" + returnRoute.page
+                : "/admin/tenants",
+            true,
+          );
+          clearLoginReturn();
+          return;
+        }
+        if (current.kind === "platform") return;
         const requested =
           current.kind === "workspace"
             ? current
@@ -429,8 +454,9 @@ export default function App() {
     if (
       loading ||
       route.kind !== "workspace" ||
-      !session ||
-      (session.scope.tenant === route.tenant && !session.scope.signal.aborted)
+      (session &&
+        session.scope.tenant === route.tenant &&
+        !session.scope.signal.aborted)
     )
       return;
     active.current?.close();
@@ -476,6 +502,7 @@ export default function App() {
           if (
             !info.authenticated ||
             info.actor?.id !== auth.actor?.id ||
+            info.actor?.platformAdmin !== auth.actor?.platformAdmin ||
             info.csrfToken !== auth.csrfToken ||
             JSON.stringify(allowed) !== JSON.stringify(tenants)
           ) {
@@ -558,6 +585,36 @@ export default function App() {
             Return to Nines
           </Button>
         </main>
+      ) : route.kind === "platform" &&
+        !loading &&
+        (auth?.authenticated || token) ? (
+        !token && auth?.actor?.platformAdmin ? (
+          <Suspense
+            fallback={
+              <main className="empty-state" role="status">
+                Loading platform administration…
+              </main>
+            }
+          >
+            <PlatformConsole
+              page={route.page}
+              auth={auth}
+              tenants={tenants}
+              onSignOut={signOut}
+              onRefreshAccess={() => setConnection((n) => n + 1)}
+            />
+          </Suspense>
+        ) : (
+          <main className="empty-state">
+            <h1>Platform access required</h1>
+            <p>Tenant ownership does not grant platform administration.</p>
+            {tenants[0] ? (
+              <Button onClick={() => chooseTenant(tenants[0].id)}>
+                Return to workspace
+              </Button>
+            ) : null}
+          </main>
+        )
       ) : session &&
         route.kind === "workspace" &&
         route.tenant !== session.scope.tenant ? (
@@ -582,6 +639,7 @@ export default function App() {
           onTenant={chooseTenant}
           onCredentials={() => setCredentials(true)}
           credentialsOpen={credentials}
+          platformAdmin={!token && auth?.actor?.platformAdmin === true}
           identityLabel={token ? "API credential" : auth?.actor?.name}
           onSignOut={auth?.enabled || token ? signOut : undefined}
           darkMode={darkMode}
@@ -683,6 +741,7 @@ export default function App() {
   );
 }
 function TenantWorkspace({
+  platformAdmin = false,
   scope,
   tenants,
   onTenant,
@@ -698,6 +757,7 @@ function TenantWorkspace({
   onToggleDemoReplay,
   onDemoSignOut,
 }: {
+  platformAdmin?: boolean;
   identityLabel?: string;
   onSignOut?: () => void;
   darkMode: boolean;
@@ -985,6 +1045,16 @@ function TenantWorkspace({
           ))}
         </nav>
         <div className="mt-auto border-t p-3">
+          {platformAdmin ? (
+            <a
+              className="mb-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted"
+              href="/admin/tenants"
+              onClick={(e) => followLink(e, "/admin/tenants")}
+            >
+              <ShieldCheck className="size-4" aria-hidden="true" />
+              Platform administration
+            </a>
+          ) : null}
           <Button
             variant="ghost"
             size="sm"
@@ -998,6 +1068,9 @@ function TenantWorkspace({
       </aside>
       <div className="workspace">
         <WorkspaceHeader
+          onPlatformAdmin={
+            platformAdmin ? () => navigateTo("/admin/tenants") : undefined
+          }
           tenants={tenants}
           tenant={scope.tenant}
           role={scope.role}
@@ -1151,7 +1224,13 @@ function TenantWorkspace({
                 ) : page === "journeys" || page === "agents" ? (
                   <ManifestEditor
                     scope={scope}
-                    onApplied={reload}
+                    onApplied={(id) => {
+                      reload();
+                      if (id) {
+                        setQuery("");
+                        openJourney(id);
+                      }
+                    }}
                     onProposed={
                       data?.workspace.workflowsConfigured
                         ? () => navigate("workflows")

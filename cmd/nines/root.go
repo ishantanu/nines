@@ -116,6 +116,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	core := func(parent *cobra.Command, action, kind, use, mode, effect, short string, min, max int) {
 		parent.AddCommand(mark(position(coreCommand(action, kind, o), use, min, max), mode, effect, short))
 	}
+	r.AddCommand(templatesCommand(o), extensionsCommand(o))
 	g := group(r, "init", "Create local versioned YAML")
 	core(g, "init", "slo", "slo", "offline", "local-write", "Generate an SLO manifest", 0, 0)
 	for _, v := range []struct{ a, mode, effect, short string }{{"validate", "offline", "read", "Validate a local YAML definition"}, {"plan", "server", "read", "Review a definition against the server"}, {"apply", "server", "write", "Apply an exact revision-checked definition"}} {
@@ -231,7 +232,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	refineFlags(r)
 	var requiredFiles func(*cobra.Command)
 	requiredFiles = func(c *cobra.Command) {
-		if c.Flags().Lookup("file") != nil {
+		if c.Flags().Lookup("file") != nil && c.Annotations["file-alternatives"] == "" {
 			_ = c.MarkFlagRequired("file")
 		}
 		for _, child := range c.Commands() {

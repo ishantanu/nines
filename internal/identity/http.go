@@ -246,6 +246,22 @@ func (s *Service) finishLogin(w http.ResponseWriter, r *http.Request, providerID
 			return
 		}
 	}
+
+	if actor.PlatformAdmin {
+		admin := actor
+		admin.platformOperation = true
+		admin.platformReason = "Platform administrator sign-in"
+		if err = s.repo.Update(r.Context(), "platform-audit", func(tx Tx) error {
+			if e := s.platformAdminTx(tx, admin); e != nil {
+				return e
+			}
+			return s.recordPlatform(tx, admin, "session.sign-in", admin.ID, "succeeded", nil)
+		}); err != nil {
+			_ = s.repo.Update(r.Context(), "session:"+hash(token), func(tx Tx) error { return tx.Delete("session", "global", hash(token)) })
+			authFailure(w, err)
+			return
+		}
+	}
 	s.setCookie(w, "session", token, actor.Expires)
 	s.setCookie(w, "login", "", time.Time{})
 	if redirect {
@@ -366,6 +382,14 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 			}
 			u.Epoch++
 			if e = put(tx, "user", "global", a.ID, u, time.Time{}); e != nil {
+				return e
+			}
+		}
+
+		if a.PlatformAdmin {
+			a.platformOperation = true
+			a.platformReason = "Platform administrator sign-out"
+			if e := s.recordPlatform(tx, a, "session.sign-out", a.ID, "succeeded", map[string]bool{"allSessions": r.URL.Path == "/auth/logout-all"}); e != nil {
 				return e
 			}
 		}

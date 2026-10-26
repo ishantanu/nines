@@ -14,6 +14,7 @@ import (
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/operator"
+	"github.com/ishantanu/nines/internal/slotemplates"
 )
 
 func runOperator(args []string, out io.Writer) error {
@@ -40,6 +41,12 @@ func operatorCommand(o *options) *cobra.Command {
 	root.AddCommand(cmd)
 	flags := cmd.Flags()
 	file := flags.StringP("file", "f", "", "native versioned YAML definition")
+	templateID := flags.String("template", "", "Render a pinned SLO template instead of --file")
+	extensionLock := flags.String("extension-lock", "", "Pinned local extension lockfile")
+	valuesFile := flags.String("values", "", "Typed YAML template values")
+	cmd.Annotations["file-alternatives"] = "template"
+	cmd.MarkFlagsOneRequired("file", "template")
+	cmd.MarkFlagsMutuallyExclusive("file", "template")
 	namespace := flags.String("namespace", "", "Kubernetes namespace")
 	tenant := &o.Tenant
 	rulesOnly := flags.Bool("rules-only", false, "emit a GitOps-owned PrometheusRule instead of a Nines CRD")
@@ -48,23 +55,50 @@ func operatorCommand(o *options) *cobra.Command {
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
 		var buffer bytes.Buffer
 		out := io.Writer(&buffer)
-		if *file == "" || *namespace == "" {
-			return fmt.Errorf("provide -f native.yaml and --namespace")
+		if (*file == "") == (*templateID == "") || *namespace == "" {
+			return fmt.Errorf("provide exactly one --file or --template, and --namespace")
 		}
 		if *rulesOnly && !cmd.Flags().Changed("tenant") && !cmd.InheritedFlags().Changed("tenant") && os.Getenv("NINES_TENANT") == "" {
 			return fmt.Errorf("rules-only requires an explicit --tenant or NINES_TENANT")
 		}
-		f, e := openInput(*file)
-		if e != nil {
-			return e
-		}
-		defer func() {
+		var b []byte
+		var e error
+		if *templateID != "" {
+			registry, err := slotemplates.Load(*extensionLock)
+			if err != nil {
+				return err
+			}
+			values, err := readTemplateValues(*valuesFile)
+			if err != nil {
+				return err
+			}
+			template, err := registry.Get(*templateID)
+			if err != nil {
+				return err
+			}
+			if values.ExpectedTemplateDigest == "" {
+				values.ExpectedTemplateDigest = template.Digest
+			}
+			draft, err := registry.Render(*templateID, values)
+			if err != nil {
+				return err
+			}
+			b = []byte(draft.YAML)
+		} else {
+			if *extensionLock != "" || *valuesFile != "" {
+				return fmt.Errorf("--extension-lock and --values require --template")
+			}
+			f, err := openInput(*file)
+			if err != nil {
+				return err
+			}
+			b, e = io.ReadAll(io.LimitReader(f, (1<<20)+1))
 			_ = f.Close()
-		}()
-		b, e := io.ReadAll(io.LimitReader(f, (1<<20)+1))
-		if e != nil {
-			return e
+			if e != nil {
+				return e
+			}
 		}
+
 		var header struct {
 			Kind string `yaml:"kind"`
 		}

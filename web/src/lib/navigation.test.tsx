@@ -243,3 +243,21 @@ test("telemetry connection routes are canonical and old data-source bookmarks re
     "/tenants/alpha/telemetry-connections",
   );
 });
+
+test("platform paths use a bounded independent route vocabulary", () => {
+  for (const page of ["tenants", "users", "audit"] as const) {
+    expect(parseRoute("/admin/" + page)).toEqual({ kind: "platform", page });
+    expect(safeReturnPath("/admin/" + page)).toBe("/admin/" + page);
+  }
+  expect(parseRoute("/admin")).toEqual({ kind: "platform", page: "tenants" });
+  for (const path of [
+    "/admin/unknown",
+    "/admin/users/extra",
+    "/admin/%2e%2e",
+    "//admin/users",
+    "https://example.test/admin/users",
+  ]) {
+    expect(parseRoute(path).kind).toBe("not-found");
+    expect(safeReturnPath(path)).toBeNull();
+  }
+});

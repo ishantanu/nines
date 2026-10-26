@@ -19,12 +19,14 @@ export function WorkspaceHeader({
   onCredentials,
   identityLabel,
   onSignOut,
+  onPlatformAdmin,
   darkMode,
   onToggleTheme,
   replayConfigured,
   replayEnabled,
   onToggleReplay,
 }: {
+  onPlatformAdmin?: () => void;
   identityLabel?: string;
   onSignOut?: () => void;
   darkMode: boolean;
@@ -54,6 +56,11 @@ export function WorkspaceHeader({
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        {onPlatformAdmin ? (
+          <Button variant="outline" size="sm" onClick={onPlatformAdmin}>
+            Administration
+          </Button>
+        ) : null}
         {identityLabel ? (
           <span
             className="max-w-40 truncate text-xs text-muted-foreground"

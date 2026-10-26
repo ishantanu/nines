@@ -1,3 +1,5 @@
+import { SystemOneAdvice } from "./system-one-assessment";
+import { IntentTemplateEvidence } from "./intent-evidence";
 import { IntentOutcomePanel } from "./intent-outcome";
 import { BudgetDecisionPanel } from "./budget-decision";
 import { useEffect, useId, useRef, useState } from "react";
@@ -55,6 +57,12 @@ export function IntentRecommendationReport({
     >
       <h3 className="text-sm font-medium">Why this recommendation</h3>
       <p className="text-sm">{report.summary}</p>
+      {report.systemOne ? (
+        <SystemOneAdvice
+          assessment={report.systemOne}
+          route={report.systemOneRoute}
+        />
+      ) : null}
       {report.budgetDecision ? (
         <BudgetDecisionPanel decision={report.budgetDecision} frozen />
       ) : null}

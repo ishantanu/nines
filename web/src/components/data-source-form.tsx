@@ -1,3 +1,4 @@
+import { FormField } from "@/components/ui/form-layout";
 import { useState } from "react";
 import { api, message, type RequestScope } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -145,83 +146,95 @@ export function DataSourceForm({
           </DialogHeader>
           {draft ? (
             <form
-              className="space-y-3"
+              className="space-y-5"
               onSubmit={(e) => {
                 e.preventDefault();
                 void save();
               }}
             >
-              <Label htmlFor="source-name">Connection name</Label>
-              <Input
-                id="source-name"
-                required
-                maxLength={63}
-                pattern="[a-z0-9][a-z0-9-]*"
-                disabled={!!connection}
-                value={draft.name}
-                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-              />
-              <Label htmlFor="source-kind">Provider</Label>
-              <select
-                id="source-kind"
-                className="h-9 w-full rounded-md border bg-background px-3"
-                value={draft.kind}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    kind: e.target.value,
-                    mimirOrgID: "",
-                    rulerURL: "",
-                    reload: e.target.value === "prometheus" && draft.autoDeploy,
-                  })
-                }
-              >
-                <option value="prometheus">Prometheus</option>
-                <option value="mimir">Mimir</option>
-              </select>
-              <Label htmlFor="source-url">Query endpoint</Label>
-              <Input
-                id="source-url"
-                type="url"
-                required
-                placeholder={
-                  draft.kind === "mimir"
-                    ? "http://mimir:9009/prometheus"
-                    : "http://prometheus:9090"
-                }
-                value={draft.url}
-                onChange={(e) => setDraft({ ...draft, url: e.target.value })}
-              />
+              <FormField htmlFor="source-name" label="Connection name">
+                <Input
+                  id="source-name"
+                  required
+                  maxLength={63}
+                  pattern="[a-z0-9][a-z0-9-]*"
+                  disabled={!!connection}
+                  value={draft.name}
+                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                />
+              </FormField>
+              <FormField htmlFor="source-kind" label="Provider">
+                <select
+                  id="source-kind"
+                  className="h-9 w-full rounded-md border bg-background px-3"
+                  value={draft.kind}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      kind: e.target.value,
+                      mimirOrgID: "",
+                      rulerURL: "",
+                      reload:
+                        e.target.value === "prometheus" && draft.autoDeploy,
+                    })
+                  }
+                >
+                  <option value="prometheus">Prometheus</option>
+                  <option value="mimir">Mimir</option>
+                </select>
+              </FormField>
+              <FormField htmlFor="source-url" label="Query endpoint">
+                <Input
+                  id="source-url"
+                  type="url"
+                  required
+                  placeholder={
+                    draft.kind === "mimir"
+                      ? "http://mimir:9009/prometheus"
+                      : "http://prometheus:9090"
+                  }
+                  value={draft.url}
+                  onChange={(e) => setDraft({ ...draft, url: e.target.value })}
+                />
+              </FormField>
               {draft.kind === "mimir" ? (
                 <>
-                  <Label htmlFor="source-org">Mimir organization</Label>
-                  <Input
-                    id="source-org"
-                    required
-                    placeholder="playground"
-                    value={draft.mimirOrgID}
-                    onChange={(e) =>
-                      setDraft({ ...draft, mimirOrgID: e.target.value })
-                    }
-                  />
+                  <FormField htmlFor="source-org" label="Mimir organization">
+                    <Input
+                      id="source-org"
+                      required
+                      placeholder="playground"
+                      value={draft.mimirOrgID}
+                      onChange={(e) =>
+                        setDraft({ ...draft, mimirOrgID: e.target.value })
+                      }
+                    />
+                  </FormField>
                 </>
               ) : null}
-              <Label htmlFor="source-token">
-                Bearer token{" "}
-                {connection ? "(leave blank to retain)" : "(optional)"}
-              </Label>
-              <Input
-                id="source-token"
-                type="password"
-                autoComplete="new-password"
-                maxLength={8192}
-                value={draft.bearerToken}
-                onChange={(e) =>
-                  setDraft({ ...draft, bearerToken: e.target.value })
+              <FormField
+                htmlFor="source-token"
+                label={
+                  <>
+                    {" "}
+                    Bearer token{" "}
+                    {connection ? "(leave blank to retain)" : "(optional)"}{" "}
+                  </>
                 }
-              />
+              >
+                <Input
+                  id="source-token"
+                  type="password"
+                  autoComplete="new-password"
+                  maxLength={8192}
+                  value={draft.bearerToken}
+                  onChange={(e) =>
+                    setDraft({ ...draft, bearerToken: e.target.value })
+                  }
+                />
+              </FormField>
               {connection ? (
-                <Label className="flex items-center gap-2">
+                <Label className="form-check">
                   <input
                     type="checkbox"
                     checked={draft.clearCredentials}
@@ -232,7 +245,7 @@ export function DataSourceForm({
                   Clear saved credentials
                 </Label>
               ) : null}
-              <Label className="flex items-center gap-2">
+              <Label className="form-check">
                 <input
                   type="checkbox"
                   checked={draft.rulesEnabled}
@@ -249,7 +262,7 @@ export function DataSourceForm({
               </Label>
               {draft.rulesEnabled ? (
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
+                  <Label className="form-check">
                     <input
                       type="checkbox"
                       checked={draft.autoDeploy}
@@ -275,7 +288,7 @@ export function DataSourceForm({
               ) : null}
               {draft.rulesEnabled && draft.kind === "prometheus" ? (
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
+                  <Label className="form-check">
                     <input
                       type="checkbox"
                       checked={draft.reload}
@@ -296,18 +309,20 @@ export function DataSourceForm({
               ) : null}
               {draft.rulesEnabled && draft.kind === "mimir" ? (
                 <>
-                  <Label htmlFor="source-ruler">
-                    Ruler endpoint (defaults to query endpoint)
-                  </Label>
-                  <Input
-                    id="source-ruler"
-                    type="url"
-                    placeholder="http://mimir:9009/prometheus"
-                    value={draft.rulerURL}
-                    onChange={(e) =>
-                      setDraft({ ...draft, rulerURL: e.target.value })
-                    }
-                  />
+                  <FormField
+                    htmlFor="source-ruler"
+                    label="Ruler endpoint (defaults to query endpoint)"
+                  >
+                    <Input
+                      id="source-ruler"
+                      type="url"
+                      placeholder="http://mimir:9009/prometheus"
+                      value={draft.rulerURL}
+                      onChange={(e) =>
+                        setDraft({ ...draft, rulerURL: e.target.value })
+                      }
+                    />
+                  </FormField>
                 </>
               ) : null}
               <p className="text-xs text-muted-foreground">

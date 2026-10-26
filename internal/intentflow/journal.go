@@ -60,6 +60,22 @@ func journalAppend(old, next record) ([]v1.AuditRecord, error) {
 			return nil, model.Invalid("audit event integrity check failed")
 		}
 		item := v1.AuditRecord{APIVersion: v1.APIVersion, ID: model.NewID(), Tenant: next.Session.Tenant, Conversation: next.Session.ID, Event: event, Resources: []v1.IntentAppliedResource{}}
+		if event.Action == "systemone.requested" || event.Action == "systemone.assessed" {
+			for _, run := range next.Session.Runs {
+				var assessment *v1.SystemOneAssessment
+				if event.Action == "systemone.assessed" {
+					assessment = run.SystemOne
+				}
+				evidence := systemOneEvidence(run, assessment)
+				if hash(evidence) == event.EvidenceDigest {
+					item.SystemOne = evidence
+					break
+				}
+			}
+			if item.SystemOne == nil {
+				return nil, model.Invalid("System One audit evidence missing or changed")
+			}
+		}
 		changes := next.Session.ChangeSetHistory
 		if next.Session.ChangeSet != nil {
 			changes = append(clone(changes), *next.Session.ChangeSet)
@@ -288,7 +304,10 @@ func validateJournalRecord(item v1.AuditRecord) error {
 	if item.Outcome != nil && hash(item.Outcome) != item.Event.EvidenceDigest {
 		return model.Invalid("audit outcome evidence digest mismatch")
 	}
-	if item.Event.EvidenceDigest != "" && item.SafetyCheck == nil && item.Outcome == nil {
+	if item.SystemOne != nil && ((item.Event.Action != "systemone.requested" && item.Event.Action != "systemone.assessed") || hash(item.SystemOne) != item.Event.EvidenceDigest) {
+		return model.Invalid("System One audit evidence digest mismatch")
+	}
+	if item.Event.EvidenceDigest != "" && item.SafetyCheck == nil && item.Outcome == nil && item.SystemOne == nil {
 		valid := item.ApprovalDigest != "" && hash(item.ApprovalDigest) == item.Event.EvidenceDigest && (item.Event.Action == "change_set.approved" || item.Event.Action == "rollback.approved")
 		if valid && item.Proposal != nil {
 			if item.Event.Action == "change_set.approved" {

@@ -1,3 +1,4 @@
+import { SystemOneAdvice, SystemOneConsent } from "./system-one-assessment";
 import { IntentOutcomePanel } from "./intent-outcome";
 import { useResourceRoute } from "@/lib/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -40,7 +41,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { IntentMeasurementEditor } from "./intent-measurement";
 import { IntentAuthoring } from "./intent-authoring";
-import { IntentEvidence, IntentProgress } from "./intent-evidence";
+import {
+  IntentEvidence,
+  IntentProgress,
+  IntentTemplateEvidence,
+} from "./intent-evidence";
 import {
   IntentRecommendationReport,
   IntentDecisionControls,
@@ -89,6 +94,7 @@ export function IntentWorkspace({
     [reply, setReply] = useState("");
   const [mode, setMode] = useState("guided"),
     [consent, setConsent] = useState(false),
+    [systemOneConsent, setSystemOneConsent] = useState(false),
     [ack, setAck] = useState(false);
   const [history, setHistory] = useState(false),
     [from, setFrom] = useState(""),
@@ -198,9 +204,10 @@ export function IntentWorkspace({
   useEffect(() => {
     setReply("");
     setConsent(false);
+    setSystemOneConsent(false);
     setAck(false);
     followMessages.current = true;
-  }, [selected]);
+  }, [selected, scope]);
   useEffect(() => {
     if (!selected) {
       setValue(null);
@@ -252,6 +259,7 @@ export function IntentWorkspace({
   }, [value?.messages.length, run?.status]);
   function choose(id: string) {
     setConsent(false);
+    setSystemOneConsent(false);
     followMessages.current = true;
     activeID.current = id;
     setSelected(id);
@@ -364,6 +372,7 @@ export function IntentWorkspace({
       expectedVersion: value.version,
       mode,
       modelConsent: consent,
+      systemOneConsent,
       ...(history
         ? {
             backtest: {
@@ -375,6 +384,7 @@ export function IntentWorkspace({
         : {}),
     });
     if (!r) return;
+    setSystemOneConsent(false);
     setPollEpoch((v) => v + 1);
   }
   function exportYAML(name: string, yaml: string) {
@@ -672,6 +682,14 @@ export function IntentWorkspace({
                           Typed goals work with guided preparation.
                         </p>
                       ) : null}
+                      {caps?.systemOneEnabled && caps.systemOneRoute ? (
+                        <SystemOneConsent
+                          route={caps.systemOneRoute}
+                          checked={systemOneConsent}
+                          disabled={busy || running}
+                          onChange={setSystemOneConsent}
+                        />
+                      ) : null}
                       <Label className="flex items-start gap-2">
                         <input
                           type="checkbox"
@@ -720,8 +738,8 @@ export function IntentWorkspace({
                       />
                       <span>
                         Allow the configured model to receive this goal and
-                        measurement metadata. Source credentials, raw samples
-                        and generated queries are excluded.
+                        measurement and template metadata. Source credentials,
+                        raw samples and generated queries are excluded.
                       </span>
                     </Label>
                   ) : null}
@@ -782,6 +800,9 @@ export function IntentWorkspace({
                       </div>
                     ) : null}
                   </dl>
+                ) : null}
+                {value.template ? (
+                  <IntentTemplateEvidence selection={value.template} />
                 ) : null}
                 {value.goal ? (
                   <details className="text-xs">
@@ -1209,6 +1230,12 @@ export function IntentWorkspace({
                     <p className="mt-2 break-all text-muted-foreground">
                       Skill {r.skill.id}@{r.skill.version} · {r.skill.digest}
                     </p>
+                    {r.systemOne ? (
+                      <SystemOneAdvice
+                        assessment={r.systemOne}
+                        route={r.systemOneRoute}
+                      />
+                    ) : null}
                     {r.steps.map((s, i) => (
                       <details key={i} className="mt-2 rounded-md border p-2">
                         <summary className="cursor-pointer">

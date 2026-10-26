@@ -16,6 +16,7 @@ import (
 
 	"github.com/ishantanu/nines/internal/auditarchive"
 	"github.com/ishantanu/nines/internal/intentmodel"
+	"github.com/ishantanu/nines/internal/systemone"
 )
 
 const Header = "X-Nines-Tenant"
@@ -33,15 +34,17 @@ type Config struct {
 type IntentModel = intentmodel.Config
 
 type Tenant struct {
-	AuditArchive    *auditarchive.Config `json:"auditArchive,omitempty" yaml:"auditArchive,omitempty"`
-	ReviewModel     *IntentModel         `json:"reviewModel,omitempty" yaml:"reviewModel,omitempty"`
-	IntentModel     *IntentModel         `json:"intentModel,omitempty" yaml:"intentModel,omitempty"`
-	Connections     []Connection         `json:"connections,omitempty" yaml:"connections,omitempty"`
-	ID              string               `json:"id" yaml:"id"`
-	Name            string               `json:"name" yaml:"name"`
-	Access          []Access             `json:"access" yaml:"access"`
-	Source          Source               `json:"source" yaml:"source"`
-	AlertWebhookEnv string               `json:"alertWebhookEnv,omitempty" yaml:"alertWebhookEnv,omitempty"`
+	SystemOne        *systemone.Config    `json:"systemOne,omitempty" yaml:"systemOne,omitempty"`
+	SLOExtensionLock string               `json:"sloExtensionLock,omitempty" yaml:"sloExtensionLock,omitempty"`
+	AuditArchive     *auditarchive.Config `json:"auditArchive,omitempty" yaml:"auditArchive,omitempty"`
+	ReviewModel      *IntentModel         `json:"reviewModel,omitempty" yaml:"reviewModel,omitempty"`
+	IntentModel      *IntentModel         `json:"intentModel,omitempty" yaml:"intentModel,omitempty"`
+	Connections      []Connection         `json:"connections,omitempty" yaml:"connections,omitempty"`
+	ID               string               `json:"id" yaml:"id"`
+	Name             string               `json:"name" yaml:"name"`
+	Access           []Access             `json:"access" yaml:"access"`
+	Source           Source               `json:"source" yaml:"source"`
+	AlertWebhookEnv  string               `json:"alertWebhookEnv,omitempty" yaml:"alertWebhookEnv,omitempty"`
 }
 type Access struct {
 	TokenEnv string `json:"tokenEnv" yaml:"tokenEnv"`

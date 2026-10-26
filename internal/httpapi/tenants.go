@@ -24,12 +24,14 @@ import (
 	"github.com/ishantanu/nines/internal/replay"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
+	"github.com/ishantanu/nines/internal/slotemplates"
 	"github.com/ishantanu/nines/internal/store"
 	"github.com/ishantanu/nines/internal/tenancy"
 	"github.com/ishantanu/nines/internal/workflow"
 )
 
 type Workspace struct {
+	Templates           *slotemplates.Registry
 	ManagedSources      *datasources.Registry
 	IntentConversations *intentflow.Service
 	Replays             *replay.Service
@@ -142,6 +144,7 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 		}
 
 		if flow := workspace.IntentConversations; flow != nil {
+			flow.Templates = workspace.Templates
 			if flow.Platform != workspace.Service || flow.Repository == nil || !reflect.TypeOf(flow.Repository).Comparable() || intentRepos[flow.Repository] {
 				return nil, fmt.Errorf("intent conversations require an independent tenant repository")
 			}
@@ -212,6 +215,36 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 		workspace.Service.TenantName = workspace.Name
 		mounted[workspace.ID] = mountedTenant{workspace, newSingle(workspace.Service, log, workspace.Workflows, workspace)}
 	}
+
+	var platformHandler http.Handler
+	if auth != nil {
+		inventory := []identity.PlatformTenant{}
+		guards := []func([]byte) bool{}
+		for _, w := range workspaces {
+			if w.IntentConversations != nil {
+				for _, adapter := range []any{w.IntentConversations.SystemOne, w.IntentConversations.Model, w.Service.IntentDrafter} {
+					if guard, ok := adapter.(interface{ ContainsCredential([]byte) bool }); ok {
+						guards = append(guards, guard.ContainsCredential)
+					}
+				}
+			}
+			var route *v1.SystemOneRoute
+			if w.IntentConversations != nil && w.IntentConversations.SystemOne != nil {
+				descriptor := w.IntentConversations.SystemOne.Descriptor()
+				route = &descriptor
+				w.IntentConversations.SystemOne = auth.ControlSystemOne(w.ID, w.IntentConversations.SystemOne)
+			}
+			connectionNames := map[string]bool{"primary": true}
+			for _, connection := range w.Connections {
+				if connection.Name != "" {
+					connectionNames[connection.Name] = true
+				}
+			}
+			inventory = append(inventory, identity.PlatformTenant{ID: w.ID, Name: w.Name, SourceKind: w.Source.Kind, Connections: len(connectionNames), SystemOne: route})
+		}
+		auth.ConfigurePlatform(inventory, guards...)
+		platformHandler = auth.PlatformHandler()
+	}
 	return observability.HTTP(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Cache-Control", "no-store")
@@ -240,6 +273,14 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 				}
 			}
 			write(w, 200, map[string]string{"status": "ok"})
+			return
+		}
+		if r.URL.Path == "/api/platform" || strings.HasPrefix(r.URL.Path, "/api/platform/") {
+			if platformHandler == nil {
+				write(w, 403, map[string]string{"error": "Platform administration requires configured identity"})
+				return
+			}
+			platformHandler.ServeHTTP(w, r)
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/auth/") {
@@ -399,6 +440,9 @@ func allowed(role string, r *http.Request) bool {
 		return true
 	}
 	if strings.HasPrefix(r.URL.Path, "/api/bindings/") && strings.HasSuffix(r.URL.Path, "/compile") {
+		return true
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/slo-templates/") && strings.HasSuffix(r.URL.Path, "/render") {
 		return true
 	}
 	if r.URL.Path == "/api/slos/compile" || r.URL.Path == "/api/intents/backtest" || r.URL.Path == "/api/intents/plan" || r.URL.Path == "/api/journeys/plan" || r.URL.Path == "/api/resources/plan" || r.URL.Path == "/api/resources/validate" {

@@ -58,6 +58,12 @@ beforeEach(async () => {
           JSON.stringify({
             tenant: "alpha",
             modelEnabled: false,
+            systemOneEnabled: true,
+            systemOneRoute: {
+              provider: "typesafe",
+              model: "jev-1.14.0",
+              contractDigest: "contract",
+            },
             draftEnabled: false,
             skill: { id: "intent", version: "1", digest: "test" },
           }),
@@ -140,4 +146,33 @@ test("a late create response cannot replace a conversation selected through hist
   expect(window.location.pathname).toBe(
     workspacePath("alpha", "intents", "previous"),
   );
+});
+
+test("System One preparation needs its own opt-in and resets after submission", async () => {
+  await act(async () =>
+    navigateTo(workspacePath("alpha", "intents", "existing")),
+  );
+  const label = [...host.querySelectorAll("label")].find((item) =>
+    item.textContent?.includes("optional category and definition advice"),
+  )!;
+  expect(label).toBeTruthy();
+  const checkbox = label.querySelector("input")!;
+  expect(checkbox.checked).toBe(false);
+  expect(
+    vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === "POST"),
+  ).toHaveLength(0);
+  await act(async () => checkbox.click());
+  await act(async () => button("Prepare proposal").click());
+  const request = vi
+    .mocked(fetch)
+    .mock.calls.find(
+      ([url, init]) => String(url).endsWith("/runs") && init?.method === "POST",
+    )!;
+  expect(JSON.parse(String(request[1]?.body))).toMatchObject({
+    systemOneConsent: true,
+    modelConsent: false,
+    mode: "guided",
+  });
+  await act(async () => complete(response("existing")));
+  expect(checkbox.checked).toBe(false);
 });

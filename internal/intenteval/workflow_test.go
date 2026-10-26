@@ -18,7 +18,7 @@ func TestNativeProviderFullWorkflowContracts(t *testing.T) {
 		}
 		t.Fatal(err)
 	}
-	if !report.Complete || report.Suite != "workflow" || report.Passed != 60 || report.Failed != 0 {
+	if !report.Complete || report.Suite != "workflow" || report.Passed != 70 || report.Failed != 0 {
 		t.Fatalf("unexpected workflow report: %+v", report)
 	}
 }

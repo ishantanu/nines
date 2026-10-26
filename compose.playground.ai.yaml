@@ -1,0 +1,45 @@
+# Optional synthetic AI workload. Add this file after the base and optional Mimir file.
+# docker compose -p nines-playground -f compose.playground.yaml -f compose.playground.ai.yaml --profile ai up --build -d
+x-ai-build: &ai-build
+  context: .
+  dockerfile: deploy/playground/ai/Dockerfile
+services:
+  ai-sample:
+    profiles: [ai]
+    build: *ai-build
+    ports:
+      - "127.0.0.1:${NINES_PLAYGROUND_AI_PORT:-19093}:8001"
+    healthcheck:
+      test: [CMD, /ai-playground, health]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  prometheus:
+    volumes:
+      - ./deploy/playground/ai/targets.json:/etc/prometheus/ai-targets.json:ro
+  ai-setup:
+    profiles: [ai]
+    build: *ai-build
+    command: [setup]
+    # The public Go client keeps HTTP restricted to loopback. Join the disposable
+    # Nines network namespace rather than weakening its production URL policy.
+    network_mode: service:nines
+    depends_on:
+      nines:
+        condition: service_started
+      ai-sample:
+        condition: service_healthy
+    environment:
+      NINES_PLAYGROUND_TENANTS: ${NINES_PLAYGROUND_TENANTS:-auto}
+  ai-verify:
+    profiles: [verify]
+    build: *ai-build
+    command: [verify]
+    network_mode: service:nines
+    depends_on:
+      nines:
+        condition: service_started
+      ai-sample:
+        condition: service_healthy
+    environment:
+      NINES_PLAYGROUND_TENANTS: ${NINES_PLAYGROUND_TENANTS:-auto}

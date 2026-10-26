@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- Keep guided SLO measurement, settings and YAML edits synchronized, preserve intent authoring context and invalidate stale reviews on tab changes. Prevent implicit replacement of custom measurements and cancel requests when editors close or tenants change.
+
+- Add guided critical user journey definitions with tenant-scoped SLO selection, step dependencies, optional agent contracts and reviewed YAML parity. Standardize spacing, select widths and responsive dialog layout across reliability, telemetry and administration forms.
+
+- Add a separate platform admin console with exact-identity authorization, global account and tenant-membership controls, session revocation, atomic platform audit records and persisted Jev pause/daily-request policies.
+
+- Optional native Jev System One assessments in intent preparation: separate tenant opt-in and consent, bounded category and definition-clarity judgments, audit receipts and deterministic review gates.
+
+- Accept equivalent integer histogram boundary labels such as `2` and `2.0` in generated latency measurements, with strict per-population evidence and duplicate rejection.
+
+- Add an optional Go-based AI workload playground with template-generated experimental SLOs, evaluation completion coverage, linked critical user journeys, named failure scenarios and Prometheus/Mimir degradation/recovery checks.
+
+- Add a provider-neutral template-selection acceptance suite with nine semantic/adversarial scenarios, 45 scripted protocol contracts, separate model/guardrail scoring, pinned corpus/catalog/skill identities and explicit live-run reports.
+
+- Add bounded template discovery and rendering to agentic intent preparation, with catalog fencing, scope/commitment checks, durable template provenance and human confirmation before reviewed changes.
+- Add declarative SLO extension bundles with typed inputs, policy/evaluation contracts, conformance tests, immutable lockfiles, pinned local/HTTPS/Git installation, private tenant catalogs and portal/MCP/operator rendering.
+
+- Add a shared categorized catalog of 15 experimental SLO templates, offline CLI generation, tenant API/Go-client reads, read-only MCP rendering and a portal SLI picker. Include agent/LLM/inference guidance, 120 deterministic template/intent checks and six additional model-drafting cases.
+
 - Add `make test-identity` and a dedicated CI job for real OpenLDAP LDAPS/StartTLS, disposable PostgreSQL and native CLI/browser authorization, including durable sessions, role changes, explicit revocation, directory failure and exact consent checks. Document the real-Entra acceptance boundary and effective SSO session lifetime.
 
 - Enforce transaction-bound measurement-quality and error-budget safety checks before reviewed intent changes, with current reviewer authorization and separately approved, expiring corrective-work exceptions.

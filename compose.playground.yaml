@@ -39,6 +39,7 @@ services:
     volumes:
       - ./deploy/playground/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
       - rules:/etc/prometheus/nines:ro
+      - ./deploy/playground/ai/disabled.json:/etc/prometheus/ai-targets.json:ro
       - prometheus:/prometheus
     ports:
       - "127.0.0.1:${NINES_PLAYGROUND_PROMETHEUS_PORT:-19090}:9090"

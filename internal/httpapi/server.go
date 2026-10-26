@@ -110,6 +110,9 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 		}
 		write(w, 200, map[string]any{"mode": mode, "prometheusConfigured": count > 0, "journeysConfigured": s.Journeys != nil, "tenant": map[string]string{"id": s.TenantID, "name": s.TenantName}, "source": map[string]any{"kind": kind, "configured": count > 0, "connectionCount": count}, "role": role, "workflowsConfigured": workflows != nil})
 	})
+	api.HandleFunc("GET /api/slo-templates", a.sloTemplates)
+	api.HandleFunc("GET /api/slo-templates/{template}", a.sloTemplate)
+	api.HandleFunc("POST /api/slo-templates/{template}/render", a.renderSLOTemplate)
 	api.HandleFunc("GET /api/access", a.access)
 	api.HandleFunc("GET /api/connections", a.connections)
 	api.HandleFunc("POST /api/connections", a.connectionSave)

@@ -7,6 +7,10 @@ scrape_configs:
   - job_name: playground-checkout
     static_configs:
       - targets: [sample:8000]
+  - job_name: playground-ai
+    file_sd_configs:
+      - files: [/etc/prometheus/ai-targets.json]
+        refresh_interval: 5s
 remote_write:
   - url: http://mimir:9009/api/v1/push
     headers:

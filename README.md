@@ -11,6 +11,12 @@ Nines connects reliability goals to the user journeys they protect. Define SLOs 
 
 [Measurement-quality checks](https://ishantanu.github.io/nines/docs/measurement-quality/) explain freshness, population counts and cohort failures. [Error-budget response policies](https://ishantanu.github.io/nines/docs/error-budget-policy/) connect that evidence to owner review and deterministic CI gates. Native providers are currently Prometheus and Mimir; see [provider extension boundaries](https://ishantanu.github.io/nines/docs/provider-adapters/).
 
+[SLI menus and templates](https://ishantanu.github.io/nines/docs/slo-templates/) provide experimental starting points for services, pipelines, storage, agents, LLM applications and inference. Generate editable YAML offline with `nines templates generate`, or choose a template in the portal. [AI workload guidance](https://ishantanu.github.io/nines/docs/agent-slos/) explains outcome evaluation, budgets and conditional latency measurements.
+
+[SLO extensions](https://ishantanu.github.io/nines/docs/slo-extensions/) let teams publish declarative measurement recipes, typed inputs, policy presets and evaluation contracts independently. Install bundles from local files, HTTPS artifacts or commit-pinned Git repositories. Installed bundles are pinned by version and digest; rendering produces ordinary SLO YAML without runtime code execution.
+
+[The optional AI workload playground](https://ishantanu.github.io/nines/docs/deployment/ai-playground/) exercises agent tasks, evaluation quality and coverage, budgets and inference histograms through real Prometheus/Mimir recording rules. It is synthetic and requires no model account.
+
 **Status: pre-release MVP, under active development.** Expect regular features and fixes as the platform develops. APIs use `nines.dev/v1alpha1` and may change before a stable release. Use the MVP for evaluation and early feedback; production-scale readiness has not been established. Report bugs and request features through [GitHub Issues](https://github.com/ishantanu/nines/issues). The [release checklist](https://ishantanu.github.io/nines/docs/release/) records the checks required before publication.
 
 ## Login credentials
@@ -105,7 +111,7 @@ Compose enables local account login. OIDC SSO and LDAP use server-owned identity
 
 Reviewed intent updates refresh measurement quality and budget evidence at apply time. A durable observer then checks current rule activation/output and SLI evidence; regressions and uncertainty lead to a separate human rollback review. See [agent change safety and verification](https://ishantanu.github.io/nines/docs/intent-governance/#action-time-safety-checks).
 
-Optional model-assisted intent/review workflows and session replay are **experimental**. They remain available for evaluation but are outside the initial supported deployment path. Models are optional and provider-configurable. No hosted LLM account is required. See [experimental features and limits](https://ishantanu.github.io/nines/docs/experimental/).
+Optional model-assisted intent/review workflows and session replay are **experimental**. They remain available for evaluation but are outside the initial supported deployment path. Models are optional and provider-configurable. No hosted LLM account is required. Run `make selection-eval` for template-selection contracts; use the [live acceptance guide](https://ishantanu.github.io/nines/docs/intent-evaluations/#template-selection-acceptance) to test your exact model before enabling it. See [experimental features and limits](https://ishantanu.github.io/nines/docs/experimental/).
 
 Identity and tenant acceptance is reproducible with `make test-identity`, using disposable PostgreSQL, real OpenLDAP with LDAPS/StartTLS, signed OIDC fixtures and the native CLI. See the [identity acceptance guide](https://ishantanu.github.io/nines/docs/deployment/identity-acceptance/) for prerequisites and real-Entra verification limits.
 
@@ -158,3 +164,7 @@ The SLO lifecycle, measurement and operational practices in Nines are informed b
 Rule delivery follows the owner-configured source policy: automatic reconciliation after SLO saves, or a separate reviewed apply. Standalone Prometheus uses a shared rule directory and native reload; Mimir activates through its ruler; Kubernetes uses the Nines operator. File persistence, runtime evaluation and recorded output have separate status evidence. See [backend activation](https://ishantanu.github.io/nines/docs/deployment/metrics-and-rules/#automatic-backend-activation).
 
 Portal SLOs can also deploy through the Kubernetes operator: configure an operator destination, review its resource plan and apply from the Rules tab or CLI. The operator reconciles provider rules and returns revision-scoped evidence. See [portal-to-operator setup](https://ishantanu.github.io/nines/docs/deployment/operator/#publish-portal-slos-through-the-operator).
+
+Optional [System One advice with Jev](docs/public/system-one.md) adds typed template-category and definition-clarity judgments to intent preparation. It uses the native TypeSafe API, explicit tenant configuration and per-run consent; deterministic checks and human approval remain required.
+
+The [platform admin console](docs/public/platform-administration.md) manages users, direct tenant grants, session revocation and Jev request limits. Open `/admin/tenants` after signing in with an explicitly configured platform administrator identity.

@@ -491,6 +491,7 @@ export interface AuthInfo {
     kind: string;
     provider?: string;
     identitySubject?: string;
+    platformAdmin?: boolean;
     expiresAt?: string;
   };
   providers: { id: string; name: string; type: "oidc" | "ldap" | "local" }[];

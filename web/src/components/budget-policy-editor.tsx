@@ -1,8 +1,8 @@
+import { FormField } from "@/components/ui/form-layout";
 import { useId } from "react";
 import type { ErrorBudgetPolicy } from "@/lib/api";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Label } from "./ui/label";
 export function BudgetPolicyEditor({
   value,
   onChange,
@@ -36,58 +36,67 @@ export function BudgetPolicyEditor({
       <legend className="px-1 text-sm font-medium">
         Error-budget response policy
       </legend>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="form-grid">
         <div>
-          <Label htmlFor={`${id}-owner`}>Responsible owner</Label>
-          <Input
-            id={`${id}-owner`}
-            value={value.owner}
-            onChange={(e) => onChange({ ...value, owner: e.target.value })}
-          />
+          <FormField htmlFor={`${id}-owner`} label="Responsible owner">
+            <Input
+              id={`${id}-owner`}
+              value={value.owner}
+              onChange={(e) => onChange({ ...value, owner: e.target.value })}
+            />
+          </FormField>
         </div>
         <div>
-          <Label htmlFor={`${id}-url`}>Runbook URL</Label>
-          <Input
-            id={`${id}-url`}
-            type="url"
-            value={value.runbookURL}
-            onChange={(e) => onChange({ ...value, runbookURL: e.target.value })}
-          />
+          <FormField htmlFor={`${id}-url`} label="Runbook URL">
+            <Input
+              id={`${id}-url`}
+              type="url"
+              value={value.runbookURL}
+              onChange={(e) =>
+                onChange({ ...value, runbookURL: e.target.value })
+              }
+            />
+          </FormField>
         </div>
         <div>
-          <Label htmlFor={`${id}-review`}>
-            Review at remaining budget (0 to 1)
-          </Label>
-          <Input
-            id={`${id}-review`}
-            type="number"
-            min="0"
-            max="1"
-            step="any"
-            value={value.reviewBelow}
-            onChange={(e) =>
-              onChange({ ...value, reviewBelow: Number(e.target.value) })
-            }
-          />
-        </div>
-        <div>
-          <Label htmlFor={`${id}-exhausted`}>
-            When the budget is exhausted
-          </Label>
-          <select
-            id={`${id}-exhausted`}
-            className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-            value={value.onExhausted || "blocked"}
-            onChange={(e) =>
-              onChange({
-                ...value,
-                onExhausted: e.target.value as ErrorBudgetPolicy["onExhausted"],
-              })
-            }
+          <FormField
+            htmlFor={`${id}-review`}
+            label="Review at remaining budget (0 to 1)"
           >
-            <option value="blocked">Block proceeding</option>
-            <option value="review_required">Require owner review</option>
-          </select>
+            <Input
+              id={`${id}-review`}
+              type="number"
+              min="0"
+              max="1"
+              step="any"
+              value={value.reviewBelow}
+              onChange={(e) =>
+                onChange({ ...value, reviewBelow: Number(e.target.value) })
+              }
+            />
+          </FormField>
+        </div>
+        <div>
+          <FormField
+            htmlFor={`${id}-exhausted`}
+            label="When the budget is exhausted"
+          >
+            <select
+              id={`${id}-exhausted`}
+              className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+              value={value.onExhausted || "blocked"}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  onExhausted: e.target
+                    .value as ErrorBudgetPolicy["onExhausted"],
+                })
+              }
+            >
+              <option value="blocked">Block proceeding</option>
+              <option value="review_required">Require owner review</option>
+            </select>
+          </FormField>
         </div>
       </div>
       <p className="text-xs text-muted-foreground">

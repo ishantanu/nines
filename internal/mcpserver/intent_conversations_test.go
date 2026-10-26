@@ -1,6 +1,7 @@
 package mcpserver
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -75,4 +76,23 @@ func TestIntentAuditMCPPaginationKeepsScopeAndSnapshot(t *testing.T) {
 	if calls != 2 {
 		t.Fatal("invalid range reached API", calls)
 	}
+}
+
+func TestSystemOneMCPUsesSeparateConsentAndServerTenant(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Nines-Tenant") != "alpha" || r.URL.Path != "/api/intent-conversations/chat/runs" {
+			t.Error("unscoped semantic assessment")
+		}
+		var in struct {
+			SystemOneConsent bool `json:"systemOneConsent"`
+			ModelConsent     bool `json:"modelConsent"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !in.SystemOneConsent || in.ModelConsent {
+			t.Error("MCP lost separate consent", err)
+		}
+		_, _ = fmt.Fprint(w, `{"tenant":"alpha","id":"chat","version":2}`)
+	}))
+	defer server.Close()
+	session, ctx := connect(t, Config{Server: server.URL, Tenant: "alpha", AllowWrites: true})
+	call(t, ctx, session, "start_intent_preparation", map[string]any{"conversationId": "chat", "input": map[string]any{"id": "assess", "expectedVersion": 1, "mode": "guided", "modelConsent": false, "systemOneConsent": true}})
 }

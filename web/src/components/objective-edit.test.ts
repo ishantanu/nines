@@ -141,3 +141,25 @@ test("quality and budget edits preserve measurement and intent agreement", () =>
   );
   expect(before.spec.quality?.minEvents).toBe(100);
 });
+
+test("visiting Settings preserves an unchanged legacy alert policy representation", () => {
+  const d = definitionFromSLO({
+    id: "api",
+    name: "API",
+    project: "p",
+    service: "api",
+    target: 0.99,
+    windowSeconds: 3600,
+    stepSeconds: 60,
+    policy: {
+      shortWindowSeconds: 60,
+      longWindowSeconds: 300,
+      burnRate: 3,
+      forSeconds: 0,
+      minCoverage: 1,
+    },
+  });
+  const after = objectiveDefinition(d, objectiveDraft(d));
+  expect(after.spec.policy).toEqual(d.spec.policy);
+  expect(after.spec.policies).toBeUndefined();
+});

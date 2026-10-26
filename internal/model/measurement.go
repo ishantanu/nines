@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -54,7 +55,7 @@ func MeasurementWindow(m v1.MeasurementSpec) *v1.ProviderWindow {
 	total := measurementSelector(metric, labels)
 	if m.Type == "latency" {
 		if m.ThresholdSeconds != nil {
-			labels["le"] = strconv.FormatFloat(*m.ThresholdSeconds, 'g', -1, 64)
+			labels["le"] = HistogramBoundaryLabels(*m.ThresholdSeconds)[0]
 		}
 		metric = m.Metric + "_bucket"
 	} else {
@@ -62,7 +63,20 @@ func MeasurementWindow(m v1.MeasurementSpec) *v1.ProviderWindow {
 			labels[k] = v
 		}
 	}
-	return &v1.ProviderWindow{GoodSelector: measurementSelector(metric, labels), TotalSelector: total, ScrapeIntervalSeconds: m.ScrapeIntervalSeconds}
+	good := measurementSelector(metric, labels)
+	if m.Type == "latency" && m.ThresholdSeconds != nil {
+		buckets := HistogramBoundaryLabels(*m.ThresholdSeconds)
+		if len(buckets) == 2 {
+			literal := "le=" + strconv.Quote(buckets[0])
+			pattern := "^(" + regexp.QuoteMeta(buckets[0]) + "|" + regexp.QuoteMeta(buckets[1]) + ")$"
+			replaced := strings.Replace(good, "{"+literal, "{le=~"+strconv.Quote(pattern), 1)
+			if replaced == good {
+				replaced = strings.Replace(good, ","+literal, ",le=~"+strconv.Quote(pattern), 1)
+			}
+			good = replaced
+		}
+	}
+	return &v1.ProviderWindow{GoodSelector: good, TotalSelector: total, ScrapeIntervalSeconds: m.ScrapeIntervalSeconds}
 }
 func measurementSelector(metric string, labels map[string]string) string {
 	keys := make([]string, 0, len(labels))
@@ -78,4 +92,29 @@ func measurementSelector(metric string, labels map[string]string) string {
 		return metric
 	}
 	return metric + "{" + strings.Join(parts, ",") + "}"
+}
+
+// HistogramBoundaryLabels preserves exact numeric thresholds across legacy text
+// exposition and Prometheus/OpenMetrics normalization of integer bucket labels.
+// No nearby boundary, interpolation or arbitrary user regex is introduced.
+func HistogramBoundaryLabels(threshold float64) []string {
+	label := strconv.FormatFloat(threshold, 'g', -1, 64)
+	out := []string{label}
+	if !strings.ContainsAny(label, ".eE") {
+		out = append(out, label+".0")
+	}
+	return out
+}
+
+var canonicalBucketMatcher = regexp.MustCompile(`\ble=~"\^\(([0-9]+)\|([0-9]+)` + regexp.QuoteMeta(`\\.0)$"`))
+
+// canonicalHistogramSelector admits only the generated two-spelling le matcher.
+// Every other label still requires equality, and the full selector is parsed.
+func canonicalHistogramSelector(query string) bool {
+	matches := canonicalBucketMatcher.FindAllStringSubmatch(query, -1)
+	if len(matches) != 1 || matches[0][1] != matches[0][2] {
+		return false
+	}
+	canonical := canonicalBucketMatcher.ReplaceAllString(query, `le="$1"`)
+	return counterSelector.MatchString(canonical)
 }

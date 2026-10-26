@@ -1,7 +1,7 @@
+import { FormField } from "@/components/ui/form-layout";
 import type { BurnRatePolicy } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export function PolicyEditor({
   policies,
@@ -40,27 +40,29 @@ export function PolicyEditor({
               Remove policy
             </Button>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="form-grid">
             <div>
-              <Label htmlFor={`policy-name-${index}`}>Name</Label>
-              <Input
-                id={`policy-name-${index}`}
-                value={policy.name ?? ""}
-                onChange={(e) => update(index, "name", e.target.value)}
-              />
+              <FormField htmlFor={`policy-name-${index}`} label="Name">
+                <Input
+                  id={`policy-name-${index}`}
+                  value={policy.name ?? ""}
+                  onChange={(e) => update(index, "name", e.target.value)}
+                />
+              </FormField>
             </div>
             <div>
-              <Label htmlFor={`policy-severity-${index}`}>Severity</Label>
-              <select
-                id={`policy-severity-${index}`}
-                className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                value={policy.severity ?? "critical"}
-                onChange={(e) => update(index, "severity", e.target.value)}
-              >
-                {["critical", "warning", "info"].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
-              </select>
+              <FormField htmlFor={`policy-severity-${index}`} label="Severity">
+                <select
+                  id={`policy-severity-${index}`}
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  value={policy.severity ?? "critical"}
+                  onChange={(e) => update(index, "severity", e.target.value)}
+                >
+                  {["critical", "warning", "info"].map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
+                </select>
+              </FormField>
             </div>
             {(
               [
@@ -73,15 +75,16 @@ export function PolicyEditor({
               ] as const
             ).map(([key, label]) => (
               <div key={key}>
-                <Label htmlFor={`policy-${key}-${index}`}>{label}</Label>
-                <Input
-                  id={`policy-${key}-${index}`}
-                  type="number"
-                  step="any"
-                  min="0"
-                  value={policy[key] ?? 0}
-                  onChange={(e) => update(index, key, Number(e.target.value))}
-                />
+                <FormField htmlFor={`policy-${key}-${index}`} label={label}>
+                  <Input
+                    id={`policy-${key}-${index}`}
+                    type="number"
+                    step="any"
+                    min="0"
+                    value={policy[key] ?? 0}
+                    onChange={(e) => update(index, key, Number(e.target.value))}
+                  />
+                </FormField>
               </div>
             ))}
           </div>

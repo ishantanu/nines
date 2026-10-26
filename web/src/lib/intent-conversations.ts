@@ -9,7 +9,36 @@ export type AuthoringScope = {
   noDataPolicy: "unknown";
   journey?: IntentDocument["spec"]["journey"];
 };
+export type SystemOneRoute = {
+  provider: string;
+  model: string;
+  contractDigest: string;
+};
+export type SystemOneAssessment = {
+  status: string;
+  errorCode?: string;
+  resolvedModel?: string;
+  requestDigest?: string;
+  inputDigest: string;
+  inputTokens: number;
+  outputTokens: number;
+  at: string;
+  judgments?: {
+    category: {
+      choice: string;
+      confidence: number;
+      probabilities: Record<string, number>;
+    };
+    populationDefined: number;
+    goodEventsDefined: number;
+    observationPointDefined: number;
+  };
+};
 export type FlowRun = {
+  systemOne?: SystemOneAssessment;
+  systemOneRoute?: SystemOneRoute;
+  systemOneConsent?: boolean;
+  systemOneCalls?: number;
   progress?: {
     modelCall: number;
     state: "waiting" | "receiving" | "received";
@@ -33,7 +62,18 @@ export type ConversationSummary = {
   createdAt: string;
   updatedAt: string;
 };
+export type IntentTemplateSelection = {
+  templateId: string;
+  templateRevision: number;
+  templateDigest: string;
+  catalogDigest: string;
+  extension?: { name: string; version: string; sha256: string };
+  valuesDigest: string;
+  intentDigest: string;
+  at: string;
+};
 export type IntentConversation = ConversationSummary & {
+  template?: IntentTemplateSelection;
   tenant: string;
   apiVersion: string;
   messages: {
@@ -60,6 +100,8 @@ export type IntentConversation = ConversationSummary & {
   changeSetHistory?: IntentChangeSet[];
 };
 export type FlowCapabilities = {
+  systemOneEnabled?: boolean;
+  systemOneRoute?: SystemOneRoute;
   tenant: string;
   modelEnabled: boolean;
   draftEnabled: boolean;
@@ -196,6 +238,9 @@ export type IntentVerification = {
 };
 
 export type IntentRecommendation = {
+  systemOne?: SystemOneAssessment;
+  systemOneRoute?: SystemOneRoute;
+  template?: IntentTemplateSelection;
   budgetDecision?: import("./api").ErrorBudgetDecision;
   measurementDigest?: string;
   requestedBy?: { subject: string; name: string; kind: string };

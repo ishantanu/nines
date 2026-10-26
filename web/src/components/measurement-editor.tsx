@@ -1,3 +1,4 @@
+import { FormField } from "@/components/ui/form-layout";
 import { useEffect, useId, useRef, useState } from "react";
 import { parse, stringify } from "yaml";
 import { api, canEdit, message, type RequestScope } from "@/lib/api";
@@ -51,7 +52,7 @@ export function MeasurementFilters({
       {rows.map((row, index) => (
         <div
           key={index}
-          className="grid grid-cols-[1fr_1fr_auto] items-end gap-2"
+          className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]"
         >
           <div>
             <Label className="text-xs" htmlFor={`${id}-${index}-label`}>
@@ -164,7 +165,7 @@ export function MeasurementFields({
   ];
   return (
     <fieldset className="space-y-5" disabled={disabled}>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="form-grid">
         {fields
           .filter(
             (f) =>
@@ -172,61 +173,66 @@ export function MeasurementFields({
           )
           .map((f) => (
             <div key={f.key}>
-              <Label htmlFor={`${id}-${f.key}`}>{f.label}</Label>
-              <Input
-                id={`${id}-${f.key}`}
-                className="mt-1"
-                type={f.type ?? "text"}
-                value={draft[f.key]}
-                disabled={disabled || (f.key === "name" && fixedName)}
-                onChange={(e) => field(f.key, e.target.value)}
-              />
+              <FormField htmlFor={`${id}-${f.key}`} label={f.label}>
+                <Input
+                  id={`${id}-${f.key}`}
+                  type={f.type ?? "text"}
+                  value={draft[f.key]}
+                  disabled={disabled || (f.key === "name" && fixedName)}
+                  onChange={(e) => field(f.key, e.target.value)}
+                />
+              </FormField>
             </div>
           ))}
         {!hideIdentity ? (
           <div>
-            <Label htmlFor={`${id}-source`}>Metrics connection</Label>
-            <Select
-              disabled={disabled}
-              value={draft.source}
-              onValueChange={(v) => field("source", v)}
-            >
-              <SelectTrigger id={`${id}-source`} className="mt-1 w-full">
-                <SelectValue placeholder="Select a connection" />
-              </SelectTrigger>
-              <SelectContent>
-                {connections.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.id}
-                    {c.kind ? ` · ${c.kind}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FormField htmlFor={`${id}-source`} label="Metrics connection">
+              <Select
+                disabled={disabled}
+                value={draft.source}
+                onValueChange={(v) => field("source", v)}
+              >
+                <SelectTrigger id={`${id}-source`} className="w-full">
+                  <SelectValue placeholder="Select a connection" />
+                </SelectTrigger>
+                <SelectContent>
+                  {connections.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.id}
+                      {c.kind ? ` · ${c.kind}` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FormField>
           </div>
         ) : null}
         {!hideType ? (
           <div>
-            <Label htmlFor={`${id}-measurement`}>
-              What do you want to measure?
-            </Label>
-            <Select
-              disabled={disabled}
-              value={draft.measurement}
-              onValueChange={(v) =>
-                field("measurement", v as MeasurementDraft["measurement"])
-              }
+            <FormField
+              htmlFor={`${id}-measurement`}
+              label="What do you want to measure?"
             >
-              <SelectTrigger id={`${id}-measurement`} className="mt-1 w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="availability">Successful events</SelectItem>
-                <SelectItem value="latency">
-                  Events below a latency threshold
-                </SelectItem>
-              </SelectContent>
-            </Select>
+              <Select
+                disabled={disabled}
+                value={draft.measurement}
+                onValueChange={(v) =>
+                  field("measurement", v as MeasurementDraft["measurement"])
+                }
+              >
+                <SelectTrigger id={`${id}-measurement`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="availability">
+                    Successful events
+                  </SelectItem>
+                  <SelectItem value="latency">
+                    Events below a latency threshold
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
           </div>
         ) : null}
       </div>
@@ -257,40 +263,42 @@ export function MeasurementFields({
             population. Values are literal strings, not regular expressions.
           </p>
           <div>
-            <Label htmlFor={`${id}-count`}>Event count comes from</Label>
-            <Select
-              disabled={disabled}
-              value={draft.countFrom}
-              onValueChange={(v) =>
-                field("countFrom", v as MeasurementDraft["countFrom"])
-              }
-            >
-              <SelectTrigger id={`${id}-count`} className="mt-1 w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="counter">Counter</SelectItem>
-                <SelectItem value="histogram">
-                  Classic histogram count
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <FormField htmlFor={`${id}-count`} label="Event count comes from">
+              <Select
+                disabled={disabled}
+                value={draft.countFrom}
+                onValueChange={(v) =>
+                  field("countFrom", v as MeasurementDraft["countFrom"])
+                }
+              >
+                <SelectTrigger id={`${id}-count`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="counter">Counter</SelectItem>
+                  <SelectItem value="histogram">
+                    Classic histogram count
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </FormField>
           </div>
         </div>
       ) : !hideType ? (
         <div>
-          <Label htmlFor={`${id}-threshold`}>
-            Good events complete within (seconds)
-          </Label>
-          <Input
-            id={`${id}-threshold`}
-            className="mt-1"
-            type="number"
-            step="any"
-            min="0"
-            value={draft.threshold}
-            onChange={(e) => field("threshold", e.target.value)}
-          />
+          <FormField
+            htmlFor={`${id}-threshold`}
+            label="Good events complete within (seconds)"
+          >
+            <Input
+              id={`${id}-threshold`}
+              type="number"
+              step="any"
+              min="0"
+              value={draft.threshold}
+              onChange={(e) => field("threshold", e.target.value)}
+            />
+          </FormField>
           <p className="mt-2 text-xs text-muted-foreground">
             Requires a classic histogram with the exact threshold bucket for
             every population. Quantiles and native histograms are not supported.
@@ -298,16 +306,17 @@ export function MeasurementFields({
         </div>
       ) : null}
       <div>
-        <Label htmlFor={`${id}-observation`}>
-          Where is this measured, and what does it miss?
-        </Label>
-        <Textarea
-          id={`${id}-observation`}
-          className="mt-1"
-          value={draft.observationPoint}
-          onChange={(e) => field("observationPoint", e.target.value)}
-          placeholder="For example: completed requests at the API server, excluding attempts that never reach it."
-        />
+        <FormField
+          htmlFor={`${id}-observation`}
+          label="Where is this measured, and what does it miss?"
+        >
+          <Textarea
+            id={`${id}-observation`}
+            value={draft.observationPoint}
+            onChange={(e) => field("observationPoint", e.target.value)}
+            placeholder="For example: completed requests at the API server, excluding attempts that never reach it."
+          />
+        </FormField>
       </div>
       <p className="text-xs text-muted-foreground">
         Match the source scrape interval to your telemetry configuration. Each
@@ -506,18 +515,19 @@ export function MeasurementEditor({
             />
           </TabsContent>
           <TabsContent value="yaml">
-            <Label htmlFor={yamlID}>MeasurementBinding manifest</Label>
-            <Textarea
-              id={yamlID}
-              value={text}
-              disabled={busy}
-              onChange={(e) => {
-                setText(e.target.value);
-                setPlan(null);
-              }}
-              className="mt-2 min-h-80 font-mono text-xs"
-              spellCheck={false}
-            />
+            <FormField htmlFor={yamlID} label="MeasurementBinding manifest">
+              <Textarea
+                id={yamlID}
+                value={text}
+                disabled={busy}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  setPlan(null);
+                }}
+                className="min-h-80 font-mono text-xs"
+                spellCheck={false}
+              />
+            </FormField>
           </TabsContent>
         </Tabs>
         {error ? (

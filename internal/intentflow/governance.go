@@ -251,6 +251,10 @@ func recommendation(r *record, c v1.IntentChangeSet) *v1.IntentRecommendation {
 		Mode:        "guided", Binding: p.Compiled.Binding, SourceDigest: p.SourceDigest, EvidenceDigest: p.Compiled.Evidence.Fingerprint, ObservedFrom: p.Compiled.Evidence.From, ObservedTo: p.Compiled.Evidence.To,
 		Fields: []v1.IntentFieldChange{},
 	}
+	if receipt := r.Session.Template; receipt != nil && receipt.IntentDigest == hash(*goal) {
+		result.Template = clone(receipt)
+		result.Basis = append(result.Basis, "The draft measurement came from the recorded template and artifact digest. Template defaults did not replace the goal's target, window, lifecycle or alert policies.")
+	}
 	if n := len(r.Session.Runs); n > 0 {
 		run := r.Session.Runs[n-1]
 		result.RequestedBy = run.Actor
@@ -258,6 +262,11 @@ func recommendation(r *record, c v1.IntentChangeSet) *v1.IntentRecommendation {
 		result.Mode = run.Mode
 		result.ModelRoute = run.ModelRoute
 		result.DraftRoute = run.DraftRoute
+		result.SystemOne = clone(run.SystemOne)
+		result.SystemOneRoute = clone(run.SystemOneRoute)
+		if run.SystemOne != nil {
+			result.Limitations = append(result.Limitations, "System One judgments are advisory probabilities about the run input, not telemetry, measurement confirmation or approval.")
+		}
 		result.Skill = &run.Skill
 		for i := len(r.Session.Messages) - 1; i >= 0; i-- {
 			m := r.Session.Messages[i]

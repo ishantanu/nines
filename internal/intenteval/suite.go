@@ -44,30 +44,52 @@ type suite struct {
 	Kind       string `yaml:"kind"`
 	Cases      []Case `yaml:"cases"`
 }
+type EvaluationCheck struct {
+	Name     string `json:"name"`
+	Category string `json:"category"`
+	Passed   bool   `json:"passed"`
+	Failure  string `json:"failure,omitempty"`
+}
+type AcceptanceSummary struct {
+	Status                string `json:"status"`
+	RequiredCases         int    `json:"requiredCases"`
+	ExecutedCases         int    `json:"executedCases"`
+	ModelChecksPassed     int    `json:"modelChecksPassed"`
+	ModelChecksFailed     int    `json:"modelChecksFailed"`
+	GuardrailChecksPassed int    `json:"guardrailChecksPassed"`
+	GuardrailChecksFailed int    `json:"guardrailChecksFailed"`
+}
 type Result struct {
-	WorkflowError        string `json:"workflowError,omitempty"`
-	Case                 string `json:"case"`
-	Provider             string `json:"provider"`
-	Model                string `json:"model"`
-	Passed               bool   `json:"passed"`
-	Status               string `json:"status"`
-	Failure              string `json:"failure,omitempty"`
-	DurationMilliseconds int64  `json:"durationMilliseconds"`
+	Checks               []EvaluationCheck `json:"checks,omitempty"`
+	ModelCalls           int               `json:"modelCalls,omitempty"`
+	ToolAttempts         int               `json:"toolAttempts,omitempty"`
+	WorkflowError        string            `json:"workflowError,omitempty"`
+	Case                 string            `json:"case"`
+	Provider             string            `json:"provider"`
+	Model                string            `json:"model"`
+	Passed               bool              `json:"passed"`
+	Status               string            `json:"status"`
+	Failure              string            `json:"failure,omitempty"`
+	DurationMilliseconds int64             `json:"durationMilliseconds"`
 }
 type Report struct {
-	SelectedCase   string    `json:"selectedCase,omitempty"`
-	Suite          string    `json:"suite"`
-	APIVersion     string    `json:"apiVersion"`
-	Kind           string    `json:"kind"`
-	Mode           string    `json:"mode"`
-	SuiteSHA256    string    `json:"suiteSHA256"`
-	GeneratedAt    time.Time `json:"generatedAt"`
-	Complete       bool      `json:"complete"`
-	RuntimeVersion string    `json:"runtimeVersion,omitempty"`
-	Results        []Result  `json:"results"`
-	Passed         int       `json:"passed"`
-	Failed         int       `json:"failed"`
-	Skipped        []string  `json:"skipped"`
+	Acceptance     *AcceptanceSummary   `json:"acceptance,omitempty"`
+	CatalogDigest  string               `json:"catalogDigest,omitempty"`
+	ModelRoute     *v1.ReviewModelRoute `json:"modelRoute,omitempty"`
+	Skill          *v1.ReviewSkillRef   `json:"skill,omitempty"`
+	SelectedCase   string               `json:"selectedCase,omitempty"`
+	Suite          string               `json:"suite"`
+	APIVersion     string               `json:"apiVersion"`
+	Kind           string               `json:"kind"`
+	Mode           string               `json:"mode"`
+	SuiteSHA256    string               `json:"suiteSHA256"`
+	GeneratedAt    time.Time            `json:"generatedAt"`
+	Complete       bool                 `json:"complete"`
+	RuntimeVersion string               `json:"runtimeVersion,omitempty"`
+	Results        []Result             `json:"results"`
+	Passed         int                  `json:"passed"`
+	Failed         int                  `json:"failed"`
+	Skipped        []string             `json:"skipped"`
 }
 
 func Cases() ([]Case, error) {

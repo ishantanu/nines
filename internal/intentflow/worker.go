@@ -50,7 +50,7 @@ var contract = func() skillContract {
 	if e := yaml.Unmarshal(skillYAML, &c); e != nil {
 		panic(e)
 	}
-	if c.APIVersion != v1.APIVersion || c.Kind != "IntentAuthoringSkill" || c.Metadata.Name != "intent-authoring" || c.Metadata.Version != "0.3.0" || c.Spec.MaxModelCalls != 6 || c.Spec.MaxToolCalls != 6 || len(c.Spec.Tools) != 6 || len(c.Spec.Definitions) != 6 {
+	if c.APIVersion != v1.APIVersion || c.Kind != "IntentAuthoringSkill" || c.Metadata.Name != "intent-authoring" || c.Metadata.Version != "0.4.0" || c.Spec.MaxModelCalls != 6 || c.Spec.MaxToolCalls != 6 || len(c.Spec.Tools) != 8 || len(c.Spec.Definitions) != 8 {
 		panic("invalid intent skill contract")
 	}
 	seen := map[string]bool{}
@@ -66,10 +66,10 @@ var contract = func() skillContract {
 
 func bytesDigest(b []byte) string { d := sha256.Sum256(b); return hex.EncodeToString(d[:]) }
 func skillRef() v1.ReviewSkillRef {
-	return v1.ReviewSkillRef{ID: "intent-authoring", Version: "0.3.0", Digest: bytesDigest(skillYAML)}
+	return v1.ReviewSkillRef{ID: "intent-authoring", Version: "0.4.0", Digest: bytesDigest(skillYAML)}
 }
 func (s *Service) Capabilities() any {
-	return map[string]any{"apiVersion": v1.APIVersion, "tenant": s.Platform.TenantID, "modelEnabled": s.Model != nil, "draftEnabled": s.Platform.IntentDrafter != nil, "skill": skillRef(), "maxRuns": 8, "maxModelCalls": 6, "maxToolCalls": 6, "tools": contract.Spec.Tools, "appliesResources": false, "reviewedChangeSets": true, "humanApprovalRequired": true, "auditTrail": true, "approvalReasonRequired": true, "independentApplierRequired": true, "tenantAuditJournal": true, "externalImmutableArchive": s.Archive != nil, "externalArchiveBackend": "s3-object-lock", "actionTimeSafetyChecks": true, "ownerCorrectiveExceptions": true, "postChangeObservation": true, "automaticRollback": false, "reviewedConfigurationRollback": true, "rollbackCreatesNewRevisions": true, "rollbackDeletesResources": false, "rollbackDeploysRules": false, "skillYAML": string(skillYAML)}
+	return map[string]any{"apiVersion": v1.APIVersion, "tenant": s.Platform.TenantID, "modelEnabled": s.Model != nil, "draftEnabled": s.Platform.IntentDrafter != nil, "skill": skillRef(), "systemOneEnabled": s.SystemOne != nil, "systemOneRoute": s.systemOneRoute(), "systemOneAdvisoryOnly": true, "templateSelection": true, "templateCatalogDigest": s.templateCatalogDigest(), "maxRuns": 8, "maxModelCalls": 6, "maxToolCalls": 6, "tools": contract.Spec.Tools, "appliesResources": false, "reviewedChangeSets": true, "humanApprovalRequired": true, "auditTrail": true, "approvalReasonRequired": true, "independentApplierRequired": true, "tenantAuditJournal": true, "externalImmutableArchive": s.Archive != nil, "externalArchiveBackend": "s3-object-lock", "actionTimeSafetyChecks": true, "ownerCorrectiveExceptions": true, "postChangeObservation": true, "automaticRollback": false, "reviewedConfigurationRollback": true, "rollbackCreatesNewRevisions": true, "rollbackDeletesResources": false, "rollbackDeploysRules": false, "skillYAML": string(skillYAML)}
 }
 func decodeArgs(raw json.RawMessage, out any) error {
 	if len(raw) > 4096 {
@@ -112,6 +112,9 @@ func toolset(r record) []rm.Tool {
 		names = append(names, "draft_goal")
 	} else if r.Session.Selection == nil {
 		names = append(names, "find_measurements")
+		if r.Session.Goal.Spec.Measurement == nil {
+			names = append(names, "list_slo_templates", "render_slo_template")
+		}
 	} else {
 		names = append(names, "compile_intent", "backtest_intent", "finish_proposal")
 	}
@@ -225,8 +228,15 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 	if run.Mode == "model" && (s.Model == nil || run.ModelRoute == nil || *run.ModelRoute != s.Model.Descriptor()) {
 		return fail("model_configuration_changed")
 	}
+	if run.Mode == "model" && run.TemplateCatalogDigest != s.templateCatalogDigest() {
+		return fail("template_catalog_changed")
+	}
+
+	if run.SystemOneConsent && run.SystemOne == nil {
+		return s.assessSystemOne(job, ctx, r, token)
+	}
 	if run.Mode == "model" && r.Pending == nil {
-		req := rm.Request{System: contract.Spec.Instructions, Messages: r.Native, Tools: toolset(r), MaxOutputTokens: 1024}
+		req := rm.Request{System: contract.Spec.Instructions + systemOneAdvice(run.SystemOne), Messages: r.Native, Tools: toolset(r), MaxOutputTokens: 1024}
 		body, _ := json.Marshal(req)
 		if run.ModelCalls >= contract.Spec.MaxModelCalls || len(body) > 32<<10 || run.ModelInputBytes+len(body) > 128<<10 {
 			return fail("model_budget_exceeded")
@@ -251,6 +261,9 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 		}
 		if err != nil {
 			return fail(safeModelFailure(err))
+		}
+		if run.TemplateCatalogDigest != s.templateCatalogDigest() {
+			return fail("template_catalog_changed")
 		}
 		if s.sensitiveInput(response) {
 			return fail("unsafe_model_response")
@@ -345,6 +358,12 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 		}
 		return fail(code)
 	}
+	if s.sensitiveInput(result) {
+		return fail("unsafe_tool_result")
+	}
+	if run.Mode == "model" && run.TemplateCatalogDigest != s.templateCatalogDigest() {
+		return fail("template_catalog_changed")
+	}
 	data, _ := json.Marshal(result)
 	if len(data) > 64<<10 {
 		return fail("evidence_budget_exceeded")
@@ -356,6 +375,13 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 		// The session is immutable while queued/running. Every completed tool and its
 		// exact evidence bytes commit atomically with goal/selection/proposal state.
 		n.Session.Goal = next.Session.Goal
+		n.Session.Template = next.Session.Template
+		if call.Name == "render_slo_template" {
+			if err := auditRoom(n); err != nil {
+				return err
+			}
+			audit(n, current(n).Actor, "template.selected", "succeeded", "", "A catalog recipe supplied a draft measurement; human confirmation is required.", now, next.Session.Template)
+		}
 		n.Session.Plan = next.Session.Plan
 		n.Session.Backtest = next.Session.Backtest
 		n.Session.Selection = next.Session.Selection
@@ -397,9 +423,18 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 	return true, e
 }
 func modelResult(r record, name string, result any) any {
-	if name == "compile_intent" && r.Session.Plan != nil {
+	if (name == "compile_intent" || name == "find_measurements") && r.Session.Plan != nil {
 		p := r.Session.Plan
-		return map[string]any{"status": p.Status, "intentDigest": p.IntentDigest, "manifestDigest": p.Compiled.Digest, "warnings": p.Warnings, "journeyChange": p.Journey != nil}
+		compact := map[string]any{"status": p.Status, "intentDigest": p.IntentDigest, "warnings": p.Warnings, "clarifications": p.Clarifications, "journeyChange": p.Journey != nil}
+		if p.Compiled != nil {
+			compact["manifestDigest"] = p.Compiled.Digest
+			compact["measurementDigest"] = p.Compiled.MeasurementDigest
+		}
+		if name == "find_measurements" {
+			compact["candidates"] = p.Candidates
+			compact["humanConfirmationRequired"] = r.Session.Selection == nil
+		}
+		return compact
 	}
 	if name == "backtest_intent" && r.Session.Backtest != nil {
 		b := r.Session.Backtest
@@ -410,6 +445,13 @@ func modelResult(r record, name string, result any) any {
 func (s *Service) execute(ctx context.Context, r *record, call rm.Call) (any, error) {
 	now := time.Now().UTC()
 	switch call.Name {
+	case "list_slo_templates":
+		if r.Session.Goal == nil || r.Session.Goal.Spec.Measurement != nil || r.Session.Selection != nil || current(r).Mode != "model" || !r.RunRequest.ModelConsent {
+			return nil, model.Invalid("template discovery requires an unconfirmed typed goal and consented model mode")
+		}
+		return s.discoverTemplates(call.Arguments)
+	case "render_slo_template":
+		return s.renderIntentTemplate(r, call.Arguments, now)
 	case "ask_user":
 		var in struct {
 			Question string `json:"question"`
@@ -418,7 +460,7 @@ func (s *Service) execute(ctx context.Context, r *record, call rm.Call) (any, er
 			return nil, rm.Failure("unsafe_tool_call")
 		}
 		status := "needs_input"
-		if r.Session.Plan != nil && r.Session.Selection == nil && len(r.Session.Plan.Candidates) > 0 {
+		if r.Session.Plan != nil && r.Session.Selection == nil && (len(r.Session.Plan.Candidates) > 0 || (r.Session.Plan.Compiled != nil && r.Session.Goal != nil && r.Session.Goal.Spec.Measurement != nil)) {
 			status = "needs_selection"
 		}
 		finish(r, status, "", in.Question, now)
@@ -472,6 +514,7 @@ func (s *Service) execute(ctx context.Context, r *record, call rm.Call) (any, er
 				return nil, model.Invalid("draft changed pinned scope")
 			}
 			r.Session.Goal = draft.Intent
+			r.Session.Template = nil
 			r.Session.Selection = nil
 			r.Session.Plan = nil
 		} else {

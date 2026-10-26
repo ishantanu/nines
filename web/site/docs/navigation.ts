@@ -29,6 +29,11 @@ export const docGroups: DocGroup[] = [
         "Run the complete Prometheus flow with Docker Compose.",
       ),
       page(
+        "deployment/ai-playground",
+        "AI workload playground",
+        "Compare task outcomes, evaluation coverage and inference reliability with synthetic metrics.",
+      ),
+      page(
         "deployment",
         "Installation",
         "Choose a binary, Compose, Kubernetes or operator deployment.",
@@ -43,6 +48,21 @@ export const docGroups: DocGroup[] = [
   {
     title: "Define reliability",
     pages: [
+      page(
+        "slo-extensions",
+        "SLO extensions",
+        "Publish typed measurement recipes, pinned bundles and evaluation contracts.",
+      ),
+      page(
+        "slo-templates",
+        "SLI menus and templates",
+        "Choose a categorized starting point and generate editable SLO YAML.",
+      ),
+      page(
+        "agent-slos",
+        "Agent, LLM and inference SLOs",
+        "Measure task outcomes, evaluation verdicts, budgets and serving latency.",
+      ),
       page(
         "measurements",
         "SLOs and measurements",
@@ -89,6 +109,11 @@ export const docGroups: DocGroup[] = [
     title: "Work with agents",
     pages: [
       page(
+        "system-one",
+        "System One advice",
+        "Use optional Jev judgments for template category and definition clarity.",
+      ),
+      page(
         "intents",
         "SLO intents",
         "Move from a reliability goal to confirmed measurements and reviewed changes.",
@@ -124,6 +149,11 @@ export const docGroups: DocGroup[] = [
   {
     title: "Deploy and connect",
     pages: [
+      page(
+        "platform-administration",
+        "Platform administration",
+        "Manage global identities, tenant access, Jev limits and platform audit history.",
+      ),
       page(
         "configuration",
         "Server configuration",

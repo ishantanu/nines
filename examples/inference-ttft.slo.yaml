@@ -1,0 +1,21 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+    name: inference-ttft
+    project: production
+spec:
+    lifecycle: experimental
+    measurement:
+        type: latency
+        metric: inference_time_to_first_token_seconds
+        labels:
+            service: inference
+        thresholdSeconds: 0.5
+        scrapeIntervalSeconds: 15
+        observationPoint: Streams reaching a first token only. Failed or never-started streams are excluded; pair with inference availability. This is a conditional latency SLO.. Requires a classic histogram in seconds with an exact matching le bucket and count series; summaries and percentile gauges are unsupported.
+    source: primary
+    displayName: Time to first token
+    service: inference
+    target: 0.99
+    windowSeconds: 2419200
+    stepSeconds: 60

@@ -1,5 +1,8 @@
 import type { IntentPlan } from "@/lib/intent";
-import type { FlowRun } from "@/lib/intent-conversations";
+import type {
+  FlowRun,
+  IntentTemplateSelection,
+} from "@/lib/intent-conversations";
 
 export function IntentProgress({
   progress,
@@ -136,5 +139,54 @@ export function IntentEvidence({
         ) : null}
       </div>
     </section>
+  );
+}
+
+export function IntentTemplateEvidence({
+  selection,
+}: {
+  selection: IntentTemplateSelection;
+}) {
+  return (
+    <details className="rounded-md border p-3 text-xs">
+      <summary className="cursor-pointer font-medium">
+        Measurement template · {selection.templateId}
+      </summary>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div>
+          <dt className="text-muted-foreground">Origin</dt>
+          <dd className="mt-1">
+            {selection.extension
+              ? `${selection.extension.name} · ${selection.extension.version}`
+              : "Built-in template"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Template revision</dt>
+          <dd className="mt-1">{selection.templateRevision}</dd>
+        </div>
+        <div className="min-w-0 sm:col-span-2">
+          <dt className="text-muted-foreground">Template digest</dt>
+          <dd className="mt-1 break-all font-mono">
+            {selection.templateDigest}
+          </dd>
+        </div>
+        {selection.extension ? (
+          <div className="min-w-0 sm:col-span-2">
+            <dt className="text-muted-foreground">
+              Extension artifact SHA-256
+            </dt>
+            <dd className="mt-1 break-all font-mono">
+              {selection.extension.sha256}
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+      <p className="mt-3 text-muted-foreground">
+        This records the recipe used to draft the measurement. Telemetry
+        evidence and human confirmation are reviewed separately. The typed goal
+        supplies the target, rolling window and alert policies.
+      </p>
+    </details>
   );
 }

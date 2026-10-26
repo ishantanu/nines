@@ -1,11 +1,18 @@
+import { FormField } from "@/components/ui/form-layout";
 import { SLORevisionHistory } from "./slo-revision-history";
 import { MeasuredObjective } from "./measured-objective";
 import { BudgetPolicyEditor } from "./budget-policy-editor";
 import { QualityPolicyEditor } from "./quality-policy-editor";
 import { SLOLifecycleSelect } from "./slo-lifecycle";
 import { PolicyEditor } from "./policy-editor";
-import { useEffect, useState } from "react";
-import { parse, stringify } from "yaml";
+import { useEffect, useRef, useState } from "react";
+import { stringify } from "yaml";
+import {
+  newObjectiveDefinition,
+  inlineObjectiveDraft,
+  inlineObjectiveDefinition,
+  parseObjectiveDefinition,
+} from "@/lib/objective-editor";
 import { Plus, Settings2 } from "lucide-react";
 import { definitionFromSLO, type SLODefinition } from "@/lib/definitions";
 import { duration, durationSeconds } from "@/lib/history";
@@ -96,7 +103,7 @@ export function objectiveDefinition(
 ): SLODefinition {
   if (d.enabled && !d.policies.length)
     throw new Error("Add an alert policy or disable burn-rate alerts.");
-  const spec = {
+  const spec: SLODefinition["spec"] = {
     ...base.spec,
     quality: d.quality,
     errorBudgetPolicy: d.errorBudgetPolicy,
@@ -131,6 +138,22 @@ export function objectiveDefinition(
     policy: undefined,
     policies: d.enabled ? d.policies : undefined,
   };
+  if (
+    d.enabled &&
+    base.spec.policy &&
+    !base.spec.policies &&
+    JSON.stringify(d.policies) ===
+      JSON.stringify([
+        {
+          ...base.spec.policy,
+          name: base.spec.policy.name || "primary",
+          severity: base.spec.policy.severity || "critical",
+        },
+      ])
+  ) {
+    spec.policy = base.spec.policy;
+    spec.policies = undefined;
+  }
   if (d.customMeasurement) {
     spec.measurement = undefined;
     spec.measurementBinding = undefined;
@@ -149,7 +172,11 @@ export function objectiveDefinition(
       policy: spec.policy,
       policies: spec.policies,
     };
-  return { ...base, metadata: { name: d.name, project: d.project }, spec };
+  return {
+    ...base,
+    metadata: { ...base.metadata, name: d.name, project: d.project },
+    spec,
+  };
 }
 export function ObjectiveCreate({
   scope,
@@ -160,6 +187,14 @@ export function ObjectiveCreate({
   onCreated: () => void;
   resource?: SLO;
 }) {
+  const [measurementFooter, setMeasurementFooter] =
+    useState<HTMLDivElement | null>(null);
+  const [definition, setDefinition] = useState<SLODefinition>(
+    newObjectiveDefinition,
+  );
+  const [measured, setMeasured] = useState(() =>
+    inlineObjectiveDraft(newObjectiveDefinition()),
+  );
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("settings");
   const [text, setText] = useState("");
@@ -178,70 +213,101 @@ export function ObjectiveCreate({
     digest: string;
     manifest: SLODefinition;
   } | null>(null);
+  const reviewRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    (error ? errorRef.current : reviewRef.current)?.scrollIntoView?.({
+      block: "nearest",
+    });
+  }, [plan, error]);
   useEffect(() => {
     setOpen(false);
     setPlan(null);
     setBusy(false);
-  }, [scope]);
+  }, [scope, resource?.id]);
   function changeOpen(value: boolean) {
     if (busy) return;
     setOpen(value);
     if (value) {
-      const d = definitionFromSLO(
-        resource ?? {
-          id: "my-objective",
-          project: "production",
-          service: "api",
-          name: "API availability",
-          target: 0.999,
-          windowSeconds: 86400,
-          stepSeconds: 60,
-          providerWindow: {
-            goodSelector: 'http_requests_total{code="200"}',
-            totalSelector: "http_requests_total",
-            scrapeIntervalSeconds: 15,
-          },
-          policies: [
-            {
-              name: "fast-burn",
-              severity: "critical",
-              shortWindowSeconds: 300,
-              longWindowSeconds: 3600,
-              burnRate: 14.4,
-              forSeconds: 120,
-              minCoverage: 1,
-            },
-            {
-              name: "sustained-burn",
-              severity: "warning",
-              shortWindowSeconds: 1800,
-              longWindowSeconds: 21600,
-              burnRate: 6,
-              forSeconds: 300,
-              minCoverage: 1,
-            },
-          ],
-        },
+      const d = resource
+        ? definitionFromSLO(resource)
+        : newObjectiveDefinition();
+      setDefinition(d);
+      setMeasured(
+        inlineObjectiveDraft(d.spec.measurement ? d : newObjectiveDefinition()),
       );
       setText(stringify(d));
-      setDraft(objectiveDraft(d, resource?.providerWindow));
+      setDraft(
+        objectiveDraft(
+          d,
+          d.spec.measurement ? undefined : resource?.providerWindow,
+        ),
+      );
       setMode(resource && !resource.measurement ? "settings" : "measurement");
       setPlan(null);
       setError("");
       setMeasurementAck(false);
+    }
+  }
+  const request = useRef(new AbortController());
+  useEffect(() => {
+    const c = new AbortController();
+    request.current = c;
+    if (open) {
+      setConnections([]);
       api<{ connections: { id: string; kind: string }[] }>(
         "/api/connections",
         scope,
+        { signal: c.signal },
       )
-        .then((r) => setConnections(r.connections))
-        .catch(() => setConnections([]));
+        .then((r) => {
+          if (!c.signal.aborted) setConnections(r.connections);
+        })
+        .catch((e) => {
+          if (!c.signal.aborted) setError(message(e));
+        });
     }
-  }
+    return () => c.abort();
+  }, [open, scope]);
   function document() {
-    const d = parse(text) as SLODefinition;
-    if (d.kind !== "ServiceLevelObjective")
-      throw new Error("Expected a ServiceLevelObjective YAML definition.");
-    return mode === "settings" && draft ? objectiveDefinition(d, draft) : d;
+    const base = mode === "yaml" ? parseObjectiveDefinition(text) : definition;
+    const current =
+      mode === "measurement"
+        ? inlineObjectiveDefinition(measured, false)
+        : mode === "settings" && draft
+          ? objectiveDefinition(base, draft)
+          : base;
+    if (resource && current.metadata.name !== resource.id)
+      throw Error(
+        "This editor keeps the existing SLO identifier. Use Define objective to create a separate SLO.",
+      );
+    return current;
+  }
+  function invalidate() {
+    setPlan(null);
+    setError("");
+    setMeasurementAck(false);
+  }
+  function changeMode(value: string) {
+    try {
+      const current = document();
+      if (value === "measurement") setMeasured(inlineObjectiveDraft(current));
+      if (value === "settings")
+        setDraft(
+          objectiveDraft(
+            current,
+            current.spec.measurement ? undefined : resource?.providerWindow,
+          ),
+        );
+      setDefinition(current);
+      setText(stringify(current));
+      setMode(value);
+      invalidate();
+    } catch (e) {
+      setError(message(e));
+      setPlan(null);
+      setMeasurementAck(false);
+    }
   }
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
@@ -250,7 +316,9 @@ export function ObjectiveCreate({
     setMeasurementAck(false);
   }
   async function review() {
+    const c = request.current;
     setBusy(true);
+    setPlan(null);
     setError("");
     try {
       const body = stringify(document());
@@ -265,21 +333,31 @@ export function ObjectiveCreate({
         method: "POST",
         headers: { "Content-Type": "application/yaml" },
         body,
+        signal: c.signal,
       });
+      if (c.signal.aborted) return;
       if (result.manifest.kind !== "ServiceLevelObjective")
         throw new Error("Expected a ServiceLevelObjective.");
       setText(body);
       setPlan(result);
       setMeasurementAck(false);
     } catch (e) {
-      setError(message(e));
-      setPlan(null);
+      if (!c.signal.aborted) {
+        setError(message(e));
+        setPlan(null);
+      }
     } finally {
-      setBusy(false);
+      if (!c.signal.aborted) setBusy(false);
     }
   }
   async function apply() {
-    if (!plan || (plan.measurementChanged && !measurementAck)) return;
+    if (
+      !canEdit(scope) ||
+      !plan ||
+      (plan.measurementChanged && !measurementAck)
+    )
+      return;
+    const c = request.current;
     setBusy(true);
     setError("");
     try {
@@ -289,15 +367,19 @@ export function ObjectiveCreate({
           "Content-Type": "application/yaml",
           "If-Match": `"${plan.expectedRevision}"`,
         },
-        body: text,
+        body: stringify(plan.manifest),
+        signal: c.signal,
       });
+      if (c.signal.aborted) return;
       setOpen(false);
       onCreated();
     } catch (e) {
-      setError(message(e));
-      setPlan(null);
+      if (!c.signal.aborted) {
+        setError(message(e));
+        setPlan(null);
+      }
     } finally {
-      setBusy(false);
+      if (!c.signal.aborted) setBusy(false);
     }
   }
   const fields: {
@@ -315,12 +397,16 @@ export function ObjectiveCreate({
     { key: "step", label: "Measurement interval (e.g. 1m)" },
   ];
   const measurementLocked =
-    !!(resource?.measurementBinding || resource?.measurement) &&
+    !!(definition.spec.measurementBinding || definition.spec.measurement) &&
     !draft?.customMeasurement;
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant={resource ? "outline" : "default"}>
+        <Button
+          size="sm"
+          variant={resource ? "outline" : "default"}
+          disabled={!canEdit(scope)}
+        >
           {resource ? (
             <Settings2 className="size-4" />
           ) : (
@@ -329,7 +415,7 @@ export function ObjectiveCreate({
           {resource ? "Edit definition" : "Define objective"}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent className="definition-dialog sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>
             {resource
@@ -342,291 +428,312 @@ export function ObjectiveCreate({
               : "Define what counts as success, choose a target and window, then review before applying. Use advanced queries or YAML for custom measurements."}
           </DialogDescription>
         </DialogHeader>
-        <Tabs
-          value={mode}
-          onValueChange={(value) => {
-            try {
-              if (value === "measurement" || mode === "measurement") {
-                if (mode === "settings") setText(stringify(document()));
-                if (value === "settings") {
-                  const d = parse(text) as SLODefinition;
-                  if (d.kind !== "ServiceLevelObjective")
-                    throw new Error("Expected a ServiceLevelObjective.");
-                  setDraft(objectiveDraft(d, resource?.providerWindow));
+        <div className="dialog-body space-y-5">
+          <Tabs value={mode} onValueChange={changeMode}>
+            <TabsList>
+              <TabsTrigger
+                value="measurement"
+                disabled={busy || !definition.spec.measurement}
+                title={
+                  !definition.spec.measurement
+                    ? "Custom queries and shared measurements are edited in Settings or YAML."
+                    : undefined
                 }
-                setMode(value);
-                setPlan(null);
-                setError("");
-                return;
-              }
-              if (value === "yaml") {
-                setText(stringify(document()));
-              } else {
-                const d = parse(text) as SLODefinition;
-                if (d.kind !== "ServiceLevelObjective")
-                  throw new Error("Expected a ServiceLevelObjective.");
-                setDraft(objectiveDraft(d, resource?.providerWindow));
-              }
-              setMode(value);
-              setPlan(null);
-              setError("");
-            } catch (e) {
-              setError(message(e));
-            }
-          }}
-        >
-          <TabsList>
-            {!resource || resource.measurement ? (
-              <TabsTrigger value="measurement" disabled={busy}>
+              >
                 Measurement
               </TabsTrigger>
+              <TabsTrigger value="settings" disabled={busy}>
+                {resource || definition.spec.measurement
+                  ? "Settings"
+                  : "Advanced queries"}
+              </TabsTrigger>
+              <TabsTrigger value="yaml" disabled={busy}>
+                YAML
+              </TabsTrigger>
+            </TabsList>
+            {definition.spec.measurement ? (
+              <TabsContent value="measurement">
+                <MeasuredObjective
+                  footer={measurementFooter}
+                  value={measured}
+                  onChange={(value) => {
+                    setMeasured(value);
+                    invalidate();
+                  }}
+                  fixedName={!!resource}
+                  connections={connections}
+                  scope={scope}
+                  onBusyChange={setBusy}
+                  onCreated={() => {
+                    setOpen(false);
+                    onCreated();
+                  }}
+                />
+              </TabsContent>
             ) : null}
-            <TabsTrigger value="settings" disabled={busy}>
-              {resource ? "Settings" : "Advanced queries"}
-            </TabsTrigger>
-            <TabsTrigger value="yaml" disabled={busy}>
-              YAML
-            </TabsTrigger>
-          </TabsList>
-          {!resource || resource.measurement ? (
-            <TabsContent value="measurement">
-              <MeasuredObjective
-                resource={resource}
-                scope={scope}
-                onBusyChange={setBusy}
-                onCreated={() => {
-                  setOpen(false);
-                  onCreated();
-                }}
-              />
-            </TabsContent>
-          ) : null}
-          <TabsContent value="settings" className="space-y-5">
-            {draft ? (
-              <>
-                {resource?.measurementBinding || resource?.measurement ? (
-                  <div className="space-y-2 rounded-md border p-3 text-sm">
-                    <p>
-                      {resource.measurement
-                        ? "This measurement is owned by the SLO. Edit it in the Measurement tab, or switch to custom queries below."
-                        : `Shared measurement: ${resource.measurementBinding?.name} · revision ${resource.measurementBinding?.revision}. Update the reference in YAML or use custom queries.`}
-                    </p>
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() =>
-                        setField("customMeasurement", !draft.customMeasurement)
-                      }
-                    >
-                      {draft.customMeasurement
-                        ? "Keep saved measurement"
-                        : "Use custom queries"}
-                    </Button>
-                    {draft.customMeasurement ? (
-                      <p className="text-xs text-muted-foreground">
-                        The next reviewed revision removes the saved measurement
-                        reference and intent provenance. Previous revisions
-                        retain both.
+            <TabsContent value="settings" className="space-y-5">
+              {draft ? (
+                <>
+                  {definition.spec.measurementBinding ||
+                  definition.spec.measurement ? (
+                    <div className="space-y-2 rounded-md border p-3 text-sm">
+                      <p>
+                        {definition.spec.measurement
+                          ? "This measurement is owned by the SLO. Edit it in the Measurement tab, or switch to custom queries below."
+                          : `Shared measurement: ${definition.spec.measurementBinding?.name} · revision ${definition.spec.measurementBinding?.revision}. Update the reference in YAML or use custom queries.`}
                       </p>
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() =>
+                          setField(
+                            "customMeasurement",
+                            !draft.customMeasurement,
+                          )
+                        }
+                      >
+                        {draft.customMeasurement
+                          ? "Keep saved measurement"
+                          : "Use custom queries"}
+                      </Button>
+                      {draft.customMeasurement ? (
+                        <p className="text-xs text-muted-foreground">
+                          The next reviewed revision removes the saved
+                          measurement reference and intent provenance. Previous
+                          revisions retain both.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <BudgetPolicyEditor
+                    value={draft.errorBudgetPolicy}
+                    disabled={busy}
+                    onChange={(value) => setField("errorBudgetPolicy", value)}
+                  />
+                  <QualityPolicyEditor
+                    value={draft.quality}
+                    disabled={busy}
+                    onChange={(value) => setField("quality", value)}
+                  />
+                  <SLOLifecycleSelect
+                    value={draft.lifecycle}
+                    disabled={busy}
+                    onChange={(value) => setField("lifecycle", value)}
+                  />
+                  <div className="form-grid">
+                    {fields.map((f) => (
+                      <div key={f.key}>
+                        <FormField htmlFor={`slo-${f.key}`} label={f.label}>
+                          <Input
+                            id={`slo-${f.key}`}
+                            type={f.type ?? "text"}
+                            step="any"
+                            value={String(draft[f.key])}
+                            disabled={
+                              busy ||
+                              (!!resource && f.fixed) ||
+                              (measurementLocked &&
+                                (f.key === "service" || f.key === "step"))
+                            }
+                            onChange={(e) => setField(f.key, e.target.value)}
+                          />
+                        </FormField>
+                      </div>
+                    ))}
+                    <div>
+                      <FormField
+                        htmlFor="slo-source"
+                        label="Metrics connection"
+                      >
+                        <select
+                          id="slo-source"
+                          className="h-9 w-full rounded-md border bg-white px-3 text-sm"
+                          value={draft.source === "primary" ? "" : draft.source}
+                          disabled={busy || measurementLocked}
+                          onChange={(e) => setField("source", e.target.value)}
+                        >
+                          <option value="">Primary (default)</option>
+                          {connections
+                            .filter((c) => c.id !== "primary")
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.id} · {c.kind}
+                              </option>
+                            ))}
+                        </select>
+                      </FormField>
+                    </div>
+                  </div>
+                  <div className="grid gap-3">
+                    <div>
+                      <FormField
+                        htmlFor="slo-good-query"
+                        label={
+                          <>
+                            {" "}
+                            {draft.providerWindow
+                              ? "Good-event counter selector"
+                              : "Good interval-count query"}{" "}
+                          </>
+                        }
+                      >
+                        <Textarea
+                          id="slo-good-query"
+                          className="font-mono text-xs"
+                          value={draft.goodQuery}
+                          disabled={busy || measurementLocked}
+                          onChange={(e) =>
+                            setField("goodQuery", e.target.value)
+                          }
+                        />
+                      </FormField>
+                    </div>
+                    <div>
+                      <FormField
+                        htmlFor="slo-total-query"
+                        label={
+                          <>
+                            {" "}
+                            {draft.providerWindow
+                              ? "Total-event counter selector"
+                              : "Total interval-count query"}{" "}
+                          </>
+                        }
+                      >
+                        <Textarea
+                          id="slo-total-query"
+                          className="font-mono text-xs"
+                          value={draft.totalQuery}
+                          disabled={busy || measurementLocked}
+                          onChange={(e) =>
+                            setField("totalQuery", e.target.value)
+                          }
+                        />
+                      </FormField>
+                    </div>
+                  </div>
+                  {draft.providerWindow ? (
+                    <div>
+                      <FormField
+                        htmlFor="slo-scrape"
+                        label="Source scrape interval (seconds)"
+                      >
+                        <Input
+                          id="slo-scrape"
+                          type="number"
+                          min="1"
+                          value={draft.scrape}
+                          disabled={busy || measurementLocked}
+                          onChange={(e) => setField("scrape", e.target.value)}
+                        />
+                      </FormField>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Match the source scrape configuration. Each full SLO and
+                        burn window is evaluated independently.
+                      </p>
+                    </div>
+                  ) : null}
+                  <div className="border-t pt-4">
+                    <Label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={draft.enabled}
+                        disabled={busy}
+                        onChange={(e) => setField("enabled", e.target.checked)}
+                      />
+                      Burn-rate alert policies
+                    </Label>
+                    {draft.enabled ? (
+                      <PolicyEditor
+                        policies={draft.policies}
+                        onChange={(value) => setField("policies", value)}
+                        disabled={busy}
+                      />
                     ) : null}
                   </div>
-                ) : null}
-                <BudgetPolicyEditor
-                  value={draft.errorBudgetPolicy}
+                </>
+              ) : null}
+            </TabsContent>
+            <TabsContent value="yaml">
+              <FormField
+                htmlFor="slo-config"
+                label="ServiceLevelObjective manifest (YAML)"
+              >
+                <Textarea
+                  id="slo-config"
                   disabled={busy}
-                  onChange={(value) => setField("errorBudgetPolicy", value)}
+                  value={text}
+                  onChange={(e) => {
+                    setText(e.target.value);
+                    setPlan(null);
+                    setError("");
+                    setMeasurementAck(false);
+                  }}
+                  className="min-h-80 font-mono text-xs"
+                  spellCheck={false}
                 />
-                <QualityPolicyEditor
-                  value={draft.quality}
-                  disabled={busy}
-                  onChange={(value) => setField("quality", value)}
-                />
-                <SLOLifecycleSelect
-                  value={draft.lifecycle}
-                  disabled={busy}
-                  onChange={(value) => setField("lifecycle", value)}
-                />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {fields.map((f) => (
-                    <div key={f.key}>
-                      <Label htmlFor={`slo-${f.key}`}>{f.label}</Label>
-                      <Input
-                        id={`slo-${f.key}`}
-                        className="mt-1"
-                        type={f.type ?? "text"}
-                        step="any"
-                        value={String(draft[f.key])}
-                        disabled={
-                          busy ||
-                          (!!resource && f.fixed) ||
-                          (measurementLocked &&
-                            (f.key === "service" || f.key === "step"))
-                        }
-                        onChange={(e) => setField(f.key, e.target.value)}
-                      />
-                    </div>
-                  ))}
-                  <div>
-                    <Label htmlFor="slo-source">Metrics connection</Label>
-                    <select
-                      id="slo-source"
-                      className="mt-1 h-9 w-full rounded-md border bg-white px-3 text-sm"
-                      value={draft.source === "primary" ? "" : draft.source}
-                      disabled={busy || measurementLocked}
-                      onChange={(e) => setField("source", e.target.value)}
-                    >
-                      <option value="">Primary (default)</option>
-                      {connections
-                        .filter((c) => c.id !== "primary")
-                        .map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.id} · {c.kind}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="grid gap-3">
-                  <div>
-                    <Label htmlFor="slo-good-query">
-                      {draft.providerWindow
-                        ? "Good-event counter selector"
-                        : "Good interval-count query"}
-                    </Label>
-                    <Textarea
-                      id="slo-good-query"
-                      className="mt-1 font-mono text-xs"
-                      value={draft.goodQuery}
-                      disabled={busy || measurementLocked}
-                      onChange={(e) => setField("goodQuery", e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="slo-total-query">
-                      {draft.providerWindow
-                        ? "Total-event counter selector"
-                        : "Total interval-count query"}
-                    </Label>
-                    <Textarea
-                      id="slo-total-query"
-                      className="mt-1 font-mono text-xs"
-                      value={draft.totalQuery}
-                      disabled={busy || measurementLocked}
-                      onChange={(e) => setField("totalQuery", e.target.value)}
-                    />
-                  </div>
-                </div>
-                {draft.providerWindow ? (
-                  <div>
-                    <Label htmlFor="slo-scrape">
-                      Source scrape interval (seconds)
-                    </Label>
-                    <Input
-                      id="slo-scrape"
-                      type="number"
-                      min="1"
-                      className="mt-1"
-                      value={draft.scrape}
-                      disabled={busy || measurementLocked}
-                      onChange={(e) => setField("scrape", e.target.value)}
-                    />
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Match the source scrape configuration. Each full SLO and
-                      burn window is evaluated independently.
+              </FormField>
+            </TabsContent>
+          </Tabs>
+          {error ? (
+            <p ref={errorRef} role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+          {mode !== "measurement" && plan ? (
+            <div
+              ref={reviewRef}
+              className="rounded-md border bg-slate-50 p-3 text-sm"
+            >
+              {plan.measurementChanged ? (
+                <div className="mb-3 space-y-2 rounded-md border p-3">
+                  {(plan.warnings ?? []).map((warning) => (
+                    <p key={warning} className="text-sm">
+                      {warning}
                     </p>
-                  </div>
-                ) : null}
-                <div className="border-t pt-4">
-                  <Label className="flex items-center gap-2">
+                  ))}
+                  <label className="flex items-start gap-2 text-sm">
                     <input
                       type="checkbox"
-                      checked={draft.enabled}
-                      disabled={busy}
-                      onChange={(e) => setField("enabled", e.target.checked)}
-                    />
-                    Burn-rate alert policies
-                  </Label>
-                  {draft.enabled ? (
-                    <PolicyEditor
-                      policies={draft.policies}
-                      onChange={(value) => setField("policies", value)}
+                      checked={measurementAck}
+                      onChange={(e) => setMeasurementAck(e.target.checked)}
                       disabled={busy}
                     />
-                  ) : null}
+                    I reviewed the measurement change and understand that active
+                    coverage starts fresh.
+                  </label>
                 </div>
-              </>
-            ) : null}
-          </TabsContent>
-          <TabsContent value="yaml">
-            <Label htmlFor="slo-config">
-              ServiceLevelObjective manifest (YAML)
-            </Label>
-            <Textarea
-              id="slo-config"
-              disabled={busy}
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                setPlan(null);
-                setError("");
-                setMeasurementAck(false);
-              }}
-              className="mt-2 min-h-80 font-mono text-xs"
-              spellCheck={false}
-            />
-          </TabsContent>
-        </Tabs>
-        {mode !== "measurement" && error ? (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        ) : null}
-        {mode !== "measurement" && plan ? (
-          <div className="rounded-md border bg-slate-50 p-3 text-sm">
-            {plan.measurementChanged ? (
-              <div className="mb-3 space-y-2 rounded-md border p-3">
-                {(plan.warnings ?? []).map((warning) => (
-                  <p key={warning} className="text-sm">
-                    {warning}
-                  </p>
-                ))}
-                <label className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={measurementAck}
-                    onChange={(e) => setMeasurementAck(e.target.checked)}
-                    disabled={busy}
-                  />
-                  I reviewed the measurement change and understand that active
-                  coverage starts fresh.
-                </label>
-              </div>
-            ) : null}
-            <p>
-              Validated · {plan.action} · revision {plan.expectedRevision} →{" "}
-              {plan.action === "unchanged"
-                ? plan.expectedRevision
-                : plan.expectedRevision + 1}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Source: {plan.manifest.spec.source || "primary"} · SLO window{" "}
-              {duration(plan.manifest.spec.windowSeconds)}
-            </p>
-            <details className="mt-2">
-              <summary className="cursor-pointer text-xs">
-                Review resulting YAML
-              </summary>
-              <pre className="code-block mt-2">{stringify(plan.manifest)}</pre>
-            </details>
-            <p className="mt-2 break-all font-mono text-xs">
-              SHA-256 {plan.digest}
-            </p>
-          </div>
-        ) : null}
-        {resource ? (
-          <SLORevisionHistory scope={scope} id={resource.id} />
-        ) : null}
-        {mode !== "measurement" ? (
+              ) : null}
+              <p>
+                Validated · {plan.action} · revision {plan.expectedRevision} →{" "}
+                {plan.action === "unchanged"
+                  ? plan.expectedRevision
+                  : plan.expectedRevision + 1}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Source: {plan.manifest.spec.source || "primary"} · SLO window{" "}
+                {duration(plan.manifest.spec.windowSeconds)}
+              </p>
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs">
+                  Review resulting YAML
+                </summary>
+                <pre className="code-block mt-2">
+                  {stringify(plan.manifest)}
+                </pre>
+              </details>
+              <p className="mt-2 break-all font-mono text-xs">
+                SHA-256 {plan.digest}
+              </p>
+            </div>
+          ) : null}
+          {resource ? (
+            <SLORevisionHistory scope={scope} id={resource.id} />
+          ) : null}
+        </div>
+        {mode === "measurement" ? (
+          <div ref={setMeasurementFooter} />
+        ) : (
           <div className="dialog-actions">
             <Button
               variant="outline"
@@ -649,7 +756,7 @@ export function ObjectiveCreate({
                 : "Apply definition"}
             </Button>
           </div>
-        ) : null}
+        )}
       </DialogContent>
     </Dialog>
   );

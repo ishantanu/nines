@@ -26,7 +26,11 @@ export type WorkspaceRoute = {
   id: string;
 };
 export type Route =
-  WorkspaceRoute | { kind: "login" } | { kind: "root" } | { kind: "not-found" };
+  | WorkspaceRoute
+  | { kind: "platform"; page: "tenants" | "users" | "audit" }
+  | { kind: "login" }
+  | { kind: "root" }
+  | { kind: "not-found" };
 const identifier = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const detailPages: Page[] = [
   "objectives",
@@ -42,6 +46,17 @@ const returnKey = "nines-login-return";
 // Parse the original path, before URL normalization can hide traversal segments.
 export function parseRoute(path: string): Route {
   if (path === "/") return { kind: "root" };
+  if (
+    path === "/admin" ||
+    path === "/admin/" ||
+    path === "/admin/tenants" ||
+    path === "/admin/tenants/"
+  )
+    return { kind: "platform", page: "tenants" };
+  if (path === "/admin/users" || path === "/admin/users/")
+    return { kind: "platform", page: "users" };
+  if (path === "/admin/audit" || path === "/admin/audit/")
+    return { kind: "platform", page: "audit" };
   if (path === "/login" || path === "/login/") return { kind: "login" };
   const parts = path.split("/");
   if (parts.at(-1) === "") parts.pop();
@@ -87,6 +102,7 @@ export function routeFromLocation(value: string): Route {
 export function safeReturnPath(value: string | null): string | null {
   if (!value || value.length > 512) return null;
   const route = parseRoute(value);
+  if (route.kind === "platform") return "/admin/" + route.page;
   return route.kind === "workspace"
     ? workspacePath(route.tenant, route.page, route.id)
     : null;
@@ -171,7 +187,9 @@ export function showLogin() {
   const next =
     route.kind === "workspace"
       ? workspacePath(route.tenant, route.page, route.id)
-      : loginReturnPath();
+      : route.kind === "platform"
+        ? "/admin/" + route.page
+        : loginReturnPath();
   try {
     if (next) window.sessionStorage.setItem(returnKey, next);
     else window.sessionStorage.removeItem(returnKey);

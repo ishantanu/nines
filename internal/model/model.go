@@ -84,8 +84,8 @@ func (s SLO) Validate() error {
 			return Invalid("scrapeIntervalSeconds must divide stepSeconds with at least two scrapes per step")
 		}
 		for _, q := range []struct{ field, text string }{{"providerWindow.goodSelector", p.GoodSelector}, {"providerWindow.totalSelector", p.TotalSelector}} {
-			if !counterSelector.MatchString(q.text) || len(q.text) > 8000 {
-				return Invalid("providerWindow requires counter selectors with exact label matchers")
+			if (!counterSelector.MatchString(q.text) && !canonicalHistogramSelector(q.text)) || len(q.text) > 8000 {
+				return Invalid("providerWindow requires exact label matchers or the generated equivalent-integer histogram boundary matcher")
 			}
 			if _, err := promqlvalidate.InstantVector(q.text); err != nil {
 				return Invalid("%s: %v", q.field, err)

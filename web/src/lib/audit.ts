@@ -1,6 +1,17 @@
 import { api, type RequestScope } from "./api";
-import type { IntentAuditEvent, IntentChangeSet } from "./intent-conversations";
+import type {
+  IntentAuditEvent,
+  IntentChangeSet,
+  SystemOneRoute,
+  SystemOneAssessment,
+} from "./intent-conversations";
 export type AuditRecord = {
+  systemOne?: {
+    runId: string;
+    route: SystemOneRoute;
+    inputDigest: string;
+    assessment?: SystemOneAssessment;
+  };
   recoveredFromConversation?: boolean;
   id: string;
   tenant: string;

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -23,7 +24,9 @@ import (
 	rm "github.com/ishantanu/nines/internal/reviewmodel"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
+	"github.com/ishantanu/nines/internal/slotemplates"
 	"github.com/ishantanu/nines/internal/store"
+	"github.com/ishantanu/nines/internal/systemone"
 	"github.com/ishantanu/nines/internal/tenancy"
 	"github.com/ishantanu/nines/internal/workflow"
 )
@@ -325,6 +328,18 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 		}
 
 		runtime := tenantRuntime{ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !identityEnabled, Workflows: wf}, Repository: repository, Webhook: t.Webhook}
+		if t.Config.SLOExtensionLock != "" {
+			extensionPath := t.Config.SLOExtensionLock
+			if !filepath.IsAbs(extensionPath) {
+				extensionPath = filepath.Join(filepath.Dir(file), extensionPath)
+			}
+			registry, err := slotemplates.Load(extensionPath)
+			if err != nil {
+				runtime.Close()
+				return fail(fmt.Errorf("tenant %s extension initialization: %w", t.Config.ID, err))
+			}
+			runtime.Workspace.Templates = registry
+		}
 		if t.Config.AuditArchive != nil {
 			if memory && !demo {
 				runtime.Close()
@@ -343,6 +358,16 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 		}
 		runtime.Workspace.Investigations.Model = reviewer
 		runtime.Workspace.IntentConversations.Model = reviewer
+		if !demo {
+			assessor, err := systemone.New(t.Config.SystemOne, os.Getenv)
+			if err != nil {
+				runtime.Close()
+				return fail(fmt.Errorf("tenant %s System One configuration: %w", t.Config.ID, err))
+			}
+			if assessor != nil {
+				runtime.Workspace.IntentConversations.SystemOne = assessor
+			}
+		}
 		out = append(out, runtime)
 		if demo {
 			if err := seed(ctx, svc); err != nil {

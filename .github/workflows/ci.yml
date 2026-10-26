@@ -175,6 +175,10 @@ jobs:
           if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
             compose+=(-f compose.playground.mimir.yaml --profile mimir)
           fi
+          compose+=(-f compose.playground.ai.yaml --profile ai)
+          if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
+            export NINES_PLAYGROUND_TENANTS=prometheus,mimir
+          fi
           cleanup() {
             "${compose[@]}" logs --no-color --tail 40 || true
             "${compose[@]}" down -v || true
@@ -182,3 +186,4 @@ jobs:
           trap cleanup EXIT
           "${compose[@]}" up --build -d
           "${compose[@]}" run --rm verify
+          "${compose[@]}" run --rm ai-verify

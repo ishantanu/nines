@@ -56,7 +56,7 @@ func durationPhrase(text string) (float64, bool) {
 func (s *Service) DraftIntent(ctx context.Context, in v1.DraftIntentInput) (out v1.IntentDraft, err error) {
 	ctx, finish := observability.Operation(ctx, "intent.draft", s.TenantID)
 	defer func() { finish(err) }()
-	out = v1.IntentDraft{APIVersion: v1.APIVersion, Tenant: s.TenantID, Status: "needs_clarification", Clarifications: []string{}, Warnings: []string{"This is a model-assisted draft, not an approved measurement. Review all typed fields and select an exact binding separately.", "Only the entered description is sent to the configured model. Numeric fields are parsed from exact phrases; no catalog, provider credentials or telemetry are sent."}}
+	out = v1.IntentDraft{APIVersion: v1.APIVersion, Tenant: s.TenantID, Status: "needs_clarification", Clarifications: []string{}, Warnings: []string{"This is a model-assisted draft, not an approved measurement. Review all typed fields and confirm the SLO measurement before planning.", "Only the entered description is sent to the configured model. Numeric fields are parsed from exact phrases; no catalog, provider credentials or telemetry are sent."}}
 	if len(in.Text) > 2000 || strings.TrimSpace(in.Text) == "" {
 		return out, model.Invalid("provide a goal description of 1–2000 bytes")
 	}
