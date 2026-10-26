@@ -74,7 +74,7 @@ for html, parsed in parsers.items():
             "A documentation page is missing chapter navigation"
         )
         assert "doc-content" in parsed.ids, "A guide is missing prerendered content"
-        assert "docs-page-data" in parsed.ids, "A guide is missing hydration metadata"
+        assert "docs-page-data" not in parsed.ids, "Guides do not need hydration data"
 assert checked, "No assets found"
 search = json.loads((SITE / "docs/search.json").read_text())
 assert len(search) >= 30, "Public guides are missing from documentation search"

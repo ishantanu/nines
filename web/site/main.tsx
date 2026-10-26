@@ -1,4 +1,3 @@
-import { createRoot, hydrateRoot } from "react-dom/client";
 import "./site.css";
 const root = document.getElementById("root")!;
 if (root.hasAttribute("data-doc")) {
@@ -6,8 +5,5 @@ if (root.hasAttribute("data-doc")) {
     mountDocumentation(root),
   );
 } else {
-  void import("./App").then(({ App }) => {
-    if (root.hasChildNodes()) hydrateRoot(root, <App />);
-    else createRoot(root).render(<App />);
-  });
+  void import("./landing").then(({ mountLanding }) => mountLanding(root));
 }

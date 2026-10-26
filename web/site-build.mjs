@@ -11,15 +11,19 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-// Ship readable HTML to crawlers and readers without JavaScript. Hydration only
-// adds the shadcn tabs and clipboard interaction; no server runtime is required.
+// Ship readable HTML without a server runtime. Only the landing page hydrates;
+// documentation uses a small independent script to enhance its static markup.
 const web = fileURLToPath(new URL(".", import.meta.url));
 // Public Go examples are downloadable website assets, not packages in this module.
 // Keep the generated artifact tree outside recursive Go tooling across rebuilds.
 const artifacts = path.resolve(web, "../dist");
 await mkdir(artifacts, { recursive: true });
 try {
-  await writeFile(path.join(artifacts, "go.mod"), "module nines.invalid/build-artifacts\n", { flag: "wx" });
+  await writeFile(
+    path.join(artifacts, "go.mod"),
+    "module nines.invalid/build-artifacts\n",
+    { flag: "wx" },
+  );
 } catch (error) {
   if (error.code !== "EEXIST") throw error;
 }

@@ -116,7 +116,6 @@ export function documentationHTML(
   const { markup, data } = renderDocumentation(page, markdown);
   const title = attribute(`${page.title} | Nines documentation`);
   const description = attribute(page.description);
-  const payload = JSON.stringify(data).replace(/</g, "\\u003c");
   return template
     .replace(/(?:src|href)="\.\//g, (match) => match.replace("./", data.root))
     .replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`)
@@ -130,8 +129,7 @@ export function documentationHTML(
     )
     .replace(
       '<div id="root"></div>',
-      () =>
-        `<div id="root" data-doc="${attribute(page.slug)}">${markup}</div><script id="docs-page-data" type="application/json">${payload}</script>`,
+      () => `<div id="root" data-doc="${attribute(page.slug)}">${markup}</div>`,
     );
 }
 

@@ -95,7 +95,7 @@ it("prerenders safe readable guides with anchors, tables and accessible code con
   expect(html).toContain('href="../../docs/measurements/"');
   expect(html).toContain('src="../../assets/site.js"');
   expect(html).toContain('href="../../assets/site.css"');
-  expect(html).toContain('id="docs-page-data" type="application/json"');
+  expect(html).not.toContain('id="docs-page-data"');
   expect(html).not.toContain("<script>alert(");
 });
 
