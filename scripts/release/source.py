@@ -40,6 +40,7 @@ FILES = {
     "compose.yaml",
     "compose.playground.yaml",
     "compose.playground.mimir.yaml",
+    "compose.playground.ai.yaml",
     ".env.example",
     ".gitignore",
     ".dockerignore",

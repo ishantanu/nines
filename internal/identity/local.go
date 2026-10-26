@@ -192,7 +192,10 @@ func (s *Service) CreateLocalUser(ctx context.Context, a Actor, tenant string, i
 		if e = s.saveMember(tx, tenant, Member{UserID: u.ID, Role: in.Role}); e != nil {
 			return e
 		}
-		return s.recompute(tx, tenant, u.ID)
+		if err := s.recompute(tx, tenant, u.ID); err != nil {
+			return err
+		}
+		return s.recordPlatform(tx, a, "user.create", u.ID, "succeeded", map[string]any{"tenant": tenant, "provider": u.Provider, "username": u.Subject, "role": in.Role})
 	})
 	return u, err
 }
@@ -213,7 +216,7 @@ func (s *Service) UpdateLocalUser(ctx context.Context, a Actor, tenant, id strin
 		if e := s.checkOwner(tx, tenant, a); e != nil {
 			return e
 		}
-		if _, e := tx.Get("member", tenant, id); e != nil {
+		if _, e := tx.Get("member", tenant, id); e != nil && !a.platformOperation {
 			return ErrForbidden
 		}
 		u, e := read[User](tx, "user", "global", id)
@@ -245,7 +248,10 @@ func (s *Service) UpdateLocalUser(ctx context.Context, a Actor, tenant, id strin
 			}
 		}
 		out = u
-		return put(tx, "user", "global", id, u, time.Time{})
+		if err := put(tx, "user", "global", id, u, time.Time{}); err != nil {
+			return err
+		}
+		return s.recordPlatform(tx, a, "user.update", id, "succeeded", map[string]any{"version": u.Version, "passwordChanged": len(h) > 0})
 	})
 	return out, err
 }

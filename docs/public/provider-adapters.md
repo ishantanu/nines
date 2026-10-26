@@ -2,6 +2,8 @@
 
 Nines currently ships native Prometheus and Mimir connections, plus imported/manual counts. New Relic and Datadog are not selectable native providers in this release. The evaluation core is reusable, but adding either provider requires an adapter and supporting configuration; setting a new `kind` alone will not enable it.
 
+The [declarative extension ecosystem](slo-extensions.md) distributes measurement recipes and presets on supported backends. It does not add native provider adapters or executable rule processors.
+
 ## Existing boundaries
 
 The server's `Collector` interface returns interval good/total event counts. `WindowCollector` and `WindowPreviewer` support independently evaluated whole-window observations, including coverage. The deterministic engine consumes those normalized counts instead of a provider response format.
@@ -12,7 +14,7 @@ These interfaces are separate capabilities. A provider can support collection wi
 
 ## What remains provider-specific
 
-Connection configuration, the managed connection registry, source authentication, the structured measurement compiler and the rule manager currently implement Prometheus/Mimir semantics. The managed registry stores a concrete Prometheus client. Custom query validation and generated recording/burn rules use PromQL. These are extension points to update, not a complete runtime plugin system.
+Connection configuration, the managed connection registry, source authentication, the structured measurement compiler and the rule manager currently implement Prometheus/Mimir semantics. The managed registry stores a concrete Prometheus client. Custom query validation and generated recording/burn rules use PromQL. These are extension points to update, not a complete runtime extension system.
 
 Native provider support should include:
 

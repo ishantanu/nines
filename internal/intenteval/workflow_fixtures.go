@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ishantanu/nines/internal/intentmodel"
+	"github.com/ishantanu/nines/internal/slotemplates"
 )
 
 func workflowReport(mode, runtime string) Report {
@@ -177,6 +178,22 @@ func workflowFixtureClient(c workflowCase, draft Case, profile fixtureProfile) (
 		case names["draft_goal"]:
 			name = "draft_goal"
 			args = map[string]any{}
+		case c.Template && names["list_slo_templates"] && last == "draft_goal":
+			name = "list_slo_templates"
+			args = map[string]any{"category": "request-serving"}
+		case c.Template && names["render_slo_template"] && last == "list_slo_templates":
+			id := "request-availability"
+			measurement := map[string]any{"type": "availability", "metric": "http_requests_total", "labels": map[string]string{"service": "api"}, "successLabels": map[string]string{"status": "200"}, "scrapeIntervalSeconds": 10, "observationPoint": "Synthetic server completion after retries"}
+			if draft.ID == "latency" {
+				id = "request-latency"
+				measurement["type"] = "latency"
+				measurement["metric"] = "http_duration_seconds"
+				measurement["thresholdSeconds"] = 0.3
+				delete(measurement, "successLabels")
+			}
+			template, _ := slotemplates.Get(id)
+			name = "render_slo_template"
+			args = map[string]any{"id": id, "expectedTemplateDigest": template.Digest, "values": map[string]any{"measurement": measurement}}
 		case names["find_measurements"] && last != "find_measurements":
 			name = "find_measurements"
 			args = map[string]any{}

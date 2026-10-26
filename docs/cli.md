@@ -144,3 +144,11 @@ Pause retains loaded rules and survives PostgreSQL-backed restarts and SLO edits
 ### Decision audit journal
 
 Owners/editors can search tenant decisions with `nines audit list --agent`, inspect a frozen proposal with `nines audit show RECORD_ID --agent`, or export matching full records with `nines audit export --agent` (NDJSON). All use the selected server/tenant context; offline mode rejects them. Filters include actor subject, resource, conversation, action, outcome and RFC3339 from/to dates. Check export exit status before retaining the output. Approvals require a nonempty review reason through every client, and a different owner/editor subject must apply that approval or rollback. The bundled CLI skill describes these boundaries. See [governance](public/intent-governance.md) for pagination, ambiguous apply outcomes and archive limitations.
+
+## SLO templates
+
+Use `nines --offline templates list --category agent`, `nines templates show agent-task-completion` and `nines templates generate agent-task-completion --out task.slo.yaml`. The shared catalog covers request serving, pipelines, storage, agents, LLMs and inference. Generated manifests start as experimental SLOs with illustrative metrics and targets. `--values` accepts strict YAML overrides; `--agent` returns a machine-readable draft receipt. Rendering never verifies telemetry, applies resources or deploys rules. See [SLI menus and templates](public/slo-templates.md) for the complete workflow.
+
+## Declarative extensions
+
+Use `nines --offline extensions test -f bundle.yaml`, `extensions install --file bundle.yaml --sha256 EXPECTED_DIGEST --lock extensions.lock.yaml`, and `templates generate EXTENSION--RECIPE --extension-lock extensions.lock.yaml --values values.yaml`. Explicit HTTPS installation supports `--url`. Git installation uses `--git REPOSITORY --commit FULL_COMMIT_ID --git-path bundles/extension.yaml` with the same trusted `--sha256`. Public HTTPS repositories and existing local clones are supported; `--offline` permits local clones and forbids remote downloads. The operator renderer accepts the same `--template`, `--extension-lock` and `--values` inputs. See [extension authoring, distribution and tenant configuration](public/slo-extensions.md).

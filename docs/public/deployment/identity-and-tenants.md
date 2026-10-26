@@ -57,6 +57,10 @@ Browser sessions use HttpOnly, SameSite cookies, with Secure and `__Host-` prote
 
 New alert events, proposed change sets and rollback records use random UUIDv4 identifiers in Go. Portal-created reviews, intent conversations and replay records use browser-generated UUIDv4 identifiers. SLOs, journeys and tenants retain their declared readable names, and existing identifiers remain valid. Authentication credentials use a separate 256-bit cryptographic token generator; UUIDs are identifiers, not secrets.
 
+## Platform administration
+
+The [platform admin console](../platform-administration.md) uses explicit `platformAdmins` provider/subject entries in the authentication configuration. It is separate from tenant ownership and requires a real browser session; tenant API keys do not grant platform access. The local Compose and Kubernetes examples explicitly grant the bootstrap local `admin` identity access to the console.
+
 ## Local accounts
 
 The persistent Compose deployment and Kubernetes reference enable a local provider. `admin` is seeded with `NINES_BOOTSTRAP_PASSWORD` on the first start; its hash and memberships persist in PostgreSQL. Owners use **Access control → Users** for profiles, password resets, roles and tenant access. A reset revokes existing sessions. Changing the environment variable does not overwrite an existing password.

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,14 @@ func TestIntentConversationCLIUsesScopedYAMLRequests(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
+		var in struct {
+			SystemOneConsent bool `json:"systemOneConsent"`
+			ModelConsent     bool `json:"modelConsent"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil || !in.SystemOneConsent || in.ModelConsent {
+			t.Error("CLI lost separate System One consent", err)
+		}
+
 		if r.Header.Get("X-Nines-Tenant") != "alpha" || r.Header.Get("Authorization") != "Bearer agent" {
 			t.Error("unscoped conversation operation")
 		}
@@ -25,7 +34,7 @@ func TestIntentConversationCLIUsesScopedYAMLRequests(t *testing.T) {
 	t.Setenv("NINES_TENANT", "alpha")
 	t.Setenv("API_TOKEN", "agent")
 	file := filepath.Join(t.TempDir(), "run.yaml")
-	if err := os.WriteFile(file, []byte("id: prepare\nexpectedVersion: 1\nmode: guided\nmodelConsent: false\n"), 0600); err != nil {
+	if err := os.WriteFile(file, []byte("id: prepare\nexpectedVersion: 1\nmode: guided\nmodelConsent: false\nsystemOneConsent: true\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	var out bytes.Buffer

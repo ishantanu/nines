@@ -26,6 +26,7 @@ import (
 var workflowBytes []byte
 
 type workflowCase struct {
+	Template            bool   `yaml:"template"`
 	ID                  string `yaml:"id"`
 	DraftCase           string `yaml:"draftCase"`
 	Telemetry           string `yaml:"telemetry"`
@@ -139,6 +140,13 @@ func EvaluateWorkflow(ctx context.Context, c workflowCase, draft Case, provider 
 	flow.Authorize = func(context.Context, v1.InvestigationActor) error { return nil }
 	owner := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "evaluation", Role: "owner", Subject: "fixture-owner", Kind: "user"})
 	input := v1.CreateIntentConversation{ID: "workflow-evaluation", Title: "Synthetic intent evaluation", Text: draft.Text, Scope: v1.IntentAuthoringScope{Metadata: v1.Metadata{Name: "evaluation-slo", Project: "test"}, Service: "api", Source: "primary", Population: map[string]string{"service": "api"}, NoDataPolicy: "unknown", Journey: &v1.IntentJourney{Name: "checkout", Step: "request", ExpectedRevision: 1, Required: true}}}
+	if c.Template {
+		metric := "http_requests_total"
+		if draft.ID == "latency" {
+			metric = "http_duration_seconds"
+		}
+		input.Text += " Use a matching built-in SLO template to propose an inline measurement for " + metric + ", verify telemetry and ask for human confirmation. Success for availability is status=200."
+	}
 	if c.UnmatchedPopulation {
 		input.Scope.Population = map[string]string{"service": "unmatched"}
 	}
@@ -168,7 +176,12 @@ func EvaluateWorkflow(ctx context.Context, c workflowCase, draft Case, provider 
 		if draft.ID == "latency" {
 			binding = "latency"
 		}
-		value, err = flow.Select(owner, value.ID, v1.ConfirmIntentBinding{ExpectedVersion: value.Version, IntentDigest: value.Plan.IntentDigest, Binding: v1.IntentSelection{Name: binding, ExpectedRevision: 1}, Confirm: true})
+		confirmation := v1.ConfirmIntentBinding{ExpectedVersion: value.Version, IntentDigest: value.Plan.IntentDigest, Binding: v1.IntentSelection{Name: binding, ExpectedRevision: 1}, Confirm: true}
+		if value.Goal.Spec.Measurement != nil && value.Plan.Compiled != nil {
+			confirmation.Binding = v1.IntentSelection{}
+			confirmation.MeasurementDigest = value.Plan.Compiled.MeasurementDigest
+		}
+		value, err = flow.Select(owner, value.ID, confirmation)
 		if err != nil {
 			return fail("human_selection_failed")
 		}
@@ -213,7 +226,14 @@ func EvaluateWorkflow(ctx context.Context, c workflowCase, draft Case, provider 
 		if b.UnknownCutoffs != c.ExpectedUnknown || b.NoTrafficCutoffs != c.ExpectedNoTraffic {
 			return fail("unexpected_traffic_classification")
 		}
-		if p.Compiled.Definition.Spec.ObservationPoint == "" || p.Compiled.Evidence.Fingerprint == "" || p.Compiled.Evidence.Source != "primary" || len(p.Warnings) == 0 {
+		observationPoint := p.Compiled.Definition.Spec.ObservationPoint
+		if p.Compiled.Manifest.Spec.Measurement != nil {
+			observationPoint = p.Compiled.Manifest.Spec.Measurement.ObservationPoint
+		}
+		if c.Template && (value.Template == nil || value.Template.IntentDigest != p.IntentDigest || value.Selection.MeasurementDigest == "" || value.Template.CatalogDigest == "") {
+			return fail("missing_template_provenance")
+		}
+		if observationPoint == "" || p.Compiled.Evidence.Fingerprint == "" || p.Compiled.Evidence.Source != "primary" || len(p.Warnings) == 0 {
 			return fail("missing_measurement_evidence")
 		}
 		if c.Apply || c.Interference != "" {

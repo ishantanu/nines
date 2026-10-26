@@ -1,0 +1,12 @@
+name: support-evaluation
+project: customer-support
+source: primary
+inputs:
+  metric: support_evaluations_total
+  service: support-agent
+  population:
+    service: support-agent
+    environment: production
+    rubric: support-v1
+    evaluator: rules-v1
+  target: 0.99

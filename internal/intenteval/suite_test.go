@@ -18,7 +18,7 @@ func TestFixtureSuite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !report.Complete || report.Passed != 75 || report.Failed != 0 || len(report.Results) != 75 || len(report.SuiteSHA256) != 64 {
+	if !report.Complete || report.Passed != 105 || report.Failed != 0 || len(report.Results) != 105 || len(report.SuiteSHA256) != 64 {
 		t.Fatalf("unexpected report: %+v", report)
 	}
 	counts := map[string]int{}
@@ -32,7 +32,7 @@ func TestFixtureSuite(t *testing.T) {
 		t.Fatal(counts)
 	}
 	for provider, count := range counts {
-		if count != 15 {
+		if count != 21 {
 			t.Fatalf("%s: %d cases", provider, count)
 		}
 	}

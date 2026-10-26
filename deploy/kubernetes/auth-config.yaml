@@ -19,3 +19,7 @@ data:
         provider: local
         subject: admin
         role: owner
+
+    platformAdmins:
+      - provider: local
+        subject: admin

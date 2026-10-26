@@ -1,6 +1,10 @@
 import { expect, test } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { IntentEvidence, IntentProgress } from "./intent-evidence";
+import {
+  IntentTemplateEvidence,
+  IntentEvidence,
+  IntentProgress,
+} from "./intent-evidence";
 import type { IntentPlan } from "@/lib/intent";
 
 const compiled: NonNullable<IntentPlan["compiled"]> = {
@@ -108,4 +112,30 @@ test("inline evidence describes the SLO measurement without a shared binding", (
   expect(html).toContain("API completion");
   expect(html).not.toContain("Shared measurement");
   expect(html).not.toContain("binding-digest");
+});
+
+test("template provenance distinguishes a recipe from telemetry evidence and escapes publisher text", () => {
+  const html = renderToStaticMarkup(
+    <IntentTemplateEvidence
+      selection={{
+        templateId: "example--recipe",
+        templateRevision: 1,
+        templateDigest: "a".repeat(64),
+        catalogDigest: "b".repeat(64),
+        extension: {
+          name: "<script>publisher</script>",
+          version: "1.0.0",
+          sha256: "c".repeat(64),
+        },
+        valuesDigest: "d".repeat(64),
+        intentDigest: "e".repeat(64),
+        at: "2026-10-25T00:00:00Z",
+      }}
+    />,
+  );
+  expect(html).toContain("Measurement template");
+  expect(html).toContain("Extension artifact SHA-256");
+  expect(html).toContain("Telemetry evidence and human confirmation");
+  expect(html).toContain("&lt;script&gt;");
+  expect(html).not.toContain("<script>");
 });

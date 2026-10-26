@@ -6,13 +6,15 @@ An SLO's name is its stable identity for critical user journey links and clients
 
 1. Open the existing SLO and select **Edit definition**.
 2. Edit its structured measurement in **Measurement**, use **Settings** for custom queries, or edit **YAML**. Keep the same `metadata.name`.
-3. Select **Validate and plan**. The plan shows the expected/current revision and the resulting definition.
-4. If the measurement changes, review the reset warning and acknowledge that coverage starts fresh, then select **Apply definition**.
+3. In **Measurement**, select **Verify telemetry and review SLO**. In **Settings** or **YAML**, select **Validate and plan**. Review the resulting definition and expected revision.
+4. In **Measurement**, confirm that you reviewed the measurement and evidence limitations, then **Save reviewed SLO**. Other tabs require the measurement-reset acknowledgement when applicable before **Apply definition**.
 5. Check the telemetry connection deployment policy. Automatic mode queues the new revision after save; manual mode requires **Rules → Apply reviewed rules**. Check runtime evaluation separately.
+
+The tabs edit one definition. Guided measurement edits appear in YAML; YAML changes repopulate the matching guided fields, including availability versus latency. Settings changes to targets, windows and policies carry back into Measurement. Switching tabs or editing any field discards the previous review and acknowledgement, so saving requires a fresh review. Invalid YAML or a filter that cannot be represented unambiguously keeps the current editor and its input intact until corrected. Existing custom-query and shared-measurement SLOs stay in Settings/YAML; opening Measurement never guesses a replacement measurement.
 
 The API/CLI uses the same revision checks. A stale editor or client receives a conflict instead of overwriting another change. A matching definition is a no-op and does not create an archive or reset coverage.
 
-The default SLO owns `spec.measurement`; edit it and the objective together. No separate measurement revision needs changing. A manual structured-form edit clears old intent provenance in the reviewed definition; an intent conversation preserves a fresh goal/evidence/approval trail. For an explicitly shared legacy measurement, update `spec.measurementBinding` through a verified compilation using the selected binding revision, or select **Use custom queries** in the editor. Switching to custom queries explicitly removes the binding and intent provenance in the proposed revision. Editing queries while retaining a binding that declares different semantics is rejected. Previous revisions retain their original binding reference.
+The default SLO owns `spec.measurement`; edit it and the objective together. No separate measurement revision needs changing. A guided edit retains the stored intent description and journey reference, and synchronizes its measurement, scope, objective and policy fields with the resulting reviewed SLO. This authoring context is not a new model recommendation or approval: the original conversation, frozen recommendation evidence and audit history remain attached to their original revisions. Use an intent conversation when a fresh goal/evidence/approval trail is needed. For an explicitly shared legacy measurement, update `spec.measurementBinding` through a verified compilation using the selected binding revision, or select **Use custom queries** in the editor. Switching to custom queries explicitly removes the binding and intent provenance in the proposed revision. Editing queries while retaining a binding that declares different semantics is rejected. Previous revisions retain their original binding reference.
 
 ## What happens to existing evidence
 

@@ -203,9 +203,24 @@
   .status-unknown {
     color: var(--status-unknown);
   }
-  .dialog-actions {
-    @apply mt-2 flex flex-wrap justify-end gap-2 border-t pt-4;
+  .form-grid {
+    @apply grid min-w-0 gap-x-4 gap-y-5 sm:grid-cols-2;
   }
+  .form-check {
+    @apply flex min-h-9 items-start gap-2 text-sm leading-5;
+  }
+  .form-check input[type="checkbox"] {
+    @apply mt-0.5 size-4 shrink-0 accent-primary;
+  }
+  .dialog-actions {
+    @apply mt-2 flex flex-col-reverse gap-2 border-t pt-4 sm:flex-row sm:flex-wrap sm:justify-end;
+  }
+}
+.definition-dialog {
+  @apply h-[min(52rem,calc(100dvh-2rem))] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden;
+}
+.dialog-body {
+  @apply min-h-0 min-w-0 overflow-y-auto overscroll-contain px-1;
 }
 .detail-tabs {
   @apply min-w-0 gap-4;

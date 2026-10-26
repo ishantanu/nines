@@ -14,12 +14,16 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 	rm "github.com/ishantanu/nines/internal/reviewmodel"
 	"github.com/ishantanu/nines/internal/service"
+	"github.com/ishantanu/nines/internal/slotemplates"
+	"github.com/ishantanu/nines/internal/systemone"
 	"github.com/ishantanu/nines/internal/tenancy"
 )
 
 var identifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 type Service struct {
+	SystemOne       systemone.Assessor
+	Templates       *slotemplates.Registry
 	Archive         *auditarchive.Worker
 	Platform        *service.Service
 	Repository      Repository
@@ -61,7 +65,7 @@ func (s *Service) sensitiveInput(value any) bool {
 	if err != nil {
 		return true
 	}
-	for _, adapter := range []any{s.Platform.IntentDrafter, s.Model} {
+	for _, adapter := range []any{s.Platform.IntentDrafter, s.Model, s.SystemOne} {
 		if guard, ok := adapter.(interface{ ContainsCredential([]byte) bool }); ok && guard.ContainsCredential(encoded) {
 			return true
 		}
@@ -186,6 +190,7 @@ func (s *Service) Append(ctx context.Context, id string, in v1.AppendIntentConve
 			return e
 		}
 		r.Session.Goal = clone(in.Goal)
+		r.Session.Template = nil
 		r.Session.Selection = nil
 		r.Session.Plan = nil
 		r.Session.Backtest = nil
@@ -248,6 +253,9 @@ func (s *Service) Start(ctx context.Context, id string, in v1.CreateIntentFlowRu
 	if in.Mode == "model" && (s.Model == nil || !in.ModelConsent) {
 		return v1.IntentConversation{}, model.Invalid("model mode requires a configured model and consent to send goal and measurement metadata")
 	}
+	if in.SystemOneConsent && s.SystemOne == nil {
+		return v1.IntentConversation{}, model.Invalid("System One assessment is not configured for this tenant")
+	}
 	if b := in.Backtest; b != nil {
 		if b.From.IsZero() || !b.To.After(b.From) || b.To.Sub(b.From) > 72*time.Hour || b.ResolutionSeconds < 1 || b.ResolutionSeconds > 3600 || b.To.Sub(b.From)%time.Duration(b.ResolutionSeconds*int64(time.Second)) != 0 || b.To.Sub(b.From)/time.Duration(b.ResolutionSeconds*int64(time.Second)) > 240 {
 			return v1.IntentConversation{}, model.Invalid("provide a bounded backtest window with at most 240 cutoffs over 72 hours")
@@ -276,6 +284,12 @@ func (s *Service) Start(ctx context.Context, id string, in v1.CreateIntentFlowRu
 			return model.Invalid("consent is required before sending the goal to the configured drafting model")
 		}
 		run := v1.IntentFlowRun{ID: in.ID, Mode: in.Mode, Status: "queued", Actor: a, CreatedAt: now, UpdatedAt: now, DeadlineAt: now.Add(5 * time.Minute), Skill: skillRef(), Steps: []v1.IntentFlowStep{}}
+		if in.SystemOneConsent {
+			route := s.SystemOne.Descriptor()
+			run.SystemOneConsent = true
+			run.SystemOneInputDigest = hash(systemOneInput(*r))
+			run.SystemOneRoute = &route
+		}
 		if drafter := s.Platform.IntentDrafter; drafter != nil {
 			run.DraftModelID = drafter.ModelID()
 			if descriptor, ok := drafter.(interface{ Descriptor() rm.Descriptor }); ok {
@@ -287,6 +301,7 @@ func (s *Service) Start(ctx context.Context, id string, in v1.CreateIntentFlowRu
 		if in.Mode == "model" {
 			route := s.Model.Descriptor()
 			run.ModelRoute = &route
+			run.TemplateCatalogDigest = s.templateCatalogDigest()
 		}
 		if e := invalidateChangeSet(r, a, "Preparation restarted; earlier reviewed evidence is retained in history.", now); e != nil {
 			return e
@@ -319,7 +334,7 @@ func (s *Service) Start(ctx context.Context, id string, in v1.CreateIntentFlowRu
 		if r.Session.Selection != nil {
 			selection = map[string]any{"binding": r.Session.Selection.Binding, "intentDigest": r.Session.Selection.IntentDigest, "measurementDigest": r.Session.Selection.MeasurementDigest, "confirmed": true}
 		}
-		contextBody, _ := json.Marshal(map[string]any{"scope": r.Session.Scope, "goal": r.Session.Goal, "selection": selection, "conversation": history, "backtest": in.Backtest})
+		contextBody, _ := json.Marshal(map[string]any{"scope": r.Session.Scope, "goal": r.Session.Goal, "selection": selection, "conversation": history, "backtest": in.Backtest, "template": r.Session.Template})
 		r.Native = []rm.Message{{Role: "user", Text: string(contextBody)}}
 		touch(r, now)
 		return nil

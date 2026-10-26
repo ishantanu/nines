@@ -1,0 +1,7 @@
+apiVersion: nines.dev/v1alpha1
+kind: SLOExtensionLock
+extensions:
+  - name: example-agent
+    version: 1.0.0
+    sha256: f7444bda525cb71ffe995f70f303319a47300d4f709f8f332d6426eb8fe5ea2a
+    path: example-agent.yaml

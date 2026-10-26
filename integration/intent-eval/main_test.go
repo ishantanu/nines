@@ -44,7 +44,7 @@ func TestFixtureReportFile(t *testing.T) {
 	if err := json.Unmarshal(data, &report); err != nil {
 		t.Fatal(err)
 	}
-	if report.Mode != "fixture" || !report.Complete || report.Passed != 75 || report.Failed != 0 {
+	if report.Mode != "fixture" || !report.Complete || report.Passed != 105 || report.Failed != 0 {
 		t.Fatalf("unexpected report: %+v", report)
 	}
 	info, err := os.Stat(path)
@@ -162,5 +162,59 @@ func TestWorkflowCaseArgumentsDoNotContactConfiguredProvider(t *testing.T) {
 	}
 	if calls.Load() != 0 {
 		t.Fatal("invalid arguments or fixture mode contacted the configured provider")
+	}
+}
+
+func TestDeterministicTemplateSuite(t *testing.T) {
+	var out, stderr bytes.Buffer
+	if code := run(context.Background(), []string{"--suite", "templates"}, &out, &stderr); code != 0 {
+		t.Fatal(code, stderr.String())
+	}
+	var report intenteval.Report
+	if json.Unmarshal(out.Bytes(), &report) != nil || report.Passed != 120 || report.Mode != "deterministic" || !report.Complete {
+		t.Fatal(out.String())
+	}
+	out.Reset()
+	if code := run(context.Background(), []string{"--suite", "templates", "--live"}, &out, &stderr); code != 2 {
+		t.Fatal("live model call allowed for deterministic suite", code)
+	}
+}
+
+func TestTemplateSelectionCLI(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls.Add(1)
+		http.Error(w, "unexpected model call", 500)
+	}))
+	defer server.Close()
+	t.Setenv("INTENT_MODEL_PROVIDER", "custom")
+	t.Setenv("INTENT_MODEL_MODEL", "test")
+	t.Setenv("INTENT_MODEL_ENDPOINT", server.URL+"/v1/chat/completions")
+	path := filepath.Join(t.TempDir(), "selection.json")
+	var out, stderr bytes.Buffer
+	args := []string{"--suite", "template-selection", "--case", "api-availability", "--out", path}
+	if code := run(context.Background(), args, &out, &stderr); code != 0 {
+		t.Fatal(code, stderr.String())
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var report intenteval.Report
+	if json.Unmarshal(data, &report) != nil || report.Passed != 5 || report.Acceptance.Status != "fixture_only" {
+		t.Fatal("invalid selection report")
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatal("report is not private")
+	}
+	if code := run(context.Background(), append(args, "--live"), &out, &stderr); code != 1 {
+		t.Fatal("existing live output accepted")
+	}
+	if code := run(context.Background(), []string{"--suite", "template-selection", "--case", "unknown", "--live"}, &out, &stderr); code != 1 {
+		t.Fatal("unknown live case accepted")
+	}
+	if calls.Load() != 0 {
+		t.Fatal("fixture or invalid request contacted configured provider")
 	}
 }

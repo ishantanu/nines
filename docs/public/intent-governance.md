@@ -9,6 +9,7 @@ Use **SLO intents**, open a prepared conversation and select **Review changes**.
 - The goal, target, window, selected measurement revision and source fingerprint.
 - Before-and-after target, window, alert policy and critical user journey changes, with explanations of their implications.
 - Metric discovery interval and evidence digest, plus a matching historical backtest summary when one was actually run. Missing historical validation is stated explicitly.
+- The chosen template ID/revision/digest, catalog digest and extension version/artifact digest when a recipe supplied the measurement. Template selection is recorded as `template.selected`; edits clear active attribution while earlier run receipts remain.
 - The preparation run, model route and skill version/digest. A guided run is identified separately from a model-assisted run.
 - The visible preparation summary, declared basis, assumptions and limitations. This records the visible supporting evidence and explicit limitations; it does not guarantee that the recommendation is correct.
 

@@ -2,6 +2,23 @@ import sdk from "../../examples/go-client/main.go?raw";
 
 export const examples = [
   {
+    id: "slo-templates",
+    label: "AI workload SLOs",
+    title: "Start with a task outcome or inference SLI",
+    description:
+      "Choose from categorized templates for services, pipelines, storage, agents, LLM applications and inference. Adapt the measurement before making a commitment.",
+    language: "Shell",
+    code: `nines --offline templates list --category agent
+nines --offline templates show agent-evaluation-pass
+nines --offline templates generate agent-task-completion \\
+  --name support-completion --service support-agent \\
+  --out support-completion.slo.yaml
+nines --offline validate -f support-completion.slo.yaml`,
+    note: "Example metrics and targets are unverified. Templates generate experimental SLOs; choosing one does not call a model, save resources or deploy rules. Evaluator pass rates require a versioned rubric and explicit evaluation coverage.",
+    path: "docs/public/slo-templates.md",
+    link: "SLI menus, templates and AI workload guidance",
+  },
+  {
     id: "playground",
     label: "Playground",
     title: "Run the complete Prometheus flow",
@@ -20,6 +37,25 @@ docker compose -p nines-playground -f compose.playground.yaml run --rm verify`,
     note: "The verifier deliberately injects synthetic failures and can take several minutes. Prometheus is at localhost:19090; Mimir is optional.",
     path: "docs/public/deployment/playground.md",
     link: "Playground guide",
+  },
+  {
+    id: "ai-playground",
+    label: "AI playground",
+    title: "Measure agent, LLM and inference outcomes",
+    description:
+      "Compare task success, tool attempts, evaluation coverage and conditional latency with a synthetic Go workload.",
+    language: "Shell",
+    code: `docker compose -p nines-playground \\
+  -f compose.playground.yaml -f compose.playground.ai.yaml \\
+  --profile ai up --build -d
+
+# Check real collection, automatic rules and SLI degradation/recovery:
+docker compose -p nines-playground \\
+  -f compose.playground.yaml -f compose.playground.ai.yaml \\
+  --profile ai run --rm ai-verify`,
+    note: "Generate the local .env first. Sign in with admin/admin unless previously customized. No model account is required. Fixtures remain experimental and suppress paging. Synthetic verdicts do not validate model quality.",
+    path: "docs/public/deployment/ai-playground.md",
+    link: "AI workload guide",
   },
   {
     id: "offline",
@@ -154,8 +190,10 @@ kubectl -n team-commerce get slo checkout-availability -o yaml`,
       "Run synthetic drafting and reviewed-apply scenarios from a source checkout. Check provider contracts, missing telemetry, stale approvals and recovery after a lost response.",
     language: "Shell",
     code: `# No server, model credentials or external telemetry required.
-make intent-eval                 # 75 drafting contract checks
-make intent-workflow-eval        # 60 workflow contract checks
+make intent-eval                 # 105 drafting contract checks
+make intent-workflow-eval        # 70 workflow contract checks
+make template-eval               # 120 deterministic measurement checks
+make selection-eval              # 45 template-selection contract checks
 
 # Save a private JSON report to a new file.
 go run ./integration/intent-eval --suite workflow \\
@@ -164,7 +202,7 @@ go run ./integration/intent-eval --suite workflow \\
 # Run one scenario across all five provider adapter profiles.
 go run ./integration/intent-eval --suite workflow \\
   --case availability-reviewed-apply`,
-    note: "Fixtures use scripted model responses and disposable in-memory workspaces, including test-only approved writes. They do not prove real model quality. Live evaluation requires explicit --live and provider/model configuration.",
+    note: "Fixtures use scripted model responses and disposable in-memory workspaces, including test-only approved writes. They do not prove real model quality. Live evaluation requires explicit --live and provider/model configuration. The template-selection suite scores model mistakes separately from server guardrails; a blocked unsafe suggestion still fails model acceptance.",
     path: "docs/public/intent-evaluations.md",
     link: "Evaluation guide and measured model limitations",
   },

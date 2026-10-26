@@ -21,6 +21,7 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/service"
+	"github.com/ishantanu/nines/internal/slotemplates"
 )
 
 func main() {
@@ -48,6 +49,7 @@ func run(log *slog.Logger) error {
 	memory := flag.Bool("memory", false, "ephemeral development store")
 	tenantsFile := flag.String("tenants-file", os.Getenv("TENANTS_FILE"), "server-owned YAML/JSON tenant configuration")
 	authFile := flag.String("auth-file", os.Getenv("AUTH_CONFIG_FILE"), "server-owned OIDC/LDAP identity configuration")
+	extensionLock := flag.String("extension-lock", "", "Administrator-owned lockfile shared across tenants; local files only")
 	flag.Parse()
 	host, _, err := net.SplitHostPort(*addr)
 	if err != nil {
@@ -84,9 +86,23 @@ func run(log *slog.Logger) error {
 	if *demo || *memory {
 		log.Warn("using ephemeral tenant stores", "demo", *demo, "tenants", len(runtimes))
 	}
+	var sharedTemplates *slotemplates.Registry
+	if *extensionLock != "" {
+		sharedTemplates, err = slotemplates.Load(*extensionLock)
+		if err != nil {
+			return err
+		}
+	}
 	workspaces := make([]httpapi.Workspace, 0, len(runtimes))
 	for _, runtime := range runtimes {
-		workspaces = append(workspaces, runtime.Workspace)
+		workspace := runtime.Workspace
+		if sharedTemplates != nil {
+			if workspace.Templates != nil {
+				return fmt.Errorf("configure shared or tenant-local extension locks, not both")
+			}
+			workspace.Templates = sharedTemplates
+		}
+		workspaces = append(workspaces, workspace)
 	}
 	var auth *identity.Service
 	if *authFile != "" {

@@ -17,7 +17,7 @@ An intent includes the service, source, target, window and SLO-owned measurement
 ## Follow the review flow
 
 1. **Draft the goal.** Use the portal or author intent YAML. State the user outcome and the observation point, including excluded traffic and retries.
-2. **Verify telemetry.** Discover the metric and matching populations through the tenant's configured source. Missing or ambiguous evidence requires clarification.
+2. **Verify telemetry.** Model mode can first propose a measurement from the tenant’s [template catalog](slo-templates.md#templates-in-intent-conversations). The recipe and digest are recorded for review; its examples are not telemetry evidence. Discover the metric and matching populations through the tenant's configured source. Missing or ambiguous evidence requires clarification.
 3. **Confirm the measurement.** An owner/editor confirms the exact goal and measurement digests. A model or agent role cannot perform this confirmation.
 4. **Prepare the changes.** Inspect the proposed SLO, optional critical user journey link, parameter diff, rationale, assumptions and available backtest evidence.
 5. **Approve the exact change set.** Record a reason and review its limits. Edits to the goal, measurement, source or affected revisions invalidate the previous approval.
@@ -30,6 +30,10 @@ A successful model response is not permission to write production configuration.
 Model configuration is optional and provider-specific. Nines supports native Anthropic and other documented provider routes, compatible endpoints and local model configurations. You do not need an OpenAI account to use the deterministic platform or a different supported adapter.
 
 Configure provider credentials in the server environment or secret manager. Do not put keys in intent YAML, prompts, project files or exported evidence. See [provider setup and measured acceptance](intent-evaluations.md) for exact configuration and current limits; drafting support does not imply full tool-calling workflow support.
+
+## Optional semantic advice
+
+[System One advice with Jev](system-one.md) suggests a template category and assesses whether the description defines eligible events, success and the observation point. It works in guided or model-directed preparation with separate consent. Results are advisory probabilities, never telemetry evidence or permission to apply a change.
 
 ## Understand rollback
 

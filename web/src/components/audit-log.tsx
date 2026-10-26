@@ -1,3 +1,4 @@
+import { SystemOneAdvice } from "./system-one-assessment";
 import { useEffect, useId, useState } from "react";
 import type { FormEvent } from "react";
 import type { RequestScope } from "@/lib/api";
@@ -69,7 +70,7 @@ function AuditDetail({
         <div>
           <dt className="text-muted-foreground">Exact change digest</dt>
           <dd className="break-all font-mono text-xs">
-            {record.event.changeSetDigest || "No proposal was admitted"}
+            {record.event.changeSetDigest || "No change set referenced"}
           </dd>
         </div>
       </dl>
@@ -86,6 +87,19 @@ function AuditDetail({
         <p role="alert">{error}</p>
       ) : !full ? (
         <p role="status">Loading frozen evidence…</p>
+      ) : full.systemOne ? (
+        full.systemOne.assessment ? (
+          <SystemOneAdvice
+            assessment={full.systemOne.assessment}
+            route={full.systemOne.route}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            An optional semantic assessment was requested for run{" "}
+            {full.systemOne.runId}. The result has its own audit event. Input
+            SHA-256: {full.systemOne.inputDigest}
+          </p>
+        )
       ) : full.proposal ? (
         <>
           <IntentRecommendationReport report={full.proposal.recommendation} />

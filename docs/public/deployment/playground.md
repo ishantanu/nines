@@ -34,6 +34,8 @@ The setup service waits for Nines, creates `checkout-success` in the **Playgroun
 
 Sign in with username `admin` and password `admin`. Set `NINES_PLAYGROUND_PASSWORD` before the first startup to choose another bootstrap password. The password is hashed and persisted; changing the bootstrap environment variable later does not reset it. API-token access remains available with token `nines-local-playground-owner-token`. The default web password and API token are deliberately public and for this loopback-only synthetic stack; the database password is supplied privately. Do not use this configuration for shared or production deployments. All published ports bind to loopback. Existing services on 8080 and 9090 are not used. Override ports with `NINES_PLAYGROUND_PORT`, `NINES_PLAYGROUND_PROMETHEUS_PORT` and `NINES_PLAYGROUND_SAMPLE_PORT` if needed.
 
+For agent, LLM and inference examples, enable the optional [AI workload playground](ai-playground.md). It uses the same Prometheus/Mimir flow with synthetic outcome counters, evaluation coverage and exact latency histograms.
+
 ## Follow the four states
 
 1. Open **SLOs**, then **Checkout success** in **Playground Prometheus**. **SLO saved** confirms the stored definition. **Measurements collected** confirms recent provider intervals for that revision; expect a brief initial wait for scrapes and the collector.

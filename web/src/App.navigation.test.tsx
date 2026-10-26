@@ -7,6 +7,7 @@ import { navigateTo, workspacePath } from "./lib/navigation";
 
 let root: Root, host: HTMLDivElement;
 let authenticated = true;
+let platformAdmin = false;
 let allowed = ["alpha", "beta"];
 let mode = "server";
 const requested: {
@@ -16,6 +17,7 @@ const requested: {
 }[] = [];
 beforeEach(() => {
   authenticated = true;
+  platformAdmin = false;
   allowed = ["alpha", "beta"];
   mode = "server";
   requested.length = 0;
@@ -36,22 +38,38 @@ beforeEach(() => {
               authenticated,
               csrfToken: "fixture-csrf",
               actor: authenticated
-                ? { id: "fixture-user", name: "Test user" }
+                ? { id: "fixture-user", name: "Test user", platformAdmin }
                 : undefined,
               providers: [{ id: "local", type: "local", name: "Local" }],
             }
-          : path === "/api/tenants"
-            ? allowed.map((id) => ({ id, name: id, role: "viewer" }))
-            : path === "/api/workspace"
-              ? {
-                  mode,
-                  tenant: { id: tenant, name: tenant },
-                  source: { kind: "manual", configured: false },
-                  role: "viewer",
-                  journeysConfigured: true,
-                  workflowsConfigured: false,
-                }
-              : [];
+          : path === "/api/platform/overview"
+            ? {
+                tenants: [
+                  {
+                    id: "alpha",
+                    name: "Alpha",
+                    sourceKind: "manual",
+                    connections: 1,
+                  },
+                ],
+                providers: [{ id: "local", name: "Local", type: "local" }],
+                administrators: [{ provider: "local", subject: "admin" }],
+                auditRetentionDays: 90,
+              }
+            : path === "/api/platform/users" || path === "/api/platform/audit"
+              ? { items: [], nextCursor: "" }
+              : path === "/api/tenants"
+                ? allowed.map((id) => ({ id, name: id, role: "viewer" }))
+                : path === "/api/workspace"
+                  ? {
+                      mode,
+                      tenant: { id: tenant, name: tenant },
+                      source: { kind: "manual", configured: false },
+                      role: "viewer",
+                      journeysConfigured: true,
+                      workflowsConfigured: false,
+                    }
+                  : [];
       return new Response(JSON.stringify(result), {
         status: 200,
         headers: { "Content-Type": "application/json" },
@@ -162,6 +180,7 @@ test("unauthenticated deep links use /login then return to the intended SLO afte
   );
   expect(requested.some((r) => r.path === "/api/tenants")).toBe(false);
   authenticated = true;
+  platformAdmin = false;
   await act(async () =>
     window.dispatchEvent(new Event("nines-access-changed")),
   );
@@ -206,4 +225,57 @@ test("a revoked browser session returns to login and browser Back cannot reopen 
   await until(() => window.location.pathname === "/login");
   expect(host.querySelector("h1")!.textContent).toBe("Sign in");
   expect(requested.filter((r) => r.path === "/api/slos").length).toBe(reads);
+});
+
+test("platform administrators with no tenant memberships can open the independent console", async () => {
+  platformAdmin = true;
+  allowed = [];
+  window.history.replaceState(null, "", "/admin/users");
+  await render();
+  await until(
+    () => host.textContent?.includes("No identities found.") ?? false,
+  );
+  expect(host.textContent).toContain("Platform administration");
+  expect(host.textContent).not.toContain("no workspace memberships");
+  expect(requested.some((r) => r.path === "/api/slos")).toBe(false);
+  expect(
+    requested
+      .filter((r) => r.path.startsWith("/api/platform/"))
+      .every((r) => r.tenant === null),
+  ).toBe(true);
+});
+test("tenant owners cannot enter the platform console", async () => {
+  window.history.replaceState(null, "", "/admin/tenants");
+  await render();
+  await until(
+    () => host.textContent?.includes("Platform access required") ?? false,
+  );
+  expect(requested.some((r) => r.path.startsWith("/api/platform/"))).toBe(
+    false,
+  );
+});
+test("platform bookmarks survive sign-in without an external redirect", async () => {
+  authenticated = false;
+  window.history.replaceState(null, "", "/admin/audit");
+  await render();
+  await until(() => window.location.pathname === "/login");
+  expect(new URLSearchParams(window.location.search).get("returnTo")).toBe(
+    "/admin/audit",
+  );
+});
+
+test("an administrator can return from the console to an explicitly authorized workspace", async () => {
+  platformAdmin = true;
+  allowed = ["alpha"];
+  window.history.replaceState(null, "", "/admin/tenants");
+  await render();
+  await until(() => host.textContent?.includes("Configured tenants") ?? false);
+  const link = [...host.querySelectorAll<HTMLAnchorElement>("a")].find(
+    (a) => a.textContent === "Open workspace",
+  )!;
+  await act(async () => link.click());
+  await until(() =>
+    requested.some((r) => r.path === "/api/workspace" && r.tenant === "alpha"),
+  );
+  expect(window.location.pathname).toBe("/tenants/alpha/home");
 });

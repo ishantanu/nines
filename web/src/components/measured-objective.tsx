@@ -1,21 +1,17 @@
+import { FormField, FormSection } from "@/components/ui/form-layout";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { stringify } from "yaml";
+import { api, canEdit, message, type RequestScope } from "@/lib/api";
+import { type BindingManifest } from "@/lib/topology";
+import { prepareInlineObjective } from "@/lib/measurement";
 import {
-  api,
-  canEdit,
-  message,
-  type RequestScope,
-  type BurnRatePolicy,
-  type SLO,
-} from "@/lib/api";
-import { bindingStarter, type BindingManifest } from "@/lib/topology";
-import {
-  measurementDraft,
-  sloFromMeasurementDraft,
-  prepareInlineObjective,
-  type MeasurementDraft,
-} from "@/lib/measurement";
-import { duration } from "@/lib/history";
+  inlineObjectiveDefinition,
+  inlineObjectiveDraft,
+  type InlineObjectiveDraft,
+} from "@/lib/objective-editor";
+import { SLOTemplatePicker } from "./slo-template-picker";
+import { draftFromSLOTemplate } from "@/lib/slo-templates";
 import { MeasurementFields } from "./measurement-editor";
 import { BudgetPolicyEditor } from "./budget-policy-editor";
 import { QualityPolicyEditor } from "./quality-policy-editor";
@@ -23,7 +19,6 @@ import { SLOLifecycleSelect } from "./slo-lifecycle";
 import { PolicyEditor } from "./policy-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 export function MeasurementSummary({
   definition,
 }: {
@@ -70,85 +65,50 @@ export function MeasuredObjective({
   scope,
   onCreated,
   onBusyChange,
-  resource,
+  value,
+  onChange,
+  fixedName,
+  connections,
+  footer,
 }: {
   scope: RequestScope;
   onCreated: () => void;
   onBusyChange: (v: boolean) => void;
-  resource?: SLO;
+  value: InlineObjectiveDraft;
+  onChange: (value: InlineObjectiveDraft) => void;
+  fixedName?: boolean;
+  connections: { id: string; kind: string }[];
+  footer?: HTMLElement | null;
 }) {
-  const [draft, setDraft] = useState<MeasurementDraft>(() => {
-    const initial = measurementDraft();
-    if (!resource?.measurement)
-      return {
-        ...initial,
-        name: "",
-        displayName: "",
-        service: "",
-        metric: "",
-        observationPoint: "",
-      };
-    const m = resource.measurement;
-    return measurementDraft({
-      ...bindingStarter(resource.source || "primary", m.metric, m.labels),
-      metadata: { name: resource.id, project: resource.project },
-      spec: {
-        ...m,
-        measurement: m.type,
-        displayName: resource.name,
-        source: resource.source || "primary",
-        service: resource.service,
-        stepSeconds: resource.stepSeconds,
-      },
-    });
-  });
-  const [errorBudgetPolicy, setErrorBudgetPolicy] = useState<
-    SLO["errorBudgetPolicy"]
-  >(resource?.errorBudgetPolicy);
-  const [quality, setQuality] = useState<SLO["quality"]>(resource?.quality);
-  const [lifecycle, setLifecycle] = useState<NonNullable<SLO["lifecycle"]>>(
-    resource?.lifecycle ?? "committed",
-  );
-  const [target, setTarget] = useState(
-    String((resource?.target ?? 0.999) * 100),
-  );
-  const [window, setWindow] = useState(
-    resource ? duration(resource.windowSeconds) : "28d",
-  );
-  const [policies, setPolicies] = useState<BurnRatePolicy[]>(
-    resource?.policies ??
-      (resource?.policy
-        ? [
-            {
-              ...resource.policy,
-              name: resource.policy.name || "default",
-              severity: resource.policy.severity || "critical",
-            },
-          ]
-        : []),
-  );
-  const [connections, setConnections] = useState<
-    { id: string; kind: string }[]
-  >([]);
+  const {
+    measurement: draft,
+    errorBudgetPolicy,
+    quality,
+    lifecycle,
+    target,
+    window,
+    policies,
+  } = value;
+  function update(patch: Partial<InlineObjectiveDraft>) {
+    onChange({ ...value, ...patch });
+  }
   const [preview, setPreview] = useState<Awaited<
     ReturnType<typeof prepareInlineObjective>
   > | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [ack, setAck] = useState(false);
+  const previewRef = useRef<HTMLElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    (error ? errorRef.current : previewRef.current)?.scrollIntoView?.({
+      block: "nearest",
+    });
+  }, [preview, error]);
   const controller = useRef(new AbortController());
   useEffect(() => {
     const c = new AbortController();
     controller.current = c;
-    api<{ connections: { id: string; kind: string }[] }>(
-      "/api/connections",
-      scope,
-      { signal: c.signal },
-    )
-      .then((r) => setConnections(r.connections))
-      .catch((e) => {
-        if (!c.signal.aborted) setError(message(e));
-      });
     return () => c.abort();
   }, [scope]);
   function change(action: () => void) {
@@ -162,30 +122,23 @@ export function MeasuredObjective({
     onBusyChange(v);
   }
   async function prepare() {
+    const c = controller.current;
     working(true);
     setError("");
     setPreview(null);
     try {
-      const manifest = sloFromMeasurementDraft(draft, target, window, policies);
-      manifest.spec.quality = quality;
-      manifest.spec.errorBudgetPolicy = errorBudgetPolicy;
-      if (lifecycle !== "committed" || resource?.lifecycle)
-        manifest.spec.lifecycle = lifecycle;
-      const p = await prepareInlineObjective(
-        scope,
-        manifest,
-        controller.current.signal,
-      );
-      if (!controller.current.signal.aborted && !scope.signal.aborted)
-        setPreview(p);
+      const manifest = inlineObjectiveDefinition(value);
+      const p = await prepareInlineObjective(scope, manifest, c.signal);
+      if (!c.signal.aborted && !scope.signal.aborted) setPreview(p);
     } catch (e) {
-      if (!controller.current.signal.aborted) setError(message(e));
+      if (!c.signal.aborted) setError(message(e));
     } finally {
-      working(false);
+      if (!c.signal.aborted) working(false);
     }
   }
   async function apply() {
-    if (!preview || !ack) return;
+    if (!preview || !ack || !canEdit(scope)) return;
+    const c = controller.current;
     working(true);
     setError("");
     try {
@@ -195,78 +148,129 @@ export function MeasuredObjective({
           "Content-Type": "application/yaml",
           "If-Match": `"${preview.plan.expectedRevision}"`,
         },
-        signal: controller.current.signal,
+        signal: c.signal,
         body: stringify(preview.plan.manifest),
       });
-      if (!controller.current.signal.aborted && !scope.signal.aborted)
-        onCreated();
+      if (!c.signal.aborted && !scope.signal.aborted) onCreated();
     } catch (e) {
-      if (!controller.current.signal.aborted) setError(message(e));
+      if (!c.signal.aborted) setError(message(e));
       setPreview(null);
     } finally {
-      working(false);
+      if (!c.signal.aborted) working(false);
     }
   }
+  const actions = (
+    <div className="dialog-actions">
+      <Button
+        variant="outline"
+        disabled={busy || !canEdit(scope)}
+        onClick={prepare}
+      >
+        {busy ? "Checking…" : "Verify telemetry and review SLO"}
+      </Button>
+      <Button
+        disabled={busy || !preview || !ack || !canEdit(scope)}
+        onClick={apply}
+      >
+        Save reviewed SLO
+      </Button>
+    </div>
+  );
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted-foreground">
         Define what counts as success, then set the target and window. The
         measurement is saved and versioned inside this SLO.
       </p>
-      <MeasurementFields
-        draft={draft}
-        connections={connections}
-        disabled={busy || !canEdit(scope)}
-        fixedName={!!resource}
-        onChange={(value) => change(() => setDraft(value))}
-      />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="inline-target">Target (%)</Label>
-          <Input
-            id="inline-target"
-            value={target}
-            disabled={busy}
-            onChange={(e) => change(() => setTarget(e.target.value))}
-          />
+      {!fixedName ? (
+        <SLOTemplatePicker
+          onBusyChange={working}
+          scope={scope}
+          disabled={busy || !canEdit(scope)}
+          onSelect={(template) =>
+            change(() => {
+              const next = inlineObjectiveDraft(template.manifest);
+              onChange({
+                ...next,
+                measurement: {
+                  ...draftFromSLOTemplate(template),
+                  source: draft.source,
+                },
+              });
+            })
+          }
+        />
+      ) : null}
+      <FormSection
+        title="Measurement"
+        description="Define eligible events, success criteria and where they are observed."
+      >
+        <MeasurementFields
+          draft={draft}
+          connections={connections}
+          disabled={busy || !canEdit(scope)}
+          fixedName={fixedName}
+          onChange={(value) => change(() => update({ measurement: value }))}
+        />
+      </FormSection>
+      <FormSection
+        title="Objective"
+        description="Set the reliability target and rolling evaluation window."
+      >
+        <div className="form-grid">
+          <div>
+            <FormField htmlFor="inline-target" label="Target (%)">
+              <Input
+                id="inline-target"
+                value={target}
+                disabled={busy}
+                onChange={(e) =>
+                  change(() => update({ target: e.target.value }))
+                }
+              />
+            </FormField>
+          </div>
+          <div>
+            <FormField htmlFor="inline-window" label="Rolling window">
+              <Input
+                id="inline-window"
+                value={window}
+                disabled={busy}
+                onChange={(e) =>
+                  change(() => update({ window: e.target.value }))
+                }
+              />
+            </FormField>
+          </div>
         </div>
-        <div>
-          <Label htmlFor="inline-window">Rolling window</Label>
-          <Input
-            id="inline-window"
-            value={window}
-            disabled={busy}
-            onChange={(e) => change(() => setWindow(e.target.value))}
-          />
-        </div>
-      </div>
+      </FormSection>
       <BudgetPolicyEditor
         value={errorBudgetPolicy}
         disabled={busy}
-        onChange={(value) => change(() => setErrorBudgetPolicy(value))}
+        onChange={(value) => change(() => update({ errorBudgetPolicy: value }))}
       />
       <QualityPolicyEditor
         value={quality}
         disabled={busy}
-        onChange={(value) => change(() => setQuality(value))}
+        onChange={(value) => change(() => update({ quality: value }))}
       />
       <SLOLifecycleSelect
         value={lifecycle}
         disabled={busy}
-        onChange={(value) => change(() => setLifecycle(value))}
+        onChange={(value) => change(() => update({ lifecycle: value }))}
       />
       <PolicyEditor
         policies={policies}
         disabled={busy}
-        onChange={(value) => change(() => setPolicies(value))}
+        onChange={(value) => change(() => update({ policies: value }))}
       />
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p ref={errorRef} role="alert" className="text-sm text-destructive">
           {error}
         </p>
       ) : null}
       {preview ? (
-        <section className="space-y-3 rounded-md border p-3">
+        <section ref={previewRef} className="space-y-3 rounded-md border p-3">
           <p className="font-medium">
             {preview.plan.action} · {preview.plan.manifest.metadata.name} ·
             expected revision {preview.plan.expectedRevision}
@@ -302,21 +306,7 @@ export function MeasuredObjective({
           </label>
         </section>
       ) : null}
-      <div className="dialog-actions">
-        <Button
-          variant="outline"
-          disabled={busy || !canEdit(scope)}
-          onClick={prepare}
-        >
-          {busy ? "Checking…" : "Verify telemetry and review SLO"}
-        </Button>
-        <Button
-          disabled={busy || !preview || !ack || !canEdit(scope)}
-          onClick={apply}
-        >
-          Save reviewed SLO
-        </Button>
-      </div>
+      {footer ? createPortal(actions, footer) : actions}
     </div>
   );
 }

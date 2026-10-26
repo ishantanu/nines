@@ -32,6 +32,12 @@ The CLI reads `NINES_API_KEY`, with `API_TOKEN` as an alias. Browser login issue
 
 Models are optional. Intent/review model calls require explicit workflow consent and trusted provider configuration. The first-release core does not require OpenAI, Anthropic, Gemini or a local model. Review destinations and data sharing before enabling any of them. The [intent evaluation guide](intent-evaluations.md) documents provider/key variables, local Ollama and vLLM endpoints, repeatable checks and measured model limitations.
 
+Optional [System One advice with Jev](system-one.md) uses a separate tenant `systemOne` configuration and per-run `systemOneConsent`. A Jev key alone enables no calls. Guided preparation can use this advisory assessment without a generative model.
+
+## Platform administrators
+
+Configure exact provider/subject identities under authentication `platformAdmins` to enable the [admin console](platform-administration.md). Platform administration is separate from tenant ownership and does not grant implicit tenant data access. The console manages users, direct memberships, session revocation and per-tenant Jev request policies with an independent platform audit trail.
+
 ## Local users
 
 A configured `local` provider enables server-authenticated username/password sign-in alongside OIDC/LDAP and API credentials. See `examples/auth-local.yaml`. Bootstrap passwords come from environment variables, are hashed with bcrypt cost 12, and are seeded only when absent. Passwords require 12–72 bytes and are never returned by APIs. The loopback playground explicitly enables `allowDemoCredentials` for its `admin` / `admin` bootstrap account only; remote public URLs and other short passwords are rejected. Changing a password increments the session epoch, revoking existing browser and CLI sessions. Configure HTTPS outside loopback and retain a recovery owner.
@@ -51,3 +57,7 @@ Changing or deleting a connection does not retire previously deployed external r
 ## Automatic rule delivery
 
 `rules.autoDeploy: true` is an owner opt-in per static or managed source. Direct Prometheus sources additionally require `rules.reload: true`, a writable/shared `rules.directory`, a matching Prometheus `rule_files` mount and lifecycle enablement. Mimir uses its pinned ruler URL/namespace/organization. Portal operator mode can publish automatically too. The managed source API accepts `autoDeploy`; the portal exposes the same setting. Existing non-playground sources default to manual. Read [automatic rules](deployment/automatic-rules.md) for retries, pause/resume, status and deployment limits.
+
+## Extension catalogs
+
+An administrator can provide `nines-server -extension-lock /etc/nines/extensions.lock.yaml` for a shared catalog, or `sloExtensionLock` in individual tenant configurations for private catalogs. Relative tenant lock paths resolve against the tenant configuration file. These options cannot be combined. Only pinned local artifacts load at startup; corrupted/missing content fails startup, and no registry is contacted by rendering. See [SLO extensions](slo-extensions.md) for installation, read-only deployment mounts and upgrades.

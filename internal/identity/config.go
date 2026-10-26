@@ -16,11 +16,12 @@ import (
 )
 
 type Config struct {
-	PublicURLEnv string           `yaml:"publicURLEnv"`
-	PublicURL    string           `yaml:"publicURL"`
-	SessionHours int              `yaml:"sessionHours"`
-	Providers    []ProviderConfig `yaml:"providers"`
-	Bootstrap    []Bootstrap      `yaml:"bootstrap"`
+	PlatformAdmins []PlatformAdmin  `yaml:"platformAdmins"`
+	PublicURLEnv   string           `yaml:"publicURLEnv"`
+	PublicURL      string           `yaml:"publicURL"`
+	SessionHours   int              `yaml:"sessionHours"`
+	Providers      []ProviderConfig `yaml:"providers"`
+	Bootstrap      []Bootstrap      `yaml:"bootstrap"`
 }
 type ProviderConfig struct {
 	AllowDemoCredentials bool          `yaml:"allowDemoCredentials"`
@@ -199,6 +200,9 @@ func ParseConfig(b []byte, lookup func(string) string) (Config, error) {
 		if err := validateMappings(p); err != nil {
 			return c, err
 		}
+	}
+	if err := validatePlatformAdmins(c); err != nil {
+		return c, err
 	}
 	if len(c.Bootstrap) > 100 {
 		return c, fmt.Errorf("too many bootstrap memberships")

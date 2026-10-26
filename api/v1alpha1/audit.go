@@ -4,6 +4,7 @@ import "time"
 
 // AuditRecord is an independently retained decision, scoped to a tenant and conversation.
 type AuditRecord struct {
+	SystemOne                 *SystemOneAuditEvidence `json:"systemOne,omitempty"`
 	ApprovalDigest            string                  `json:"approvalDigest,omitempty"`
 	SafetyCheck               *IntentSafetyCheck      `json:"safetyCheck,omitempty"`
 	Outcome                   *IntentOutcome          `json:"outcome,omitempty"`

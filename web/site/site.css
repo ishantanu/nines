@@ -493,6 +493,9 @@ h1 em {
   border-bottom: 1px solid #e4e0e9;
 }
 .definition-toolbar [data-slot="tabs-trigger"] {
+  flex: 0 0 auto;
+  height: auto;
+  min-height: 30px;
   font-size: 10px;
 }
 .definition-toolbar > span {
@@ -940,6 +943,8 @@ h1 em {
   overflow: hidden;
 }
 .example-tabs {
+  flex-wrap: wrap;
+  overflow: visible;
   width: 100%;
   max-width: 100%;
   height: auto;
@@ -950,6 +955,7 @@ h1 em {
 }
 .example-tabs [data-slot="tabs-trigger"] {
   flex: 1 0 auto;
+  height: auto;
   min-height: 34px;
   padding-inline: 12px;
   font-size: 12px;
@@ -1014,7 +1020,15 @@ h1 em {
   tab-size: 2;
 }
 .definition-toolbar [data-slot="tabs-list"] {
+  flex: 1;
+  flex-wrap: wrap;
+  height: auto;
   min-width: 0;
+  overflow: visible;
+}
+.definition-toolbar [data-slot="tabs-trigger"]::after,
+.example-tabs [data-slot="tabs-trigger"]::after {
+  content: none;
 }
 @media (max-width: 760px) {
   .examples-section {

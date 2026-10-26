@@ -72,3 +72,5 @@ The current verifier requires `_count`, the `+Inf` bucket and the exact `le="0.3
 The selected population includes every completed request with the declared labels, regardless of response status. If success also requires a particular status, model that requirement explicitly through an appropriate measurement/query contract. Review the observation point, retries and requests that never reach this server.
 
 See [measurements](measurements.md), [rule deployment](deployment/automatic-rules.md) and [PromQL validation](promql-validation.md).
+
+Integer histogram thresholds match the two equivalent canonical boundary labels, such as `le="2"` and `le="2.0"`, through a generated bounded matcher. This supports legacy text exposition and Prometheus normalization without interpolation. Verification requires exactly one matching threshold bucket, `_count` and `+Inf` per observed population; duplicate equivalent buckets are rejected. Other population labels retain equality matchers.

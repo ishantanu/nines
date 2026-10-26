@@ -19,6 +19,8 @@ Open `http://127.0.0.1:18080` and sign in with **admin / admin**. The setup comm
 
 | Goal | Guide |
 | --- | --- |
+| Choose a categorized SLO starting point | [SLI menus and templates](slo-templates.md) |
+| Measure agents, LLM outputs and inference | [AI workload SLOs](agent-slos.md) |
 | Define what successful requests look like | [SLOs and measurements](measurements.md) |
 | Set a latency objective and understand its ratios | [Latency SLOs](latency-slos.md) |
 | Connect reliability to a user outcome | [Critical user journeys](critical-user-journeys.md) |
@@ -46,3 +48,7 @@ See [architecture](architecture.md), [installation](deployment.md) and [current 
 Read the [session replay guide](session-replay.md) to capture the current tab, inspect masked playback and export a portable HTML recording. Replay remains experimental; browser acceptance is recorded separately.
 
 Owners can configure [immutable audit archival](deployment/audit-archive.md) and inspect delivery/retention receipts in Audit log or with `nines audit status`. Amazon S3 and explicitly configured S3-compatible gateways are supported by the adapter; Ceph RGW is the documented open-source target, with disposable container acceptance available through `make test-ceph`. Archival is disabled by default.
+
+Optional [System One advice](system-one.md) uses Jev to suggest template categories and assess definition clarity, with separate consent and audit receipts.
+
+The [platform admin console](platform-administration.md) separates global account administration from tenant ownership, with user/session controls, Jev request policies and platform audit records.

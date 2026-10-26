@@ -110,3 +110,53 @@ cases:
     fixtureOnly: true
     expected:
       status: unavailable
+  - id: agent-task-success
+    text: "99% of logical agent tasks should complete successfully after internal retries over 7 days."
+    fixtureGoal: |
+      {"outcome":"availability","targetText":"99%","windowText":"7 days","thresholdText":null,"clarifications":[]}
+    expected:
+      status: draft
+      outcome: availability
+      target: 0.99
+      windowSeconds: 604800
+  - id: agent-task-duration
+    text: "99% of terminal agent tasks should finish within 10 seconds over 28 days."
+    fixtureGoal: |
+      {"outcome":"latency","targetText":"99%","windowText":"28 days","thresholdText":"10 seconds","clarifications":[]}
+    expected:
+      status: draft
+      outcome: latency
+      target: 0.99
+      windowSeconds: 2419200
+      thresholdSeconds: 10
+  - id: llm-evaluation-pass
+    text: "95% of all selected LLM evaluations should have verdict pass under rubric v1 over 7 days. Unknown verdicts stay in the denominator."
+    fixtureGoal: |
+      {"outcome":"availability","targetText":"95%","windowText":"7 days","thresholdText":null,"clarifications":[]}
+    expected:
+      status: draft
+      outcome: availability
+      target: 0.95
+      windowSeconds: 604800
+  - id: inference-conditional-ttft
+    text: "99% of inference streams reaching a first token should reach that token within 500 milliseconds over 7 days. Measure request failures separately."
+    fixtureGoal: |
+      {"outcome":"latency","targetText":"99%","windowText":"7 days","thresholdText":"500 milliseconds","clarifications":[]}
+    expected:
+      status: draft
+      outcome: latency
+      target: 0.99
+      windowSeconds: 604800
+      thresholdSeconds: 0.5
+  - id: llm-undefined-quality
+    text: "Make LLM answers trustworthy and grounded. We have no rubric, evaluation metric, target or window yet."
+    fixtureGoal: |
+      {"outcome":"unsupported","targetText":null,"windowText":null,"thresholdText":null,"clarifications":["Define eligible outputs, a versioned evaluation rubric, an explicit percentage target and rolling window."]}
+    expected:
+      status: needs_clarification
+  - id: agent-joint-conditions
+    text: "99% of agent tasks should succeed AND cost less than 1 dollar AND finish within 10 seconds over 28 days."
+    fixtureGoal: |
+      {"outcome":"compound","targetText":"99%","windowText":"28 days","thresholdText":"10 seconds","clarifications":[]}
+    expected:
+      status: needs_clarification

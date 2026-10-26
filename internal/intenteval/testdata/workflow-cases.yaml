@@ -13,3 +13,5 @@ cases:
   - {id: changed-mimir-dataset, draftCase: availability, telemetry: normal, expectedState: ready, interference: source}
   - {id: ambiguous-apply-readback, draftCase: availability, telemetry: normal, expectedState: ready, apply: true, lostResponse: true}
   - {id: reject-provider-routing-tool, draftCase: availability, telemetry: normal, expectedState: failed, expectedCode: unsafe_tool_call, attack: true, fixtureOnly: true}
+  - {id: template-availability-reviewed-apply, draftCase: availability, telemetry: normal, expectedState: ready, template: true, apply: true}
+  - {id: template-latency-reviewed-apply, draftCase: latency, telemetry: normal, expectedState: ready, template: true, apply: true}

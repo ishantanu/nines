@@ -99,7 +99,7 @@ func addIntentConversations(s *mcp.Server, a *apiClient, c Config) {
 	// Starting a model-directed run can transmit explicitly consented goal/binding
 	// metadata to the configured provider. It is not a closed-world read operation.
 	open := true
-	mcp.AddTool(s, &mcp.Tool{Name: "start_intent_preparation", Description: "Start a bounded, durable guided or model-directed preparation run. Requires enabled writes; modelConsent must explicitly allow transmitting goal/measurement metadata and model cost. Binding confirmation remains a separate human UI/API operation. No resource apply/deployment occurs.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, OpenWorldHint: &open}}, func(ctx context.Context, _ *mcp.CallToolRequest, in intentConversationRun) (*mcp.CallToolResult, output, error) {
+	mcp.AddTool(s, &mcp.Tool{Name: "start_intent_preparation", Description: "Start a bounded, durable guided or model-directed preparation run. Requires enabled writes; modelConsent must explicitly allow transmitting goal, measurement and tenant template metadata and model cost. Optional systemOneConsent separately authorizes a bounded Jev definition assessment; it is advisory and cannot apply changes. Binding confirmation remains a separate human UI/API operation. No resource apply/deployment occurs.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, OpenWorldHint: &open}}, func(ctx context.Context, _ *mcp.CallToolRequest, in intentConversationRun) (*mcp.CallToolResult, output, error) {
 		if err := validID(in.ConversationID); err != nil {
 			return nil, output{}, err
 		}

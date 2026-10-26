@@ -37,25 +37,31 @@ type IntentModelProgress struct {
 	At        time.Time `json:"at"`
 }
 type IntentFlowRun struct {
-	Progress        *IntentModelProgress `json:"progress,omitempty"`
-	InputDigest     string               `json:"inputDigest"`
-	ModelConsent    bool                 `json:"modelConsent"`
-	DraftModelID    string               `json:"draftModelId,omitempty"`
-	DraftRoute      *ReviewModelRoute    `json:"draftRoute,omitempty"`
-	ID              string               `json:"id"`
-	Mode            string               `json:"mode"`
-	Status          string               `json:"status"`
-	Actor           InvestigationActor   `json:"actor"`
-	CreatedAt       time.Time            `json:"createdAt"`
-	UpdatedAt       time.Time            `json:"updatedAt"`
-	DeadlineAt      time.Time            `json:"deadlineAt"`
-	Attempts        int                  `json:"attempts"`
-	ModelCalls      int                  `json:"modelCalls"`
-	ModelInputBytes int                  `json:"modelInputBytes"`
-	ModelRoute      *ReviewModelRoute    `json:"modelRoute,omitempty"`
-	Skill           ReviewSkillRef       `json:"skill"`
-	Steps           []IntentFlowStep     `json:"steps"`
-	ErrorCode       string               `json:"errorCode,omitempty"`
+	SystemOneInputDigest  string               `json:"systemOneInputDigest,omitempty"`
+	SystemOneConsent      bool                 `json:"systemOneConsent,omitempty"`
+	SystemOneRoute        *SystemOneRoute      `json:"systemOneRoute,omitempty"`
+	SystemOneCalls        int                  `json:"systemOneCalls,omitempty"`
+	SystemOne             *SystemOneAssessment `json:"systemOne,omitempty"`
+	TemplateCatalogDigest string               `json:"templateCatalogDigest,omitempty"`
+	Progress              *IntentModelProgress `json:"progress,omitempty"`
+	InputDigest           string               `json:"inputDigest"`
+	ModelConsent          bool                 `json:"modelConsent"`
+	DraftModelID          string               `json:"draftModelId,omitempty"`
+	DraftRoute            *ReviewModelRoute    `json:"draftRoute,omitempty"`
+	ID                    string               `json:"id"`
+	Mode                  string               `json:"mode"`
+	Status                string               `json:"status"`
+	Actor                 InvestigationActor   `json:"actor"`
+	CreatedAt             time.Time            `json:"createdAt"`
+	UpdatedAt             time.Time            `json:"updatedAt"`
+	DeadlineAt            time.Time            `json:"deadlineAt"`
+	Attempts              int                  `json:"attempts"`
+	ModelCalls            int                  `json:"modelCalls"`
+	ModelInputBytes       int                  `json:"modelInputBytes"`
+	ModelRoute            *ReviewModelRoute    `json:"modelRoute,omitempty"`
+	Skill                 ReviewSkillRef       `json:"skill"`
+	Steps                 []IntentFlowStep     `json:"steps"`
+	ErrorCode             string               `json:"errorCode,omitempty"`
 }
 type IntentBindingConfirmation struct {
 	MeasurementDigest string             `json:"measurementDigest,omitempty"`
@@ -73,12 +79,25 @@ type IntentConversationSummary struct {
 	UpdatedAt time.Time            `json:"updatedAt"`
 	Scope     IntentAuthoringScope `json:"scope"`
 }
+
+// IntentTemplateSelection records a recipe choice, not telemetry or approval evidence.
+type IntentTemplateSelection struct {
+	TemplateID       string              `json:"templateId"`
+	TemplateRevision int                 `json:"templateRevision"`
+	TemplateDigest   string              `json:"templateDigest"`
+	CatalogDigest    string              `json:"catalogDigest"`
+	Extension        *ExtensionReference `json:"extension,omitempty"`
+	ValuesDigest     string              `json:"valuesDigest"`
+	IntentDigest     string              `json:"intentDigest"`
+	At               time.Time           `json:"at"`
+}
 type IntentConversation struct {
-	Audit            []IntentAuditEvent `json:"audit,omitempty"`
-	ChangeSetHistory []IntentChangeSet  `json:"changeSetHistory,omitempty"`
-	ChangeSet        *IntentChangeSet   `json:"changeSet,omitempty"`
-	APIVersion       string             `json:"apiVersion"`
-	Tenant           string             `json:"tenant"`
+	Template         *IntentTemplateSelection `json:"template,omitempty"`
+	Audit            []IntentAuditEvent       `json:"audit,omitempty"`
+	ChangeSetHistory []IntentChangeSet        `json:"changeSetHistory,omitempty"`
+	ChangeSet        *IntentChangeSet         `json:"changeSet,omitempty"`
+	APIVersion       string                   `json:"apiVersion"`
+	Tenant           string                   `json:"tenant"`
 	IntentConversationSummary
 	CreatedBy InvestigationActor          `json:"createdBy"`
 	Messages  []IntentConversationMessage `json:"messages"`
@@ -109,11 +128,12 @@ type ConfirmIntentBinding struct {
 	Confirm           bool            `json:"confirm"`
 }
 type CreateIntentFlowRun struct {
-	ID              string                    `json:"id"`
-	ExpectedVersion int64                     `json:"expectedVersion"`
-	Mode            string                    `json:"mode"`
-	ModelConsent    bool                      `json:"modelConsent"`
-	Backtest        *IntentFlowBacktestWindow `json:"backtest,omitempty"`
+	SystemOneConsent bool                      `json:"systemOneConsent,omitempty"`
+	ID               string                    `json:"id"`
+	ExpectedVersion  int64                     `json:"expectedVersion"`
+	Mode             string                    `json:"mode"`
+	ModelConsent     bool                      `json:"modelConsent"`
+	Backtest         *IntentFlowBacktestWindow `json:"backtest,omitempty"`
 }
 type IntentFlowBacktestWindow struct {
 	From              time.Time `json:"from"`
