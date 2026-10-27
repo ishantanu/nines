@@ -66,7 +66,7 @@ func operatorSeverity(t *testing.T, kind string) {
 		defer func() { _ = response.Body.Close() }()
 		body, e := io.ReadAll(io.LimitReader(response.Body, 4<<20))
 		if e != nil || response.StatusCode != want {
-			t.Fatalf("fixture evaluator %s returned %d (%v)", path, response.StatusCode, e)
+			t.Fatalf("fixture evaluator %s returned %d (%v): %.1024s", path, response.StatusCode, e, body)
 		}
 		return body
 	}
@@ -139,7 +139,15 @@ func operatorSeverity(t *testing.T, kind string) {
 							if !filepath.IsAbs(directory) {
 								t.Fatal("missing private shared rule directory")
 							}
-							if e = os.WriteFile(filepath.Join(directory, id+".yaml"), body, 0644); e != nil {
+							path := filepath.Join(directory, id+".yaml")
+							if e = os.WriteFile(path, body, 0600); e != nil {
+								t.Fatal(e)
+							}
+							// The fixture deliberately uses umask 077 for credentials.
+							// Only synthetic rules must be readable by Prometheus's
+							// nonroot UID across a Linux bind mount; creation mode
+							// alone is masked by the inherited umask.
+							if e = os.Chmod(path, 0644); e != nil {
 								t.Fatal(e)
 							}
 							request(http.MethodPost, "/-/reload", http.StatusOK)
