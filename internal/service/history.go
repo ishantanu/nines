@@ -55,7 +55,11 @@ func (s *Service) historyFromRecord(ctx context.Context, r model.Record, now, fr
 	if resolution > 2*r.SLO.WindowSeconds || resolution < r.SLO.StepSeconds || resolution%r.SLO.StepSeconds != 0 || int64(to.Sub(from)/time.Second)/resolution+1 > 1500 {
 		return engine.History{}, model.Invalid("resolution must be a multiple of stepSeconds with at most 1500 chart points")
 	}
-	result := engine.HistoryRecord(r, from, to, resolution)
+	evaluation := r
+	if r.SLO.Retired() {
+		evaluation.SLO.Revision = r.SLO.Retirement.OriginalRevision
+	}
+	result := engine.HistoryRecord(evaluation, from, to, resolution)
 	events, err := s.Store.Deliveries(ctx)
 	if err != nil {
 		return result, err

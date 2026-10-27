@@ -98,7 +98,7 @@ export function SLOPerformance({
             </Label>
             <select
               id="chart-policy"
-              className="mt-1 block h-9 w-full max-w-full rounded-md border bg-background px-3 text-sm"
+              className="mt-1 block h-9 w-full max-w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               value={policyName}
               onChange={(e) => setPolicyName(e.target.value)}
             >
@@ -116,7 +116,7 @@ export function SLOPerformance({
           </Label>
           <select
             id="chart-resolution"
-            className="mt-1 block h-9 w-full rounded-md border bg-background px-3 text-sm"
+            className="mt-1 block h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             value={resolution}
             onChange={(e) => setResolution(e.target.value)}
           >
@@ -136,38 +136,52 @@ export function SLOPerformance({
           </select>
         </div>
         {loading ? (
-          <span role="status" className="pb-2 text-xs text-muted-foreground">
+          <span role="status" className="pb-2 text-sm text-muted-foreground">
             Loading history…
           </span>
         ) : null}
       </div>
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm text-[var(--status-degraded)]">
           {error}
         </p>
       ) : null}
       {history && !error ? (
         <>
-          <p className="break-words text-xs text-muted-foreground">
-            {utcInput(history.from).replace("T", " ")} to{" "}
-            {utcInput(history.to).replace("T", " ")} UTC
-            <br />
-            Connection {history.source} · SLO target{" "}
-            {percent(history.target, 3)} · rolling window{" "}
-            {duration(history.windowSeconds)} · revision{" "}
-            {history.configRevision} · {duration(history.resolutionSeconds)}{" "}
-            chart buckets.{" "}
-            {history.measurementMode === "provider_window"
-              ? "Independent provider windows · coverage from scrape density."
-              : "Coverage from interval presence."}
-          </p>
-          <div className="performance-grid">
+          <details className="performance-context disclosure-panel">
+            <summary>
+              Chart context{" "}
+              <span className="font-normal text-muted-foreground">
+                {history.source} · {duration(history.windowSeconds)} objective
+                window
+              </span>
+            </summary>
+            <p className="break-words text-sm text-muted-foreground">
+              {utcInput(history.from).replace("T", " ")} to{" "}
+              {utcInput(history.to).replace("T", " ")} UTC
+              <br />
+            </p>
+            <dl className="grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
+              {[
+                ["Telemetry connection", history.source],
+                ["SLO window", duration(history.windowSeconds)],
+                ["Chart resolution", duration(history.resolutionSeconds)],
+                ["Definition revision", history.configRevision],
+              ].map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="break-words font-medium">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </details>
+          <div className="performance-grid performance-focused">
             <Timeline
               title="SLI and SLO target"
               history={history}
               lines={sliTimelineLines}
               threshold={history.target}
-              thresholdLabel={`Target ${percent(history.target, 3)}`}
+              thresholdLabel={`SLO target ${percent(history.target, 3)}`}
               percentages
               index={index}
               onIndex={setIndex}
@@ -197,6 +211,7 @@ export function SLOPerformance({
                   {
                     name: `Short ${duration(history.policy.shortWindowSeconds)}`,
                     color: "var(--chart-short)",
+                    dashed: true,
                     get: (p) =>
                       p.shortCoverage >= (history.policy?.minCoverage ?? 1)
                         ? p.shortBurnRate
@@ -228,143 +243,175 @@ export function SLOPerformance({
                 </CardContent>
               </Card>
             )}
-            {point ? (
-              <Card className="chart-panel gap-0 py-0">
-                <CardHeader>
+          </div>
+          {point ? (
+            <details className="disclosure-panel selected-interval">
+              <summary>
+                <ReplayLabel>Selected interval details</ReplayLabel>{" "}
+                <span className="font-normal text-muted-foreground">
+                  {utcInput(point.at).replace("T", " ")} UTC
+                </span>
+              </summary>
+              <div className="text-sm">
+                <p className="mb-2 font-medium">
+                  {utcInput(point.at).replace("T", " ") + " UTC"} · window
+                  coverage {percent(point.coverage, 1)}
+                </p>
+                <div className="grid gap-x-4 gap-y-5 py-3 sm:grid-cols-2">
+                  <span>
+                    Interval SLI:{" "}
+                    {point.intervalReliability == null
+                      ? "No data"
+                      : percent(point.intervalReliability, 3)}
+                  </span>
+                  <span>
+                    Measured SLI:{" "}
+                    {point.reliability == null
+                      ? "No data"
+                      : percent(point.reliability, 3)}
+                    {point.reliability != null &&
+                    point.coverage > 0 &&
+                    point.coverage < 1
+                      ? " (incomplete window)"
+                      : ""}
+                  </span>
+                  <span>
+                    Budget:{" "}
+                    {point.coverage === 1 &&
+                    point.budgetRemainingFraction != null
+                      ? percent(point.budgetRemainingFraction, 1)
+                      : "Not evaluated"}
+                  </span>
+                  <span>
+                    Short burn:{" "}
+                    {point.shortBurnRate == null
+                      ? "No data"
+                      : `${point.shortBurnRate.toFixed(2)}×`}
+                    {point.shortBurnRate != null &&
+                    history.policy &&
+                    point.shortCoverage < history.policy.minCoverage
+                      ? " (insufficient coverage)"
+                      : ""}
+                  </span>
+                  <span>
+                    Long burn:{" "}
+                    {point.longBurnRate == null
+                      ? "No data"
+                      : `${point.longBurnRate.toFixed(2)}×`}
+                    {point.longBurnRate != null &&
+                    history.policy &&
+                    point.longCoverage < history.policy.minCoverage
+                      ? " (insufficient coverage)"
+                      : ""}
+                  </span>
+                </div>
+              </div>
+            </details>
+          ) : null}
+          <details className="disclosure-panel">
+            <summary>
+              Periods and alert history{" "}
+              <span className="font-normal text-muted-foreground">
+                {history.violations.length} below-target periods ·{" "}
+                {history.alertEvents.length} alert transitions
+              </span>
+            </summary>
+            <div className="panel-grid">
+              <Card className="gap-0 py-0">
+                <div className="panel-header">
                   <h3 className="section-label">
-                    <ReplayLabel>Selected interval</ReplayLabel>
+                    Below-target periods and burn breaches (
+                    {history.violations.length})
                   </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Move across a chart or use the arrow keys.
+                </div>
+                <CardContent className="max-h-80 overflow-auto p-5">
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    Triangles mark complete-window SLI values below target.
+                    Dashed SLI segments have incomplete history and do not
+                    establish full-window attainment. Burn breaches require both
+                    alert windows and minimum coverage. Periods are approximate
+                    to the chart resolution; they are separate from recorded
+                    alert transitions. Missing measurements and no traffic
+                    create gaps.
                   </p>
-                </CardHeader>
-                <CardContent className="overflow-auto text-xs">
-                  <p className="mb-2 font-medium">
-                    {utcInput(point.at).replace("T", " ") + " UTC"} · rolling
-                    coverage {percent(point.coverage, 1)}
-                  </p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-5 py-3">
-                    <span>
-                      Interval SLI: {percent(point.intervalReliability, 3)}
-                    </span>
-                    <span>
-                      Rolling SLI: {percent(point.reliability, 3)}
-                      {point.coverage < 1 ? " (partial)" : ""}
-                    </span>
-                    <span>
-                      Budget: {percent(point.budgetRemainingFraction, 1)}
-                    </span>
-                    <span>
-                      Short burn:{" "}
-                      {point.shortBurnRate == null
-                        ? "N/A"
-                        : `${point.shortBurnRate.toFixed(2)}×`}
-                      {history.policy &&
-                      point.shortCoverage < history.policy.minCoverage
-                        ? " (partial)"
-                        : ""}
-                    </span>
-                    <span>
-                      Long burn:{" "}
-                      {point.longBurnRate == null
-                        ? "N/A"
-                        : `${point.longBurnRate.toFixed(2)}×`}
-                      {history.policy &&
-                      point.longCoverage < history.policy.minCoverage
-                        ? " (partial)"
-                        : ""}
-                    </span>
-                  </div>
+                  {!history.violations.length ? (
+                    <p className="mb-3 text-sm">
+                      No below-target periods or burn breaches in this range.
+                    </p>
+                  ) : null}
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>
+                          <ReplayLabel>Condition</ReplayLabel>
+                        </TableHead>
+                        <TableHead>
+                          <ReplayLabel>From</ReplayLabel>
+                        </TableHead>
+                        <TableHead>
+                          <ReplayLabel>To</ReplayLabel>
+                        </TableHead>
+                        <TableHead>
+                          <ReplayLabel>Buckets</ReplayLabel>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {history.violations.map((v, i) => (
+                        <TableRow key={i}>
+                          <TableCell>
+                            {
+                              (
+                                {
+                                  interval_target: "Interval below target",
+                                  slo_target: "Rolling SLO violation",
+                                  burn_threshold: "Both burn windows breached",
+                                } as Record<string, string>
+                              )[v.kind]
+                            }
+                          </TableCell>
+                          <TableCell>
+                            {utcInput(v.from).replace("T", " ") + " UTC"}
+                          </TableCell>
+                          <TableCell>
+                            {utcInput(v.to).replace("T", " ") + " UTC"}
+                          </TableCell>
+                          <TableCell>{v.buckets}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </CardContent>
               </Card>
-            ) : null}
-          </div>
-          <div className="panel-grid">
-            <Card className="gap-0 py-0">
-              <div className="panel-header">
-                <h3 className="section-label">
-                  Below-target periods and burn breaches (
-                  {history.violations.length})
-                </h3>
-              </div>
-              <CardContent className="h-64 overflow-auto p-5">
-                <p className="mb-3 text-xs text-muted-foreground">
-                  Red dots mark observed interval buckets below target. SLO
-                  violations require full rolling coverage. Burn breaches
-                  require both windows and minimum coverage; they are not alert
-                  episodes. Period boundaries are approximate to chart
-                  resolution. History uses the current definition; missing
-                  measurements and no traffic create chart gaps. Dashed amber
-                  rolling SLI shows available measurements from partial windows;
-                  it does not establish full-window compliance.
-                </p>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>
-                        <ReplayLabel>Condition</ReplayLabel>
-                      </TableHead>
-                      <TableHead>
-                        <ReplayLabel>From</ReplayLabel>
-                      </TableHead>
-                      <TableHead>
-                        <ReplayLabel>To</ReplayLabel>
-                      </TableHead>
-                      <TableHead>
-                        <ReplayLabel>Buckets</ReplayLabel>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {history.violations.map((v, i) => (
-                      <TableRow key={i}>
-                        <TableCell>
-                          {
-                            (
-                              {
-                                interval_target: "Interval below target",
-                                slo_target: "Rolling SLO violation",
-                                burn_threshold: "Both burn windows breached",
-                              } as Record<string, string>
-                            )[v.kind]
-                          }
-                        </TableCell>
-                        <TableCell>
-                          {utcInput(v.from).replace("T", " ") + " UTC"}
-                        </TableCell>
-                        <TableCell>
-                          {utcInput(v.to).replace("T", " ") + " UTC"}
-                        </TableCell>
-                        <TableCell>{v.buckets}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-            <Card className="gap-0 py-0">
-              <div className="panel-header">
-                <h3 className="section-label">
-                  Recorded alert transitions ({history.alertEvents.length})
-                </h3>
-              </div>
-              <CardContent className="h-64 overflow-auto p-5">
-                <p className="mb-3 text-xs text-muted-foreground">
-                  From the tenant's latest 200 alert transitions. This is a
-                  bounded event view, not a complete incident archive.
-                </p>
-                {history.alertEvents.map((e) => (
-                  <p className="border-b py-2 text-xs" key={e.id}>
-                    {utcInput(e.time).replace("T", " ") + " UTC"} ·{" "}
-                    {e.policy ? `${e.policy} (${e.severity}) · ` : ""}
-                    {e.kind}
-                    {e.reason ? ` · ${e.reason}` : ""} · short{" "}
-                    {e.shortBurn.toFixed(2)}× / long {e.longBurn.toFixed(2)}×
+              <Card className="gap-0 py-0">
+                <div className="panel-header">
+                  <h3 className="section-label">
+                    Recorded alert transitions ({history.alertEvents.length})
+                  </h3>
+                </div>
+                <CardContent className="max-h-80 overflow-auto p-5">
+                  <p className="mb-3 text-sm text-muted-foreground">
+                    From the tenant's latest 200 alert transitions. This is a
+                    bounded event view, not a complete incident archive.
                   </p>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+                  {!history.alertEvents.length ? (
+                    <p className="text-sm">
+                      No recorded alert transitions in this range.
+                    </p>
+                  ) : null}
+                  {history.alertEvents.map((e) => (
+                    <p className="border-b py-2 text-sm" key={e.id}>
+                      {utcInput(e.time).replace("T", " ") + " UTC"} ·{" "}
+                      {e.policy ? `${e.policy} (${e.severity}) · ` : ""}
+                      {e.kind}
+                      {e.reason ? ` · ${e.reason}` : ""} · short{" "}
+                      {e.shortBurn.toFixed(2)}× / long {e.longBurn.toFixed(2)}×
+                    </p>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          </details>
         </>
       ) : null}
     </div>

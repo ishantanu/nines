@@ -50,6 +50,49 @@ class PublicSourceTests(unittest.TestCase):
                 (root / "README.md").write_text(body)
                 self.assertTrue(source.inspect(root)[1])
 
+    def test_only_reviewed_synthetic_product_media_is_exported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            name = next(iter(source.PRODUCT_IMAGES))
+            image = root / name
+            image.parent.mkdir(parents=True)
+            image.write_bytes((ROOT / name).read_bytes())
+            selected, errors = source.inspect(root)
+            self.assertFalse(errors)
+            self.assertIn(Path(name), selected)
+            arbitrary = image.with_name("private-screenshot.png")
+            arbitrary.write_bytes(image.read_bytes())
+            self.assertNotIn(arbitrary.relative_to(root), source.inspect(root)[0])
+            image.write_bytes(image.read_bytes() + b"unreviewed payload")
+            self.assertTrue(source.inspect(root)[1])
+
+    def test_only_exact_licensed_font_assets_are_exported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            name = next(iter(source.FONT_ASSETS))
+            _, license_name = source.FONT_ASSETS[name]
+            fonts = root / "web/site/fonts"
+            fonts.mkdir(parents=True)
+            font = fonts / name
+            original = (ROOT / "web/site/fonts" / name).read_bytes()
+            font.write_bytes(original)
+            license_file = fonts / license_name
+            license_file.write_text("Licensed typeface")
+            built = root / "internal/httpapi/web/assets"
+            built.mkdir(parents=True)
+            (built / (Path(name).stem + "-buildhash.woff2")).write_bytes(original)
+            self.assertFalse(source.inspect(root)[1])
+            font.write_bytes(original + b"unexpected appended payload")
+            self.assertTrue(source.inspect(root)[1])
+            font.write_bytes(original)
+            license_file.unlink()
+            self.assertTrue(source.inspect(root)[1])
+            license_file.write_text("Licensed typeface")
+            (root / "internal/private.woff2").write_bytes(original)
+            self.assertTrue(source.inspect(root)[1])
+
     def test_symlink_cannot_pull_external_content(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "source"
@@ -107,6 +150,7 @@ class RequiredIntegrationTests(unittest.TestCase):
         rows = [
             {"Action": "pass", "Test": n, "Package": "app/integration/mimir"}
             for n in [
+                "TestRealMimirRetirement",
                 "TestRealMimirTenantCollection",
                 "TestRealMimirRuleDestinations",
                 "TestRealMimirLifecycleAndMinEvents",
@@ -161,6 +205,8 @@ class RequiredIntegrationTests(unittest.TestCase):
                 "TestRealOperatorControllerConformance",
                 "TestRealOperatorLeaseFailover",
                 "TestRealOperatorPortalPublication",
+                "TestRealOperatorCleanupOutageAndCredentialRotation",
+                "TestRealOperatorIndependentSeverityEvaluation",
             ]
         ]
         self.assertEqual(self.run_gate(rows, "operator"), 0)

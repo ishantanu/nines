@@ -84,7 +84,7 @@ export function ChartTimeRange({
         </PopoverTrigger>
         <PopoverContent aria-label="Select chart time range" className="p-3">
           <h3 className="font-semibold">Time range</h3>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Dates and chart axes use UTC. Up to {duration(maxSeconds)} of
             retained history.
           </p>
@@ -158,7 +158,7 @@ export function ChartTimeRange({
                 />
               </div>
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Dates align to complete {duration(stepSeconds)} intervals. Changes
               load only when applied.
             </p>
@@ -166,7 +166,7 @@ export function ChartTimeRange({
               <p
                 id={`${id}-error`}
                 role="alert"
-                className="text-sm text-destructive"
+                className="text-sm text-[var(--status-degraded)]"
               >
                 {error}
               </p>

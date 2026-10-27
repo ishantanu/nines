@@ -18,6 +18,7 @@ import (
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/intentmodel"
 	"github.com/ishantanu/nines/internal/investigation"
+	"github.com/ishantanu/nines/internal/kubediscovery"
 	"github.com/ishantanu/nines/internal/operator"
 	"github.com/ishantanu/nines/internal/prometheus"
 	"github.com/ishantanu/nines/internal/replay"
@@ -209,6 +210,15 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 
 		var reviewer rm.Model
 		svc := service.New(st, collector)
+		if !demo && t.Config.KubernetesDiscovery != nil {
+			reader, err := kubediscovery.InCluster(*t.Config.KubernetesDiscovery)
+			if err != nil {
+				repository.Close()
+				st.Close()
+				return fail(fmt.Errorf("tenant %s Kubernetes discovery: %w", t.Config.ID, err))
+			}
+			svc.KubernetesDiscovery = reader
+		}
 		if !demo {
 			drafter, err := intentmodel.FromEnvironment(t.Config.IntentModel, os.Getenv)
 			if err != nil {
@@ -353,6 +363,7 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 			runtime.Workspace.IntentConversations.Archive = &auditarchive.Worker{Tenant: t.Config.ID, Config: *t.Config.AuditArchive, Repository: intentRepo, Sink: sink}
 		}
 		svc.RuleManager = runtime.Workspace.Rules
+		runtime.Workspace.Rules.PublicationGuard = svc.PinRuleDestination
 		if managed != nil {
 			runtime.Workspace.Rules.DynamicTarget = managed.Target
 		}

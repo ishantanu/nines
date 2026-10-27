@@ -1,27 +1,40 @@
 # Deploy Nines
 
-Nines supports a server/portal deployment and a standalone Kubernetes operator. The server runs as one collecting Go process with an embedded web UI and PostgreSQL for durable data. The operator uses GitOps CRDs and Kubernetes RBAC without a Nines server or database. The server can also publish reviewed portal SLOs to the operator through a namespace-scoped bridge. Start with a local demo, then choose a single-instance deployment. The project currently requires Go 1.27.3 to build from source. Node 24 is needed to rebuild the UI or product site.
+Nines supports a server/portal deployment and a standalone Kubernetes operator.
 
-| Deployment | Guide | Scope |
-| --- | --- | --- |
-| Local integration playground | [Prometheus playground](deployment/playground.md) | Synthetic traffic, recording and burn-rate rules; optional Mimir profile |
-| Local demonstration | [README quickstart](../../README.md#try-the-demo) | Synthetic, ephemeral and loopback-only |
-| Docker Compose | [Persistent container setup](deployment/docker-compose.md) | Recommended first evaluation with a dedicated database volume |
-| Linux service | [Native binary and systemd](deployment/linux-service.md) | One server behind a TLS reverse proxy |
-| Kubernetes | [Single-replica manifests](deployment/kubernetes.md) | Server deployment with optional reviewed operator publishing |
-| Kubernetes operator | [Controller and offline rendering](deployment/operator.md) | GitOps CRDs, PrometheusRule/Mimir reconciliation, namespaced RBAC and lease-based standby |
-| Team access | [Identity and tenant configuration](deployment/identity-and-tenants.md) | Local accounts, API keys, OIDC/Microsoft Entra, LDAP and roles |
-| Metrics and rules | [Prometheus/Mimir routing](deployment/metrics-and-rules.md) | Explicit query connections and reviewed rule destinations |
-| Data protection | [Backup, restore and upgrades](deployment/backup-and-restore.md) | Database, configuration and credential recovery |
-| Product website | [GitHub Pages](site.md) | Static documentation, separate from the server |
+- The server runs as one collecting Go process with an embedded web UI and PostgreSQL for durable data.
+- The operator uses GitOps CRDs and Kubernetes RBAC without a Nines server or database.
+- The server can also publish reviewed portal SLOs to the operator through a namespace-scoped bridge.
+- Start with a local demo, then choose a single-instance deployment.
+- The project currently requires Go 1.27.3 to build from source.
+- Node 24 is needed to rebuild the UI or product site.
+
+* **Local integration playground**: [Prometheus playground](deployment/playground.md) · Synthetic traffic, recording and burn-rate rules; optional Mimir profile
+* **Local demonstration**: [README quickstart](../../README.md#try-the-demo) · Synthetic, ephemeral and loopback-only
+* **Docker Compose**: [Persistent container setup](deployment/docker-compose.md) · Recommended first evaluation with a dedicated database volume
+* **Linux service**: [Native binary and systemd](deployment/linux-service.md) · One server behind a TLS reverse proxy
+* **Kubernetes**: [Single-replica manifests](deployment/kubernetes.md) · Server deployment with optional reviewed operator publishing
+* **Kubernetes operator**: [Controller and offline rendering](deployment/operator.md) · GitOps CRDs, PrometheusRule/Mimir reconciliation, namespaced RBAC and lease-based standby
+* **Team access**: [Identity and tenant configuration](deployment/identity-and-tenants.md) · Local accounts, API keys, OIDC/Microsoft Entra, LDAP and roles
+* **Metrics and rules**: [Prometheus/Mimir routing](deployment/metrics-and-rules.md) · Explicit query connections and reviewed rule destinations
+* **Data protection**: [Backup, restore and upgrades](deployment/backup-and-restore.md) · Database, configuration and credential recovery
+* **Product website**: [GitHub Pages](site.md) · Static documentation, separate from the server
 
 ## Before exposing a server
 
-Use a dedicated PostgreSQL database and role. Nines creates tables and tenant schemas at startup; the role needs the corresponding DDL privileges. Keep the database on a private network and use certificate-verified PostgreSQL TLS across untrusted networks. The example Compose database is on its internal Docker network.
-
-Configure random API credentials or server-owned identity settings. Authentication must be paired with an explicit tenant role. Put HTTPS in front of the server and configure an OIDC `publicURL` that exactly matches the external origin. Do not expose the synthetic demo as a team deployment.
-
-Keep one collecting process for the MVP. There is no distributed collector leader election. Multiple replicas can duplicate collection, workflow execution and alert delivery. A rollout must stop the old process before starting its replacement. The Kubernetes reference uses `Recreate` for that reason.
+- Use a dedicated PostgreSQL database and role.
+  - Nines creates tables and tenant schemas at startup; the role needs the corresponding DDL privileges.
+  - Keep the database on a private network and use certificate-verified PostgreSQL TLS across untrusted networks.
+  - The example Compose database is on its internal Docker network.
+- Configure random API credentials or server-owned identity settings.
+  - Authentication must be paired with an explicit tenant role.
+  - Put HTTPS in front of the server and configure an OIDC `publicURL` that exactly matches the external origin.
+  - Do not expose the synthetic demo as a team deployment.
+- Keep one collecting process for the MVP.
+  - There is no distributed collector leader election.
+  - Multiple replicas can duplicate collection, workflow execution and alert delivery.
+  - A rollout must stop the old process before starting its replacement.
+  - The Kubernetes reference uses `Recreate` for that reason.
 
 ## Verify a deployment
 
@@ -31,4 +44,4 @@ Keep one collecting process for the MVP. There is no distributed collector leade
 4. Review recording/burn-rate rules and their destination before deployment. Verify provider-side evaluation and Alertmanager delivery separately.
 5. Rehearse a database/configuration restore into an isolated deployment before relying on retained history.
 
-The [operational limits](operations.md), [configuration reference](configuration.md) and [release checklist](release.md) define the current MVP boundary. Manifests and guides do not establish HA, production scale, a real identity-provider rollout or a completed restore exercise.
+- The [operational limits](operations.md), [configuration reference](configuration.md) and [release checklist](release.md) define the current MVP boundary. Manifests and guides do not establish HA, production scale, a real identity-provider rollout or a completed restore exercise.

@@ -89,6 +89,7 @@
   "Not observed",
   "Source measurements",
   "SLI and SLO target",
+  "Measured SLI",
   "Interval SLI",
   "Rolling SLI",
   "Rolling SLI (partial window)",

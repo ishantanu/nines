@@ -87,7 +87,9 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 async function until(check: () => boolean) {
-  for (let tries = 0; tries < 100; tries++) {
+  // Lazy route transforms can exceed one second after a clean dependency install.
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     });

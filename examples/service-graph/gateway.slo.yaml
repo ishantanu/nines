@@ -1,0 +1,19 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: graph-gateway-availability
+  project: playground
+spec:
+  displayName: Gateway request success
+  service: gateway
+  source: primary
+  target: 0.99
+  windowSeconds: 300
+  stepSeconds: 10
+  measurement:
+    type: availability
+    metric: example_http_requests_total
+    labels: {service: gateway, environment: playground}
+    successLabels: {outcome: success}
+    scrapeIntervalSeconds: 5
+    observationPoint: Requests completed by the gateway process in the local HTTP chain.

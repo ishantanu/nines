@@ -94,6 +94,16 @@ export const docGroups: DocGroup[] = [
         "Connect user outcomes to the SLOs on which each journey step depends.",
       ),
       page(
+        "service-dependencies",
+        "Service dependencies",
+        "Discover Kubernetes relationships and review visual service maps linked to SLOs.",
+      ),
+      page(
+        "slo-retirement",
+        "Retire SLOs",
+        "Review references, archive retained evidence and verify owned-rule cleanup before deletion.",
+      ),
+      page(
         "slo-editing",
         "Edit and version SLOs",
         "Change an SLO under the same identity and retain its previous evidence.",

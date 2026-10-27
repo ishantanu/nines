@@ -6,10 +6,12 @@ import (
 	"sync"
 	"time"
 
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 )
 
 type Memory struct {
+	tombstones map[string]v1.RetirementReceipt
 	batches    map[string]definitionReceipt
 	archives   map[string]map[int64]SLOArchive
 	mu         sync.Mutex
@@ -29,6 +31,9 @@ func (m *Memory) Create(ctx context.Context, s model.SLO) error {
 	defer m.mu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if _, deleted := m.tombstones[s.ID]; deleted {
+		return model.ErrConflict
 	}
 	if _, ok := m.records[s.ID]; ok {
 		return model.ErrConflict
@@ -90,6 +95,15 @@ func (m *Memory) Update(ctx context.Context, id string, fn func(*model.Record) e
 			return model.ErrRevisionConflict
 		}
 		m.archives[id][archive.Summary.Revision] = archive
+	}
+	if !r.SLO.Retired() && next.SLO.Retired() {
+		for key, d := range m.deliveries {
+			if d.Event.SLOID == id && d.Status == "pending" {
+				d.Status = "failed"
+				d.LastError = "slo_archived"
+				m.deliveries[key] = d
+			}
+		}
 	}
 	for _, e := range next.Events {
 		m.deliveries[e.ID] = model.Delivery{Event: e, Status: "pending", NextAttempt: e.Time}

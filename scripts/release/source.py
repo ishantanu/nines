@@ -41,6 +41,8 @@ FILES = {
     "compose.playground.yaml",
     "compose.playground.mimir.yaml",
     "compose.playground.ai.yaml",
+    "compose.playground.jev.yaml",
+    "compose.playground.topology.yaml",
     ".env.example",
     ".gitignore",
     ".dockerignore",
@@ -72,6 +74,49 @@ PRIVATE = re.compile(
 LINK = re.compile(r'!?\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)')
 
 
+# Only these vendored, licensed font bytes may bypass text-source inspection.
+# The embedded build is allowed to rename them with Vite's content hash.
+FONT_ASSETS = {
+    "atkinson-hyperlegible-next-latin.woff2": (
+        "1e4cea71d75ec427581d6259fc07148a2e60d60d16cabf4b4f5360487b3f9dc3",
+        "OFL-Atkinson-Hyperlegible-Next.txt",
+    ),
+    "barlow-condensed-400-latin.woff2": (
+        "0e2a408159b32d8105bcd1a0a4d6222fcee375a84fb62703c614ce34d8bb68bb",
+        "OFL-Barlow-Condensed.txt",
+    ),
+    "barlow-condensed-600-latin.woff2": (
+        "5bc49d41f32810a114765314392332ce2acae2276635eee265a50319a12c1b49",
+        "OFL-Barlow-Condensed.txt",
+    ),
+    "barlow-condensed-700-latin.woff2": (
+        "e3e520cb7468f2efd60bc2ce96694567c3312f4ef414fffbe605e3ad146b24e6",
+        "OFL-Barlow-Condensed.txt",
+    ),
+}
+
+
+# Reviewed synthetic product media; arbitrary screenshots remain excluded.
+PRODUCT_IMAGES = {
+    "docs/public/brand/nines-overview.jpg": "2d71e77e100cb9184d88e70b375c29f683954a0bc60668a91039e6e6c546a239",
+}
+
+
+def approved_font(rel, data, root):
+    if rel.parent not in {Path("web/site/fonts"), Path("internal/httpapi/web/assets")}:
+        return False
+    if not data.startswith(b"wOF2"):
+        return False
+    for name, (digest, license_name) in FONT_ASSETS.items():
+        source_name = rel.parent == Path("web/site/fonts") and rel.name == name
+        built_name = rel.parent == Path("internal/httpapi/web/assets") and re.fullmatch(
+            re.escape(Path(name).stem) + r"-[A-Za-z0-9_-]+\.woff2", rel.name
+        )
+        if (source_name or built_name) and hashlib.sha256(data).hexdigest() == digest:
+            return (root / "web/site/fonts" / license_name).is_file()
+    return False
+
+
 def included(rel):
     if any(
         p in EXCLUDED or p == ".env" or p.startswith(".env.") and p != ".env.example"
@@ -79,7 +124,7 @@ def included(rel):
     ):
         return False
     if rel.suffix in {".test", ".log", ".jpg", ".png", ".mp4", ".webm"}:
-        return False
+        return rel.as_posix() in PRODUCT_IMAGES
     if rel.parts[0] == "docs":
         return rel.as_posix() == "docs/cli.md" or rel.parts[:2] == ("docs", "public")
     if rel.parts[0] == "integration" and rel.name.startswith("result-"):
@@ -124,6 +169,16 @@ def inspect(root):
             problems.append("Missing release file: " + name)
     for rel, p in selected.items():
         data = p.read_bytes()
+        if rel.as_posix() in PRODUCT_IMAGES:
+            if (
+                data.startswith(b"\xff\xd8\xff")
+                and hashlib.sha256(data).hexdigest() == PRODUCT_IMAGES[rel.as_posix()]
+            ):
+                continue
+            problems.append("Unapproved product image: " + str(rel))
+            continue
+        if approved_font(rel, data, root):
+            continue
         if b"\x00" in data:
             problems.append("Unexpected binary file: " + str(rel))
             continue

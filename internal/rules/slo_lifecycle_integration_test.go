@@ -141,19 +141,31 @@ func realLifecycleAndMinEvents(t *testing.T, kind, base, directory string) {
 			t.Fatal("rule activation failed", result, e)
 		}
 		earliest := time.Now().Add(7 * time.Second)
+		var stableSince time.Time
 		for {
 			_, evaluation := manager.Inspect(ctx, s, time.Now().UTC())
 			output := collector.RuleOutput(ctx, OutputIdentity(s, manager.Tenant, ""), time.Now().UTC())
 			firing, queryErr := queryCount(fmt.Sprintf(`ALERTS{nines_slo=%q,alertstate="firing"}`, s.ID))
 			coverage, coverageErr := queryCount(fmt.Sprintf(`nines:slo_coverage:ratio{nines_slo=%q,nines_revision=%q,window="4s"} == 1`, s.ID, fmt.Sprint(s.Revision)))
 			if time.Now().After(earliest) && evaluation.State == "evaluating" && output.State == "verified" && queryErr == nil && coverageErr == nil && coverage == 1 {
-				if (firing == 1) != stage.wantFiring {
-					t.Fatalf("%s stage %d: firing series=%d, want firing=%v", kind, i, firing, stage.wantFiring)
+				// Loaded rules and full coverage can precede completion of `for`.
+				// Observe the requested phase continuously instead of failing on that
+				// legitimate intermediate state or accepting one inactive sample.
+				if (firing == 1) == stage.wantFiring {
+					if stableSince.IsZero() {
+						stableSince = time.Now()
+					}
+					if time.Since(stableSince) >= 2*time.Second {
+						break
+					}
+				} else {
+					stableSince = time.Time{}
 				}
-				break
+			} else {
+				stableSince = time.Time{}
 			}
 			if ctx.Err() != nil {
-				t.Fatalf("%s stage %d did not evaluate: %s/%s, query=%v coverage=%v", kind, i, evaluation.State, output.State, queryErr, coverageErr)
+				t.Fatalf("%s stage %d did not reach expected firing=%v: %s/%s, query=%v coverage=%v", kind, i, stage.wantFiring, evaluation.State, output.State, queryErr, coverageErr)
 			}
 			time.Sleep(200 * time.Millisecond)
 		}

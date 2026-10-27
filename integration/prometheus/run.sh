@@ -31,6 +31,6 @@ container=$(docker run -d --name "nines-prometheus-acceptance-$$" \
 port=$(docker inspect --format '{{(index (index .NetworkSettings.Ports "9090/tcp") 0).HostPort}}' "$container")
 cd "$platform_dir"
 PROMETHEUS_TEST_URL="http://127.0.0.1:$port" PROMETHEUS_TEST_RULE_DIRECTORY="$fixture_dir/rules" \
-  go test -race -count=1 -json ./internal/rules -run '^TestRealPrometheus(ReviewedActivation|LifecycleAndMinEvents)$' > "$fixture_dir/results.json"
+  go test -race -count=1 -json ./internal/rules -run '^TestRealPrometheus(ReviewedActivation|LifecycleAndMinEvents|Retirement)$' > "$fixture_dir/results.json"
 python3 scripts/release/check-tests.py "$fixture_dir/results.json" --required prometheus
 cp "$fixture_dir/results.json" prometheus-test-results.json

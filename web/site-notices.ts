@@ -70,6 +70,25 @@ export function siteNotices(): Plugin {
           )),
       );
       notices.push(
+        "\nSelf-hosted typefaces\n" +
+          (await readFile(
+            fileURLToPath(
+              new URL(
+                "./site/fonts/OFL-Atkinson-Hyperlegible-Next.txt",
+                import.meta.url,
+              ),
+            ),
+            "utf8",
+          )) +
+          "\n" +
+          (await readFile(
+            fileURLToPath(
+              new URL("./site/fonts/OFL-Barlow-Condensed.txt", import.meta.url),
+            ),
+            "utf8",
+          )),
+      );
+      notices.push(
         "\nNines application license\n" +
           (await readFile(
             fileURLToPath(new URL("../LICENSE", import.meta.url)),

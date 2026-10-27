@@ -1,7 +1,14 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { api, message, type RequestScope } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { stringify } from "yaml";
+import { DependencyDesigner } from "./dependency-designer";
+import { DependencyDiscovery } from "./dependency-discovery";
+import { dependencyManifest } from "@/lib/dependency-editor";
+import { mapKind } from "@/lib/topology";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -29,15 +36,54 @@ export function TopologyEditor({
   initial: string;
   kind: string;
   label: string;
-  onApplied: () => void;
+  onApplied: (id: string) => void;
 }) {
+  const id = useId();
+  const epoch = useRef(0);
+  const dialog = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState("visual");
   const [open, setOpen] = useState(false),
     [text, setText] = useState(initial),
     [plan, setPlan] = useState<ResourcePlan | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  useEffect(() => {
+    epoch.current++;
+    setOpen(false);
+    setPlan(null);
+    setError("");
+    setBusy(false);
+  }, [scope]);
   const writable = scope.role === "owner" || scope.role === "editor";
+  let parsed: ReturnType<typeof dependencyManifest> | null = null;
+  if (kind === mapKind) {
+    try {
+      parsed = dependencyManifest(text);
+    } catch {
+      /* YAML remains editable when the visual draft is incomplete. */
+    }
+  }
+  function change(next: string) {
+    epoch.current++;
+    setText(next);
+    setPlan(null);
+    setError("");
+  }
+  const yamlEditor = (
+    <>
+      <Label htmlFor={`${id}-manifest`}>YAML manifest</Label>
+      <Textarea
+        id={`${id}-manifest`}
+        value={text}
+        disabled={busy}
+        onChange={(e) => change(e.target.value)}
+        spellCheck={false}
+        className="min-h-80 font-mono text-sm"
+      />
+    </>
+  );
   async function review() {
+    const generation = ++epoch.current;
     setBusy(true);
     setError("");
     try {
@@ -48,15 +94,17 @@ export function TopologyEditor({
       });
       if (p.manifest.kind !== kind)
         throw new Error(`Expected a ${kind} manifest`);
-      setPlan(p);
+      if (generation === epoch.current && !scope.signal.aborted) setPlan(p);
     } catch (e) {
-      if (!scope.signal.aborted) setError(message(e));
+      if (generation === epoch.current && !scope.signal.aborted)
+        setError(message(e));
     } finally {
-      setBusy(false);
+      if (generation === epoch.current) setBusy(false);
     }
   }
   async function apply() {
     if (!plan) return;
+    const generation = ++epoch.current;
     setBusy(true);
     setError("");
     try {
@@ -68,17 +116,17 @@ export function TopologyEditor({
         },
         body: text,
       });
-      if (!scope.signal.aborted) {
+      if (generation === epoch.current && !scope.signal.aborted) {
         setOpen(false);
-        onApplied();
+        onApplied(plan.manifest.metadata.name);
       }
     } catch (e) {
-      if (!scope.signal.aborted) {
+      if (generation === epoch.current && !scope.signal.aborted) {
         setError(message(e));
         setPlan(null);
       }
     } finally {
-      setBusy(false);
+      if (generation === epoch.current) setBusy(false);
     }
   }
   return (
@@ -86,8 +134,10 @@ export function TopologyEditor({
       open={open}
       onOpenChange={(v) => {
         if (busy) return;
+        epoch.current++;
         setOpen(v);
         if (v) {
+          setTab("visual");
           setText(initial);
           setPlan(null);
           setError("");
@@ -99,26 +149,123 @@ export function TopologyEditor({
           {label}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent
+        ref={dialog}
+        data-private
+        data-replay-block
+        className={`max-h-[90vh] overflow-y-auto ${kind === mapKind ? "sm:max-w-6xl" : "sm:max-w-3xl"}`}
+      >
         <DialogHeader>
           <DialogTitle>{label}</DialogTitle>
           <DialogDescription>
-            Review the YAML and revision before applying. Workspace owners and
-            editors can save definitions.
+            Edit the draft, review its plan, then save a new revision. Only
+            workspace owners and editors can apply definitions.
           </DialogDescription>
         </DialogHeader>
-        <Label htmlFor="topology-manifest">YAML manifest</Label>
-        <Textarea
-          id="topology-manifest"
-          value={text}
-          disabled={busy}
-          onChange={(e) => {
-            setText(e.target.value);
-            setPlan(null);
-          }}
-          spellCheck={false}
-          className="min-h-80 font-mono text-xs"
-        />
+        {parsed ? (
+          <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-3">
+            <legend className="sr-only">Map definition</legend>
+            <div className="space-y-2">
+              <Label htmlFor={`${id}-name`}>Map identifier</Label>
+              <Input
+                id={`${id}-name`}
+                value={parsed.metadata.name}
+                maxLength={63}
+                onChange={(e) =>
+                  change(
+                    stringify({
+                      ...parsed,
+                      metadata: { ...parsed.metadata, name: e.target.value },
+                    }),
+                  )
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${id}-project`}>Project</Label>
+              <Input
+                id={`${id}-project`}
+                value={parsed.metadata.project}
+                maxLength={200}
+                onChange={(e) =>
+                  change(
+                    stringify({
+                      ...parsed,
+                      metadata: { ...parsed.metadata, project: e.target.value },
+                    }),
+                  )
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${id}-display`}>Map display name</Label>
+              <Input
+                id={`${id}-display`}
+                value={parsed.spec.displayName}
+                maxLength={200}
+                onChange={(e) =>
+                  change(
+                    stringify({
+                      ...parsed,
+                      spec: { ...parsed.spec, displayName: e.target.value },
+                    }),
+                  )
+                }
+              />
+            </div>
+          </fieldset>
+        ) : null}
+        {kind === mapKind ? (
+          <Tabs value={tab} onValueChange={setTab}>
+            <TabsList
+              aria-label="Dependency map authoring"
+              className="w-full flex-wrap gap-1 overflow-visible group-data-[orientation=horizontal]/tabs:h-auto"
+            >
+              <TabsTrigger value="visual">Visual editor</TabsTrigger>
+              <TabsTrigger value="yaml">YAML</TabsTrigger>
+              <TabsTrigger value="discover">
+                Discover from Kubernetes
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="visual">
+              {parsed ? (
+                <DependencyDesigner
+                  value={parsed}
+                  disabled={busy}
+                  onChange={(next) => change(stringify(next))}
+                />
+              ) : (
+                <p role="status" className="text-sm text-muted-foreground">
+                  Correct the map's YAML structure to use the visual editor.
+                </p>
+              )}
+            </TabsContent>
+            <TabsContent value="yaml" className="space-y-2">
+              {yamlEditor}
+            </TabsContent>
+            <TabsContent value="discover">
+              {parsed ? (
+                <DependencyDiscovery
+                  scope={scope}
+                  value={parsed}
+                  disabled={busy}
+                  onChange={(next) => change(stringify(next))}
+                  onAdopt={() => {
+                    setTab("visual");
+                    dialog.current?.scrollTo({ top: 0 });
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Set valid map metadata in YAML before discovering
+                  dependencies.
+                </p>
+              )}
+            </TabsContent>
+          </Tabs>
+        ) : (
+          yamlEditor
+        )}
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -154,7 +301,7 @@ export function TopologyEditor({
             disabled={busy || !text.trim()}
             onClick={review}
           >
-            {busy ? "Working…" : "Validate & plan"}
+            {busy ? "Working…" : "Validate and plan"}
           </Button>
           <Button disabled={busy || !plan || !writable} onClick={apply}>
             {writable

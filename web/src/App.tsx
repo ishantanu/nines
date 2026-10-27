@@ -12,6 +12,7 @@ import {
 } from "react";
 import {
   Activity,
+  BookOpen,
   Video,
   MessageSquare,
   Moon,
@@ -32,6 +33,8 @@ import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -198,6 +201,15 @@ const navigation = [
   { id: "audit" as const, label: "Audit log", icon: ShieldCheck },
   { id: "access" as const, label: "Access control", icon: KeyRound },
   { id: "clients" as const, label: "API and clients", icon: Terminal },
+];
+const navigationGroups = [
+  { label: "Reliability", pages: ["objectives", "journeys", "maps", "alerts"] },
+  {
+    label: "Agent workflows",
+    pages: ["intents", "investigations", "workflows"],
+  },
+  { label: "Evidence", pages: ["agents", "replays", "audit"] },
+  { label: "Administration", pages: ["connections", "access", "clients"] },
 ];
 const copy = {
   audit: [
@@ -1020,50 +1032,56 @@ function TenantWorkspace({
         <div className="flex h-14 shrink-0 items-center gap-2.5 border-b px-5">
           <Brand />
         </div>
-        <nav className="space-y-1 px-3 py-5" aria-label="Main navigation">
-          {navigation.map((n) => (
-            <a
-              href={workspacePath(scope.tenant, n.id)}
-              key={n.id}
-              className={cn(
-                "nav-item",
-                n.id === "connections" && "mt-6",
-                activePage === n.id && "nav-active",
-              )}
-              onClick={(event) => {
-                followLink(event, workspacePath(scope.tenant, n.id));
-                if (event.defaultPrevented) {
-                  setQuery("");
-                  setReplayFilter("all");
-                }
-              }}
-              aria-current={activePage === n.id ? "page" : undefined}
-            >
-              <n.icon className="size-4 shrink-0" aria-hidden="true" />
-              <ReplayLabel>{n.label}</ReplayLabel>
-            </a>
-          ))}
+        <nav className="sidebar-navigation" aria-label="Main navigation">
+          {[{ label: "", pages: ["home"] }, ...navigationGroups].map(
+            (group) => (
+              <div
+                className="navigation-group"
+                key={group.label || "home"}
+                role="group"
+                aria-label={group.label || "Overview"}
+              >
+                {group.label ? (
+                  <p className="navigation-group-label">{group.label}</p>
+                ) : null}
+                {group.pages.map((id) => {
+                  const n = navigation.find((item) => item.id === id)!;
+                  return (
+                    <a
+                      href={workspacePath(scope.tenant, n.id)}
+                      key={n.id}
+                      className={cn(
+                        "nav-item",
+                        activePage === n.id && "nav-active",
+                      )}
+                      onClick={(event) => {
+                        followLink(event, workspacePath(scope.tenant, n.id));
+                        if (event.defaultPrevented) {
+                          setQuery("");
+                          setReplayFilter("all");
+                        }
+                      }}
+                      aria-current={activePage === n.id ? "page" : undefined}
+                    >
+                      <n.icon className="size-4 shrink-0" aria-hidden="true" />
+                      <ReplayLabel>{n.label}</ReplayLabel>
+                    </a>
+                  );
+                })}
+              </div>
+            ),
+          )}
         </nav>
-        <div className="mt-auto border-t p-3">
-          {platformAdmin ? (
-            <a
-              className="mb-2 flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted"
-              href="/admin/tenants"
-              onClick={(e) => followLink(e, "/admin/tenants")}
-            >
-              <ShieldCheck className="size-4" aria-hidden="true" />
-              Platform administration
-            </a>
-          ) : null}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-muted-foreground"
-            onClick={onCredentials}
+        <div className="shrink-0 border-t p-3">
+          <a
+            className="nav-item"
+            href="https://ishantanu.github.io/nines/docs/"
+            target="_blank"
+            rel="noreferrer"
           >
-            <Settings2 className="size-4" aria-hidden="true" />
-            <ReplayLabel>API connection</ReplayLabel>
-          </Button>
+            <BookOpen className="size-4" aria-hidden="true" />
+            Documentation<span className="sr-only"> (opens in a new tab)</span>
+          </a>
         </div>
       </aside>
       <div className="workspace">
@@ -1108,11 +1126,19 @@ function TenantWorkspace({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {navigation.map((n) => (
-                <SelectItem key={n.id} value={n.id}>
-                  <n.icon className="size-4" aria-hidden="true" />
-                  <ReplayLabel>{n.label}</ReplayLabel>
-                </SelectItem>
+              <SelectItem value="home">Home</SelectItem>
+              {navigationGroups.map((group) => (
+                <SelectGroup key={group.label}>
+                  <SelectLabel>{group.label}</SelectLabel>
+                  {group.pages.map((id) => {
+                    const n = navigation.find((item) => item.id === id)!;
+                    return (
+                      <SelectItem key={n.id} value={n.id}>
+                        <ReplayLabel>{n.label}</ReplayLabel>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
@@ -1282,25 +1308,35 @@ function TenantWorkspace({
                     <dl className="summary-grid">
                       {(page === "objectives"
                         ? [
-                            { label: "Objectives", value: objectives.length },
+                            {
+                              label: "Objectives",
+                              value: objectives.filter((o) => !o.slo.retirement)
+                                .length,
+                            },
                             {
                               label: "Healthy",
                               value: objectives.filter(
-                                (o) => healthOf(o.status) === "healthy",
+                                (o) =>
+                                  !o.slo.retirement &&
+                                  healthOf(o.status) === "healthy",
                               ).length,
                             },
                             {
                               label: "Needs attention",
-                              value: objectives.filter((o) =>
-                                ["degraded", "at_risk"].includes(
-                                  healthOf(o.status),
-                                ),
+                              value: objectives.filter(
+                                (o) =>
+                                  !o.slo.retirement &&
+                                  ["degraded", "at_risk"].includes(
+                                    healthOf(o.status),
+                                  ),
                               ).length,
                             },
                             {
                               label: "Without full coverage",
                               value: objectives.filter(
-                                (o) => healthOf(o.status) === "unknown",
+                                (o) =>
+                                  !o.slo.retirement &&
+                                  healthOf(o.status) === "unknown",
                               ).length,
                             },
                           ]
@@ -1353,7 +1389,11 @@ function TenantWorkspace({
                         <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
                         <Input
                           className="bg-white pl-9"
-                          aria-label="Search journeys or objectives"
+                          aria-label={
+                            page === "objectives"
+                              ? "Search objectives"
+                              : "Search critical user journeys"
+                          }
                           placeholder={
                             page === "objectives"
                               ? "Search objectives"

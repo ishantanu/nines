@@ -1,0 +1,18 @@
+apiVersion: nines.dev/v1alpha1
+kind: CriticalUserJourney
+metadata:
+  name: graph-checkout
+  project: playground
+spec:
+  displayName: Complete the example checkout
+  owner: commerce
+  criticality: high
+  description: Receive a successful response through the instrumented HTTP chain.
+  slos:
+    - {id: graph-gateway-availability, dimension: availability, required: true}
+    - {id: graph-checkout-availability, dimension: availability, required: true}
+    - {id: graph-payments-availability, dimension: availability, required: true}
+  steps:
+    - {id: enter, name: Submit request, actor: user, sloRefs: [graph-gateway-availability]}
+    - {id: checkout, name: Process checkout, actor: service, sloRefs: [graph-checkout-availability], dependsOn: [enter]}
+    - {id: pay, name: Authorize payment, actor: service, sloRefs: [graph-payments-availability], dependsOn: [checkout]}

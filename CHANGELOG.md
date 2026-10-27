@@ -1,6 +1,18 @@
 # Changelog
 
-## Unreleased
+## Unreleased (v0.1.0-alpha.3)
+
+- Add reviewed tenant-owner SLO retirement across HTTP, CLI, Go client and portal, with retained historical reads, concurrent-reference fences, durable audit/tombstones and retryable owned-rule cleanup at the original trusted destination.
+- Qualify observed dependency links with actual sample age, series continuity, provenance, declared-link alignment and journey steps. Add an optional instrumented HTTP chain and real exporter-outage acceptance.
+- Complete operator acceptance for provider outage/credential rotation and independent severity alert lifecycles on actual Prometheus/Mimir rule output.
+
+
+- Add a visual service dependency editor with revisioned positions, directed links and SLO references; discover reviewable Kubernetes candidates from local exports or opt-in tenant-scoped cluster inventory with namespace-only RBAC.
+
+- Simplify SLI charts to measured attainment and target, retain incomplete-history qualifications, and add keyboard time inspection, equivalent data tables, readable responsive panels and accessible theme/control contrast checks.
+
+- Package Jev playground configuration behind an explicit optional Compose override for Prometheus and Mimir, preserving key-free default startup and all tenant/rule destinations.
+- Reduce documentation scripts to about 9.5 KB with independent static-page enhancement, cached chapter navigation, responsive sticky chapter menus, history restoration and CI bundle budgets.
 
 - Keep guided SLO measurement, settings and YAML edits synchronized, preserve intent authoring context and invalidate stale reviews on tab changes. Prevent implicit replacement of custom measurements and cancel requests when editors close or tenants change.
 

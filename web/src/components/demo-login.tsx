@@ -1,3 +1,4 @@
+import { LoginFrame } from "./login-frame";
 import { Brand } from "@/components/brand";
 import { useState, type FormEvent } from "react";
 import { LogIn, Moon, Sun } from "lucide-react";
@@ -55,9 +56,9 @@ export function DemoLogin({
           <Moon className="size-4" aria-hidden="true" />
         )}
       </Button>
-      <div className="demo-login-content mx-auto flex min-h-[calc(100svh-5rem)] w-full max-w-md items-center">
+      <LoginFrame>
         <Card className="demo-login-card w-full gap-0 overflow-hidden py-0">
-          <div className="demo-login-heading space-y-3 border-b p-6">
+          <div className="demo-login-heading login-form-heading space-y-3 border-b p-6">
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Brand />
             </div>
@@ -67,7 +68,7 @@ export function DemoLogin({
             </p>
           </div>
           <CardContent className="space-y-5 p-6">
-            <div className="demo-credentials rounded-md border bg-muted/50 p-4 text-sm">
+            <div className="demo-credentials border-b pb-4 text-sm">
               <p className="font-medium">Demo credentials</p>
               <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 text-muted-foreground">
                 <dt>Username</dt>
@@ -138,7 +139,7 @@ export function DemoLogin({
             </p>
           </CardContent>
         </Card>
-      </div>
+      </LoginFrame>
     </main>
   );
 }

@@ -1,4 +1,4 @@
-.PHONY: demo run build server cli mcp operator ui test test-integration test-mimir test-prometheus test-ceph test-operator test-identity intent-eval intent-workflow-eval template-eval selection-eval check release-check public-source release site site-check lint lint-go lint-python
+.PHONY: demo run build server cli mcp operator ui test test-integration test-mimir test-prometheus test-ceph test-operator test-identity test-dependencies test-topology intent-eval intent-workflow-eval template-eval selection-eval check release-check public-source release site site-check lint lint-go lint-python
 VERSION ?= dev
 RELEASE_TARGETS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64
 ui:
@@ -39,6 +39,10 @@ test-ceph:
 	sh integration/ceph/run.sh
 test-identity:
 	sh integration/identity/run.sh
+test-topology:
+	sh integration/topology/run.sh
+test-dependencies:
+	sh integration/dependencies/run.sh
 test-operator:
 	sh integration/operator/run.sh
 check:
@@ -61,7 +65,7 @@ site-check:
 lint: lint-go lint-python
 lint-go:
 	golangci-lint run
-	golangci-lint fmt --diff
+	golangci-lint fmt --diff api client cmd examples integration internal reviewskills skills
 lint-python:
 	ruff check .
 	ruff format --check .

@@ -108,6 +108,7 @@ export interface ErrorBudgetDecision {
   advisory: boolean;
 }
 export interface SLO {
+  retirement?: import("./retirement").RetirementState;
   errorBudgetPolicy?: ErrorBudgetPolicy;
   quality?: MeasurementQualityPolicy;
   lifecycle?: SLOLifecycle;

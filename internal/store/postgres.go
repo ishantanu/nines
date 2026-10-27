@@ -54,12 +54,30 @@ func (p *Postgres) Create(ctx context.Context, s model.SLO) error {
 	if err != nil {
 		return err
 	}
-	_, err = p.pool.Exec(ctx, "INSERT INTO slos(id,config) VALUES($1,$2)", s.ID, b)
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	if _, err = tx.Exec(ctx, "LOCK TABLE slos IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+		return err
+	}
+	var deleted bool
+	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM slo_tombstones WHERE slo_id=$1)", s.ID).Scan(&deleted); err != nil {
+		return err
+	}
+	if deleted {
+		return model.ErrConflict
+	}
+	_, err = tx.Exec(ctx, "INSERT INTO slos(id,config) VALUES($1,$2)", s.ID, b)
 	var pe *pgconn.PgError
 	if errors.As(err, &pe) && pe.Code == "23505" {
 		return model.ErrConflict
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 func (p *Postgres) List(ctx context.Context) ([]model.SLO, error) {
 	rows, err := p.pool.Query(ctx, "SELECT config FROM slos ORDER BY id")
@@ -234,6 +252,11 @@ func (p *Postgres) Update(ctx context.Context, id string, fn func(*model.Record)
 	}
 	if _, err = tx.Exec(ctx, "UPDATE slos SET alert_state=$2,config=$3,collection_health=$4,operator_route=$5,rule_automation=$6 WHERE id=$1", id, state, config, collection, r.OperatorRoute, automation); err != nil {
 		return err
+	}
+	if !before.SLO.Retired() && r.SLO.Retired() {
+		if _, err = tx.Exec(ctx, "UPDATE alert_outbox SET status='failed',last_error='slo_archived' WHERE event->>'sloId'=$1 AND status='pending'", id); err != nil {
+			return err
+		}
 	}
 	for _, e := range r.Events {
 		body, err := json.Marshal(e)

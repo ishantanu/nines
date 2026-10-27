@@ -146,10 +146,18 @@ func (s *Service) sloContextFromRecord(rec model.Record, now, requested time.Tim
 	if requested.IsZero() {
 		at = s.recordEvaluationAt(rec, now)
 	}
-	if at.Before(now.Add(-2 * time.Duration(c.WindowSeconds) * time.Second)) {
+	retentionNow := now
+	if c.Retired() {
+		retentionNow = c.Retirement.ArchivedAt
+	}
+	if at.Before(retentionNow.Add(-2 * time.Duration(c.WindowSeconds) * time.Second)) {
 		return v1.SLOContext{}, model.Invalid("context time exceeds SLO sample retention")
 	}
-	snapshot := engine.EvaluateRecord(rec, at, c.WindowSeconds)
+	evaluation := rec
+	if c.Retired() {
+		evaluation.SLO.Revision = c.Retirement.OriginalRevision
+	}
+	snapshot := engine.EvaluateRecord(evaluation, at, c.WindowSeconds)
 	current := s.nominalEvaluationAt(c, now)
 	if requested.IsZero() {
 		current = s.recordEvaluationAt(rec, now)
@@ -165,6 +173,12 @@ func (s *Service) sloContextFromRecord(rec model.Record, now, requested time.Tim
 	if c.ProviderWindow != nil {
 		out.Definition.MeasurementMode = "provider_window"
 		out.Definition.CoverageBasis = "scrape_density"
+	}
+	if c.Retired() {
+		out.Retirement = c.Retirement
+		out.Health = "archived"
+		out.Warnings = append(out.Warnings, "slo_archived_collection_and_alerts_stopped")
+		snapshot.Alert = model.AlertState{Phase: "archived"}
 	}
 	if !c.AlertsEnabled() {
 		out.Warnings = append(out.Warnings, "burn_alerts_disabled_by_lifecycle")

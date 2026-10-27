@@ -240,8 +240,9 @@ export function JourneyDetail({
         <Tabs
           defaultValue={evidenceOnly ? "evidence" : "overview"}
           key={`${m.metadata.name}-${evidenceOnly}`}
+          className="detail-tabs"
         >
-          <TabsList className="mb-5">
+          <TabsList className="detail-tab-list mb-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="manifest">Manifest</TabsTrigger>
             <TabsTrigger value="evidence">Run evidence</TabsTrigger>

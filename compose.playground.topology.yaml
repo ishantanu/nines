@@ -1,0 +1,26 @@
+# Optional instrumented HTTP chain. Use with the ordinary Prometheus playground;
+# the same target-file override also works with its optional Mimir configuration.
+services:
+  graph-gateway:
+    build:
+      context: .
+      dockerfile: examples/service-graph/Dockerfile
+    image: nines-service-graph:local
+    command: [-name, gateway, -dependency, checkout, -next, 'http://graph-checkout:8000/request']
+    ports:
+      - '127.0.0.1:${NINES_PLAYGROUND_GRAPH_PORT:-19094}:8000'
+  graph-checkout:
+    image: nines-service-graph:local
+    command: [-name, checkout, -dependency, payments, -next, 'http://graph-payments:8000/request']
+    depends_on: [graph-gateway]
+  graph-payments:
+    image: nines-service-graph:local
+    command: [-name, payments]
+    depends_on: [graph-gateway]
+  graph-traffic:
+    image: nines-service-graph:local
+    command: [-generate, 'http://graph-gateway:8000/request']
+    depends_on: [graph-gateway, graph-checkout, graph-payments]
+  prometheus:
+    volumes:
+      - ./deploy/playground/topology/targets.json:/etc/prometheus/topology-targets.json:ro

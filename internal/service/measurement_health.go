@@ -103,6 +103,9 @@ func (s *Service) CheckMeasurement(ctx context.Context, id string) (v1.BindingHe
 		return v1.BindingHealth{}, err
 	}
 	config := record.SLO
+	if config.Retired() {
+		return v1.BindingHealth{}, model.Invalid("SLO is archived")
+	}
 	if config.MeasurementBinding == nil && config.Measurement == nil {
 		return v1.BindingHealth{}, model.Invalid("SLO has no structured measurement")
 	}
@@ -141,6 +144,9 @@ func (s *Service) RunMeasurementMonitor(ctx context.Context, log *slog.Logger) {
 		if err == nil {
 			checked := 0
 			for _, c := range configs {
+				if c.Retired() {
+					continue
+				}
 				if c.MeasurementBinding == nil && c.Measurement == nil {
 					continue
 				}

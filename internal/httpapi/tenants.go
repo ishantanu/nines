@@ -211,6 +211,9 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 		}
 		services[workspace.Service] = true
 		workspace.Service.RuleManager = workspace.Rules
+		if workspace.Rules != nil {
+			workspace.Rules.PublicationGuard = workspace.Service.PinRuleDestination
+		}
 		workspace.Service.TenantID = workspace.ID
 		workspace.Service.TenantName = workspace.Name
 		mounted[workspace.ID] = mountedTenant{workspace, newSingle(workspace.Service, log, workspace.Workflows, workspace)}
@@ -445,7 +448,7 @@ func allowed(role string, r *http.Request) bool {
 	if strings.HasPrefix(r.URL.Path, "/api/slo-templates/") && strings.HasSuffix(r.URL.Path, "/render") {
 		return true
 	}
-	if r.URL.Path == "/api/slos/compile" || r.URL.Path == "/api/intents/backtest" || r.URL.Path == "/api/intents/plan" || r.URL.Path == "/api/journeys/plan" || r.URL.Path == "/api/resources/plan" || r.URL.Path == "/api/resources/validate" {
+	if r.URL.Path == "/api/dependency-discovery/kubernetes" || r.URL.Path == "/api/slos/compile" || r.URL.Path == "/api/intents/backtest" || r.URL.Path == "/api/intents/plan" || r.URL.Path == "/api/journeys/plan" || r.URL.Path == "/api/resources/plan" || r.URL.Path == "/api/resources/validate" {
 		return true
 	}
 	if r.URL.Path == "/api/session-replays" || strings.HasPrefix(r.URL.Path, "/api/session-replays/") && strings.HasSuffix(r.URL.Path, "/links") {

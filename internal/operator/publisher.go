@@ -388,7 +388,7 @@ func (p *Publisher) Withdraw(ctx context.Context, s model.SLO, plan rules.Plan) 
 		_, err = api.Get(bounded, v1.SLOKind, s.ID)
 		if code(err, 404) {
 			if err := p.Store.Update(ctx, s.ID, func(record *model.Record) error {
-				if model.ConfigRevision(record.SLO) != model.ConfigRevision(s) {
+				if model.ConfigRevision(record.SLO) != model.ConfigRevision(s) && (!record.SLO.Retired() || record.SLO.Retirement.OriginalRevision != model.ConfigRevision(s)) {
 					return model.ErrRevisionConflict
 				}
 				if record.OperatorRoute != "" && record.OperatorRoute != rules.RouteDigest(plan.Target) {

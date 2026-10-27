@@ -126,13 +126,14 @@ test("charts retain observed rolling SLI while distinguishing partial and comple
     intervalCoverage: 1,
     intervalReliability: snapshot.reliability,
   } as HistoryPoint;
-  const full = sliTimelineLines.find((line) => line.name === "Rolling SLI")!;
-  const partial = sliTimelineLines.find((line) => line.dashed)!;
-  expect(full.get(point)).toBeNull();
-  expect(partial.get(point)).toBe(snapshot.reliability);
-  expect(full.get({ ...point, coverage: 1 })).toBe(snapshot.reliability);
-  expect(partial.get({ ...point, coverage: 1 })).toBeNull();
-  expect(partial.get({ ...point, coverage: 0, reliability: null })).toBeNull();
+  expect(sliTimelineLines).toHaveLength(1);
+  const measured = sliTimelineLines[0];
+  expect(measured.name).toBe("Measured SLI");
+  expect(measured.get(point)).toBe(snapshot.reliability);
+  expect(measured.partial?.(point)).toBe(true);
+  expect(measured.get({ ...point, coverage: 1 })).toBe(snapshot.reliability);
+  expect(measured.partial?.({ ...point, coverage: 1 })).toBe(false);
+  expect(measured.get({ ...point, coverage: 0, reliability: null })).toBeNull();
 });
 
 test("compact journey-map values retain the partial-window qualification", () => {

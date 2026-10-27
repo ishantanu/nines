@@ -74,3 +74,15 @@ func (c *Client) CompileMeasurement(ctx context.Context, definition []byte) (v1.
 	err := c.scopedMediaRequest(ctx, http.MethodPost, "/api/slos/compile", definition, 1<<20, "application/yaml", &out)
 	return out, err
 }
+
+// DiscoverDependencies previews Kubernetes configuration candidates. It never
+// saves a graph, changes cluster resources or fetches caller-selected endpoints.
+func (c *Client) DiscoverDependencies(ctx context.Context, in v1.DependencyDiscoveryInput) (v1.DependencyDiscovery, error) {
+	var out v1.DependencyDiscovery
+	body, err := json.Marshal(in)
+	if err != nil {
+		return out, err
+	}
+	err = c.scopedRequest(ctx, http.MethodPost, "/api/dependency-discovery/kubernetes", body, 1<<20, &out)
+	return out, err
+}

@@ -16,6 +16,9 @@ import (
 )
 
 func (s *Service) RuleAutomationStatus(record model.Record, manager *rules.Manager) *v1.RuleAutomationStatus {
+	if record.SLO.Retired() {
+		return &v1.RuleAutomationStatus{Paused: true, Revision: model.ConfigRevision(record.SLO), IntegrationStage: v1.IntegrationStage{State: "archived", Code: "slo_archived", Message: "Archived SLOs cannot deploy rules."}}
+	}
 	if manager == nil {
 		return nil
 	}
@@ -81,6 +84,9 @@ func (s *Service) ReconcileRules(ctx context.Context, id string, manager *rules.
 	record, e := s.Store.Read(ctx, id)
 	if e != nil {
 		return nil, e
+	}
+	if record.SLO.Retired() {
+		return s.RuleAutomationStatus(record, manager), nil
 	}
 	target, ok := manager.TargetFor(record.SLO)
 	if !ok || !target.AutoDeploy {
@@ -195,6 +201,21 @@ func (s *Service) RunRuleReconciler(ctx context.Context, manager *rules.Manager,
 					continue
 				}
 				after = config.ID
+				if config.Retired() {
+					if config.Retirement.Cleanup != "complete" {
+						job, stop := context.WithTimeout(ctx, 20*time.Second)
+						_, err := s.ReconcileRetirement(job, config.ID)
+						stop()
+						if err != nil {
+							log.Warn("SLO retirement cleanup needs attention", "slo", config.ID)
+						}
+						processed++
+					}
+					if processed >= 100 || ctx.Err() != nil {
+						break
+					}
+					continue
+				}
 				target, ok := manager.TargetFor(config)
 				if !ok || !target.AutoDeploy {
 					continue

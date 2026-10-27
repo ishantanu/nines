@@ -70,7 +70,8 @@ type ExternalDestination interface {
 	Identity(context.Context, model.SLO, Target) (model.RuleOutputIdentity, error)
 }
 type Manager struct {
-	External ExternalDestination
+	PublicationGuard func(context.Context, model.SLO, Target) error
+	External         ExternalDestination
 
 	DynamicTarget func(string) (Target, bool)
 	BeforeWrite   func() error // Optional lease/authorization guard immediately before external writes.
@@ -86,6 +87,9 @@ func (m *Manager) Plan(s model.SLO) (Plan, error) {
 	return m.PlanContext(ctx, s)
 }
 func (m *Manager) PlanContext(ctx context.Context, s model.SLO) (Plan, error) {
+	if s.Retired() {
+		return Plan{}, model.Invalid("SLO is archived; rule publication is disabled")
+	}
 	target, ok := m.target(ConnectionID(s))
 	if !ok {
 		return Plan{}, model.Invalid("connection %s has no recording-rule destination configured", ConnectionID(s))
@@ -136,6 +140,11 @@ func (m *Manager) Apply(ctx context.Context, s model.SLO, expected string) (Depl
 	}
 	if expected == "" || expected != p.Digest {
 		return Deployment{}, model.ErrRevisionConflict
+	}
+	if m.PublicationGuard != nil {
+		if err := m.PublicationGuard(ctx, s, p.Target); err != nil {
+			return Deployment{}, err
+		}
 	}
 	if p.Target.Kind == "operator" {
 		if err := m.authorizeWrite(ctx, s, expected); err != nil {

@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/engine"
+	"github.com/ishantanu/nines/internal/kubediscovery"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/rules"
@@ -26,20 +27,21 @@ type MetricSource struct {
 }
 
 type Service struct {
-	RuleManager   *rules.Manager
-	DynamicSource func(string) (MetricSource, bool)
-	IntentDrafter IntentDrafter
-	DefinitionMu  sync.Mutex
-	Sources       map[string]MetricSource
-	Store         store.Store
-	Journeys      store.JourneyStore
-	Demo          bool
-	TenantID      string
-	TenantName    string
-	SourceKind    string
-	Collector     Collector
-	Now           func() time.Time
-	collectionMu  sync.Mutex
+	KubernetesDiscovery kubediscovery.Reader
+	RuleManager         *rules.Manager
+	DynamicSource       func(string) (MetricSource, bool)
+	IntentDrafter       IntentDrafter
+	DefinitionMu        sync.Mutex
+	Sources             map[string]MetricSource
+	Store               store.Store
+	Journeys            store.JourneyStore
+	Demo                bool
+	TenantID            string
+	TenantName          string
+	SourceKind          string
+	Collector           Collector
+	Now                 func() time.Time
+	collectionMu        sync.Mutex
 }
 
 func New(st store.Store, c Collector) *Service {
@@ -51,6 +53,9 @@ func New(st store.Store, c Collector) *Service {
 	return &Service{Store: st, Journeys: journeys, Collector: c, Now: time.Now, TenantID: "default", TenantName: "Default workspace", SourceKind: kind}
 }
 func (s *Service) Create(ctx context.Context, c model.SLO) error {
+	if c.Retired() || c.RuleDestination != "" {
+		return model.Invalid("retirement state is server-owned")
+	}
 	if c.Measurement != nil && c.ProviderWindow == nil {
 		c.ProviderWindow = model.MeasurementWindow(*c.Measurement)
 	}
@@ -85,6 +90,13 @@ func (s *Service) evaluationAt(c model.SLO) time.Time { return s.nominalEvaluati
 // cutoff rather than describing an interval it has not queried as missing.
 // Failed, overdue, empty-result and historical reads never borrow old samples.
 func (s *Service) recordEvaluationAt(r model.Record, now time.Time) time.Time {
+	if r.SLO.Retired() {
+		if !r.SLO.Retirement.EvaluationAt.IsZero() {
+			return r.SLO.Retirement.EvaluationAt
+		}
+		now = r.SLO.Retirement.ArchivedAt
+		r.SLO.Revision = r.SLO.Retirement.OriginalRevision
+	}
 	at := s.nominalEvaluationAt(r.SLO, now)
 	h := r.Collection
 	if s.CollectorFor(r.SLO) == nil || !r.SLO.HasQueries() || h.State != "succeeded" || h.Points <= 0 || h.SLORevision != model.ConfigRevision(r.SLO) || h.CompletedAt.IsZero() || now.Before(h.CompletedAt) || now.Sub(h.CompletedAt) > collectionInterval {
@@ -146,7 +158,11 @@ func (s *Service) statusFromRecord(r model.Record, at time.Time) (model.Snapshot
 	if at.After(s.Now()) {
 		return model.Snapshot{}, model.Invalid("evaluation time cannot be in the future")
 	}
-	result := engine.EvaluateRecord(r, at, r.SLO.WindowSeconds)
+	evaluation := r
+	if r.SLO.Retired() {
+		evaluation.SLO.Revision = r.SLO.Retirement.OriginalRevision
+	}
+	result := engine.EvaluateRecord(evaluation, at, r.SLO.WindowSeconds)
 	if at.Equal(current) {
 		if health, ok := s.measurementHealth(r); ok && health.EvaluationBlocked {
 			result.Reliability = nil
@@ -161,6 +177,9 @@ func (s *Service) statusFromRecord(r model.Record, at time.Time) (model.Snapshot
 	// Historical evaluations do not attach today's alert state to past data.
 	if result.At.Equal(current) {
 		result.Alert = r.SLO.LifecycleAlertState(r.Alert)
+		if r.SLO.Retired() {
+			result.Alert = model.AlertState{Phase: "archived"}
+		}
 	} else {
 		result.Alert = model.AlertState{Phase: "historical"}
 	}
@@ -195,6 +214,9 @@ func (s *Service) Ingest(ctx context.Context, id string, points []model.Point) e
 	})
 }
 func (s *Service) apply(r *model.Record, points []model.Point, replace *[2]time.Time) error {
+	if r.SLO.Retired() {
+		return model.Invalid("SLO is archived")
+	}
 	now := s.Now().UTC().Truncate(time.Duration(r.SLO.StepSeconds) * time.Second)
 	cutoff := now.Add(-2 * time.Duration(r.SLO.WindowSeconds) * time.Second)
 	seen := map[int64]bool{}
@@ -244,7 +266,13 @@ func (s *Service) advance(r *model.Record, at time.Time) {
 	r.Events = append(r.Events, events...)
 }
 func (s *Service) Evaluate(ctx context.Context, id string) error {
-	return s.Store.Update(ctx, id, func(r *model.Record) error { s.advance(r, s.recordEvaluationAt(*r, s.Now())); return nil })
+	return s.Store.Update(ctx, id, func(r *model.Record) error {
+		if r.SLO.Retired() {
+			return model.Invalid("SLO is archived")
+		}
+		s.advance(r, s.recordEvaluationAt(*r, s.Now()))
+		return nil
+	})
 }
 
 // CollectRecent reads a bounded recent range using the saved SLO and configured
@@ -276,6 +304,9 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 		return 0, err
 	}
 	c := r.SLO
+	if c.Retired() {
+		return 0, model.Invalid("SLO is archived")
+	}
 	collector := s.CollectorFor(c)
 	sourceDigest := collectorFingerprint(collector, c.Source)
 	if collector == nil {
@@ -320,7 +351,7 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 		persist, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer cancel()
 		if e := s.Store.Update(persist, id, func(r *model.Record) error {
-			if model.ConfigRevision(r.SLO) != model.ConfigRevision(c) {
+			if r.SLO.Retired() || model.ConfigRevision(r.SLO) != model.ConfigRevision(c) {
 				return nil // A late failure belongs to the old definition, not the new measurement.
 			}
 			if !r.Collection.AttemptedAt.After(health.AttemptedAt) {
@@ -351,6 +382,9 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 	}
 	rangeToReplace := [2]time.Time{from, to}
 	err = s.Store.Update(ctx, id, func(r *model.Record) error {
+		if r.SLO.Retired() {
+			return model.Invalid("SLO is archived")
+		}
 		if check, ok := s.measurementHealth(*r); ok && check.EvaluationBlocked {
 			return errMeasurementContract
 		}
@@ -372,7 +406,7 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 			health.Measurement = r.Collection.Measurement
 			r.Collection = health
 		}
-		if model.ConfigRevision(r.SLO) != model.ConfigRevision(c) {
+		if r.SLO.Retired() || model.ConfigRevision(r.SLO) != model.ConfigRevision(c) {
 			return model.ErrRevisionConflict
 		}
 		if c.ProviderWindow != nil {
