@@ -36,3 +36,6 @@ backups/
 
 # Private local model evaluation reports.
 /intent-evaluation*.json
+
+# Local Impeccable design-tool preferences and scratch files.
+/.impeccable/
