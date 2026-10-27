@@ -121,6 +121,10 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 	a.mountTelemetry(api)
 	api.HandleFunc("POST /api/connections/{connection}/test", a.connectionTest)
 
+	api.HandleFunc("GET /api/slos/{id}/retirement/plan", a.retirementPlan)
+	api.HandleFunc("GET /api/slos/{id}/retirement", a.retirementStatus)
+	api.HandleFunc("POST /api/slos/{id}/retirement/apply", a.retirementApply)
+	api.HandleFunc("POST /api/slos/{id}/retirement/retry", a.retirementRetry)
 	api.HandleFunc("GET /api/slos/{id}/integration", a.integrationStatus)
 	api.HandleFunc("GET /api/slos/{id}/rules", a.rulePlan)
 	api.HandleFunc("POST /api/slos/{id}/rules/plan", a.rulePlan)

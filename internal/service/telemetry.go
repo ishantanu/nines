@@ -121,6 +121,9 @@ func (s *Service) validateTopology(ctx context.Context, d model.Definition) erro
 			if err != nil {
 				return err
 			}
+			if r.SLO.Retired() {
+				return model.Invalid("SLO %s is archived", id)
+			}
 			if r.SLO.Service != node.Name {
 				return model.Invalid("SLO %s belongs to service %s, not %s", id, r.SLO.Service, node.Name)
 			}
@@ -428,7 +431,7 @@ func (s *Service) DependencyView(ctx context.Context, id string, expected int64)
 	}
 	nodes := map[string]v1.DependencyNode{}
 	for _, n := range g.Spec.Services {
-		node := v1.DependencyNode{Name: n.Name, DisplayName: n.DisplayName, Declared: true, Health: "unknown", Objectives: []v1.MapObjective{}, Journeys: []v1.MapJourney{}}
+		node := v1.DependencyNode{Position: n.Position, Name: n.Name, DisplayName: n.DisplayName, Declared: true, Health: "unknown", Objectives: []v1.MapObjective{}, Journeys: []v1.MapJourney{}}
 		journeys := map[string]bool{}
 		health := "healthy"
 		for _, id := range n.SLORefs {
@@ -467,10 +470,14 @@ func (s *Service) DependencyView(ctx context.Context, id string, expected int64)
 		nodes[n.Name] = node
 	}
 	for _, e := range g.Spec.Dependencies {
-		out.Edges = append(out.Edges, v1.DependencyEdge{Caller: e.Caller, Callee: e.Callee, Provenance: "declared", Critical: e.Critical, Description: e.Description})
+		out.Edges = append(out.Edges, v1.DependencyEdge{Caller: e.Caller, Callee: e.Callee, Provenance: "declared", Origin: e.Origin, Alignment: "declared_only", Critical: e.Critical, Description: e.Description})
 	}
+	out.DeclaredEdges = len(g.Spec.Dependencies)
 	if o := g.Spec.Observed; o != nil {
 		out.Source = o.Source
+		out.SourceDigest = s.SourceFingerprint(o.Source)
+		out.InstrumentationCoverage = "unknown"
+		out.DeclaredEdges = len(g.Spec.Dependencies)
 		to := out.ObservedAt
 		from := to.Add(-time.Duration(o.WindowSeconds) * time.Second)
 		out.From = &from
@@ -478,10 +485,24 @@ func (s *Service) DependencyView(ctx context.Context, id string, expected int64)
 		out.ObservationState = "unavailable"
 		c, err := s.telemetrySource(o.Source)
 		if err == nil {
-			edges, truncated, observeErr := c.ObserveDependencies(ctx, *o, to)
+			var edges []v1.ObservedEdge
+			var truncated bool
+			var observeErr error
+			if enhanced, ok := c.(graphEvidenceSource); ok {
+				edges, truncated, observeErr = enhanced.ObserveDependencyEvidence(ctx, *o, to)
+			} else {
+				edges, truncated, observeErr = c.ObserveDependencies(ctx, *o, to)
+			}
+			if s.SourceFingerprint(o.Source) != out.SourceDigest {
+				observeErr = ErrTelemetry
+			}
 			if observeErr == nil {
 				out.ObservationState = "observed"
 				out.Truncated = truncated
+				if len(edges) > 100 {
+					edges = edges[:100]
+					out.Truncated = true
+				}
 				if len(edges) == 0 {
 					out.ObservationState = "no_edges"
 				}
@@ -506,14 +527,49 @@ func (s *Service) DependencyView(ctx context.Context, id string, expected int64)
 						}
 					}
 					requests := e.Requests
-					out.Edges = append(out.Edges, v1.DependencyEdge{Caller: e.Caller, Callee: e.Callee, Provenance: "observed", ConnectionType: e.ConnectionType, Requests: &requests})
+					out.Edges = append(out.Edges, v1.DependencyEdge{Caller: e.Caller, Callee: e.Callee, Provenance: "observed", Alignment: "observed_only", ConnectionType: e.ConnectionType, Requests: &requests, Evidence: graphEvidence(*o, out.SourceDigest, to, e.Evidence, "unknown")})
 				}
 			}
 		}
+		pairs := map[string]*v1.GraphEdgeEvidence{}
+		for _, edge := range out.Edges {
+			if edge.Provenance == "observed" {
+				pairs[edge.Caller+"\x00"+edge.Callee] = edge.Evidence
+			}
+		}
+		declaredPairs := map[string]bool{}
+		for i := range out.Edges {
+			edge := &out.Edges[i]
+			if edge.Provenance != "declared" {
+				continue
+			}
+			key := edge.Caller + "\x00" + edge.Callee
+			declaredPairs[key] = true
+			state := "not_seen"
+			if out.ObservationState == "unavailable" {
+				state = "unavailable"
+			}
+			edge.Evidence = graphEvidence(*o, out.SourceDigest, to, nil, state)
+			if observed := pairs[key]; observed != nil {
+				edge.Evidence = observed
+				edge.Alignment = "matched"
+				out.MatchedDeclaredEdges++
+			}
+		}
+		for i := range out.Edges {
+			edge := &out.Edges[i]
+			if edge.Provenance == "observed" && declaredPairs[edge.Caller+"\x00"+edge.Callee] {
+				edge.Alignment = "matched"
+			}
+		}
+		out.Warnings = append(out.Warnings, "Sample continuity covers only counter series present in this window. Instrumentation and trace-sampling coverage are unknown. A missing or stale edge does not prove independence or health.")
 		out.Warnings = append(out.Warnings, "Observed edges use Tempo service-graph request counters. Trace sampling, missing instrumentation and virtual/database nodes can make this graph incomplete; absence is not proof of no dependency.")
 		if out.ObservationState == "unavailable" {
 			out.Warnings = append(out.Warnings, "Observed telemetry is unavailable; declared dependencies remain visible.")
 		}
+	}
+	if err := s.attachGraphJourneySteps(ctx, nodes); err != nil {
+		return out, err
 	}
 	// Potential impact follows reverse reachability; it never changes measured health.
 	for name, node := range nodes {
@@ -525,9 +581,13 @@ func (s *Service) DependencyView(ctx context.Context, id string, expected int64)
 			n := nodes[current]
 			node.ImpactTruncated = node.ImpactTruncated || n.JourneyLinksTruncated
 			for _, j := range n.Journeys {
+				j.Steps = nil // Step details belong only to a direct service/SLO link.
 				journeys[j.ID] = j
 			}
 			for _, e := range out.Edges {
+				if e.Provenance == "observed" && (e.Evidence == nil || e.Evidence.Freshness != "fresh") {
+					continue
+				}
 				if e.Callee == current && !visited[e.Caller] {
 					visited[e.Caller] = true
 					queue = append(queue, e.Caller)

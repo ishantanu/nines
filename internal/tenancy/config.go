@@ -16,6 +16,7 @@ import (
 
 	"github.com/ishantanu/nines/internal/auditarchive"
 	"github.com/ishantanu/nines/internal/intentmodel"
+	"github.com/ishantanu/nines/internal/kubediscovery"
 	"github.com/ishantanu/nines/internal/systemone"
 )
 
@@ -34,17 +35,18 @@ type Config struct {
 type IntentModel = intentmodel.Config
 
 type Tenant struct {
-	SystemOne        *systemone.Config    `json:"systemOne,omitempty" yaml:"systemOne,omitempty"`
-	SLOExtensionLock string               `json:"sloExtensionLock,omitempty" yaml:"sloExtensionLock,omitempty"`
-	AuditArchive     *auditarchive.Config `json:"auditArchive,omitempty" yaml:"auditArchive,omitempty"`
-	ReviewModel      *IntentModel         `json:"reviewModel,omitempty" yaml:"reviewModel,omitempty"`
-	IntentModel      *IntentModel         `json:"intentModel,omitempty" yaml:"intentModel,omitempty"`
-	Connections      []Connection         `json:"connections,omitempty" yaml:"connections,omitempty"`
-	ID               string               `json:"id" yaml:"id"`
-	Name             string               `json:"name" yaml:"name"`
-	Access           []Access             `json:"access" yaml:"access"`
-	Source           Source               `json:"source" yaml:"source"`
-	AlertWebhookEnv  string               `json:"alertWebhookEnv,omitempty" yaml:"alertWebhookEnv,omitempty"`
+	KubernetesDiscovery *kubediscovery.Config `json:"kubernetesDiscovery,omitempty" yaml:"kubernetesDiscovery,omitempty"`
+	SystemOne           *systemone.Config     `json:"systemOne,omitempty" yaml:"systemOne,omitempty"`
+	SLOExtensionLock    string                `json:"sloExtensionLock,omitempty" yaml:"sloExtensionLock,omitempty"`
+	AuditArchive        *auditarchive.Config  `json:"auditArchive,omitempty" yaml:"auditArchive,omitempty"`
+	ReviewModel         *IntentModel          `json:"reviewModel,omitempty" yaml:"reviewModel,omitempty"`
+	IntentModel         *IntentModel          `json:"intentModel,omitempty" yaml:"intentModel,omitempty"`
+	Connections         []Connection          `json:"connections,omitempty" yaml:"connections,omitempty"`
+	ID                  string                `json:"id" yaml:"id"`
+	Name                string                `json:"name" yaml:"name"`
+	Access              []Access              `json:"access" yaml:"access"`
+	Source              Source                `json:"source" yaml:"source"`
+	AlertWebhookEnv     string                `json:"alertWebhookEnv,omitempty" yaml:"alertWebhookEnv,omitempty"`
 }
 type Access struct {
 	TokenEnv string `json:"tokenEnv" yaml:"tokenEnv"`
@@ -163,6 +165,11 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 			return nil, fmt.Errorf("tenants need unique valid IDs and names of at most 200 bytes")
 		}
 		ids[t.ID] = true
+		if t.KubernetesDiscovery != nil {
+			if err := t.KubernetesDiscovery.Validate(); err != nil {
+				return nil, fmt.Errorf("tenant %s: %w", t.ID, err)
+			}
+		}
 		if t.AuditArchive != nil {
 			if err := t.AuditArchive.Validate(); err != nil {
 				return nil, fmt.Errorf("tenant %s: %w", t.ID, err)

@@ -53,15 +53,35 @@ func (a *Server) ruleMutation(w http.ResponseWriter, r *http.Request, withdraw b
 	var result rules.Deployment
 	if withdraw {
 		target, _ := a.Workspace.Rules.TargetFor(record.SLO)
-		if target.Kind != "operator" {
-			a.fail(w, r, model.Invalid("withdraw is supported only for operator publications; pause automation before manual provider cleanup"))
-			return
-		}
 		if err = a.Service.PauseAutomaticRules(ctx, record, a.Workspace.Rules, body.ExpectedDigest); err != nil {
 			a.fail(w, r, err)
 			return
 		}
-		result, err = a.Workspace.Rules.Withdraw(ctx, record.SLO, body.ExpectedDigest)
+		if target.Kind == "operator" {
+			result, err = a.Workspace.Rules.Withdraw(ctx, record.SLO, body.ExpectedDigest)
+		} else {
+			plan, planErr := a.Workspace.Rules.PlanContext(ctx, record.SLO)
+			if planErr != nil {
+				a.fail(w, r, planErr)
+				return
+			}
+			if plan.Digest != body.ExpectedDigest {
+				a.fail(w, r, model.ErrRevisionConflict)
+				return
+			}
+			temporary := record.SLO
+			temporary.Retirement = &v1.SLORetirement{OriginalRevision: model.ConfigRevision(record.SLO), RouteDigest: rules.RouteDigest(plan.Target), Group: plan.Group.Name}
+			var complete bool
+			complete, err = a.Workspace.Rules.Retire(ctx, temporary)
+			result = rules.Deployment{State: "withdrawing", Digest: plan.Digest, Target: plan.Target, Group: plan.Group.Name, Message: "Owned configuration removal or runtime absence is pending. Automation remains paused; retry the reviewed withdrawal."}
+			if complete {
+				result.State = "withdrawn"
+				result.Message = "Owned configuration was removed and evaluator absence verified. Automation remains paused."
+			}
+		}
+		if err == nil && result.State == "withdrawn" {
+			err = a.Service.ClearRuleDestination(ctx, record.SLO.ID, model.ConfigRevision(record.SLO))
+		}
 	} else {
 		result, err = a.Workspace.Rules.Deploy(ctx, record.SLO, body.ExpectedDigest)
 	}

@@ -93,6 +93,9 @@ func (g ServiceDependencyMap) Validate() error {
 	names := map[string]bool{}
 	refs := map[string]bool{}
 	for _, n := range g.Spec.Services {
+		if p := n.Position; p != nil && (p.X < 0 || p.Y < 0 || p.X > 10000 || p.Y > 10000) {
+			return Invalid("service positions must be integer coordinates from 0 to 10000")
+		}
 		if !validService(n.Name) || !validText(n.DisplayName, 200) || names[n.Name] || len(n.SLORefs) > 10 {
 			return Invalid("services require unique names, displayName and at most 10 SLO references")
 		}
@@ -110,18 +113,29 @@ func (g ServiceDependencyMap) Validate() error {
 	edges := map[string]bool{}
 	for _, e := range g.Spec.Dependencies {
 		key := e.Caller + "\x00" + e.Callee
-		if !names[e.Caller] || !names[e.Callee] || e.Caller == e.Callee || edges[key] || len(e.Description) > 500 {
+		if !oneOf(e.Origin, "", "manual", "kubernetes") || !names[e.Caller] || !names[e.Callee] || e.Caller == e.Callee || edges[key] || len(e.Description) > 500 {
 			return Invalid("dependencies require unique distinct declared caller/callee services")
 		}
 		edges[key] = true
 	}
 	if o := g.Spec.Observed; o != nil {
-		if !identifier.MatchString(o.Source) || o.WindowSeconds < 60 || o.WindowSeconds > 3600 {
-			return Invalid("observed requires a source and windowSeconds from 60 to 3600")
+		if !identifier.MatchString(o.Source) {
+			return Invalid("observed requires a configured source")
+		}
+		if err := ValidateGraphObservation(*o); err != nil {
+			return err
 		}
 		if err := ValidateLabels(o.Labels); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func ValidateGraphObservation(o v1.GraphObservation) error {
+	interval, age := o.EvidenceTiming()
+	if o.WindowSeconds < 60 || o.WindowSeconds > 3600 || interval < 1 || interval > 300 || interval*2 > o.WindowSeconds || age < interval || age > 3600 {
+		return Invalid("observed requires a 60–3600s window, 1–300s scrape interval with two samples per window, and a sample age limit from scrape interval to 3600s")
+	}
+	return ValidateLabels(o.Labels)
 }

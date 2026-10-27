@@ -7,6 +7,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
+	"github.com/ishantanu/nines/internal/rules"
 )
 
 type ResourceRevision struct {
@@ -76,6 +77,12 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	if err != nil {
 		return p, err
 	}
+	if old.SLO.Retired() {
+		return p, model.Invalid("SLO is archived; its retained definition cannot be edited")
+	}
+	if old.SLO.RuleDestination != "" && rules.ConnectionID(d.SLO.SLO()) != rules.ConnectionID(old.SLO) {
+		return p, model.Invalid("withdraw owned rules from the original connection before changing the SLO source")
+	}
 	if !old.SLO.AlertsEnabled() && d.SLO.SLO().AlertsEnabled() {
 		p.Warnings = append(p.Warnings, "Promoting this SLO to committed enables its configured burn alerts. Review the thresholds, traffic guard and rule destination before applying.")
 	}
@@ -125,6 +132,9 @@ func (s *Service) ApplyDefinition(ctx context.Context, d model.Definition, expec
 	if err == nil {
 		var result ResourceRevision
 		err = s.Store.Update(ctx, d.SLO.Metadata.Name, func(r *model.Record) error {
+			if r.SLO.Retired() {
+				return model.Invalid("SLO is archived; its retained definition cannot be edited")
+			}
 			revision := model.ConfigRevision(r.SLO)
 			if expected != revision {
 				return model.ErrRevisionConflict
@@ -135,6 +145,10 @@ func (s *Service) ApplyDefinition(ctx context.Context, d model.Definition, expec
 				return nil
 			}
 			next := d.SLO.SLO()
+			if r.SLO.RuleDestination != "" && rules.ConnectionID(next) != rules.ConnectionID(r.SLO) {
+				return model.Invalid("withdraw owned rules from the original connection before changing the SLO source")
+			}
+			next.RuleDestination = r.SLO.RuleDestination
 			measurementChanged := MeasurementDigest(r.SLO) != MeasurementDigest(next)
 			next.CreatedAt = r.SLO.CreatedAt
 			next.Revision = revision + 1

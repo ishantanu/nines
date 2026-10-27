@@ -29,7 +29,7 @@ func (q CatalogQuery) Validate() error {
 	return nil
 }
 func SLOSummary(s model.SLO) v1.ResourceSummary {
-	return v1.ResourceSummary{Kind: v1.SLOKind, ID: s.ID, Project: s.Project, DisplayName: s.Name, Service: s.Service, Revision: model.ConfigRevision(s)}
+	return v1.ResourceSummary{Archived: s.Retired(), Kind: v1.SLOKind, ID: s.ID, Project: s.Project, DisplayName: s.Name, Service: s.Service, Revision: model.ConfigRevision(s)}
 }
 func JourneySummary(j model.JourneyRevision) v1.ResourceSummary {
 	return v1.ResourceSummary{Kind: v1.JourneyKind, ID: j.Manifest.Metadata.Name, Project: j.Manifest.Metadata.Project, DisplayName: j.Manifest.Spec.DisplayName, Revision: j.Revision}

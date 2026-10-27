@@ -98,7 +98,7 @@ test("chart tracks both dimensions without a minimum-width overflow or scaled la
 });
 test("missing data splits paths and single observed points remain visible", async () => {
   await render();
-  const series = host.querySelector('[data-series="Interval SLI"]')!;
+  const series = host.querySelector('[data-series="Measured SLI"]')!;
   expect(
     series.querySelector("path")?.getAttribute("d")?.match(/M/g),
   ).toHaveLength(2);
@@ -110,7 +110,7 @@ test("keyboard inspection supports endpoints and never fabricates a selection fo
   await render();
   await act(async () =>
     host
-      .querySelector("svg")!
+      .querySelector('input[type="range"]')!
       .dispatchEvent(
         new KeyboardEvent("keydown", { key: "End", bubbles: true }),
       ),
@@ -120,7 +120,7 @@ test("keyboard inspection supports endpoints and never fabricates a selection fo
   await render({ ...history, points: [] });
   await act(async () =>
     host
-      .querySelector("svg")!
+      .querySelector('input[type="range"]')!
       .dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
       ),
@@ -139,4 +139,107 @@ test("tight SLO scales retain distinct labels instead of rounding every tick to 
     .slice(0, 5)
     .map((node) => node.textContent);
   expect(new Set(yLabels).size).toBe(5);
+});
+
+test("one measured SLI and target replace overlapping legend entries", async () => {
+  await render({
+    ...history,
+    points: [{ ...history.points[0], coverage: 0.25 }],
+  });
+  expect(host.querySelectorAll("[data-series]")).toHaveLength(1);
+  expect(host.textContent).not.toMatch(/Rolling SLI|Interval SLI/);
+  expect(host.textContent).toContain("incomplete 1h history");
+  const slider = host.querySelector('input[type="range"]')!;
+  expect(slider.getAttribute("aria-valuetext")).toContain("25.0% coverage");
+  expect(slider.getAttribute("aria-valuetext")).toContain("Target 99.9%");
+});
+
+test("partial-to-complete history stays connected without joining missing data", async () => {
+  await render({
+    ...history,
+    points: [
+      { ...history.points[0], coverage: 0.5 },
+      { ...history.points[0], at: "2026-10-24T10:01:00Z", reliability: 0.995 },
+      history.points[1],
+      history.points[2],
+    ],
+  });
+  const paths = host.querySelectorAll('[data-series="Measured SLI"] path');
+  expect(paths[1].getAttribute("stroke-dasharray")).toBe("6 4");
+  expect(paths[1].getAttribute("d")?.match(/L/g)).toHaveLength(1);
+  expect(paths[0].getAttribute("d")).not.toContain("L");
+});
+
+test("keyboard control exposes the value and leaves Tab unhandled", async () => {
+  await render();
+  const slider = host.querySelector<HTMLInputElement>('input[type="range"]')!;
+  expect(slider.labels?.[0].textContent).toBe("Time point");
+  for (const [key, expected] of [
+    ["ArrowRight", 1],
+    ["Home", 0],
+    ["End", 2],
+  ] as const) {
+    await act(async () =>
+      slider.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+      ),
+    );
+    expect(onIndex).toHaveBeenLastCalledWith(expected);
+  }
+  const tab = new KeyboardEvent("keydown", {
+    key: "Tab",
+    bubbles: true,
+    cancelable: true,
+  });
+  slider.dispatchEvent(tab);
+  expect(tab.defaultPrevented).toBe(false);
+  expect(host.querySelector("svg")?.hasAttribute("tabindex")).toBe(false);
+});
+
+test("data table provides every value, missing interval and partial qualification", async () => {
+  await render({
+    ...history,
+    points: [
+      { ...history.points[0], coverage: 0.5 },
+      ...history.points.slice(1),
+    ],
+  });
+  const button = host.querySelector<HTMLButtonElement>("button")!;
+  expect(button.getAttribute("aria-expanded")).toBe("false");
+  await act(async () => button.click());
+  expect(button.getAttribute("aria-expanded")).toBe("true");
+  expect(host.querySelector("table caption")?.textContent).toContain(
+    "All times UTC",
+  );
+  const rows = host.querySelectorAll("tbody tr");
+  expect(rows).toHaveLength(3);
+  expect(rows[0].textContent).toContain("50.0% coverage");
+  expect(rows[1].textContent).toContain("No data");
+  expect(rows[2].textContent).toContain("100.000%");
+  expect(host.querySelectorAll('th[scope="col"]')).toHaveLength(2);
+});
+
+test("chart and expanded data table pass automated WCAG semantic checks", async () => {
+  const { default: axe } = await import("axe-core");
+  await render({
+    ...history,
+    points: [{ ...history.points[0], coverage: 0.5 }],
+  });
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>("button")!.click(),
+  );
+  const results = await axe.run(host, {
+    runOnly: {
+      type: "tag",
+      values: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"],
+    },
+    // jsdom has no layout/canvas. Real-theme contrast is checked separately.
+    rules: { "color-contrast": { enabled: false } },
+  });
+  expect(
+    results.violations.map(({ id, nodes }) => ({
+      id,
+      targets: nodes.map((n) => n.target),
+    })),
+  ).toEqual([]);
 });

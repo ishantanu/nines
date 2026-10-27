@@ -116,7 +116,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	core := func(parent *cobra.Command, action, kind, use, mode, effect, short string, min, max int) {
 		parent.AddCommand(mark(position(coreCommand(action, kind, o), use, min, max), mode, effect, short))
 	}
-	r.AddCommand(templatesCommand(o), extensionsCommand(o))
+	r.AddCommand(templatesCommand(o), extensionsCommand(o), retirementCommand(o))
 	g := group(r, "init", "Create local versioned YAML")
 	core(g, "init", "slo", "slo", "offline", "local-write", "Generate an SLO manifest", 0, 0)
 	for _, v := range []struct{ a, mode, effect, short string }{{"validate", "offline", "read", "Validate a local YAML definition"}, {"plan", "server", "read", "Review a definition against the server"}, {"apply", "server", "write", "Apply an exact revision-checked definition"}} {
@@ -191,7 +191,10 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 		g.AddCommand(mark(position(conversationCommand(a, o), use, min, max), "server", effect, map[string]string{"list": "List saved conversations", "show": "Read one conversation", "create": "Create a preparation conversation", "message": "Append a clarification", "run": "Prepare with explicit model consent", "confirm": "Confirm a measurement revision", "cancel": "Cancel preparation", "changes": "Freeze exact SLO and journey changes", "approve": "Approve an exact change-set digest", "reject": "Reject changes or withdraw approval with a reason", "audit": "Read the decision audit log", "rollback-plan": "Prepare a revision-fenced configuration rollback", "rollback-approve": "Approve an exact rollback digest", "rollback-apply": "Apply an approved configuration rollback", "rollback-reject": "Reject or withdraw rollback approval", "rollback-kubernetes": "Export reviewed rollback definitions for GitOps", "apply": "Atomically apply approved definitions", "observe": "Inspect runtime and persist post-change outcome evidence", "verify": "Read applied revisions and recorded outcome evidence", "kubernetes": "Export exact definitions for GitOps review"}[a]))
 	}
 	for _, name := range []string{"telemetry", "bindings", "dependencies"} {
-		g := group(r, name, map[string]string{"telemetry": "Discover configured source measurements", "bindings": "Review and compile measurement bindings", "dependencies": "Read service dependency maps"}[name])
+		g := group(r, name, map[string]string{"telemetry": "Discover configured source measurements", "bindings": "Review and compile measurement bindings", "dependencies": "Discover and read service dependency maps"}[name])
+		if name == "dependencies" {
+			g.AddCommand(dependencyDiscoveryCommand(o, false), dependencyDiscoveryCommand(o, true))
+		}
 		actions := map[string][]string{"telemetry": {"names", "inspect", "verify"}, "bindings": {"list", "compile"}, "dependencies": {"list", "show"}}[name]
 		for _, a := range actions {
 			use, min, max := a+" ID", 1, 1

@@ -37,11 +37,15 @@ func (s *Service) ValidateJourney(ctx context.Context, j model.Journey) error {
 		return model.ErrUnavailable
 	}
 	for _, link := range j.Spec.SLOs {
-		if _, err := s.Store.Read(ctx, link.ID); err != nil {
+		record, err := s.Store.Read(ctx, link.ID)
+		if err != nil {
 			if errors.Is(err, model.ErrNotFound) {
 				return model.Invalid("linked SLO %s does not exist; create it before applying the journey", link.ID)
 			}
 			return err
+		}
+		if record.SLO.Retired() {
+			return model.Invalid("linked SLO %s is archived", link.ID)
 		}
 	}
 	return nil

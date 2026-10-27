@@ -11,3 +11,8 @@ scrape_configs:
     file_sd_configs:
       - files: [/etc/prometheus/ai-targets.json]
         refresh_interval: 5s
+
+  - job_name: playground-service-graph
+    file_sd_configs:
+      - files: [/etc/prometheus/topology-targets.json]
+        refresh_interval: 5s

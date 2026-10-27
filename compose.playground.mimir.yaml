@@ -21,6 +21,7 @@ services:
       NINES_SOURCE_HOSTS: prometheus,mimir
     volumes:
       - ./deploy/playground/tenants-mimir.yaml:/etc/nines/tenants.yaml:ro
+      - ./deploy/playground/tenants-mimir-jev.yaml:/etc/nines/tenants-jev.yaml:ro
       - ./deploy/playground/auth-mimir.yaml:/etc/nines/auth.yaml:ro
   setup:
     environment:

@@ -1,0 +1,19 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: graph-payments-availability
+  project: playground
+spec:
+  displayName: Payments request success
+  service: payments
+  source: primary
+  target: 0.99
+  windowSeconds: 300
+  stepSeconds: 10
+  measurement:
+    type: availability
+    metric: example_http_requests_total
+    labels: {service: payments, environment: playground}
+    successLabels: {outcome: success}
+    scrapeIntervalSeconds: 5
+    observationPoint: Requests completed by the payments process in the local HTTP chain.

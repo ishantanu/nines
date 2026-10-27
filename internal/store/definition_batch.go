@@ -35,6 +35,7 @@ func (m *Memory) DefinitionBatch(ctx context.Context, key, digest string, commit
 		return append(json.RawMessage{}, old.Result...), nil
 	}
 	snapshot := NewMemory()
+	snapshot.tombstones = copyJSON(m.tombstones)
 	snapshot.records = copyJSON(m.records)
 	snapshot.archives = copyJSON(m.archives)
 	snapshot.deliveries = copyJSON(m.deliveries)
@@ -53,6 +54,7 @@ func (m *Memory) DefinitionBatch(ctx context.Context, key, digest string, commit
 		return nil, fmt.Errorf("invalid definition receipt")
 	}
 	if commit {
+		m.tombstones = snapshot.tombstones
 		m.records = snapshot.records
 		m.archives = snapshot.archives
 		m.deliveries = snapshot.deliveries

@@ -30,6 +30,8 @@ func Invalid(format string, args ...any) error { return &ValidationError{fmt.Spr
 type Policy = v1alpha1.BurnRatePolicy
 
 type SLO struct {
+	RuleDestination    string                             `json:"ruleDestination,omitempty"`
+	Retirement         *v1alpha1.SLORetirement            `json:"retirement,omitempty"`
 	ErrorBudgetPolicy  *v1alpha1.ErrorBudgetPolicy        `json:"errorBudgetPolicy,omitempty"`
 	Quality            *v1alpha1.MeasurementQualityPolicy `json:"quality,omitempty"`
 	Lifecycle          v1alpha1.SLOLifecycle              `json:"lifecycle,omitempty"`
@@ -56,6 +58,8 @@ type SLO struct {
 var counterSelector = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*(\{([a-zA-Z_][a-zA-Z0-9_]*="([^"\\]|\\.)*"(,[a-zA-Z_][a-zA-Z0-9_]*="([^"\\]|\\.)*")*)?\})?$`)
 
 var identifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
+
+func (s SLO) Retired() bool { return s.Retirement != nil }
 
 func (s SLO) HasQueries() bool { return s.ProviderWindow != nil || s.GoodQuery != "" }
 func (s SLO) Validate() error {

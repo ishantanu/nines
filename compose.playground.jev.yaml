@@ -1,0 +1,7 @@
+# Optional native Jev advice. Combine with the base playground and, optionally,
+# compose.playground.mimir.yaml. No provider request occurs without run consent.
+services:
+  nines:
+    environment:
+      TENANTS_FILE: /etc/nines/tenants-jev.yaml
+      JEV_API_KEY: ${JEV_API_KEY:?Set JEV_API_KEY for the optional Jev playground}

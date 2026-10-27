@@ -73,6 +73,12 @@ export function SLOAlertState({
 }: {
   status: Pick<Snapshot, "alert" | "reliability">;
 }) {
+  if (status.alert.phase === "archived")
+    return (
+      <span className="text-sm text-muted-foreground">
+        Archived · alerts stopped
+      </span>
+    );
   const lifecycleLabel = (
     {
       lifecycle_experimental: "Experimental",

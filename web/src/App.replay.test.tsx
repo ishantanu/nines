@@ -281,7 +281,20 @@ test("sign-out discards capture immediately even while logout is pending", async
     ),
   );
   await recordTab();
-  await act(async () => button("Sign out").click());
+  await act(async () => {
+    host
+      .querySelector('[aria-label="Account menu"]')!
+      .dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+      );
+  });
+  await act(async () => {
+    const signOut = [
+      ...document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ].find((item) => item.textContent?.includes("Sign out"));
+    expect(signOut).toBeDefined();
+    signOut!.click();
+  });
   expect(recorder.stop).toHaveBeenCalledOnce();
   expect(host.textContent).not.toContain("Recording this tab. Private data");
   expect(host.textContent).not.toContain(

@@ -23,6 +23,10 @@ type Store interface {
 
 func clone(r model.Record) model.Record {
 	c := r
+	if r.SLO.Retirement != nil {
+		v := copyJSON(*r.SLO.Retirement)
+		c.SLO.Retirement = &v
+	}
 	if r.SLO.ErrorBudgetPolicy != nil {
 		p := copyJSON(*r.SLO.ErrorBudgetPolicy)
 		c.SLO.ErrorBudgetPolicy = &p

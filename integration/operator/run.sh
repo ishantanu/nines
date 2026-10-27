@@ -12,13 +12,14 @@ server="$name-api"
 controller="$name-controller"
 mimir="$name-mimir"
 runtime="$name-runtime"
+prometheus="$name-prometheus"
 cleanup() {
   result=$?
   if [ "$result" != 0 ]; then
     docker logs --tail 80 "$runtime" > operator-runtime-diagnostics.log 2>&1 || true
     docker exec "$server" kubectl -n team-commerce get slo,cuj,lease -o json > operator-runtime-debug-test-results.json 2>/dev/null || true
   fi
-  docker rm -f "$runtime" "$controller" "$mimir" "$server" >/dev/null 2>&1 || true
+  docker rm -f "$runtime" "$controller" "$mimir" "$prometheus" "$server" >/dev/null 2>&1 || true
   docker image rm "$name-runtime-image" >/dev/null 2>&1 || true
   docker network rm "$network" >/dev/null 2>&1 || true
   rm -rf "$work"
@@ -66,7 +67,7 @@ docker run -d --name "$controller" --network "$network" --user 0:0 \
   quay.io/prometheus-operator/prometheus-operator:v0.94.1@sha256:7c88d4e7bae63bd8d0f8da986054337c23b4472fa8d3c6817f5bc4b8407a2d6a \
   --apiserver=https://api:6443 --ca-file=/etc/nines-test/ca.pem \
   --cert-file=/etc/nines-test/cert.pem --key-file=/etc/nines-test/key.pem \
-  --namespaces=nines-prometheus,nines-rules,nines-unselected \
+  --namespaces=nines-prometheus,nines-rules,nines-unselected,team-commerce \
   --disable-unmanaged-prometheus-configuration >/dev/null
 # Install the shipped namespace Role/ServiceAccount and generated domain CRDs.
 docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/crds.yaml" >/dev/null
@@ -75,13 +76,34 @@ docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/operator.ya
 docker exec "$server" kubectl -n team-commerce scale deployment nines-operator --replicas=0 >/dev/null
 docker exec "$server" kubectl -n team-commerce create token nines-operator --duration=15m > "$work/token"
 api_port=$(docker port "$server" 6443/tcp | sed 's/.*://')
-docker run -d --name "$mimir" --network "$network" --publish 127.0.0.1::9009 \
+docker run -d --name "$mimir" --label nines.acceptance=operator --network "$network" --publish 127.0.0.1::9009 \
   --mount "type=bind,src=$root/integration/mimir/mimir.yaml,dst=/etc/mimir/test.yaml,readonly" \
   --tmpfs /tmp:rw,size=256m \
   grafana/mimir:3.2.2@sha256:04068a0a838b6efe9449a04c1d6acd74c7438ac6073dfcbb99c29892647525e3 \
   --config.file=/etc/mimir/test.yaml --http.prometheus-http-prefix=/prometheus \
   --ingest-storage.enabled=false >/dev/null
 mimir_port=$(docker port "$mimir" 9009/tcp | sed 's/.*://')
+mkdir -p "$work/prometheus-rules"
+chmod 755 "$work/prometheus-rules"
+cat > "$work/prometheus.yaml" <<'PROMETHEUS'
+global:
+  scrape_interval: 1s
+  evaluation_interval: 1s
+rule_files: [/rules/*.yaml]
+scrape_configs: []
+PROMETHEUS
+chmod 644 "$work/prometheus.yaml"
+docker run -d --name "$prometheus" --label nines.acceptance=operator \
+  --publish 127.0.0.1::9090 --network "$network" \
+  --mount "type=bind,src=$work/prometheus.yaml,dst=/etc/prometheus/prometheus.yml,readonly" \
+  --mount "type=bind,src=$work/prometheus-rules,dst=/rules,readonly" \
+  --tmpfs /prometheus:rw,size=67108864,uid=65534,gid=65534 \
+  prom/prometheus:v3.5.1@sha256:38c3b05c3bc744ff1b0b7b4eb82196026442845e62a1e2073795565da506d7a2 \
+  --config.file=/etc/prometheus/prometheus.yml --web.enable-lifecycle >/dev/null
+prometheus_port=$(docker port "$prometheus" 9090/tcp | sed 's/.*://')
+export NINES_OPERATOR_TEST_PROMETHEUS="http://127.0.0.1:$prometheus_port"
+export NINES_OPERATOR_TEST_RULE_DIRECTORY="$work/prometheus-rules"
+export NINES_OPERATOR_TEST_MIMIR_CONTAINER="$mimir"
 export NINES_OPERATOR_TEST_API="https://127.0.0.1:$api_port"
 export NINES_OPERATOR_TEST_CA="$work/ca.pem"
 export NINES_OPERATOR_TEST_TOKEN="$work/token"

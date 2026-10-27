@@ -1,3 +1,4 @@
+import { SLORetirement } from "./slo-retirement";
 import { useChartSize } from "@/lib/use-chart-size";
 import { ReplayLabel } from "@/components/replay-label";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -61,7 +62,9 @@ export function Objectives({
   onSelect: (id: string) => void;
   onJourney: (id: string) => void;
 }) {
-  const sorted = [...items].sort(
+  const [archived, setArchived] = useState(false);
+  const visible = items.filter((o) => Boolean(o.slo.retirement) === archived);
+  const sorted = [...visible].sort(
     (a, b) =>
       (a.status.budgetRemainingFraction ?? Infinity) -
       (b.status.budgetRemainingFraction ?? Infinity),
@@ -69,6 +72,26 @@ export function Objectives({
   return (
     <Card className="gap-0 py-0">
       <CardContent className="p-0">
+        <div
+          className="flex flex-wrap gap-2 border-b px-4 py-3"
+          role="group"
+          aria-label="Objective lifecycle filter"
+        >
+          <Button
+            variant={archived ? "ghost" : "secondary"}
+            aria-pressed={!archived}
+            onClick={() => setArchived(false)}
+          >
+            Active objectives
+          </Button>
+          <Button
+            variant={archived ? "secondary" : "ghost"}
+            aria-pressed={archived}
+            onClick={() => setArchived(true)}
+          >
+            Archived objectives
+          </Button>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -98,6 +121,11 @@ export function Objectives({
                     className="text-left font-medium hover:text-primary"
                   >
                     {o.slo.name}
+                    {o.slo.retirement ? (
+                      <span className="ml-2 text-sm text-muted-foreground">
+                        (Archived)
+                      </span>
+                    ) : null}
                     <ArrowUpRight className="ml-1 inline size-3" />
                   </button>
                   <div className="mt-1 text-xs text-muted-foreground">
@@ -168,7 +196,7 @@ export function Objectives({
             ))}
           </TableBody>
         </Table>
-        {!items.length ? (
+        {!visible.length ? (
           <p className="empty-state">
             <ReplayLabel>No objectives match this view.</ReplayLabel>
           </p>
@@ -333,130 +361,30 @@ export function ObjectiveDetail({
   const status = historical ?? objective?.status;
   return (
     <section className="resource-detail" aria-label="Objective detail">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClose}
+        className="mb-3 -ml-2"
+      >
+        <ArrowLeft className="size-4" aria-hidden="true" />
+        All objectives
+      </Button>
       <PageHeader
         title={objective?.slo.name ?? "Objective"}
         description={`${objective?.slo.project} / ${objective?.slo.service} · ${objective?.slo.id}`}
       >
-        <div className="flex flex-wrap gap-2">
-          {journeys
-            .filter((j) => j.links.some((l) => l.link.id === id))
-            .map((j) => (
-              <Button
-                variant="outline"
-                size="sm"
-                key={j.resource.manifest.metadata.name}
-                onClick={() => {
-                  onClose();
-                  onJourney(j.resource.manifest.metadata.name);
-                }}
-              >
-                {j.resource.manifest.spec.displayName}
-                <ArrowUpRight className="size-3" />
-              </Button>
-            ))}
-        </div>
+        {objective ? <SLOAlertState status={objective.status} /> : null}
         {onReplays ? (
           <Button variant="outline" size="sm" onClick={onReplays}>
             <ReplayLabel>Session replay</ReplayLabel>
           </Button>
         ) : null}
-        <Button variant="outline" size="sm" onClick={onClose}>
-          <ArrowLeft className="size-4" />
-          <ReplayLabel>Back</ReplayLabel>
-        </Button>
-        {objective && status ? (
-          <SLIValue status={status} target={objective.slo.target} />
-        ) : null}
       </PageHeader>
-      {objective ? (
-        <SLOIntegrationStatus
-          id={objective.slo.id}
-          revision={objective.slo.revision}
-          refreshKey={refresh + refreshKey}
-          scope={scope}
-        />
-      ) : null}
-      {objective ? (
-        <Suspense fallback={<p role="status">Loading source measurements…</p>}>
-          <SourceMeasurements
-            scope={scope}
-            slo={objective.slo}
-            collection={objective.collection}
-            onConnections={onConnections}
-            onCollected={() => {
-              onRefresh();
-              setRefresh((n) => n + 1);
-            }}
-          />
-        </Suspense>
-      ) : null}
-      {objective?.slo.policies?.length ? (
-        <Card className="gap-0 py-0">
-          <div className="panel-header">
-            <h2 className="section-label">
-              <ReplayLabel>Alert policies</ReplayLabel>
-            </h2>
-          </div>
-          <CardContent className="p-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <ReplayLabel>Policy</ReplayLabel>
-                  </TableHead>
-                  <TableHead>
-                    <ReplayLabel>Severity</ReplayLabel>
-                  </TableHead>
-                  <TableHead>
-                    <ReplayLabel>State</ReplayLabel>
-                  </TableHead>
-                  <TableHead>
-                    <ReplayLabel>Burn threshold</ReplayLabel>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {objective.slo.policies.map((p) => (
-                  <TableRow key={p.name}>
-                    <TableCell>{p.name}</TableCell>
-                    <TableCell>{p.severity}</TableCell>
-                    <TableCell>
-                      {objective.status.alert.policies?.[p.name ?? ""]?.phase ??
-                        "Not evaluated"}
-                    </TableCell>
-                    <TableCell>{p.burnRate}×</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ) : null}
-      {objective?.budgetDecision && objective.slo.errorBudgetPolicy ? (
+      {objective?.budgetDecision &&
+      !objective.slo.retirement &&
+      objective.slo.errorBudgetPolicy ? (
         <BudgetDecisionPanel decision={objective.budgetDecision} />
-      ) : null}
-      {objective?.quality ? (
-        <MeasurementQualityPanel
-          report={objective.quality}
-          scope={scope}
-          cohortLabels={objective.slo.quality?.cohortLabels}
-        />
-      ) : null}
-      {objective?.measurementHealth ? (
-        <Card className="gap-0 py-0">
-          <CardContent className="space-y-1 p-4 text-sm" role="status">
-            <p className="font-medium">
-              Measurement contract: {objective.measurementHealth.state}
-            </p>
-            <p className="text-muted-foreground">
-              {objective.measurementHealth.message}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Checked{" "}
-              {new Date(objective.measurementHealth.checkedAt).toLocaleString()}
-            </p>
-          </CardContent>
-        </Card>
       ) : null}
       {status ? (
         <dl className="summary-grid">
@@ -482,17 +410,33 @@ export function ObjectiveDetail({
               <dt>
                 <ReplayLabel>{label}</ReplayLabel>
               </dt>
-              <dd>{value}</dd>
+              <dd>
+                {value}
+                {label === "Observed SLI" && objective ? (
+                  <p className="text-xs text-muted-foreground">
+                    Target {percent(objective.slo.target, 3)}
+                  </p>
+                ) : null}
+              </dd>
             </div>
           ))}
         </dl>
       ) : null}
-      {status ? <SLOHealthNotice status={status} /> : null}
+      {objective?.slo.retirement ? (
+        <p role="status" className="rounded-md border p-4 text-sm">
+          Archived. The summary is frozen at archival; retained historical
+          measurements remain available. Rule cleanup:{" "}
+          {objective.slo.retirement.cleanup}.
+        </p>
+      ) : status ? (
+        <SLOHealthNotice status={status} />
+      ) : null}
       <Tabs value={tab} onValueChange={setTab} className="detail-tabs">
         <TabsList className="detail-tab-list">
           <TabsTrigger value="performance">
             <ReplayLabel>Performance</ReplayLabel>
           </TabsTrigger>
+          <TabsTrigger value="measurement">Measurement</TabsTrigger>
           <TabsTrigger value="rules">
             <ReplayLabel>Rules</ReplayLabel>
           </TabsTrigger>
@@ -512,6 +456,28 @@ export function ObjectiveDetail({
           </TabsTrigger>
         </TabsList>
         <TabsContent value="performance">
+          {objective &&
+          !objective.slo.retirement &&
+          (objective.measurementHealth?.evaluationBlocked ||
+            (objective.quality && objective.quality.state !== "usable")) ? (
+            <div
+              role="status"
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm"
+            >
+              <p>
+                {objective.measurementHealth?.evaluationBlocked
+                  ? objective.measurementHealth.message
+                  : "Measurement evidence needs review before relying on this SLI."}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTab("measurement")}
+              >
+                Review measurement
+              </Button>
+            </div>
+          ) : null}
           {objective ? (
             <Suspense
               fallback={
@@ -529,8 +495,131 @@ export function ObjectiveDetail({
               />
             </Suspense>
           ) : null}
+          {journeys.some((j) => j.links.some((l) => l.link.id === id)) ? (
+            <section
+              className="mt-5 border-t pt-4"
+              aria-label="Linked critical user journeys"
+            >
+              <h2 className="mb-2 text-sm font-semibold">
+                Linked critical user journeys
+              </h2>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {journeys
+                  .filter((j) => j.links.some((l) => l.link.id === id))
+                  .map((j) => (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      key={j.resource.manifest.metadata.name}
+                      onClick={() => {
+                        onClose();
+                        onJourney(j.resource.manifest.metadata.name);
+                      }}
+                    >
+                      {j.resource.manifest.spec.displayName}
+                      <ArrowUpRight className="size-3" />
+                    </Button>
+                  ))}
+              </div>
+            </section>
+          ) : null}
         </TabsContent>
-        <TabsContent value="rules">
+        <TabsContent value="measurement" className="space-y-4">
+          {objective && !objective.slo.retirement ? (
+            <Suspense
+              fallback={<p role="status">Loading source measurements…</p>}
+            >
+              <SourceMeasurements
+                scope={scope}
+                slo={objective.slo}
+                collection={objective.collection}
+                onConnections={onConnections}
+                onCollected={() => {
+                  onRefresh();
+                  setRefresh((n) => n + 1);
+                }}
+              />
+            </Suspense>
+          ) : null}
+          {objective?.quality && !objective.slo.retirement ? (
+            <MeasurementQualityPanel
+              report={objective.quality}
+              scope={scope}
+              cohortLabels={objective.slo.quality?.cohortLabels}
+            />
+          ) : null}
+          {objective?.measurementHealth ? (
+            <Card className="gap-0 py-0">
+              <CardContent className="space-y-1 p-4 text-sm" role="status">
+                <p className="font-medium">
+                  Measurement contract: {objective.measurementHealth.state}
+                </p>
+                <p className="text-muted-foreground">
+                  {objective.measurementHealth.message}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Checked{" "}
+                  {new Date(
+                    objective.measurementHealth.checkedAt,
+                  ).toLocaleString()}
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
+        </TabsContent>
+        <TabsContent value="rules" className="space-y-4">
+          {objective && !objective.slo.retirement ? (
+            <SLOIntegrationStatus
+              id={objective.slo.id}
+              revision={objective.slo.revision}
+              refreshKey={refresh + refreshKey}
+              scope={scope}
+            />
+          ) : null}
+
+          {objective?.slo.policies?.length ? (
+            <Card className="gap-0 py-0">
+              <div className="panel-header">
+                <h2 className="section-label">
+                  <ReplayLabel>Alert policies</ReplayLabel>
+                </h2>
+              </div>
+              <CardContent className="p-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
+                        <ReplayLabel>Policy</ReplayLabel>
+                      </TableHead>
+                      <TableHead>
+                        <ReplayLabel>Severity</ReplayLabel>
+                      </TableHead>
+                      <TableHead>
+                        <ReplayLabel>State</ReplayLabel>
+                      </TableHead>
+                      <TableHead>
+                        <ReplayLabel>Burn threshold</ReplayLabel>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {objective.slo.policies.map((p) => (
+                      <TableRow key={p.name}>
+                        <TableCell>{p.name}</TableCell>
+                        <TableCell>{p.severity}</TableCell>
+                        <TableCell>
+                          {objective.status.alert.policies?.[p.name ?? ""]
+                            ?.phase ?? "Not evaluated"}
+                        </TableCell>
+                        <TableCell>{p.burnRate}×</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          ) : null}
+
           {objective ? (
             <Suspense
               fallback={
@@ -643,7 +732,8 @@ export function ObjectiveDetail({
                 !from ||
                 !to ||
                 (!objective?.slo.goodQuery && !objective?.slo.providerWindow) ||
-                !canEdit(scope)
+                !canEdit(scope) ||
+                Boolean(objective?.slo.retirement)
               }
               onClick={() => action("collect")}
             >
@@ -656,7 +746,7 @@ export function ObjectiveDetail({
           </div>
         </TabsContent>
         <TabsContent value="config" className="detail-panel space-y-4">
-          {objective && canEdit(scope) ? (
+          {objective && !objective.slo.retirement && canEdit(scope) ? (
             <Suspense fallback={null}>
               <ObjectiveCreate
                 scope={scope}
@@ -691,6 +781,20 @@ export function ObjectiveDetail({
           <pre className="code-block">
             {objective ? stringify(definitionFromSLO(objective.slo)) : ""}
           </pre>
+          {objective ? (
+            <SLORetirement
+              slo={objective.slo}
+              scope={scope}
+              onChanged={() => {
+                onRefresh();
+                setRefresh((n) => n + 1);
+              }}
+              onDeleted={() => {
+                onRefresh();
+                onClose();
+              }}
+            />
+          ) : null}
         </TabsContent>
       </Tabs>
       {error ? (

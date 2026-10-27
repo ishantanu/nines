@@ -17,7 +17,8 @@ export function SLOHealthNotice({ status }: { status: Snapshot }) {
   return (
     <p role="status" className="rounded-md border p-4 text-sm leading-6">
       <span className="font-medium">{title}</span>
-      {reason} Rule activation is verified separately above.
+      {reason} Review collection evidence in Measurement and rule activation in
+      Rules.
     </p>
   );
 }

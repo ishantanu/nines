@@ -39,6 +39,13 @@ func (m *Memory) ApplyJourney(ctx context.Context, next model.JourneyRevision, e
 	if err := ctx.Err(); err != nil {
 		return next, err
 	}
+	ids := []string{}
+	for _, link := range next.Manifest.Spec.SLOs {
+		ids = append(ids, link.ID)
+	}
+	if e := m.checkRetiredReferences(ids); e != nil {
+		return next, e
+	}
 	if m.journeys == nil {
 		m.journeys = map[string][]model.JourneyRevision{}
 	}
@@ -153,6 +160,13 @@ func (p *Postgres) ApplyJourney(ctx context.Context, next model.JourneyRevision,
 	defer func() {
 		_ = tx.Rollback(context.Background())
 	}()
+	ids := []string{}
+	for _, link := range next.Manifest.Spec.SLOs {
+		ids = append(ids, link.ID)
+	}
+	if e := checkPostgresRetiredReferences(ctx, tx, ids); e != nil {
+		return next, e
+	}
 	// A name-scoped advisory lock also serializes two concurrent initial creates.
 	id := next.Manifest.Metadata.Name
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':' || $1,654239119))", id); err != nil {

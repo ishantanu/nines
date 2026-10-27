@@ -26,6 +26,13 @@ func (m *Memory) ApplyTopology(ctx context.Context, next model.TopologyRevision,
 	if err := ctx.Err(); err != nil {
 		return next, err
 	}
+	ids, e := topologySLOs(next)
+	if e != nil {
+		return next, e
+	}
+	if e = m.checkRetiredReferences(ids); e != nil {
+		return next, e
+	}
 	if m.topology == nil {
 		m.topology = map[string][]model.TopologyRevision{}
 	}
@@ -93,6 +100,13 @@ func (p *Postgres) ApplyTopology(ctx context.Context, next model.TopologyRevisio
 	defer func() {
 		_ = tx.Rollback(context.Background())
 	}()
+	ids, e := topologySLOs(next)
+	if e != nil {
+		return next, e
+	}
+	if e = checkPostgresRetiredReferences(ctx, tx, ids); e != nil {
+		return next, e
+	}
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtextextended(current_schema() || ':' || $1,654239120))", topologyKey(next.Kind, next.ID)); err != nil {
 		return next, err
 	}

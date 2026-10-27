@@ -265,7 +265,7 @@ export function RecordingRules({
                 {deploying ? "Applying..." : "Apply reviewed rules"}
               </Button>
             ) : null}
-            {plan?.target.kind === "operator" ? (
+            {plan ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -274,7 +274,7 @@ export function RecordingRules({
                 }
                 onClick={() => void deploy(true)}
               >
-                Withdraw reviewed publication
+                Withdraw reviewed rules
               </Button>
             ) : null}
           </div>

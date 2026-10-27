@@ -1,0 +1,19 @@
+# Selected only by compose.playground.jev.yaml.
+tenants:
+  - id: prometheus
+    name: Playground Prometheus
+    access:
+      - tokenEnv: API_TOKEN
+        role: owner
+    source:
+      kind: prometheus
+      url: http://prometheus:9090
+      rules:
+        autoDeploy: true
+        namespace: playground
+        directory: /rules
+        reload: true
+    systemOne:
+      provider: typesafe
+      model: jev-1.14.0
+      apiKeyEnv: JEV_API_KEY

@@ -1,3 +1,4 @@
+import { DependencyEvidence } from "./dependency-evidence";
 import { SLIValue } from "@/components/sli-value";
 import { useEffect, useId, useState } from "react";
 import { stringify } from "yaml";
@@ -61,6 +62,7 @@ export function DependencyMaps({
       signal: c.signal,
     })
       .then((v) => {
+        if (c.signal.aborted || scope.signal.aborted) return;
         setItems(v.items);
         setCursor(v.nextCursor ?? "");
         setID((old) =>
@@ -97,6 +99,9 @@ export function DependencyMaps({
       ),
     ])
       .then(([v, r]) => {
+        if (c.signal.aborted || scope.signal.aborted) return;
+        if (v.tenant !== scope.tenant)
+          throw new Error("Dependency map returned an unexpected tenant.");
         setView(v);
         setManifest(stringify(r.resource.manifest));
         setSelected((old) =>
@@ -174,16 +179,29 @@ export function DependencyMaps({
               scope={scope}
               kind={mapKind}
               initial={manifest}
-              label="Edit map YAML"
-              onApplied={() => setRefresh((v) => v + 1)}
+              label="Edit map"
+              onApplied={(nextID) => {
+                setID(nextID);
+                setRefresh((v) => v + 1);
+              }}
             />
           ) : null}
           <TopologyEditor
             scope={scope}
             kind={mapKind}
-            initial={stringify(mapStarter)}
+            initial={stringify({
+              ...mapStarter,
+              spec: {
+                displayName: mapStarter.spec.displayName,
+                services: [],
+                dependencies: [],
+              },
+            })}
             label="Define dependency map"
-            onApplied={() => setRefresh((v) => v + 1)}
+            onApplied={(nextID) => {
+              setID(nextID);
+              setRefresh((v) => v + 1);
+            }}
           />
         </div>
       </div>
@@ -201,8 +219,9 @@ export function DependencyMaps({
         <Card className="gap-0 py-0">
           <CardContent className="empty-state">
             Define services, link their SLOs and declare caller-to-dependency
-            edges in YAML. Add an observed source when Tempo service-graph
-            metrics are available.
+            edges in the visual editor, import Kubernetes resources or edit
+            YAML. Add an observed source when Tempo service-graph metrics are
+            available.
           </CardContent>
         </Card>
       ) : null}
@@ -233,7 +252,9 @@ export function DependencyMaps({
               </div>
               <CardContent className="p-0">
                 <div
-                  className="h-[480px] max-w-full overflow-auto bg-slate-50/50"
+                  className="h-[480px] max-w-full overflow-auto bg-muted/30 focus-visible:outline-2 focus-visible:outline-ring"
+                  role="region"
+                  tabIndex={0}
                   aria-label="Service dependency graph"
                 >
                   <div
@@ -255,7 +276,10 @@ export function DependencyMaps({
                           refY="4"
                           orient="auto"
                         >
-                          <path d="M0,0 L8,4 L0,8" fill="#64748b" />
+                          <path
+                            d="M0,0 L8,4 L0,8"
+                            fill="var(--muted-foreground)"
+                          />
                         </marker>
                       </defs>
                       {edges.map((e, i) => {
@@ -277,8 +301,8 @@ export function DependencyMaps({
                             fill="none"
                             stroke={
                               e.provenance === "observed"
-                                ? "#2563eb"
-                                : "#64748b"
+                                ? "var(--chart-long)"
+                                : "var(--muted-foreground)"
                             }
                             strokeWidth="1.7"
                             strokeDasharray={
@@ -324,7 +348,7 @@ export function DependencyMaps({
                   {nodes.length} services · {edges.length} edges · revision{" "}
                   {view.revision}
                 </span>
-                <span>Solid: declared · dashed blue: observed</span>
+                <span>Solid: declared · dashed: observed</span>
               </div>
             </Card>
             <Card className="min-w-0 gap-0 py-0">
@@ -379,6 +403,31 @@ export function DependencyMaps({
                         </p>
                       )}
                     </section>
+                    {node.journeys.some((j) => j.steps?.length) ? (
+                      <section>
+                        <h3 className="mb-2 text-sm font-semibold">
+                          Linked journey steps
+                        </h3>
+                        {node.journeys
+                          .filter((j) => j.steps?.length)
+                          .map((j) => (
+                            <div key={j.id} className="mb-3">
+                              <Button
+                                variant="link"
+                                className="h-auto whitespace-normal px-0 text-left"
+                                onClick={() => onJourney(j.id)}
+                              >
+                                {j.displayName}
+                              </Button>
+                              <ul className="mt-1 list-inside list-disc space-y-1 text-sm text-muted-foreground">
+                                {j.steps?.map((step) => (
+                                  <li key={step.id}>{step.name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          ))}
+                      </section>
+                    ) : null}
                     <section>
                       <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Potential journey impact
@@ -413,7 +462,8 @@ export function DependencyMaps({
                 )}
               </CardContent>
               <div className="border-t px-5 py-3 text-xs text-muted-foreground">
-                Health reflects linked SLOs. Impact follows caller paths.
+                Health reflects linked SLOs. Possible impact follows declared
+                and fresh observed links.
               </div>
             </Card>
           </div>
@@ -432,6 +482,7 @@ export function DependencyMaps({
                     <TableHead>Dependency</TableHead>
                     <TableHead>Evidence</TableHead>
                     <TableHead>Traffic / requirement</TableHead>
+                    <TableHead>Telemetry evidence</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -454,7 +505,20 @@ export function DependencyMaps({
                         </button>
                       </TableCell>
                       <TableCell>
-                        {e.provenance}
+                        <p>
+                          {e.origin === "kubernetes"
+                            ? "Kubernetes configuration"
+                            : e.provenance === "observed"
+                              ? "Observed counter"
+                              : "Declared"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {e.alignment === "matched"
+                            ? "Observed match"
+                            : e.alignment === "observed_only"
+                              ? "Outside declared map"
+                              : "No observed match"}
+                        </p>
                         {e.connectionType ? ` · ${e.connectionType}` : ""}
                       </TableCell>
                       <TableCell>
@@ -469,11 +533,14 @@ export function DependencyMaps({
                           </p>
                         ) : null}
                       </TableCell>
+                      <TableCell>
+                        <DependencyEvidence edge={e} />
+                      </TableCell>
                     </TableRow>
                   ))}
                   {!edges.length ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="empty-state">
+                      <TableCell colSpan={5} className="empty-state">
                         No edges match the selected evidence filters.
                       </TableCell>
                     </TableRow>
@@ -483,6 +550,14 @@ export function DependencyMaps({
             </CardContent>
             <div className="space-y-1 border-t px-5 py-3 text-xs text-muted-foreground">
               {view.source ? (
+                <p className="text-sm">
+                  {view.matchedDeclaredEdges ?? 0} of {view.declaredEdges ?? 0}{" "}
+                  declared links have observed counter evidence in this bounded
+                  window. Instrumentation and trace-sampling coverage are
+                  unknown.
+                </p>
+              ) : null}
+              {view.source ? (
                 <p>
                   Source {view.source} · {date(view.from ?? "")} to{" "}
                   {date(view.to ?? "")}
@@ -490,7 +565,7 @@ export function DependencyMaps({
               ) : null}
               <p>Read {date(view.observedAt)}</p>
               {view.truncated ? (
-                <p className="font-medium text-amber-800">
+                <p className="font-medium text-[var(--status-at-risk)]">
                   Observed graph truncated. Narrow the configured population
                   labels.
                 </p>

@@ -24,7 +24,12 @@ export interface ObjectiveLink {
   freshness: string;
   collectionState: string;
 }
+export interface GraphPosition {
+  x: number;
+  y: number;
+}
 export interface DependencyNode {
+  position?: GraphPosition;
   potentialImpact: { id: string; displayName: string; revision: number }[];
   impactTruncated: boolean;
   name: string;
@@ -32,25 +37,57 @@ export interface DependencyNode {
   declared: boolean;
   health: string;
   objectives: ObjectiveLink[];
-  journeys: { id: string; displayName: string; revision: number }[];
+  journeys: {
+    id: string;
+    displayName: string;
+    revision: number;
+    steps?: { id: string; name: string }[];
+  }[];
   journeyLinksTruncated: boolean;
 }
 export interface DependencyEdge {
   caller: string;
   callee: string;
   provenance: "declared" | "observed";
+  origin?: "manual" | "kubernetes";
+  alignment?: "declared_only" | "observed_only" | "matched";
+  evidence?: GraphEdgeEvidence;
   critical: boolean;
   description?: string;
   connectionType?: string;
   requests?: number;
 }
+export interface GraphEdgeEvidence {
+  source: string;
+  sourceDigest: string;
+  metric: string;
+  readAt: string;
+  from: string;
+  to: string;
+  freshness: string;
+  maxSampleAgeSeconds: number;
+  sampleAgeSeconds?: number;
+  instrumentationCoverage: string;
+  samples?: {
+    lastSampleAt?: string;
+    samples: number;
+    series: number;
+    sampleContinuity?: number;
+    resolutionSeconds: number;
+  };
+}
 export interface DependencyView {
+  tenant: string;
   id: string;
   revision: number;
   observedAt: string;
   nodes: DependencyNode[];
   edges: DependencyEdge[];
   observationState: string;
+  sourceDigest?: string;
+  instrumentationCoverage?: string;
+  declaredEdges?: number;
+  matchedDeclaredEdges?: number;
   source?: string;
   from?: string;
   to?: string;
@@ -130,7 +167,10 @@ export const mapStarter = {
   },
 };
 // Fixed layers keep cycles and disconnected services visible without treating the graph as a DAG.
-export function layoutGraph(nodes: DependencyNode[], edges: DependencyEdge[]) {
+export function layoutGraph(
+  nodes: Pick<DependencyNode, "name" | "position">[],
+  edges: Pick<DependencyEdge, "caller" | "callee">[],
+) {
   const sorted = [...nodes].sort((a, b) => a.name.localeCompare(b.name));
   const depth = new Map<string, number>();
   const targets = new Set(edges.map((e) => e.callee));
@@ -158,9 +198,24 @@ export function layoutGraph(nodes: DependencyNode[], edges: DependencyEdge[]) {
     rows.set(col, row + 1);
     positions.set(n.name, { x: 36 + col * 252, y: 36 + row * 116 });
   }
+  for (const n of sorted) if (n.position) positions.set(n.name, n.position);
+  const fixed = sorted.filter((n) => n.position).map((n) => n.name);
+  for (const n of sorted)
+    if (!n.position) {
+      const p = { ...positions.get(n.name)! };
+      while (
+        fixed.some((name) => {
+          const other = positions.get(name)!;
+          return Math.abs(other.x - p.x) < 208 && Math.abs(other.y - p.y) < 96;
+        })
+      )
+        p.y += 116;
+      positions.set(n.name, p);
+      fixed.push(n.name);
+    }
   return {
     positions,
-    width: Math.max(720, Math.max(0, ...depth.values()) * 252 + 284),
-    height: Math.max(420, Math.max(0, ...rows.values()) * 116 + 72),
+    width: Math.max(720, ...Array.from(positions.values(), (p) => p.x + 228)),
+    height: Math.max(420, ...Array.from(positions.values(), (p) => p.y + 116)),
   };
 }

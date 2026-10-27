@@ -186,7 +186,7 @@ export function IntentBacktestPanel({
               lines={[
                 {
                   name: "Full-window SLI",
-                  color: "#0f766e",
+                  color: "var(--chart-sli)",
                   get: (p) => (p.coverage === 1 ? p.reliability : null),
                 },
               ]}
@@ -203,7 +203,8 @@ export function IntentBacktestPanel({
                 lines={[
                   {
                     name: "Short window",
-                    color: "#b45309",
+                    color: "var(--chart-short)",
+                    dashed: true,
                     get: (p) =>
                       p.shortCoverage >= intent.spec.policy!.minCoverage
                         ? p.shortBurnRate
@@ -211,7 +212,7 @@ export function IntentBacktestPanel({
                   },
                   {
                     name: "Long window",
-                    color: "#be123c",
+                    color: "var(--chart-long)",
                     get: (p) =>
                       p.longCoverage >= intent.spec.policy!.minCoverage
                         ? p.longBurnRate

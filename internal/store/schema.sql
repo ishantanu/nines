@@ -85,3 +85,9 @@ CREATE TABLE IF NOT EXISTS slo_revision_archives (
 );
 
 ALTER TABLE slos ADD COLUMN IF NOT EXISTS rule_automation jsonb;
+
+-- Retirement receipts survive irreversible deletion. Names are never recycled.
+CREATE TABLE IF NOT EXISTS slo_tombstones (
+ slo_id text PRIMARY KEY,
+ document jsonb NOT NULL
+);

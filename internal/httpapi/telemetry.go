@@ -179,6 +179,8 @@ func (a *Server) dependencyView(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, out)
 }
 func (a *Server) mountTelemetry(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/dependency-discovery/kubernetes", a.dependencyDiscoveryCapabilities)
+	mux.HandleFunc("POST /api/dependency-discovery/kubernetes", a.dependencyDiscover)
 	mux.HandleFunc("POST /api/intents/plan", a.intentPlan)
 	mux.HandleFunc("POST /api/intents/draft", a.intentDraft)
 	mux.HandleFunc("POST /api/intents/backtest", a.intentBacktest)

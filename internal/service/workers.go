@@ -29,6 +29,9 @@ func (s *Service) Run(ctx context.Context, log *slog.Logger) {
 				continue
 			}
 			for _, c := range configs {
+				if c.Retired() {
+					continue
+				}
 				if s.CollectorFor(c) != nil && c.HasQueries() {
 					// Re-read the last two completed intervals after a one-step source
 					// delay. Gaps beyond this overlap need an explicit backfill.

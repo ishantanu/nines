@@ -4,6 +4,7 @@ import "time"
 
 // ResourceSummary is discovery metadata, not a measurement or an instruction.
 type ResourceSummary struct {
+	Archived    bool   `json:"archived,omitempty"`
 	Kind        string `json:"kind"`
 	ID          string `json:"id"`
 	Project     string `json:"project"`
@@ -93,6 +94,7 @@ type SLOParameters struct {
 	Policy             *BurnRatePolicy   `json:"policy,omitempty"`
 }
 type SLOContext struct {
+	Retirement        *SLORetirement       `json:"retirement,omitempty"`
 	BudgetDecision    *ErrorBudgetDecision `json:"budgetDecision,omitempty"`
 	Quality           *MeasurementQuality  `json:"quality,omitempty"`
 	MeasurementHealth *BindingHealth       `json:"measurementHealth,omitempty"`

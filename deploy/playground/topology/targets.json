@@ -1,0 +1,1 @@
+[{"targets":["graph-gateway:8000","graph-checkout:8000","graph-payments:8000"]}]

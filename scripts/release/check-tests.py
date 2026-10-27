@@ -10,7 +10,7 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("result", type=Path)
 p.add_argument(
     "--required",
-    choices=["database", "mimir", "operator", "prometheus", "identity"],
+    choices=["database", "mimir", "operator", "prometheus", "identity", "topology"],
     required=True,
 )
 a = p.parse_args()
@@ -24,6 +24,7 @@ skips = []
 seen = False
 
 prefixes = {
+    "topology": "TestRealInstrumentedDependency",
     "mimir": "TestRealMimir",
     "operator": "TestRealOperator",
     "prometheus": "TestRealPrometheus",
@@ -49,17 +50,20 @@ for row in rows:
         if row.get("Action") == "skip":
             skips.append(package + "/" + test)
 anchors = {
+    "topology": ["TestRealInstrumentedDependencyEvidence"],
     "database": [
         "TestPostgresIdentitySessionSurvivesRestart",
         "TestPostgresRestartPreservesSamplesStateAndOutbox",
     ],
     "mimir": [
+        "TestRealMimirRetirement",
         "TestRealMimirTenantCollection",
         "TestRealMimirRuleDestinations",
         "TestRealMimirLifecycleAndMinEvents",
         "TestRealMimirIndependentAlertLifecycle",
     ],
     "prometheus": [
+        "TestRealPrometheusRetirement",
         "TestRealPrometheusReviewedActivation",
         "TestRealPrometheusLifecycleAndMinEvents",
     ],
@@ -76,6 +80,8 @@ anchors = {
         "TestRealOperatorControllerConformance",
         "TestRealOperatorLeaseFailover",
         "TestRealOperatorPortalPublication",
+        "TestRealOperatorCleanupOutageAndCredentialRotation",
+        "TestRealOperatorIndependentSeverityEvaluation",
     ],
 }[a.required]
 passed = {r.get("Test") for r in rows if r.get("Action") == "pass"}

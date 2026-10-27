@@ -54,15 +54,12 @@ function WorkspacePreview() {
   return (
     <figure className="workspace-preview" aria-labelledby="preview-caption">
       <div className="preview-top">
-        <span>
-          <span className="workspace-dot" /> Commerce
-        </span>
-        <span className="preview-label">SYNTHETIC PREVIEW</span>
+        <span>Commerce / Checkout</span>
+        <span className="preview-label">Synthetic example</span>
       </div>
       <div className="preview-body">
         <div className="objective-title">
           <div>
-            <p className="mini-label">SERVICE LEVEL OBJECTIVE</p>
             <h2>Checkout success</h2>
           </div>
           <span className="objective-status">
@@ -87,6 +84,12 @@ function WorkspacePreview() {
             <span>Rolling window</span>
             <strong>
               28<small>days</small>
+            </strong>
+          </div>
+          <div>
+            <span>Error budget remaining</span>
+            <strong>
+              60.0<small>%</small>
             </strong>
           </div>
         </div>
@@ -115,23 +118,27 @@ function WorkspacePreview() {
             dip below the 99.90 percent target. This is an illustration, not
             live telemetry.
           </desc>
-          <g stroke="#e9e6ef" strokeWidth="1">
+          <g stroke="var(--folio-rule-soft)" strokeWidth="1">
             <path d="M0 26H520M0 65H520M0 104H520M0 143H520" />
           </g>
           <path
             d="M0 104H520"
-            stroke="#a494c1"
+            stroke="var(--folio-revision)"
             strokeWidth="1.5"
             strokeDasharray="5 5"
           />
           <path
             d="M0 45L20 39L40 43L60 32L80 37L100 34L120 42L140 35L160 43L180 39L200 51L220 40L240 46L260 39L280 61L300 125L320 88L340 43L360 38L380 42L400 28L420 36L440 32L460 38L480 27L500 37L520 32"
             fill="none"
-            stroke="#65519b"
+            stroke="var(--folio-reference)"
             strokeWidth="2.7"
             strokeLinejoin="round"
           />
-          <g fill="#777180" fontSize="10" fontFamily="ui-monospace,monospace">
+          <g
+            fill="var(--folio-muted)"
+            fontSize="10"
+            fontFamily="ui-monospace,monospace"
+          >
             <text x="0" y="160">
               00:00
             </text>
@@ -143,23 +150,105 @@ function WorkspacePreview() {
             </text>
           </g>
         </svg>
-        <div className="budget-row">
-          <span>Error budget remaining</span>
-          <strong>60.0%</strong>
-        </div>
-        <div className="budget-track">
-          <span />
-        </div>
         <div className="journey-link">
           <Waypoints size={17} aria-hidden="true" />
           <span>
-            Critical user journey<strong>Complete checkout</strong>
+            <span>Critical user journey</span>
+            <strong>Complete checkout · Authorize payment</strong>
           </span>
-          <span>3 linked SLOs</span>
+          <ArrowRight size={16} aria-hidden="true" />
+          <span>
+            <span>Linked SLO</span>
+            <strong>Checkout success</strong>
+          </span>
+          <span className="journey-count">3 linked · 2 required</span>
+        </div>
+        <div className="contract-stamp">
+          <span>Journey definition</span>
+          <code>checkout.journey.yaml</code>
+          <a href="#as-code">
+            Review YAML <ArrowRight size={14} aria-hidden="true" />
+          </a>
         </div>
       </div>
       <figcaption id="preview-caption">
         Illustrative workspace with synthetic values.
+      </figcaption>
+    </figure>
+  );
+}
+
+const journeySteps = [
+  {
+    name: "Submit cart",
+    actor: "User",
+    slo: "api-availability",
+    dimension: "Availability",
+    required: true,
+  },
+  {
+    name: "Authorize payment",
+    actor: "Service",
+    slo: "checkout-success",
+    dimension: "Correctness",
+    required: true,
+  },
+  {
+    name: "Send confirmation",
+    actor: "Service",
+    slo: "background-jobs",
+    dimension: "Latency",
+    required: false,
+  },
+];
+function JourneyExample() {
+  const [selected, setSelected] = useState(1);
+  const step = journeySteps[selected];
+  return (
+    <figure className="journey-example">
+      <div
+        className="journey-example-path"
+        role="group"
+        aria-label="Example critical user journey steps"
+      >
+        {journeySteps.map((item, index) => (
+          <div className="journey-example-step" key={item.slo}>
+            <button
+              type="button"
+              aria-pressed={selected === index}
+              aria-controls="journey-step-detail"
+              onClick={() => setSelected(index)}
+            >
+              <span>{item.actor}</span>
+              <strong>{item.name}</strong>
+              <span className="journey-example-slo">{item.slo}</span>
+            </button>
+            {index < journeySteps.length - 1 ? (
+              <ArrowRight aria-hidden="true" />
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <div
+        className="journey-example-detail"
+        id="journey-step-detail"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        <p>
+          <strong>{step.name}</strong> depends on <code>{step.slo}</code>.
+        </p>
+        <span>
+          {step.dimension} ·{" "}
+          {step.required ? "Required for journey health" : "Optional objective"}
+        </span>
+        <a className="text-link" href="#as-code">
+          Read the definition <ArrowRight size={15} aria-hidden="true" />
+        </a>
+      </div>
+      <figcaption>
+        Illustrative journey from <code>checkout.journey.yaml</code>. Select a
+        step to inspect its SLO link.
       </figcaption>
     </figure>
   );
@@ -196,9 +285,6 @@ export function App() {
           aria-labelledby="hero-title"
         >
           <div className="hero-copy">
-            <p className="eyebrow">
-              <span /> OPEN SOURCE SLO MANAGEMENT
-            </p>
             <h1 id="hero-title">
               Reliability, tied to the <em>user journey.</em>
             </h1>
@@ -241,13 +327,13 @@ export function App() {
           aria-labelledby="product-title"
         >
           <div className="section-heading">
-            <p className="eyebrow">FROM USER EXPERIENCE TO SERVICE SIGNAL</p>
             <h2 id="product-title">Give every objective a reason.</h2>
             <p>
               Service metrics describe a system. Critical user journeys explain
               why its reliability matters. Nines connects the two explicitly.
             </p>
           </div>
+          <JourneyExample />
           <ol className="reliability-path">
             <li>
               <span>01</span>
@@ -283,7 +369,6 @@ export function App() {
           aria-labelledby="architecture-title"
         >
           <div className="section-heading">
-            <p className="eyebrow">ARCHITECTURE</p>
             <h2 id="architecture-title">From telemetry to reviewed rules.</h2>
             <p>
               Keep metrics in Prometheus or Mimir. Nines connects objectives and
@@ -291,33 +376,43 @@ export function App() {
               your configured destination after review.
             </p>
           </div>
-          <figure className="architecture-figure">
-            <div
-              className="architecture-viewport"
-              role="region"
-              aria-label="Architecture diagram, scroll horizontally on smaller screens"
-              tabIndex={0}
-            >
-              <img
-                src="./nines-architecture.svg"
-                width="1200"
-                height="870"
-                loading="lazy"
-                decoding="async"
-                alt="Applications send metrics through scraping or an OpenTelemetry Collector to Prometheus or Mimir. Portal, CLI and MCP clients use Nines for tenant-scoped SLO plans. Reviewed rules deploy through shared Prometheus files and reload, the Mimir ruler API, or the Nines Kubernetes operator. Nines queries measurements and recorded output to verify results. GitOps can also use the operator independently of the server."
-              />
-            </div>
-            <figcaption>
-              <span>
-                Saved SLOs deploy rules automatically when enabled on the data
-                source. Stored configuration, runtime evaluation and SLO health
-                have separate status checks.
-              </span>
-              <a className="text-link" href="./nines-architecture.svg" download>
-                Download SVG <ArrowRight size={15} aria-hidden="true" />
-              </a>
-            </figcaption>
-          </figure>
+          <details className="architecture-details">
+            <summary>
+              Explore the deployment architecture{" "}
+              <span>Portal, CLI, MCP, operator and rule destinations</span>
+            </summary>
+            <figure className="architecture-figure">
+              <div
+                className="architecture-viewport"
+                role="region"
+                aria-label="Architecture diagram, scroll horizontally on smaller screens"
+                tabIndex={0}
+              >
+                <img
+                  src="./nines-architecture.svg"
+                  width="1200"
+                  height="870"
+                  loading="lazy"
+                  decoding="async"
+                  alt="Applications send metrics through scraping or an OpenTelemetry Collector to Prometheus or Mimir. Portal, CLI and MCP clients use Nines for tenant-scoped SLO plans. Reviewed rules deploy through shared Prometheus files and reload, the Mimir ruler API, or the Nines Kubernetes operator. Nines queries measurements and recorded output to verify results. GitOps can also use the operator independently of the server."
+                />
+              </div>
+              <figcaption>
+                <span>
+                  Saved SLOs deploy rules automatically when enabled on the data
+                  source. Stored configuration, runtime evaluation and SLO
+                  health have separate status checks.
+                </span>
+                <a
+                  className="text-link"
+                  href="./nines-architecture.svg"
+                  download
+                >
+                  Download SVG <ArrowRight size={15} aria-hidden="true" />
+                </a>
+              </figcaption>
+            </figure>
+          </details>
           <div className="architecture-notes">
             <p>
               <strong>Reviewed delivery.</strong> The server can write a shared
@@ -343,7 +438,6 @@ export function App() {
         >
           <div className="container code-layout">
             <div className="code-copy">
-              <p className="eyebrow">ONE VERSIONED CONTRACT</p>
               <h2 id="code-title">
                 Reliability belongs
                 <br />
@@ -433,7 +527,6 @@ export function App() {
           aria-labelledby="examples-title"
         >
           <div className="section-heading">
-            <p className="eyebrow">TRY THE WORKFLOW</p>
             <h2 id="examples-title">From a definition to a running SLO.</h2>
             <p>
               Use these examples from a source checkout or with the alpha
@@ -492,7 +585,6 @@ export function App() {
           aria-labelledby="agent-title"
         >
           <div className="section-heading">
-            <p className="eyebrow">CLI, SDK AND MCP</p>
             <h2 id="agent-title">
               Give agents context.
               <br />
@@ -591,7 +683,6 @@ export function App() {
         >
           <div className="container quickstart-layout">
             <div>
-              <p className="eyebrow">START WITH THE LOCAL DEMO</p>
               <h2 id="start-title">
                 Start with a
                 <br />
@@ -631,7 +722,6 @@ export function App() {
           aria-labelledby="release-title"
         >
           <div>
-            <p className="eyebrow">BUILT IN THE OPEN</p>
             <h2 id="release-title">Release status and scope.</h2>
             <p>
               Nines is a pre-release MVP under active development. Expect
