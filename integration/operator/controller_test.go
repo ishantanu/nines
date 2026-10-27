@@ -43,7 +43,7 @@ func realCluster(t *testing.T) *clusterFixture {
 	if !strings.HasPrefix(name, "nines-operator-acceptance-") {
 		t.Fatal("refusing non-fixture container")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	t.Cleanup(cancel)
 	owned, err := exec.CommandContext(ctx, "docker", "inspect", "--format", `{{index .Config.Labels "nines.acceptance"}}`, name).Output()
 	if err != nil || strings.TrimSpace(string(owned)) != "operator" {

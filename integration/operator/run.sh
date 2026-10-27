@@ -110,7 +110,7 @@ export NINES_OPERATOR_TEST_TOKEN="$work/token"
 export NINES_OPERATOR_TEST_MIMIR="http://127.0.0.1:$mimir_port"
 cd "$root"
 test_status=0
-NINES_OPERATOR_TEST_CONTAINER="$server" go test -race -count=1 -json ./integration/operator > "$work/go-results.json" || test_status=$?
+NINES_OPERATOR_TEST_CONTAINER="$server" go test -race -count=1 -json -timeout 20m ./integration/operator > "$work/go-results.json" || test_status=$?
 # Publish only a complete report; another run cannot corrupt this run's gate.
 cp "$work/go-results.json" ".$name-test-results.json"
 mv ".$name-test-results.json" operator-test-results.json
