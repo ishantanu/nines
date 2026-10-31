@@ -212,8 +212,10 @@ jobs:
             flags+=(--mimir)
           fi
           cleanup() {
-            ./playground logs --no-follow || true
-            docker compose -p nines-ci-playground -f compose.playground.yaml --profile '*' down -v || true
+            set +e
+            ./playground logs --no-follow
+            docker compose -p nines-ci-playground -f compose.playground.yaml --profile '*' down -v
+            set -e
           }
           trap cleanup EXIT
           ./playground up "${flags[@]}"
