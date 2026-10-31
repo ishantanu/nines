@@ -1,8 +1,9 @@
+import { MeasurementLabels } from "./measurement-labels";
 import { SystemOneAdvice, SystemOneConsent } from "./system-one-assessment";
 import { IntentOutcomePanel } from "./intent-outcome";
 import { useResourceRoute } from "@/lib/navigation";
 import { useEffect, useRef, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import {
   api,
   canEdit,
@@ -901,12 +902,16 @@ export function IntentWorkspace({
                           {c.definition.spec.displayName}
                         </p>
                         <p>{c.definition.spec.observationPoint}</p>
-                        <p className="break-all text-xs text-muted-foreground">
-                          {c.definition.spec.measurement === "latency"
-                            ? `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
-                            : "Success labels: " +
-                              JSON.stringify(c.definition.spec.successLabels)}
-                        </p>
+                        <div className="break-all text-xs text-muted-foreground">
+                          {c.definition.spec.measurement === "latency" ? (
+                            `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
+                          ) : (
+                            <MeasurementLabels
+                              labels={c.definition.spec.successLabels}
+                              empty="No success labels specified"
+                            />
+                          )}
+                        </div>
                         <p className="text-xs">
                           {c.binding.name} · revision {c.binding.revision}
                         </p>

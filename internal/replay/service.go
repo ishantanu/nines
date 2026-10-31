@@ -24,11 +24,12 @@ const LegacyPolicy = "masked-v1"
 var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 type Service struct {
+	Privacy    v1.ReplayPrivacy
 	Platform   *service.Service
 	Repository Repository
 }
 
-func New(p *service.Service, r Repository) *Service { return &Service{p, r} }
+func New(p *service.Service, r Repository) *Service { return &Service{Platform: p, Repository: r} }
 func digest(b []byte) string                        { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
 func (s *Service) actor(ctx context.Context) (v1.InvestigationActor, error) {
 	p, ok := tenancy.FromContext(ctx)
@@ -98,12 +99,19 @@ func (s *Service) references(ctx context.Context, refs []v1.ReplayReference) ([]
 	return out, nil
 }
 func (s *Service) Create(ctx context.Context, in v1.CreateSessionReplay) (v1.SessionReplay, error) {
+	if s.Privacy.Disabled {
+		return v1.SessionReplay{}, model.Invalid("new replay recording and sharing are disabled by the operator")
+	}
 	actor, err := s.actor(ctx)
 	if err != nil {
 		return v1.SessionReplay{}, err
 	}
-	if !idPattern.MatchString(in.ID) || !utf8.ValidString(in.Title) || strings.TrimSpace(in.Title) == "" || len(in.Title) > 160 || strings.ContainsRune(in.Title, 0) || !in.Consent || (in.Policy != Policy && in.Policy != LegacyPolicy) {
-		return v1.SessionReplay{}, model.Invalid("provide a valid ID, title (1–160 bytes) and explicit consent to a supported recording policy")
+	principal, _ := tenancy.FromContext(ctx)
+	if principal.Role != "owner" && principal.Role != "editor" {
+		return v1.SessionReplay{}, model.Invalid("replay sharing consent requires an owner or editor")
+	}
+	if !idPattern.MatchString(in.ID) || !utf8.ValidString(in.Title) || strings.TrimSpace(in.Title) == "" || len(in.Title) > 160 || strings.ContainsRune(in.Title, 0) || !in.Consent || !in.SharingConsent || in.NoticeVersion != v1.ReplayConsentNotice || (in.Policy != Policy && in.Policy != LegacyPolicy) {
+		return v1.SessionReplay{}, model.Invalid("provide a valid ID, title (1–160 bytes) and explicit recording and tenant-sharing consent to replay-sharing-v1 and a supported recording policy")
 	}
 	events, err := sanitize(in.Events, in.Policy == Policy)
 	if err != nil {
@@ -147,7 +155,7 @@ func (s *Service) Create(ctx context.Context, in v1.CreateSessionReplay) (v1.Ses
 	if started.Before(now.Add(-7*24*time.Hour)) || finished.After(now.Add(5*time.Minute)) {
 		return v1.SessionReplay{}, model.Invalid("recording timestamps must be within the last seven days")
 	}
-	m := v1.SessionReplay{APIVersion: v1.APIVersion, Tenant: s.Platform.TenantID, ID: in.ID, Title: in.Title, Version: 1, CreatedAt: now, ExpiresAt: now.Add(RetentionDays * 24 * time.Hour), StartedAt: started, FinishedAt: finished, DurationMillis: end.Timestamp - start.Timestamp, EventCount: len(events), SizeBytes: len(payload), Digest: digest(payload), Policy: in.Policy, RecordedBy: actor, References: refs}
+	m := v1.SessionReplay{APIVersion: v1.APIVersion, Tenant: s.Platform.TenantID, ID: in.ID, Title: in.Title, Version: 1, CreatedAt: now, ExpiresAt: now.Add(RetentionDays * 24 * time.Hour), StartedAt: started, FinishedAt: finished, DurationMillis: end.Timestamp - start.Timestamp, EventCount: len(events), SizeBytes: len(payload), Digest: digest(payload), Policy: in.Policy, RecordedBy: actor, References: refs, ConsentReceipt: &v1.EvidenceConsent{NoticeVersion: in.NoticeVersion, At: now, Actor: actor, Purpose: "record and share masked replay within this tenant"}}
 	r, err := s.Repository.Create(ctx, record{Meta: m, Events: events, RequestDigest: requestHash})
 	return r.Meta, err
 }
@@ -296,6 +304,11 @@ func (s *Service) RunRetention(ctx context.Context, log *slog.Logger) {
 	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 	for {
+		if visual, ok := s.Platform.Store.(interface{ PruneVisual(context.Context) error }); ok {
+			if err := visual.PruneVisual(ctx); err != nil && ctx.Err() == nil {
+				log.Error("visual receipt retention failed", "tenant", s.Platform.TenantID)
+			}
+		}
 		if err := s.Repository.Prune(ctx); err != nil && ctx.Err() == nil {
 			log.Error("session replay retention failed", "tenant", s.Platform.TenantID)
 		}
@@ -305,4 +318,18 @@ func (s *Service) RunRetention(ctx context.Context, log *slog.Logger) {
 		case <-ticker.C:
 		}
 	}
+}
+
+func (s *Service) Delete(ctx context.Context, id string, version int64) error {
+	p, ok := tenancy.FromContext(ctx)
+	if !ok || p.TenantID != s.Platform.TenantID || p.Role != "owner" {
+		return model.Invalid("an owner is required to permanently delete recordings")
+	}
+	if version < 1 {
+		return model.Invalid("expectedVersion must be positive")
+	}
+	if _, e := s.read(ctx, id); e != nil {
+		return e
+	}
+	return s.Repository.Delete(ctx, id, version)
 }

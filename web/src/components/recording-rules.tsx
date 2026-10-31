@@ -1,3 +1,4 @@
+import { NativeSLOResults } from "./native-slo-results";
 import { useEffect, useRef, useState } from "react";
 import { api, message, percent, type RequestScope, type SLO } from "@/lib/api";
 import { duration } from "@/lib/history";
@@ -23,10 +24,44 @@ interface Rule {
   labels: Record<string, string>;
   annotations?: Record<string, string>;
 }
+interface NativeQueries {
+  goodEvents: { nrql: string; accountId: number };
+  validEvents: { nrql: string; accountId: number };
+  indicator: { nrql: string; accountId: number };
+}
 interface Plan {
+  nativeNewRelic?: {
+    origin: string;
+    entityGUID: string;
+    nativeID?: string;
+    nativeGUID?: string;
+    url?: string;
+    matches: boolean;
+    warnings: string[];
+    resultQueries?: NativeQueries;
+  };
   digest: string;
   yaml: string;
   resourceYAML?: string;
+  nativeDatadog?: {
+    origin: string;
+    nativeID?: string;
+    url?: string;
+    matches: boolean;
+    warnings: string[];
+  };
+  nativeGoogleCloud?: {
+    origin: string;
+    priorDigest?: string;
+    matches: boolean;
+    warnings: string[];
+  };
+  nativeSLO?: {
+    origin: string;
+    priorVersion?: string;
+    matches: boolean;
+    warnings: string[];
+  };
   sloRevision: number;
   group: { name: string; interval: string; rules: Rule[] };
   target: {
@@ -41,6 +76,11 @@ interface Plan {
     autoDeploy?: boolean;
     publisher?: string;
     providerKind?: string;
+    dataset?: string;
+    newRelicAccountID?: string;
+    newRelicEntityGUID?: string;
+    googleProjectID?: string;
+    googleServiceID?: string;
   };
 }
 export function RecordingRules({
@@ -108,7 +148,14 @@ export function RecordingRules({
       );
       if (!request.signal.aborted) {
         setResult(response);
-        if (withdraw) setStale(true);
+        if (
+          withdraw ||
+          plan.nativeSLO ||
+          plan.nativeGoogleCloud ||
+          plan.nativeDatadog ||
+          plan.nativeNewRelic
+        )
+          setStale(true);
         onApplied?.();
       }
     } catch (e) {
@@ -130,6 +177,247 @@ export function RecordingRules({
         : plan
           ? `${plan.target.rulerURL?.replace(/\/$/, "")}/config/v1/rules/${encodeURIComponent(plan.target.namespace)}`
           : "";
+  const nativePublication =
+    plan?.nativeSLO ??
+    plan?.nativeGoogleCloud ??
+    plan?.nativeDatadog ??
+    plan?.nativeNewRelic;
+  const isNewRelic = plan?.target.kind === "newrelic";
+  const nativeQueries =
+    result?.nativeQueries ?? plan?.nativeNewRelic?.resultQueries;
+  const isDatadog = plan?.target.kind === "datadog";
+  const isGoogle = plan?.target.kind === "googlecloud";
+  if (plan && nativePublication) {
+    return (
+      <div className="space-y-4">
+        <Card className="gap-0 py-0">
+          <div className="panel-header">
+            <h2 className="section-label">
+              {isNewRelic
+                ? "New Relic native SLO"
+                : isDatadog
+                  ? "Datadog native SLO"
+                  : isGoogle
+                    ? "Google Cloud native SLO"
+                    : "Dash0 native SLO"}
+            </h2>
+            <Button variant="outline" size="sm" onClick={onConnections}>
+              Telemetry connections
+            </Button>
+          </div>
+          <CardContent className="space-y-5 p-5">
+            <dl className="grid gap-4 text-sm sm:grid-cols-2">
+              {Object.entries({
+                Connection: plan.target.connection,
+                ...(isNewRelic
+                  ? {
+                      Account: plan.target.newRelicAccountID ?? "Unavailable",
+                      "Associated entity":
+                        plan.target.newRelicEntityGUID ?? "Unavailable",
+                      "Native SLO ID":
+                        plan.nativeNewRelic?.nativeID ??
+                        "Assigned after publication",
+                      "Current revision": nativePublication.matches
+                        ? "Stored"
+                        : "New resource",
+                    }
+                  : isDatadog
+                    ? {
+                        "Ownership scope": plan.target.namespace,
+                        "Native SLO ID":
+                          plan.nativeDatadog?.nativeID ??
+                          "Assigned after publication",
+                        "Current revision": nativePublication.matches
+                          ? "Stored"
+                          : "New resource",
+                      }
+                    : isGoogle
+                      ? {
+                          Project: plan.target.googleProjectID ?? "Unavailable",
+                          "Ownership scope": plan.target.namespace,
+                          Service: plan.target.googleServiceID ?? "Unavailable",
+                          Resource: nativePublication.origin,
+                          "Native revision": nativePublication.matches
+                            ? "Stored"
+                            : "New resource",
+                        }
+                      : {
+                          Dataset: plan.target.dataset ?? "Unavailable",
+                          Origin: nativePublication.origin,
+                          "Upstream version":
+                            plan.nativeSLO?.priorVersion ?? "New resource",
+                        }),
+              }).map(([label, value]) => (
+                <div key={label} className="min-w-0">
+                  <dt className="text-xs text-muted-foreground">{label}</dt>
+                  <dd className="mt-1 break-all font-medium">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <section className="space-y-2" aria-label="Publication scope">
+              <h3 className="text-sm font-semibold">
+                Review evaluation differences
+              </h3>
+              <ul className="list-disc space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                {nativePublication.warnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </section>
+            <p className="text-sm leading-6 text-muted-foreground">
+              {isNewRelic
+                ? "Publication creates an immutable New Relic event-count SLI/SLO on the configured entity. Older revisions are retained. Native derived metrics need fresh telemetry; no alert conditions or notifications are created."
+                : isDatadog
+                  ? "Publication creates an immutable Datadog metric SLO revision. Older revisions are retained. Nines collection and burn alerts remain independent; native monitors are not created. Verify provider removal checks manual removal without issuing a delete."
+                  : isGoogle
+                    ? "Publication creates an immutable Google Cloud SLO revision. Older native revisions are retained. Nines collection and burn alerts run independently; native alert policies are not published. Verify provider removal confirms manual removal without issuing a delete."
+                    : "Publication stores an OpenSLO definition in Dash0. Nines collection and burn alerts run independently. Native Dash0 check rules are not published by this action. Withdrawal disables the owned SLO and retains its definition."}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={deploying}
+                onClick={() => setRefresh((n) => n + 1)}
+              >
+                Refresh plan
+              </Button>
+              <Button
+                size="sm"
+                disabled={deploying || stale || scope.role !== "owner"}
+                onClick={() => void deploy()}
+              >
+                {deploying ? "Applying..." : "Publish reviewed SLO"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={deploying || stale || scope.role !== "owner"}
+                onClick={() => void deploy(true)}
+              >
+                {isGoogle || isDatadog || isNewRelic
+                  ? "Verify provider removal"
+                  : "Disable reviewed SLO"}
+              </Button>
+            </div>
+            {scope.role !== "owner" ? (
+              <p className="text-sm text-muted-foreground">
+                An owner role is required for native SLO publication controls.
+              </p>
+            ) : null}
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error} Refresh the plan before retrying.
+              </p>
+            ) : null}
+            {stale ? (
+              <p role="status" className="text-sm text-muted-foreground">
+                {isGoogle || isDatadog || isNewRelic
+                  ? "Refresh the plan to review the current native resource before another action."
+                  : "Refresh the plan to review the current upstream version before another action."}
+              </p>
+            ) : null}
+            {plan.nativeNewRelic?.url ? (
+              <a
+                className="text-sm underline underline-offset-4"
+                href={plan.nativeNewRelic.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open native SLO in New Relic
+              </a>
+            ) : null}
+            {nativeQueries ? (
+              <section aria-label="New Relic SLI queries" className="space-y-3">
+                <h3 className="text-sm font-semibold">
+                  Inspect native SLI metrics
+                </h3>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Run these provider-generated queries in the configured New
+                  Relic account. Derived metrics need fresh events after
+                  publication; empty results do not establish health.
+                </p>
+                {(
+                  [
+                    ["Good events", nativeQueries.goodEvents],
+                    ["Valid events", nativeQueries.validEvents],
+                    ["SLI ratio", nativeQueries.indicator],
+                  ] as const
+                ).map(([label, query]) => (
+                  <details key={label} className="space-y-2">
+                    <summary className="cursor-pointer text-sm font-medium">
+                      {label}
+                    </summary>
+                    <pre
+                      className="code-block max-h-48 overflow-auto"
+                      tabIndex={0}
+                      aria-label={`New Relic ${label} query`}
+                    >
+                      {query.nrql}
+                    </pre>
+                  </details>
+                ))}
+              </section>
+            ) : null}
+            {plan.nativeDatadog?.url ? (
+              <a
+                className="text-sm underline underline-offset-4"
+                href={plan.nativeDatadog.url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open native SLO in Datadog
+              </a>
+            ) : null}
+            {result ? <RuleApplyEvidence result={result} /> : null}
+          </CardContent>
+        </Card>
+        {isDatadog || isNewRelic ? (
+          <NativeSLOResults
+            key={`${slo.id}-${slo.revision}`}
+            slo={slo}
+            scope={scope}
+            provider={isDatadog ? "datadog" : "newrelic"}
+          />
+        ) : null}
+
+        <Card className="gap-0 py-0">
+          <div className="panel-header">
+            <h2 className="section-label">
+              {isNewRelic
+                ? "New Relic SLO document"
+                : isDatadog
+                  ? "Datadog SLO document"
+                  : isGoogle
+                    ? "Google Cloud SLO document"
+                    : "OpenSLO document"}
+            </h2>
+          </div>
+          <CardContent className="min-w-0 space-y-3 p-5">
+            <pre
+              className="code-block max-h-96 overflow-auto"
+              tabIndex={0}
+              aria-label={
+                isNewRelic
+                  ? "Reviewed New Relic SLO YAML"
+                  : isDatadog
+                    ? "Reviewed Datadog SLO YAML"
+                    : isGoogle
+                      ? "Reviewed Google Cloud SLO YAML"
+                      : "Reviewed OpenSLO YAML"
+              }
+            >
+              {plan.yaml}
+            </pre>
+            <p className="break-all text-xs text-muted-foreground">
+              SLO revision {plan.sloRevision} · plan digest{" "}
+              <span className="font-mono">{plan.digest}</span>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
   return (
     <div className="space-y-4">
       <div className="panel-grid">
@@ -468,6 +756,9 @@ export function RecordingRules({
 }
 
 interface RuleApplyResult {
+  nativeQueries?: NativeQueries;
+  nativeID?: string;
+  nativeURL?: string;
   state: string;
   message: string;
   activation?: Stage;
@@ -481,13 +772,15 @@ export function RuleApplyEvidence({ result }: { result: RuleApplyResult }) {
         ? "Withdrawal pending"
         : result.state === "withdrawn"
           ? "Publication withdrawn"
-          : result.state === "written"
-            ? "File written"
-            : result.state === "accepted" || result.state === "verified"
-              ? "Stored in ruler"
-              : result.state === "unchanged"
-                ? "Configuration unchanged"
-                : "Configuration result";
+          : result.state === "stored"
+            ? "Native SLO stored"
+            : result.state === "written"
+              ? "File written"
+              : result.state === "accepted" || result.state === "verified"
+                ? "Stored in ruler"
+                : result.state === "unchanged"
+                  ? "Configuration unchanged"
+                  : "Configuration result";
   const stateLabels: Record<string, string> = {
     accepted: "Accepted",
     verified: "Verified",
@@ -506,6 +799,21 @@ export function RuleApplyEvidence({ result }: { result: RuleApplyResult }) {
       role="status"
       className="grid gap-4 rounded-md border p-4 text-sm md:grid-cols-3"
     >
+      {result.nativeID ? (
+        <div className="min-w-0 space-y-2 sm:col-span-3">
+          <p className="break-all text-sm">Native SLO ID: {result.nativeID}</p>
+          {result.nativeURL ? (
+            <a
+              className="text-sm underline underline-offset-4"
+              href={result.nativeURL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Open native SLO
+            </a>
+          ) : null}
+        </div>
+      ) : null}
       {[
         {
           title: "Configuration",

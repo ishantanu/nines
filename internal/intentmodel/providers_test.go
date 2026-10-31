@@ -201,7 +201,7 @@ func TestPortableJSONModeRetainsStrictValidation(t *testing.T) {
 		}
 		format := body["response_format"].(map[string]any)
 		messages := body["messages"].([]any)
-		if format["type"] != "json_object" || !strings.Contains(messages[0].(map[string]any)["content"].(string), `"targetText"`) || r.Header.Get("Authorization") != "Bearer custom-key" {
+		if format["type"] != "json_object" || !strings.Contains(messages[0].(map[string]any)["content"].(string), `"targetText"`) || strings.Contains(messages[0].(map[string]any)["content"].(string), "State a percentage and rolling duration.") || r.Header.Get("Authorization") != "Bearer custom-key" {
 			t.Error("JSON mode is not grounded in the shared schema")
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": validGoal}}}})

@@ -62,6 +62,43 @@ func (m *Manager) Retire(ctx context.Context, archived model.SLO) (bool, error) 
 	if e = m.authorizeWrite(ctx, original, plan.Digest); e != nil {
 		return false, e
 	}
+	if target.Kind == "newrelic" {
+		c, err := newrelicClient(target)
+		if err != nil {
+			return false, err
+		}
+		rows, err := c.OwnedRevisions(ctx, plan.NativeNewRelic.EntityGUID, plan.NativeNewRelic.Owner)
+		return len(rows) == 0, err
+	}
+	if target.Kind == "datadog" {
+		c, err := datadogClient(target)
+		if err != nil {
+			return false, err
+		}
+		rows, err := c.OwnedRevisions(ctx, plan.NativeDatadog.Owner)
+		return len(rows) == 0, err
+	}
+	if target.Kind == "googlecloud" {
+		c, err := googleClient(target)
+		if err != nil {
+			return false, err
+		}
+		retained, err := c.OwnedRevisions(ctx, plan.NativeGoogleCloud.Document.UserLabels["nines_owner"])
+		if err != nil {
+			return false, err
+		}
+		return len(retained) == 0, nil
+	}
+	if target.Kind == "dash0" {
+		c, err := nativeClient(target)
+		if err != nil {
+			return false, err
+		}
+		if err = c.Disable(ctx, *plan.NativeSLO); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
 	switch target.Kind {
 	case "prometheus":
 		file := filepath.Join(target.Directory, target.Namespace+"-"+plan.Group.Name+".yaml")

@@ -1,4 +1,5 @@
 publicURLEnv: NINES_PUBLIC_URL
+allowLoopbackAliases: true
 sessionHours: 12
 providers:
   - id: local

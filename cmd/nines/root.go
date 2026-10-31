@@ -27,6 +27,7 @@ type options struct {
 	Offline, Agent                                                   bool
 	Timeout                                                          time.Duration
 	cancel                                                           context.CancelFunc
+	githubTransport                                                  http.RoundTripper
 }
 
 func (o *options) format(fallback string) string {
@@ -93,6 +94,7 @@ func (o *options) prepare(c *cobra.Command) error {
 }
 func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	r := &cobra.Command{Use: "nines", Short: "SLOs and critical user journeys, locally and with Nines", Long: "Validate YAML and generate rules offline, or manage authenticated tenant resources through Nines.\nUse --offline to prohibit server operations. Use --agent for machine-readable results and errors without interactive login.", SilenceUsage: true, SilenceErrors: true}
+	r.AddCommand(nativeCommands(o))
 	r.Version = buildinfo.Version
 	r.SetVersionTemplate("{{.Version}}\n")
 	r.SetOut(out)
@@ -116,7 +118,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	core := func(parent *cobra.Command, action, kind, use, mode, effect, short string, min, max int) {
 		parent.AddCommand(mark(position(coreCommand(action, kind, o), use, min, max), mode, effect, short))
 	}
-	r.AddCommand(templatesCommand(o), extensionsCommand(o), retirementCommand(o))
+	r.AddCommand(opensloCommand(o), templatesCommand(o), extensionsCommand(o), retirementCommand(o), visualCommand(o))
 	g := group(r, "init", "Create local versioned YAML")
 	core(g, "init", "slo", "slo", "offline", "local-write", "Generate an SLO manifest", 0, 0)
 	for _, v := range []struct{ a, mode, effect, short string }{{"validate", "offline", "read", "Validate a local YAML definition"}, {"plan", "server", "read", "Review a definition against the server"}, {"apply", "server", "write", "Apply an exact revision-checked definition"}} {
@@ -156,7 +158,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	g = group(r, "connections", "Inspect configured data sources")
 	core(g, "connections-list", "", "list", "server", "read", "List configured sources", 0, 0)
 	core(g, "connections-test", "", "test [NAME]", "server", "provider-read", "Test a configured source", 0, 1)
-	g = group(r, "rules", "Generate and review recording and burn-rate rules")
+	g = group(r, "rules", "Generate rules and review provider SLO publication")
 	for _, a := range []string{"generate", "plan", "apply", "withdraw", "pause", "resume"} {
 		mode, effect := "server", "read"
 		if a == "generate" {
@@ -165,7 +167,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 		if a == "apply" || a == "withdraw" || a == "pause" || a == "resume" {
 			effect = "deploy"
 		}
-		core(g, "rules-"+a, "", a, mode, effect, map[string]string{"generate": "Generate rules from local YAML", "plan": "Review rule digest and destination dataset", "apply": "Deploy an exact reviewed rule digest", "pause": "Pause automatic deployment without removing loaded rules", "resume": "Resume automatic deployment of the saved SLO revision", "withdraw": "Withdraw a reviewed operator publication and retain its definition"}[a], 0, 0)
+		core(g, "rules-"+a, "", a, mode, effect, map[string]string{"generate": "Generate rules from local YAML", "plan": "Review a recording-rule or native SLO publication plan", "apply": "Publish an exact reviewed rule or native SLO digest", "pause": "Pause automatic deployment without removing loaded rules", "resume": "Resume automatic deployment of the saved SLO revision", "withdraw": "Withdraw a reviewed publication using provider-specific safeguards"}[a], 0, 0)
 	}
 	intent := group(r, "intent", "Prepare and review intent-based SLOs")
 	for _, a := range []string{"draft", "plan", "backtest"} {
@@ -176,19 +178,20 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 		intent.AddCommand(mark(intentCommand(a, o), "server", effect, map[string]string{"draft": "Draft using the configured model", "plan": "Compile a reviewed measurement selection", "backtest": "Backtest a selection against provider telemetry"}[a]))
 	}
 	g = group(intent, "conversations", "Durable preparation, review, apply and verification")
-	for _, a := range []string{"list", "show", "create", "message", "run", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "observe", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
+	g.AddCommand(githubReviewCommand(o, false), githubReviewCommand(o, true))
+	for _, a := range []string{"list", "show", "status", "report", "create", "message", "run", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "observe", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
 		use, min, max := a+" ID", 1, 1
 		effect := "write"
 		if a == "list" || a == "create" {
 			use, min, max = a, 0, 0
 		}
-		if a == "list" || a == "show" || a == "verify" || a == "kubernetes" || a == "audit" || a == "rollback-kubernetes" {
+		if a == "list" || a == "show" || a == "status" || a == "report" || a == "verify" || a == "kubernetes" || a == "audit" || a == "rollback-kubernetes" {
 			effect = "read"
 		}
 		if a == "run" {
 			effect = "model-call"
 		}
-		g.AddCommand(mark(position(conversationCommand(a, o), use, min, max), "server", effect, map[string]string{"list": "List saved conversations", "show": "Read one conversation", "create": "Create a preparation conversation", "message": "Append a clarification", "run": "Prepare with explicit model consent", "confirm": "Confirm a measurement revision", "cancel": "Cancel preparation", "changes": "Freeze exact SLO and journey changes", "approve": "Approve an exact change-set digest", "reject": "Reject changes or withdraw approval with a reason", "audit": "Read the decision audit log", "rollback-plan": "Prepare a revision-fenced configuration rollback", "rollback-approve": "Approve an exact rollback digest", "rollback-apply": "Apply an approved configuration rollback", "rollback-reject": "Reject or withdraw rollback approval", "rollback-kubernetes": "Export reviewed rollback definitions for GitOps", "apply": "Atomically apply approved definitions", "observe": "Inspect runtime and persist post-change outcome evidence", "verify": "Read applied revisions and recorded outcome evidence", "kubernetes": "Export exact definitions for GitOps review"}[a]))
+		g.AddCommand(mark(position(conversationCommand(a, o), use, min, max), "server", effect, map[string]string{"list": "List saved conversations", "show": "Read one conversation", "status": "Read the resumable workflow phase and next review gate", "report": "Export an audited review artifact", "create": "Create a preparation conversation", "message": "Append a clarification", "run": "Prepare with explicit model consent", "confirm": "Confirm a measurement revision", "cancel": "Cancel preparation", "changes": "Freeze exact SLO and journey changes", "approve": "Approve an exact change-set digest", "reject": "Reject changes or withdraw approval with a reason", "audit": "Read the decision audit log", "rollback-plan": "Prepare a revision-fenced configuration rollback", "rollback-approve": "Approve an exact rollback digest", "rollback-apply": "Apply an approved configuration rollback", "rollback-reject": "Reject or withdraw rollback approval", "rollback-kubernetes": "Export reviewed rollback definitions for GitOps", "apply": "Atomically apply approved definitions", "observe": "Inspect runtime and persist post-change outcome evidence", "verify": "Read applied revisions and recorded outcome evidence", "kubernetes": "Export exact definitions for GitOps review"}[a]))
 	}
 	for _, name := range []string{"telemetry", "bindings", "dependencies"} {
 		g := group(r, name, map[string]string{"telemetry": "Discover configured source measurements", "bindings": "Review and compile measurement bindings", "dependencies": "Discover and read service dependency maps"}[name])
@@ -205,6 +208,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 		}
 	}
 	g = group(r, "replays", "Read or ingest consented masked recordings")
+	g.AddCommand(replayDeleteCommand(o))
 	for _, a := range []string{"list", "show", "events", "ingest"} {
 		use, min, max := a, 0, 0
 		effect := "read"
@@ -385,14 +389,16 @@ func refineFlags(root *cobra.Command) {
 		"nines replays list": "resource-kind resource-id", "nines replays show": "", "nines replays events": "", "nines replays ingest": "file",
 		"nines review-skills list": "", "nines review-skills show": "version",
 	}
-	for _, a := range []string{"list", "show", "create", "message", "run", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
+	for _, a := range []string{"list", "show", "status", "report", "create", "message", "run", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "observe", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
 		f := "file"
 		switch a {
 		case "list":
 			f = "cursor"
 		case "audit":
 			f = "after through"
-		case "show", "verify":
+		case "report":
+			f = "markdown"
+		case "show", "status", "verify":
 			f = ""
 		case "kubernetes", "rollback-kubernetes":
 			f = "namespace digest"

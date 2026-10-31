@@ -10,20 +10,24 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/auditarchive"
 	"github.com/ishantanu/nines/internal/intentmodel"
 	"github.com/ishantanu/nines/internal/kubediscovery"
 	"github.com/ishantanu/nines/internal/systemone"
+	"github.com/ishantanu/nines/internal/workflowhook"
 )
 
 const Header = "X-Nines-Tenant"
 
 var idPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 var envPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
+var entityGUIDPattern = regexp.MustCompile(`^[a-zA-Z0-9_+/=-]{1,512}$`)
 var mimirPattern = regexp.MustCompile(`^[a-zA-Z0-9_!.*'()-]{1,150}$`)
 
 func ValidID(id string) bool      { return idPattern.MatchString(id) }
@@ -35,24 +39,28 @@ type Config struct {
 type IntentModel = intentmodel.Config
 
 type Tenant struct {
-	KubernetesDiscovery *kubediscovery.Config `json:"kubernetesDiscovery,omitempty" yaml:"kubernetesDiscovery,omitempty"`
-	SystemOne           *systemone.Config     `json:"systemOne,omitempty" yaml:"systemOne,omitempty"`
-	SLOExtensionLock    string                `json:"sloExtensionLock,omitempty" yaml:"sloExtensionLock,omitempty"`
-	AuditArchive        *auditarchive.Config  `json:"auditArchive,omitempty" yaml:"auditArchive,omitempty"`
-	ReviewModel         *IntentModel          `json:"reviewModel,omitempty" yaml:"reviewModel,omitempty"`
-	IntentModel         *IntentModel          `json:"intentModel,omitempty" yaml:"intentModel,omitempty"`
-	Connections         []Connection          `json:"connections,omitempty" yaml:"connections,omitempty"`
-	ID                  string                `json:"id" yaml:"id"`
-	Name                string                `json:"name" yaml:"name"`
-	Access              []Access              `json:"access" yaml:"access"`
-	Source              Source                `json:"source" yaml:"source"`
-	AlertWebhookEnv     string                `json:"alertWebhookEnv,omitempty" yaml:"alertWebhookEnv,omitempty"`
+	ManagedProviderRoutes map[string][]string   `json:"managedProviderRoutes,omitempty" yaml:"managedProviderRoutes,omitempty"`
+	WorkflowWebhook       *workflowhook.Config  `json:"workflowWebhook,omitempty" yaml:"workflowWebhook,omitempty"`
+	ReplayPrivacy         v1.ReplayPrivacy      `json:"replayPrivacy,omitempty" yaml:"replayPrivacy,omitempty"`
+	KubernetesDiscovery   *kubediscovery.Config `json:"kubernetesDiscovery,omitempty" yaml:"kubernetesDiscovery,omitempty"`
+	SystemOne             *systemone.Config     `json:"systemOne,omitempty" yaml:"systemOne,omitempty"`
+	SLOExtensionLock      string                `json:"sloExtensionLock,omitempty" yaml:"sloExtensionLock,omitempty"`
+	AuditArchive          *auditarchive.Config  `json:"auditArchive,omitempty" yaml:"auditArchive,omitempty"`
+	ReviewModel           *IntentModel          `json:"reviewModel,omitempty" yaml:"reviewModel,omitempty"`
+	IntentModel           *IntentModel          `json:"intentModel,omitempty" yaml:"intentModel,omitempty"`
+	Connections           []Connection          `json:"connections,omitempty" yaml:"connections,omitempty"`
+	ID                    string                `json:"id" yaml:"id"`
+	Name                  string                `json:"name" yaml:"name"`
+	Access                []Access              `json:"access" yaml:"access"`
+	Source                Source                `json:"source" yaml:"source"`
+	AlertWebhookEnv       string                `json:"alertWebhookEnv,omitempty" yaml:"alertWebhookEnv,omitempty"`
 }
 type Access struct {
 	TokenEnv string `json:"tokenEnv" yaml:"tokenEnv"`
 	Role     string `json:"role" yaml:"role"`
 }
 type RuleDestination struct {
+	EntityGUID       string `json:"entityGUID,omitempty" yaml:"entityGUID,omitempty"`
 	AutoDeploy       bool   `json:"autoDeploy,omitempty" yaml:"autoDeploy,omitempty"`
 	Mode             string `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Publisher        string `json:"publisher,omitempty" yaml:"publisher,omitempty"`
@@ -69,6 +77,7 @@ type Connection struct {
 	Source `yaml:",inline"`
 }
 type ResolvedConnection struct {
+	Credentials        map[string]string `json:"-" yaml:"-"`
 	Config             Connection
 	BearerToken        string `json:"-" yaml:"-"`
 	BasicPassword      string `json:"-" yaml:"-"`
@@ -76,7 +85,10 @@ type ResolvedConnection struct {
 	RulesBasicPassword string `json:"-" yaml:"-"`
 }
 type Source struct {
-	Rules *RuleDestination `json:"rules,omitempty" yaml:"rules,omitempty"`
+	CollectionMode string            `json:"collectionMode,omitempty" yaml:"collectionMode,omitempty"`
+	Options        map[string]string `json:"options,omitempty" yaml:"options,omitempty"`
+	CredentialsEnv map[string]string `json:"credentialsEnv,omitempty" yaml:"credentialsEnv,omitempty"`
+	Rules          *RuleDestination  `json:"rules,omitempty" yaml:"rules,omitempty"`
 
 	Kind             string `json:"kind" yaml:"kind"`
 	URL              string `json:"url,omitempty" yaml:"url,omitempty"`
@@ -88,7 +100,9 @@ type Source struct {
 
 // Resolved values are intentionally excluded from JSON/YAML serialization.
 type Resolved struct {
-	IntentModelKey     string `json:"-" yaml:"-"`
+	Credentials        map[string]string      `json:"-" yaml:"-"`
+	WorkflowWebhook    *workflowhook.Settings `json:"-" yaml:"-"`
+	IntentModelKey     string                 `json:"-" yaml:"-"`
 	Connections        []ResolvedConnection
 	RulesBearerToken   string `json:"-" yaml:"-"`
 	RulesBasicPassword string `json:"-" yaml:"-"`
@@ -170,6 +184,25 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 				return nil, fmt.Errorf("tenant %s: %w", t.ID, err)
 			}
 		}
+		if len(t.ManagedProviderRoutes) > 4 {
+			return nil, fmt.Errorf("managed provider routes support New Relic accounts/entities, Dash0 datasets and VictoriaMetrics cluster accounts/projects")
+		}
+		for kind, routes := range t.ManagedProviderRoutes {
+			if (kind != "newrelic" && kind != "newrelic-entity" && kind != "dash0" && kind != "victoriametrics") || len(routes) > 32 {
+				return nil, fmt.Errorf("invalid managed provider route policy")
+			}
+			for _, route := range routes {
+				if kind == "victoriametrics" && !ValidVictoriaMetricsRoute(route) {
+					return nil, fmt.Errorf("invalid VictoriaMetrics cluster route; use a canonical uint32 account or account:project")
+				}
+				if route == "" || len(route) > 512 || kind != "newrelic-entity" && len(route) > 64 || strings.TrimSpace(route) != route || kind == "newrelic-entity" && !entityGUIDPattern.MatchString(route) {
+					return nil, fmt.Errorf("invalid managed provider route")
+				}
+			}
+		}
+		if err := validateReplayPrivacy(t.ReplayPrivacy); err != nil {
+			return nil, err
+		}
 		if t.AuditArchive != nil {
 			if err := t.AuditArchive.Validate(); err != nil {
 				return nil, fmt.Errorf("tenant %s: %w", t.ID, err)
@@ -204,11 +237,40 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 			s.Kind = "manual"
 			r.Config.Source.Kind = s.Kind
 		}
-		if s.Kind != "manual" && s.Kind != "prometheus" && s.Kind != "mimir" {
-			return nil, fmt.Errorf("tenant %s source must be manual, prometheus or mimir", t.ID)
+		if s.CollectionMode != "" && s.CollectionMode != "automatic" && s.CollectionMode != "manual" {
+			return nil, fmt.Errorf("collectionMode must be automatic or manual")
 		}
+		if !ValidID(s.Kind) {
+			return nil, fmt.Errorf("source kind must be a provider identifier")
+		}
+		if len(s.Options) > 16 {
+			return nil, fmt.Errorf("configure at most 16 provider options")
+		}
+		for key, value := range s.Options {
+			if key == "" || len(key) > 64 || len(value) > 512 {
+				return nil, fmt.Errorf("provider option exceeds bounds")
+			}
+		}
+		if len(s.CredentialsEnv) > 8 {
+			return nil, fmt.Errorf("configure at most eight provider credential references")
+		}
+		if len(s.CredentialsEnv) > 0 && (s.BearerTokenEnv != "" || s.BasicUsername != "" || s.BasicPasswordEnv != "") {
+			return nil, fmt.Errorf("choose provider credential references or legacy bearer/basic authentication")
+		}
+		r.Credentials = map[string]string{}
+		for name, env := range s.CredentialsEnv {
+			if name == "" || len(name) > 64 {
+				return nil, fmt.Errorf("invalid provider credential field")
+			}
+			value, err := secret(env, true)
+			if err != nil {
+				return nil, err
+			}
+			r.Credentials[name] = value
+		}
+
 		if s.Kind == "manual" {
-			if s.Rules != nil || s.URL != "" || s.MimirOrgID != "" || s.BearerTokenEnv != "" || s.BasicUsername != "" || s.BasicPasswordEnv != "" {
+			if len(s.Options) > 0 || len(s.CredentialsEnv) > 0 || s.Rules != nil || s.URL != "" || s.MimirOrgID != "" || s.BearerTokenEnv != "" || s.BasicUsername != "" || s.BasicPasswordEnv != "" {
 				return nil, fmt.Errorf("manual source cannot contain upstream configuration")
 			}
 		} else {
@@ -238,11 +300,36 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 			}
 		}
 		if rules := s.Rules; rules != nil {
+			if s.Kind != "prometheus" && s.Kind != "mimir" && s.Kind != "dash0" && s.Kind != "googlecloud" && s.Kind != "datadog" && s.Kind != "newrelic" {
+				return nil, fmt.Errorf("rule deployment is supported only for Prometheus, Mimir, Datadog, New Relic, Dash0 and Google Cloud providers")
+			}
+			if s.Kind != "newrelic" && rules.EntityGUID != "" {
+				return nil, fmt.Errorf("entityGUID is only supported for New Relic native publication")
+			}
 			if !ValidID(rules.Namespace) {
 				return nil, fmt.Errorf("rules require a valid namespace")
 			}
-			if rules.Mode != "" && rules.Mode != "operator" {
+			if rules.Mode != "" && rules.Mode != "operator" && rules.Mode != "native" {
 				return nil, fmt.Errorf("unsupported rule deployment mode")
+			}
+			if s.Kind == "newrelic" {
+				if rules.Mode != "native" || rules.EntityGUID == "" || !entityGUIDPattern.MatchString(rules.EntityGUID) || rules.AutoDeploy || rules.Directory != "" || rules.RulerURL != "" || rules.Reload || rules.Publisher != "" || rules.BasicUsername != "" || rules.BasicPasswordEnv != "" || rules.BearerTokenEnv != "" {
+					return nil, fmt.Errorf("new relic native publication requires mode: native, configured entityGUID and the connection user key; automatic/file/ruler/operator options are unsupported")
+				}
+			} else if s.Kind == "datadog" {
+				if rules.Mode != "native" || rules.AutoDeploy || rules.Directory != "" || rules.RulerURL != "" || rules.Reload || rules.Publisher != "" || rules.BasicUsername != "" || rules.BasicPasswordEnv != "" || rules.BearerTokenEnv != "" {
+					return nil, fmt.Errorf("datadog native publication requires mode: native, explicit namespace and the configured API/application key pair; automatic/file/ruler/operator options are unsupported")
+				}
+			} else if s.Kind == "dash0" {
+				if rules.Mode != "native" || rules.AutoDeploy || rules.Directory != "" || rules.RulerURL != "" || rules.Reload || rules.Publisher != "" || rules.BasicUsername != "" || rules.BasicPasswordEnv != "" || rules.BearerTokenEnv == "" {
+					return nil, fmt.Errorf("Dash0 native publication requires mode: native and a separate bearerTokenEnv; automatic deployment and file/ruler/operator options are unsupported")
+				}
+			} else if s.Kind == "googlecloud" {
+				if rules.Mode != "native" || rules.AutoDeploy || rules.Directory != "" || rules.RulerURL != "" || rules.Reload || rules.Publisher != "" || rules.BasicUsername != "" || rules.BasicPasswordEnv != "" || s.Options["serviceID"] == "" || rules.BearerTokenEnv == "" && s.Options["auth"] != "adc" {
+					return nil, fmt.Errorf("google cloud native publication requires mode: native, serviceID and explicit ADC or a publish-token reference; automatic/file/ruler/operator options are unsupported")
+				}
+			} else if rules.Mode == "native" {
+				return nil, fmt.Errorf("native publication mode requires Datadog, New Relic, Dash0 or Google Cloud")
 			}
 			if rules.Mode == "operator" {
 				if !ValidID(rules.Publisher) || rules.Directory != "" || rules.RulerURL != "" || rules.Reload || rules.BearerTokenEnv != "" || rules.BasicUsername != "" || rules.BasicPasswordEnv != "" {
@@ -304,10 +391,24 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 			}
 			resolved := nested[0]
 			connection.Source = resolved.Config.Source
-			r.Connections = append(r.Connections, ResolvedConnection{Config: connection, BearerToken: resolved.BearerToken, BasicPassword: resolved.BasicPassword, RulesBearerToken: resolved.RulesBearerToken, RulesBasicPassword: resolved.RulesBasicPassword})
+			r.Connections = append(r.Connections, ResolvedConnection{Credentials: resolved.Credentials, Config: connection, BearerToken: resolved.BearerToken, BasicPassword: resolved.BasicPassword, RulesBearerToken: resolved.RulesBearerToken, RulesBasicPassword: resolved.RulesBasicPassword})
 		}
 
 		var err error
+		if t.WorkflowWebhook != nil {
+			endpoint, e := secret(t.WorkflowWebhook.EndpointEnv, true)
+			if e != nil {
+				return nil, e
+			}
+			key, e := secret(t.WorkflowWebhook.SigningKeyEnv, true)
+			if e != nil {
+				return nil, e
+			}
+			if e = workflowhook.Validate(endpoint, key, t.WorkflowWebhook.Since); e != nil {
+				return nil, fmt.Errorf("tenant %s: %w", t.ID, e)
+			}
+			r.WorkflowWebhook = &workflowhook.Settings{Endpoint: endpoint, Key: key, Since: t.WorkflowWebhook.Since}
+		}
 		r.Webhook, err = secret(t.AlertWebhookEnv, false)
 		if err != nil {
 			return nil, err
@@ -336,4 +437,20 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 		}
 	}
 	return out, nil
+}
+
+// ValidVictoriaMetricsRoute accepts one fixed numeric cluster account/project.
+// Wildcard and multitenant endpoints never become managed routes.
+func ValidVictoriaMetricsRoute(route string) bool {
+	parts := strings.Split(route, ":")
+	if len(parts) > 2 {
+		return false
+	}
+	for _, part := range parts {
+		n, err := strconv.ParseUint(part, 10, 32)
+		if err != nil || strconv.FormatUint(n, 10) != part {
+			return false
+		}
+	}
+	return true
 }

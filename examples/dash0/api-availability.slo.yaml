@@ -1,0 +1,31 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: api-availability
+  project: production
+spec:
+  displayName: API availability
+  service: api
+  source: dash0-production
+  target: 0.999
+  windowSeconds: 2419200
+  stepSeconds: 60
+  providerWindow:
+    goodSelector: http_requests_total{service="api",code="200"}
+    totalSelector: http_requests_total{service="api"}
+    scrapeIntervalSeconds: 15
+  policies:
+    - name: fast-burn
+      severity: critical
+      shortWindow: 5m
+      longWindow: 1h
+      burnRate: 14.4
+      forSeconds: 120
+      minCoverage: 1
+    - name: sustained-burn
+      severity: warning
+      shortWindow: 30m
+      longWindow: 6h
+      burnRate: 6
+      forSeconds: 300
+      minCoverage: 1

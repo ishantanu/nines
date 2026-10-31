@@ -11,18 +11,13 @@ export function DemoLogin({
   darkMode,
   onToggleTheme,
   onSignIn,
-  replayConfigured,
-  replayConsent,
 }: {
   darkMode: boolean;
   onToggleTheme: () => void;
-  onSignIn: (allowReplay: boolean) => void;
-  replayConfigured: boolean;
-  replayConsent: boolean;
+  onSignIn: () => void;
 }) {
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin");
-  const [allowReplay, setAllowReplay] = useState(replayConsent);
   const [error, setError] = useState("");
 
   function login(event: FormEvent) {
@@ -32,7 +27,7 @@ export function DemoLogin({
       return;
     }
     setError("");
-    onSignIn(allowReplay);
+    onSignIn();
   }
 
   return (
@@ -108,26 +103,6 @@ export function DemoLogin({
                   className="mt-2"
                 />
               </div>
-              {replayConfigured ? (
-                <label className="flex items-start gap-2 text-sm leading-5 text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={allowReplay}
-                    onChange={(event) => setAllowReplay(event.target.checked)}
-                    className="mt-1 accent-primary"
-                  />
-                  <span>
-                    Allow operator diagnostics through PostHog for this demo
-                    session. All text and form inputs are hidden from
-                    recordings.
-                  </span>
-                </label>
-              ) : (
-                <p className="text-xs leading-5 text-muted-foreground">
-                  Record and view masked sessions from Session replay after
-                  signing in.
-                </p>
-              )}
               <Button type="submit" className="w-full">
                 <LogIn className="size-4" aria-hidden="true" />
                 Sign in

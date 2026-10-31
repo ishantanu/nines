@@ -1,3 +1,5 @@
+import { providerLabel } from "@/lib/telemetry-providers";
+import { SLOProvider } from "./provider-identity";
 import { useState } from "react";
 import { ReplayLabel } from "@/components/replay-label";
 import {
@@ -41,7 +43,7 @@ export function Home({
   const impacted = data.journeys.filter((j) => j.health !== "healthy");
   const unknownJourneys = impacted.filter((j) => j.health === "unknown").length;
   const healthGroups = [
-    { key: "degraded", label: "Alerting or budget exhausted", Icon: CircleX },
+    { key: "degraded", label: "Degraded", Icon: CircleX },
     { key: "at_risk", label: "At risk", Icon: TriangleAlert },
     { key: "unknown", label: "Incomplete evidence", Icon: CircleHelp },
     { key: "healthy", label: "Healthy", Icon: CircleCheck },
@@ -58,7 +60,6 @@ export function Home({
       (a.status.budgetRemainingFraction ?? Infinity) -
         (b.status.budgetRemainingFraction ?? Infinity),
   );
-  const breakdownKey = groups.map((g) => g.count).join("-");
   return (
     <div className="overview space-y-5">
       <section className="overview-brief" aria-labelledby="overview-focus">
@@ -83,7 +84,9 @@ export function Home({
           <Button
             size="sm"
             variant={attention.length ? "default" : "outline"}
-            onClick={() => onNavigate("objectives")}
+            onClick={() =>
+              attention.length ? setReviewOnly(true) : onNavigate("objectives")
+            }
           >
             {attention.length ? "Review objectives" : "Open objectives"}
             <ArrowRight className="size-4" aria-hidden="true" />
@@ -91,94 +94,84 @@ export function Home({
         </div>
         {active.length ? (
           <>
-            <div
-              className="overview-health-rail"
-              key={breakdownKey}
-              aria-hidden="true"
-            >
-              {groups
-                .filter((g) => g.count)
-                .map((g) => (
-                  <span
-                    key={g.key}
-                    data-health={g.key}
-                    style={{ flexGrow: g.count }}
-                  />
-                ))}
-            </div>
             <dl className="overview-health-counts">
-              {groups.map(({ key, label, Icon, count }) => (
-                <div key={key}>
-                  <dt>
-                    <Icon
-                      className={`size-4 status-${key.replace("_", "-")}`}
-                      aria-hidden="true"
-                    />
-                    <ReplayLabel>{label}</ReplayLabel>
-                  </dt>
-                  <dd>{count}</dd>
-                </div>
-              ))}
+              {groups
+                .filter((g) => g.count > 0)
+                .map(({ key, label, Icon, count }) => (
+                  <div key={key}>
+                    <dt>
+                      <Icon
+                        className={`size-4 status-${key.replace("_", "-")}`}
+                        aria-hidden="true"
+                      />
+                      <ReplayLabel>{label}</ReplayLabel>
+                    </dt>
+                    <dd>{count}</dd>
+                  </div>
+                ))}
             </dl>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Counts reflect each objective’s alert state, budget and coverage.
-            </p>
           </>
         ) : null}
       </section>
       <div className="overview-columns">
-        <Card className="gap-0 py-0">
-          <div className="panel-header">
-            <div>
-              <h2 className="text-sm font-semibold">
-                Service level objectives
-              </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Prioritised by alert state, budget burn and measurement
-                coverage.
-              </p>
+        <Card className="overview-panel gap-0 py-0">
+          <div className="overview-panel-header">
+            <div className="overview-panel-heading">
+              <div>
+                <h2 className="text-sm font-semibold">
+                  Service level objectives
+                </h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onNavigate("objectives")}
+              >
+                View SLOs
+                <ArrowRight className="size-3.5" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate("objectives")}
+            <div
+              className="overview-objective-filters"
+              role="group"
+              aria-label="Overview objective filter"
             >
-              View SLOs
-              <ArrowRight className="size-3.5" />
-            </Button>
-          </div>
-          <div
-            className="flex flex-wrap items-center gap-2 border-b px-4 py-3"
-            role="group"
-            aria-label="Overview objective filter"
-          >
-            <Button
-              size="sm"
-              variant={!reviewOnly ? "secondary" : "ghost"}
-              aria-pressed={!reviewOnly}
-              onClick={() => setReviewOnly(false)}
-            >
-              All ({active.length})
-            </Button>
-            <Button
-              size="sm"
-              variant={reviewOnly ? "secondary" : "ghost"}
-              aria-pressed={reviewOnly}
-              onClick={() => setReviewOnly(true)}
-            >
-              Needs review ({attention.length})
-            </Button>
+              <Button
+                size="sm"
+                variant={!reviewOnly ? "secondary" : "ghost"}
+                aria-pressed={!reviewOnly}
+                onClick={() => setReviewOnly(false)}
+              >
+                All ({active.length})
+              </Button>
+              <Button
+                size="sm"
+                variant={reviewOnly ? "secondary" : "ghost"}
+                aria-pressed={reviewOnly}
+                onClick={() => setReviewOnly(true)}
+              >
+                Needs review ({attention.length})
+              </Button>
+            </div>
           </div>
           <CardContent className="overview-objective-list p-0">
             {visible.length ? (
               visible.slice(0, 6).map((o) => (
                 <button
                   key={o.slo.id}
-                  className="overview-resource-row"
+                  className="overview-resource-row overview-objective-row"
                   onClick={() => onSLO(o.slo.id)}
                 >
                   <div>
-                    <span className="text-sm font-medium">{o.slo.name}</span>
+                    <span className="overview-resource-name text-sm font-medium">
+                      {o.slo.name}
+                    </span>
+                    <div className="mt-1">
+                      <SLOProvider
+                        slo={o.slo}
+                        connections={data.workspace.connections}
+                      />
+                    </div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {o.slo.service} ·{" "}
                       {o.status.budgetRemainingFraction == null
@@ -217,17 +210,23 @@ export function Home({
             )}
           </CardContent>
         </Card>
-        <Card className="gap-0 py-0">
-          <div className="panel-header">
-            <h2 className="text-sm font-semibold">Critical user journeys</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onNavigate("journeys")}
-            >
-              View journeys
-              <ArrowRight className="size-3.5" />
-            </Button>
+        <Card className="overview-panel gap-0 py-0">
+          <div className="overview-panel-header">
+            <div className="overview-panel-heading">
+              <div>
+                <h2 className="text-sm font-semibold">
+                  Critical user journeys
+                </h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onNavigate("journeys")}
+              >
+                View journeys
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Button>
+            </div>
           </div>
           <CardContent className="overview-journey-list p-0">
             {unknownJourneys ? (
@@ -253,7 +252,7 @@ export function Home({
                     onClick={() => onJourney(j.resource.manifest.metadata.name)}
                   >
                     <div>
-                      <span className="text-sm font-medium">
+                      <span className="overview-resource-name text-sm font-medium">
                         {j.resource.manifest.spec.displayName}
                       </span>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -303,7 +302,7 @@ export function Home({
               detail: data.workspace.source.configured
                 ? (data.workspace.source.connectionCount ?? 1) > 1
                   ? `${data.workspace.source.connectionCount} configured connections`
-                  : `${data.workspace.source.kind === "mimir" ? "Mimir" : "Prometheus"} configured`
+                  : `${providerLabel(data.workspace.source.kind)} configured`
                 : "No connected source · manual ingestion",
               Icon: Database,
             },

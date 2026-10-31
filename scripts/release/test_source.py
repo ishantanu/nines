@@ -26,6 +26,9 @@ class PublicSourceTests(unittest.TestCase):
             root = Path(directory)
             self.fixture(root)
             (root / ".env").write_text("private")
+            (root / ".nines-playground.conf").write_text(
+                "providers=/private/local/tenants.yaml\n"
+            )
             (root / ".vscode").mkdir()
             (root / ".vscode/mcp.json").write_text("private")
             (root / "docs").mkdir()
@@ -33,6 +36,8 @@ class PublicSourceTests(unittest.TestCase):
             selected, errors = source.inspect(root)
             self.assertFalse(errors)
             self.assertNotIn(Path(".env"), selected)
+            self.assertNotIn(Path(".nines-playground.conf"), selected)
+            self.assertIn(Path("playground"), selected)
             self.assertNotIn(Path(".vscode/mcp.json"), selected)
             self.assertNotIn(Path("docs/old-proof.json"), selected)
             self.assertIn(Path("internal/example.go"), selected)

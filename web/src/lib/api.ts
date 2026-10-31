@@ -129,6 +129,7 @@ export interface SLO {
   target: number;
   windowSeconds: number;
   stepSeconds: number;
+  queryLanguage?: string;
   goodQuery?: string;
   totalQuery?: string;
   policies?: BurnRatePolicy[];
@@ -254,13 +255,15 @@ export interface Workspace {
   prometheusConfigured: boolean;
   journeysConfigured: boolean;
   tenant: { id: string; name: string };
+  connections?: { id: string; kind: string }[];
   source: {
-    kind: "manual" | "prometheus" | "mimir" | "multiple";
+    kind: string;
     configured: boolean;
     connectionCount?: number;
   };
   role: Role;
   workflowsConfigured: boolean;
+  replayCaptureEnabled?: boolean;
 }
 export type Role = "owner" | "editor" | "agent" | "viewer";
 export interface Tenant {

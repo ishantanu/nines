@@ -21,7 +21,7 @@ import (
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	flags := flag.NewFlagSet("intent-eval", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	caseID := flags.String("case", "", "optional case ID for workflow or template-selection suites")
+	caseID := flags.String("case", "", "optional case ID for live draft, workflow or template-selection suites")
 	suite := flags.String("suite", "draft", "evaluation suite: draft, workflow, templates (deterministic) or template-selection")
 	live := flags.Bool("live", false, "explicitly contact the configured model using synthetic cases (may incur provider charges)")
 	out := flags.String("out", "", "write a private JSON report to a new file instead of stdout")
@@ -33,7 +33,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		}
 		return 2
 	}
-	if (*caseID != "" && *suite != "workflow" && *suite != "template-selection") || (*suite != "draft" && *suite != "workflow" && *suite != "templates" && *suite != "template-selection") || (*suite == "templates" && *live) || flags.NArg() != 0 || *timeout <= 0 || *timeout > 15*time.Minute || len(*runtime) > 200 || strings.ContainsFunc(*runtime, unicode.IsControl) || !*live && *runtime != "" {
+	if (*caseID != "" && *suite != "workflow" && *suite != "template-selection" && (*suite != "draft" || !*live)) || (*suite != "draft" && *suite != "workflow" && *suite != "templates" && *suite != "template-selection") || (*suite == "templates" && *live) || flags.NArg() != 0 || *timeout <= 0 || *timeout > 15*time.Minute || len(*runtime) > 200 || strings.ContainsFunc(*runtime, unicode.IsControl) || !*live && *runtime != "" {
 		_, _ = fmt.Fprintln(stderr, "invalid evaluation arguments")
 		return 2
 	}
@@ -67,7 +67,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 			report, err = intenteval.WorkflowFixtures(ctx, *caseID)
 		}
 	} else if *live {
-		report, err = intenteval.Live(ctx, os.Getenv, *runtime)
+		report, err = intenteval.Live(ctx, os.Getenv, *runtime, *caseID)
 	} else {
 		report, err = intenteval.Fixtures(ctx)
 	}

@@ -1,0 +1,22 @@
+tenants:
+  - id: production
+    name: Production
+    access:
+      - tokenEnv: NINES_PRODUCTION_TOKEN
+        role: owner
+    source:
+      kind: manual
+    connections:
+      - name: newrelic-prod
+        kind: newrelic
+        url: https://api.eu.newrelic.com/graphql
+        options:
+          accountID: "123456"
+        credentialsEnv:
+          userKey: NEW_RELIC_USER_KEY
+        # Optional reviewed native service-level destination. Choose an existing
+        # same-account entity or workload; requires events-to-metrics permissions.
+        # rules:
+        #   mode: native
+        #   namespace: production
+        #   entityGUID: REPLACE_WITH_APPROVED_NEW_RELIC_ENTITY_GUID

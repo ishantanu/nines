@@ -2,6 +2,68 @@
 
 ## Unreleased (v0.1.0-alpha.3)
 
+- Prefer shortWindow/longWindow duration strings in burn-policy YAML, with strict parsing, legacy seconds input and matching portal/CLI/operator exports.
+
+- Treat New Relic no-event notices as empty measurements without fabricated coverage; use provider-neutral collection failure text.
+
+- Replace per-chart sample tables and time-point scrubbers with direct pointer/keyboard inspection and compact synchronized readouts.
+
+- Enable VictoriaMetrics connection creation in the portal and managed API, with optional bearer credentials and explicitly authorized cluster account/project routing.
+
+- Remove PostHog operator diagnostics and external recorder configuration; retain consent-based native replay. Simplify overview health counts and show measurement labels as readable fields instead of raw JSON.
+
+- Consolidate dependency PRs #46–#53: update setup-node, Prometheus, x/time, Lucide, PostHog and Vitest; migrate browser telemetry to coordinated OpenTelemetry 3 packages with three-signal export and redaction regression coverage.
+
+- Add opt-in OAuth-protected remote MCP with tenant-fixed, distinct client/user bindings, read-only defaults, request limits and SDK conformance tests; preserve stdio and align Nines credential environment variables.
+- Add credential-free provider contract checks and real VictoriaMetrics container acceptance to CI.
+
+- Add on-demand native Datadog/New Relic SLO attainment, history and explicit budget provenance, plus bounded discovery and experimental reviewed YAML import drafts across API, Go client, CLI and MCP.
+
+- Consolidate local playground profiles in one Compose file and add a launcher that remembers backend, Jev, sample workloads and private provider configuration.
+
+
+- Allow explicit localhost/127.0.0.1 aliases in playground authentication on the configured port, preserving CSRF checks, host-only cookies and strict production origins.
+
+
+- Show bundled provider SVG symbols and connection identities beside SLOs. Correct workspace provider labels, restrict guided selectors to compatible adapters and document native publication separately from collection and vendor alerting.
+
+- Add reviewed New Relic event-count SLI/SLO publication with account/entity verification, immutable revision ownership, provider-generated metric queries and explicit managed-connection opt-in.
+
+- Add reviewed Datadog native metric SLO publication for 7/30 day windows, explicit connection opt-in and verified provider links. Native burn monitors remain separate.
+
+- Add experimental Google Cloud Monitoring DELTA-count collection, explicit ADC/token authentication, bounded filter validation, reviewed immutable native SLO revisions and separate native health evidence.
+
+- Add experimental dataset-pinned Dash0 collection, reviewed native SLO publication with ownership/version fencing, and offline OpenSLO v1 export with explicit omission warnings.
+
+- Add experimental VictoriaMetrics interval-count collection for single-node and pinned cluster tenants, with official MetricsQL parsing, SLO count-shape validation, explicit partial-response refusal and a disposable real-backend acceptance test.
+
+- Add experimental New Relic NerdGraph event-count collection through the provider extension API, with pinned accounts, bounded NRQL, Nines burn-policy evaluation and setup examples.
+
+- Add a versioned compiled telemetry-provider registry and experimental read-only Datadog count collection, with explicit query languages, tenant credential references and capability discovery.
+
+- Add explicit GitHub review planning and immutable PR-comment publication, guarded by sharing consent, conversation and report digests, current revision and PR head checks. Approval and application remain independent Nines operations.
+
+- Add privacy-preserving diagnostic categories for unexpected synthetic draft evaluation outcomes, without storing model or input text.
+
+- Accept a single complete JSON code fence in portable model output mode while retaining strict decoding and review safeguards.
+
+- Remove a misleading JSON-mode drafting example and add opt-in single-case synthetic live evaluation; deterministic safety checks remain unchanged.
+
+- Publish a versioned OpenAPI 3.1 contract for core SLO and reviewed intent workflows, with route and critical Go-field checks. Other endpoints and full resource schemas remain outside the initial contract.
+
+- Add a practical HTTP API guide, repository instructions for coding agents and per-page Markdown with a copy control for documentation.
+
+- Improve public SLO guidance, documentation canonical URLs and the LLM-readable documentation index; explain Mimir authentication and tenant mapping.
+- Expand opt-in Jev acceptance with negative controls for undefined success criteria; model behavior remains subject to acceptance evaluation.
+
+- Add audited review artifacts across HTTP, CLI, Go and read-only MCP, with a Markdown format for CI review.
+- Add opt-in, tenant-scoped signed workflow notifications with retryable PostgreSQL delivery and Go receiver verification.
+
+- Add resumable headless intent status across HTTP, CLI, SDK and read-only MCP, with explicit human gates, saved runtime outcomes and an end-to-end CLI acceptance test for independent approval/application and reviewed rollback.
+
+- Add opt-in Jev screenshot assessments linked to exact journey revisions, contract-bound sharing consent, bounded image normalization, image-free durable receipts and separate human review through the portal, CLI and Go client.
+- Require separate replay capture and tenant-sharing attestations, retain versioned consent receipts, expose operator privacy notices and capture controls, and add owner-only permanent deletion. Optional PostHog diagnostics require fresh permission and exclude private/evidence panels.
+
 - Add reviewed tenant-owner SLO retirement across HTTP, CLI, Go client and portal, with retained historical reads, concurrent-reference fences, durable audit/tombstones and retryable owned-rule cleanup at the original trusted destination.
 - Qualify observed dependency links with actual sample age, series continuity, provenance, declared-link alignment and journey steps. Add an optional instrumented HTTP chain and real exporter-outage acceptance.
 - Complete operator acceptance for provider outage/credential rotation and independent severity alert lifecycles on actual Prometheus/Mimir rule output.

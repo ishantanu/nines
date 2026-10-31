@@ -18,6 +18,7 @@ export interface SLODefinition {
     target: number;
     windowSeconds: number;
     stepSeconds: number;
+    queryLanguage?: string;
     goodQuery?: string;
     totalQuery?: string;
     policy?: SLO["policy"];
@@ -39,6 +40,7 @@ export function definitionFromSLO(slo: SLO): SLODefinition {
       ...(slo.measurementBinding
         ? { measurementBinding: slo.measurementBinding }
         : {}),
+      ...(slo.queryLanguage ? { queryLanguage: slo.queryLanguage } : {}),
       ...(slo.source ? { source: slo.source } : {}),
       ...(slo.lifecycle ? { lifecycle: slo.lifecycle } : {}),
       ...(slo.quality ? { quality: slo.quality } : {}),

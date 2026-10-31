@@ -110,7 +110,7 @@ test("keyboard inspection supports endpoints and never fabricates a selection fo
   await render();
   await act(async () =>
     host
-      .querySelector('input[type="range"]')!
+      .querySelector('svg[role="slider"]')!
       .dispatchEvent(
         new KeyboardEvent("keydown", { key: "End", bubbles: true }),
       ),
@@ -120,7 +120,7 @@ test("keyboard inspection supports endpoints and never fabricates a selection fo
   await render({ ...history, points: [] });
   await act(async () =>
     host
-      .querySelector('input[type="range"]')!
+      .querySelector('svg[role="slider"]')!
       .dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }),
       ),
@@ -149,7 +149,7 @@ test("one measured SLI and target replace overlapping legend entries", async () 
   expect(host.querySelectorAll("[data-series]")).toHaveLength(1);
   expect(host.textContent).not.toMatch(/Rolling SLI|Interval SLI/);
   expect(host.textContent).toContain("incomplete 1h history");
-  const slider = host.querySelector('input[type="range"]')!;
+  const slider = host.querySelector('svg[role="slider"]')!;
   expect(slider.getAttribute("aria-valuetext")).toContain("25.0% coverage");
   expect(slider.getAttribute("aria-valuetext")).toContain("Target 99.9%");
 });
@@ -172,8 +172,8 @@ test("partial-to-complete history stays connected without joining missing data",
 
 test("keyboard control exposes the value and leaves Tab unhandled", async () => {
   await render();
-  const slider = host.querySelector<HTMLInputElement>('input[type="range"]')!;
-  expect(slider.labels?.[0].textContent).toBe("Time point");
+  const slider = host.querySelector<SVGSVGElement>('svg[role="slider"]')!;
+  expect(slider.getAttribute("aria-labelledby")).toBeTruthy();
   for (const [key, expected] of [
     ["ArrowRight", 1],
     ["Home", 0],
@@ -193,10 +193,10 @@ test("keyboard control exposes the value and leaves Tab unhandled", async () => 
   });
   slider.dispatchEvent(tab);
   expect(tab.defaultPrevented).toBe(false);
-  expect(host.querySelector("svg")?.hasAttribute("tabindex")).toBe(false);
+  expect(host.querySelector("svg")?.getAttribute("tabindex")).toBe("0");
 });
 
-test("data table provides every value, missing interval and partial qualification", async () => {
+test("the chart replaces sample tables and scrubbers with a compact readout", async () => {
   await render({
     ...history,
     points: [
@@ -204,30 +204,25 @@ test("data table provides every value, missing interval and partial qualificatio
       ...history.points.slice(1),
     ],
   });
-  const button = host.querySelector<HTMLButtonElement>("button")!;
-  expect(button.getAttribute("aria-expanded")).toBe("false");
-  await act(async () => button.click());
-  expect(button.getAttribute("aria-expanded")).toBe("true");
-  expect(host.querySelector("table caption")?.textContent).toContain(
-    "All times UTC",
+  expect(host.querySelector("table")).toBeNull();
+  expect(host.querySelector('input[type="range"]')).toBeNull();
+  expect(host.textContent).not.toMatch(/View data|Time point/);
+  expect(host.querySelector("time")?.getAttribute("datetime")).toBe(
+    history.points[0].at,
   );
-  const rows = host.querySelectorAll("tbody tr");
-  expect(rows).toHaveLength(3);
-  expect(rows[0].textContent).toContain("50.0% coverage");
-  expect(rows[1].textContent).toContain("No data");
-  expect(rows[2].textContent).toContain("100.000%");
-  expect(host.querySelectorAll('th[scope="col"]')).toHaveLength(2);
+  expect(host.textContent).toContain("50.0% coverage");
+  await render({ ...history, points: [history.points[1]] });
+  expect(
+    host.querySelector('[role="slider"]')?.getAttribute("aria-valuetext"),
+  ).toContain("No data");
 });
 
-test("chart and expanded data table pass automated WCAG semantic checks", async () => {
+test("direct chart inspection passes automated WCAG semantic checks", async () => {
   const { default: axe } = await import("axe-core");
   await render({
     ...history,
     points: [{ ...history.points[0], coverage: 0.5 }],
   });
-  await act(async () =>
-    host.querySelector<HTMLButtonElement>("button")!.click(),
-  );
   const results = await axe.run(host, {
     runOnly: {
       type: "tag",

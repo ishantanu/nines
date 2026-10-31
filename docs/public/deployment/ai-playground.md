@@ -8,18 +8,12 @@ Run synthetic agent, LLM and inference measurements through Prometheus, Nines co
 
 ## Start and sign in
 
-From a fresh checkout, generate the local database password once. Skip setup if `.env` or `POSTGRES_PASSWORD` is already configured:
+The launcher creates private local credentials on first use, or uses your existing `.env` / `POSTGRES_PASSWORD`:
 
 ```sh
-python3 scripts/setup-local.py --playground
+./playground up --ai
 
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.ai.yaml \
-  --profile ai up --build -d
-
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.ai.yaml \
-  --profile ai logs -f ai-setup
+./playground logs
 ```
 
 - Open [Nines on localhost:18080](http://127.0.0.1:18080) and sign in with `admin` / `admin`, or the password configured when your playground database was initialized.
@@ -27,7 +21,7 @@ docker compose -p nines-playground \
   - Open **Critical user journeys → Resolve a support request with an agent** to follow its SLO links.
 - The `ai-setup` service discovers only the authorized playground workspaces, renders nine built-in templates, adds one explicit evaluation-coverage SLO, verifies the actual exported telemetry and creates missing definitions. It also creates `ai-support-resolution`.
   - Repeated setup preserves existing definitions and user edits.
-  - To rerun setup after a failure, use the same Compose files/profile with `run --rm ai-setup`.
+  - To rerun setup after a failure, run `./playground up` again; saved settings retain the AI profile.
 - Every AI objective has a **60-second rolling window**, **10-second step**, **5-second scrape interval**, illustrative **99% target** and **experimental lifecycle**.
   - Recording rules and SLI values work; paging is suppressed.
   - These accelerated settings are for synthetic testing.
@@ -94,9 +88,7 @@ nines:slo_coverage:ratio{nines_tenant="prometheus",nines_slo=~"ai-.*",window="60
 ## Verify degradation and recovery
 
 ```sh
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.ai.yaml \
-  --profile ai run --rm ai-verify
+./playground verify
 ```
 
 - Allow several minutes.
@@ -112,22 +104,18 @@ docker compose -p nines-playground \
 
 ## Add Mimir
 
-Place the AI override after the base and Mimir files and enable both profiles:
+Select Mimir and the AI workload together; the launcher remembers both:
 
 ```sh
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.mimir.yaml \
-  -f compose.playground.ai.yaml --profile mimir --profile ai up --build -d
+./playground up --mimir --ai
 
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.mimir.yaml \
-  -f compose.playground.ai.yaml --profile mimir --profile ai run --rm ai-verify
+./playground verify
 ```
 
 - Setup automatically recognizes both authorized workspaces.
   - The verifier checks **Playground Prometheus** and **Playground Mimir** independently.
-  - Prometheus remote-writes source metrics only; Mimir evaluates its own recording groups in organization and namespace `playground`. `NINES_PLAYGROUND_TENANTS=prometheus` can explicitly restrict AI setup/verification to that workspace.
-- Use the same files, profiles and project name for logs and shutdown. `down` preserves history; `down -v` deletes only that project's synthetic data.
+  - Prometheus remote-writes source metrics only; Mimir evaluates its own recording groups in organization and namespace `playground`. The launcher configures AI setup/verification for the selected workspaces.
+- Use `./playground logs` and `./playground down`; saved settings retain the correct profiles. Shutdown preserves history.
   - Returning to the base playground mounts an empty AI target list; retained AI SLOs then lose fresh data as their old windows age out.
   - Remove unwanted definitions through the normal reviewed workflow.
 

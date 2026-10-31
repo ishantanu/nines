@@ -1,9 +1,11 @@
+import { MeasurementLabels } from "./measurement-labels";
+import { ProviderIdentity } from "./provider-identity";
 import { BudgetPolicyEditor } from "./budget-policy-editor";
 import { QualityPolicyEditor } from "./quality-policy-editor";
 import type { MeasurementQualityPolicy } from "@/lib/api";
 import { SLOLifecycleSelect } from "./slo-lifecycle";
 import { useEffect, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, message, type Journey, type RequestScope } from "@/lib/api";
 import { RESOURCE_API_VERSION } from "@/lib/definitions";
 import {
@@ -349,7 +351,7 @@ export function IntentAuthoring({
                   <SelectContent>
                     {sources.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.id} ({s.kind})
+                        <ProviderIdentity kind={s.kind} connection={s.id} />
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -611,9 +613,14 @@ export function IntentAuthoring({
                   <div>
                     <dt className="text-muted-foreground">Success criteria</dt>
                     <dd className="break-all">
-                      {c.definition.spec.measurement === "latency"
-                        ? `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
-                        : JSON.stringify(c.definition.spec.successLabels)}
+                      {c.definition.spec.measurement === "latency" ? (
+                        `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
+                      ) : (
+                        <MeasurementLabels
+                          labels={c.definition.spec.successLabels}
+                          empty="No success labels specified"
+                        />
+                      )}
                     </dd>
                   </div>
                   <div>

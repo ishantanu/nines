@@ -1,4 +1,4 @@
-.PHONY: demo run build server cli mcp operator ui test test-integration test-mimir test-prometheus test-ceph test-operator test-identity test-dependencies test-topology intent-eval intent-workflow-eval template-eval selection-eval check release-check public-source release site site-check lint lint-go lint-python
+.PHONY: demo run build server cli mcp operator ui test test-providers test-integration test-mimir test-victoriametrics test-prometheus test-ceph test-operator test-identity test-dependencies test-topology intent-eval intent-workflow-eval template-eval selection-eval check release-check public-source release site site-check lint lint-go lint-python check-api
 VERSION ?= dev
 RELEASE_TARGETS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64
 ui:
@@ -19,6 +19,10 @@ run:
 test:
 	go test -race ./...
 	npm test --prefix web
+# Synthetic provider/API/MCP contracts only. Paid-provider credentials are never required.
+test-providers:
+	env -u DD_API_KEY -u DD_APP_KEY -u NEWRELIC_API_KEY -u NEWRELIC_INGEST_KEY -u NEWRELIC_ACCOUNT_ID -u GOOGLE_APPLICATION_CREDENTIALS -u GOOGLE_OAUTH_ACCESS_TOKEN -u MIMIR_TEST_URL -u PROMETHEUS_TEST_URL -u VICTORIAMETRICS_TEST_URL -u TEST_DATABASE_URL NINES_LIVE_NATIVE_READ=0 go test -race -count=1 ./internal/datadog ./internal/newrelic ./internal/dash0 ./internal/googlecloud ./internal/victoriametrics ./internal/providers ./internal/queryspec ./internal/rules ./internal/datasources ./internal/mcpserver ./client ./cmd/nines ./cmd/mcp ./api/openapi ./api/mcp
+
 test-integration:
 	@test -n "$$TEST_DATABASE_URL" || (echo 'Set TEST_DATABASE_URL to a dedicated test database'; exit 1)
 	go test -race -count=1 -json ./... > database-test-results.json
@@ -33,6 +37,8 @@ template-eval:
 	@go run ./integration/intent-eval --suite templates
 test-prometheus:
 	sh integration/prometheus/run.sh
+test-victoriametrics:
+	sh integration/victoriametrics/run.sh
 test-mimir:
 	sh integration/mimir/run.sh
 test-ceph:
@@ -65,7 +71,13 @@ site-check:
 lint: lint-go lint-python
 lint-go:
 	golangci-lint run
-	golangci-lint fmt --diff api client cmd examples integration internal reviewskills skills
+	golangci-lint fmt --diff api client cmd examples integration internal provider reviewskills skills
 lint-python:
 	ruff check .
 	ruff format --check .
+
+# Validate the versioned HTTP contract with the pinned development tool.
+check-api:
+	python3 -m openapi_spec_validator api/openapi/v1alpha1.yaml
+	python3 -c 'import json,jsonschema; jsonschema.Draft202012Validator.check_schema(json.load(open("api/mcp/v1alpha1.schema.json")))'
+	go test ./api/openapi ./api/mcp

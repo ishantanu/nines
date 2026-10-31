@@ -262,3 +262,7 @@ nines intent conversations rollback-kubernetes CONVERSATION \
 - Standalone GitOps exports are definitions for an external review/deployment system.
   - Applying exported YAML directly to Kubernetes does not run the Nines server's transaction-bound safety gate or outcome observer.
   - Enforce equivalent current-evidence checks and human approval in that GitOps pipeline; do not treat an export annotation as approval or a successful rollout.
+
+## Headless operation
+
+- The [headless workflow guide](headless-workflows.md) documents a browser-free lifecycle and the structured `status` cursor available through HTTP, CLI, Go SDK and read-only MCP.

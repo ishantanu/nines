@@ -6,6 +6,13 @@ import { Play, RefreshCw, Archive, Link2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -19,6 +26,9 @@ import { validateReplayEvents } from "@/lib/replay-validation";
 import { downloadReplay } from "@/lib/replay-download";
 import { MaskedReplayCapture } from "@/lib/replay-capture";
 import {
+  replayPrivacy,
+  deleteReplay,
+  type ReplayPrivacy,
   archiveReplay,
   createReplay,
   linkReplay,
@@ -261,6 +271,29 @@ export function SessionReplays({
   const [archived, setArchived] = useState(false);
   const [filter, setFilter] = useState(initialFilter);
   const [consent, setConsent] = useState(false);
+  const [sharingConsent, setSharingConsent] = useState(false);
+  const [privacy, setPrivacy] = useState<ReplayPrivacy | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteID, setDeleteID] = useState("");
+  useEffect(() => {
+    let current = true;
+    setPrivacy(null);
+    setConsent(false);
+    setSharingConsent(false);
+    replayPrivacy(scope)
+      .then((value) => {
+        if (current && !scope.signal.aborted) setPrivacy(value);
+      })
+      .catch((e) => {
+        if (current && !scope.signal.aborted) setError(message(e));
+      });
+    return () => {
+      current = false;
+    };
+  }, [scope]);
+  useEffect(() => {
+    setSharingConsent(false);
+  }, [state.status]);
   const [title, setTitle] = useState("");
   const [pendingID, setPendingID] = useState<string | null>(null);
   const mounted = useRef(false);
@@ -271,6 +304,7 @@ export function SessionReplays({
     };
   }, []);
   const writable = scope.role !== "viewer";
+  const canRecord = scope.role === "owner" || scope.role === "editor";
   const owner = scope.role === "owner";
   useEffect(() => {
     let current = true;
@@ -312,6 +346,10 @@ export function SessionReplays({
     setPendingID(null);
     setError("");
     try {
+      if (!canRecord || !privacy?.enabled)
+        throw Error(
+          "Recording is unavailable for this account or disabled by the operator.",
+        );
       await capture.start(consent);
       setConsent(false);
     } catch (e) {
@@ -320,6 +358,7 @@ export function SessionReplays({
     }
   }
   async function save() {
+    if (!canRecord || !sharingConsent || !privacy?.enabled) return;
     const recordingVersion = capture.getRecordingVersion();
     setBusy(true);
     setError("");
@@ -330,6 +369,8 @@ export function SessionReplays({
         id,
         title,
         consent: true,
+        sharingConsent,
+        noticeVersion: privacy.noticeVersion,
         policy: replayPolicy,
         references: [],
         events: capture.export(),
@@ -342,6 +383,7 @@ export function SessionReplays({
       setFilter("all");
       setPendingID(null);
       setTitle("");
+      setSharingConsent(false);
     } catch (e) {
       if (!scope.signal.aborted) setError(message(e));
     } finally {
@@ -365,112 +407,229 @@ export function SessionReplays({
   }
   return (
     <section className="space-y-4">
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent data-replay-block>
+          <DialogHeader>
+            <DialogTitle>Delete recording permanently</DialogTitle>
+            <DialogDescription>
+              This removes the stored recording and its links from Nines.
+              Downloads, backups and external copies are not removed. This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <Label htmlFor="replay-delete-id">
+            Type the recording ID: {chosen?.id}
+          </Label>
+          <Input
+            id="replay-delete-id"
+            value={deleteID}
+            disabled={busy}
+            onChange={(e) => setDeleteID(e.target.value)}
+          />
+          <Button
+            variant="destructive"
+            disabled={busy || deleteID !== chosen?.id}
+            onClick={async () => {
+              if (!chosen) return;
+              setBusy(true);
+              try {
+                await deleteReplay(scope, chosen);
+                if (scope.signal.aborted) return;
+                setDeleteOpen(false);
+                setSelected("");
+                setItems((prev) => prev.filter((r) => r.id !== chosen.id));
+                setEpoch((v) => v + 1);
+              } catch (e) {
+                if (!scope.signal.aborted) setError(message(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Delete permanently
+          </Button>
+        </DialogContent>
+      </Dialog>
       <Card className="gap-0 py-0" data-replay-block>
         <CardContent className="space-y-3 p-4">
           <details open={state.status !== "idle"}>
-            <summary className="cursor-pointer text-sm font-medium">
+            <summary className="cursor-pointer rounded-sm text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
               <ReplayLabel>Record this tab</ReplayLabel>
             </summary>
-            <div className="mt-3 space-y-3 text-xs text-muted-foreground">
-              <p>
-                Record only after consent. Approved navigation, control labels
-                and status messages remain readable. Resource names, queries,
-                metric values and entered text are masked; media and URLs are
-                removed. Private screens pause capture. Layout styles and class
-                names are retained. The recording stays in this tab until you
-                save it to this tenant. Saved sessions expire after seven days.
-              </p>
-              {state.status === "idle" ? (
-                <>
-                  <Label className="flex items-start gap-2 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={consent}
-                      disabled={!writable}
-                      onChange={(e) => setConsent(e.target.checked)}
-                    />
-                    <span>
-                      I agree to record this tab using the selective recording
-                      policy.
-                    </span>
-                  </Label>
-                  <Button
-                    size="sm"
-                    disabled={!writable || !consent}
-                    onClick={() => void start()}
-                  >
-                    <ReplayLabel>Start recording</ReplayLabel>
-                  </Button>
+            <div className="mt-4 grid gap-5 text-sm text-muted-foreground lg:grid-cols-[minmax(0,1.25fr)_minmax(15rem,0.75fr)] lg:gap-8">
+              <div className="space-y-3 leading-relaxed">
+                <ul className="max-w-prose list-disc space-y-2 pl-5">
+                  <li>
+                    Only this application tab is recorded. Approved control
+                    labels remain readable; inputs, resource names, queries and
+                    metric values are masked. Media and URLs are removed.
+                    Private screens pause capture.
+                  </li>
+                  <li>
+                    The capture stays in this tab until you separately agree to
+                    share and save it. Authorized members of this tenant can
+                    view saved recordings, which expire after seven days.
+                  </li>
+                  <li>
+                    Recording is optional. Declining does not restrict access.
+                    Stop and discard an unsaved capture to withdraw. A tenant
+                    owner can permanently delete a saved recording; archive only
+                    hides it.
+                  </li>
+                </ul>
+                <p className="max-w-prose">
+                  Masking does not guarantee anonymity. Layout styles and
+                  interactions remain. Downloads and backups require separate
+                  handling. No replay is automatically sent to Jev.
+                </p>
+                {!canRecord ? (
                   <p>
-                    This records this application tab from now on. Browse your
-                    workspace, then return here to stop and save. Recording
-                    pauses on access, data-source and API credential screens.
+                    Only a tenant owner or editor can record and share a
+                    session.
                   </p>
-                </>
-              ) : state.status === "recording" || state.status === "paused" ? (
-                <>
+                ) : null}
+                {!privacy ? (
                   <p role="status">
-                    {state.status === "paused"
-                      ? "Recording paused on this screen."
-                      : "Recording this tab."}{" "}
-                    {state.eventCount} events ·{" "}
-                    {Math.round(state.duration / 1000)} seconds
+                    Recording is unavailable until privacy settings have loaded.
                   </p>
-                  <div className="flex gap-2">
-                    <Button size="sm" onClick={() => capture.stop()}>
-                      <ReplayLabel>Stop recording</ReplayLabel>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => capture.discard()}
+                ) : null}
+                {privacy?.policyURL ? (
+                  <p>
+                    <a
+                      href={privacy.policyURL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
                     >
-                      <ReplayLabel>Discard recording</ReplayLabel>
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
+                      Operator privacy notice
+                    </a>
+                  </p>
+                ) : null}
+                {privacy?.contact ? (
+                  <p>Privacy contact: {privacy.contact}</p>
+                ) : null}
+                {privacy && !privacy.enabled ? (
                   <p role="status">
-                    Recording stopped. {state.eventCount} events ·{" "}
-                    {(state.bytes / 1024).toFixed(0)} KiB. {state.reason}
+                    New recordings are disabled by the operator.
                   </p>
-                  <Label htmlFor="replay-title">
-                    <ReplayLabel>Recording title</ReplayLabel>
-                  </Label>
-                  <Input
-                    id="replay-title"
-                    value={title}
-                    maxLength={160}
-                    disabled={busy}
-                    onChange={(e) => {
-                      setTitle(e.target.value);
-                      setPendingID(null);
-                    }}
-                    placeholder="Describe the session"
-                  />
-                  <div className="flex gap-2">
+                ) : null}
+              </div>
+              <div className="min-w-0 space-y-4 border-t pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+                {state.status === "idle" ? (
+                  <>
+                    <Label className="flex items-start gap-3 text-sm leading-relaxed text-foreground">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 size-4 shrink-0 accent-primary"
+                        checked={consent}
+                        disabled={!canRecord || !privacy?.enabled}
+                        onChange={(e) => setConsent(e.target.checked)}
+                      />
+                      <span>
+                        I agree to record this tab using the selective recording
+                        policy.
+                      </span>
+                    </Label>
                     <Button
                       size="sm"
-                      disabled={busy || !title.trim() || !writable}
-                      onClick={() => void save()}
+                      disabled={!canRecord || !consent || !privacy?.enabled}
+                      onClick={() => void start()}
                     >
-                      <ReplayLabel>Save recording</ReplayLabel>
+                      <ReplayLabel>Start recording</ReplayLabel>
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <p>
+                      This records this application tab from now on. Browse your
+                      workspace, then return here to stop and save. Recording
+                      pauses on access, data-source and API credential screens.
+                    </p>
+                  </>
+                ) : state.status === "recording" ||
+                  state.status === "paused" ? (
+                  <>
+                    <p role="status">
+                      {state.status === "paused"
+                        ? "Recording paused on this screen."
+                        : "Recording this tab."}{" "}
+                      {state.eventCount} events ·{" "}
+                      {Math.round(state.duration / 1000)} seconds
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" onClick={() => capture.stop()}>
+                        <ReplayLabel>Stop recording</ReplayLabel>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => capture.discard()}
+                      >
+                        Withdraw consent and discard
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p role="status">
+                      Recording stopped. {state.eventCount} events ·{" "}
+                      {(state.bytes / 1024).toFixed(0)} KiB. {state.reason}
+                    </p>
+                    <Label htmlFor="replay-title">
+                      <ReplayLabel>Recording title</ReplayLabel>
+                    </Label>
+                    <Input
+                      id="replay-title"
+                      value={title}
+                      maxLength={160}
                       disabled={busy}
-                      onClick={() => {
-                        capture.discard();
+                      onChange={(e) => {
+                        setTitle(e.target.value);
+                        setSharingConsent(false);
                         setPendingID(null);
                       }}
-                    >
-                      <ReplayLabel>Discard recording</ReplayLabel>
-                    </Button>
-                  </div>
-                </>
-              )}
+                      placeholder="Describe the session"
+                    />
+                    <Label className="flex items-start gap-3 text-sm leading-relaxed text-foreground">
+                      <input
+                        id="replay-sharing-consent"
+                        className="mt-0.5 size-4 shrink-0 accent-primary"
+                        type="checkbox"
+                        checked={sharingConsent}
+                        disabled={busy || !canRecord || !privacy?.enabled}
+                        onChange={(e) => setSharingConsent(e.target.checked)}
+                      />
+                      <span>
+                        I agree to share this masked recording with authorized
+                        members of tenant {scope.tenant} for reliability review.
+                      </span>
+                    </Label>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={
+                          busy ||
+                          !title.trim() ||
+                          !canRecord ||
+                          !sharingConsent ||
+                          !privacy?.enabled
+                        }
+                        onClick={() => void save()}
+                      >
+                        <ReplayLabel>Save recording</ReplayLabel>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => {
+                          capture.discard();
+                          setPendingID(null);
+                        }}
+                      >
+                        <ReplayLabel>Discard recording</ReplayLabel>
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </details>
         </CardContent>
@@ -583,15 +742,28 @@ export function SessionReplays({
               ) : null}
             </div>
             {chosen && owner ? (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => void archive()}
-              >
-                <Archive className="size-3.5" />
-                {chosen.archived ? "Restore" : "Archive"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => {
+                    setDeleteID("");
+                    setDeleteOpen(true);
+                  }}
+                >
+                  Delete recording
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void archive()}
+                >
+                  <Archive className="size-3.5" />
+                  {chosen.archived ? "Restore" : "Archive"}
+                </Button>
+              </div>
             ) : null}
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4">

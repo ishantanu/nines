@@ -1,0 +1,30 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: newrelic-api-latency
+  project: production
+spec:
+  displayName: API request latency
+  service: api
+  source: newrelic-prod
+  queryLanguage: nrql
+  target: 0.999
+  windowSeconds: 86400
+  stepSeconds: 60
+  goodQuery: SELECT count(*) FROM NinesRequest WHERE service = 'api' AND durationSeconds <= 0.3
+  totalQuery: SELECT count(*) FROM NinesRequest WHERE service = 'api'
+  policies:
+    - name: fast-burn
+      severity: critical
+      shortWindow: 5m
+      longWindow: 1h
+      burnRate: 14.4
+      forSeconds: 120
+      minCoverage: 1
+    - name: sustained-burn
+      severity: warning
+      shortWindow: 30m
+      longWindow: 6h
+      burnRate: 6
+      forSeconds: 300
+      minCoverage: 1

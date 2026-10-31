@@ -26,13 +26,13 @@ jobs:
           "$RUNNER_TEMP/nines-lint/bin/python" -m pip install -r requirements-lint.txt
           echo "$RUNNER_TEMP/nines-lint/bin" >> "$GITHUB_PATH"
       - run: make lint
+      - name: Validate versioned API contract
+        run: make check-api
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       VITE_OTEL_EXPORTER_OTLP_ENDPOINT: ''
-      VITE_POSTHOG_PROJECT_TOKEN: ''
-      VITE_POSTHOG_HOST: ''
       NINES_TEST_COMPOSE_CONFIG: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.27.3'
-      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: npm
@@ -114,6 +114,17 @@ jobs:
         with:
           go-version: '1.27.3'
       - run: make test-prometheus
+  victoriametrics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.3'
+      - run: make test-victoriametrics
   dependencies:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -194,19 +205,16 @@ jobs:
           set -euo pipefail
           export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
           printf '::add-mask::%s\n' "$POSTGRES_PASSWORD"
-          compose=(docker compose -p nines-ci-playground -f compose.playground.yaml)
+          export NINES_PLAYGROUND_PROJECT=nines-ci-playground
+          export NINES_PLAYGROUND_STATE_FILE="$RUNNER_TEMP/nines-playground.conf"
+          flags=(--ai)
           if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
-            compose+=(-f compose.playground.mimir.yaml --profile mimir)
-          fi
-          compose+=(-f compose.playground.ai.yaml --profile ai)
-          if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
-            export NINES_PLAYGROUND_TENANTS=prometheus,mimir
+            flags+=(--mimir)
           fi
           cleanup() {
-            "${compose[@]}" logs --no-color --tail 40 || true
-            "${compose[@]}" down -v || true
+            ./playground logs --no-follow || true
+            docker compose -p nines-ci-playground -f compose.playground.yaml --profile '*' down -v || true
           }
           trap cleanup EXIT
-          "${compose[@]}" up --build -d
-          "${compose[@]}" run --rm verify
-          "${compose[@]}" run --rm ai-verify
+          ./playground up "${flags[@]}"
+          ./playground verify

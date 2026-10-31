@@ -208,3 +208,39 @@ func TestTenantCompatibleAuditArchiveIsOptionalAndValidated(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkflowWebhookConfigurationKeepsSecretsPrivate(t *testing.T) {
+	block := "  workflowWebhook:\n    endpointEnv: HOOK_URL\n    signingKeyEnv: HOOK_KEY\n    since: \"2026-10-29T00:00:00Z\"\n"
+	config := strings.Replace(validConfig, "  source:", block+"  source:", 1)
+	lookup := func(name string) string {
+		switch name {
+		case "COMMERCE_TOKEN":
+			return "tenant-credential-at-least-24-characters"
+		case "METRICS_TOKEN":
+			return "upstream-private-secret"
+		case "HOOK_URL":
+			return "https://receiver.example/events"
+		case "HOOK_KEY":
+			return "private-signing-key-at-least-32-characters"
+		}
+		return ""
+	}
+	got, err := Parse([]byte(config), lookup)
+	if err != nil || len(got) != 1 || got[0].WorkflowWebhook == nil {
+		t.Fatalf("webhook configuration: %v", err)
+	}
+	encoded, err := json.Marshal(got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, secret := range []string{lookup("HOOK_URL"), lookup("HOOK_KEY")} {
+		if strings.Contains(string(encoded), secret) {
+			t.Fatal("webhook secret serialized")
+		}
+	}
+	for _, invalid := range []string{strings.Replace(config, "    since: \"2026-10-29T00:00:00Z\"\n", "", 1), strings.Replace(config, "HOOK_KEY", "MISSING", 1)} {
+		if _, err := Parse([]byte(invalid), lookup); err == nil {
+			t.Fatal("accepted invalid webhook configuration")
+		}
+	}
+}

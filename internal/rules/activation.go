@@ -21,7 +21,7 @@ func (m *Manager) Deploy(ctx context.Context, s model.SLO, expected string) (Dep
 	if err != nil {
 		return result, err
 	}
-	if result.Target.Kind == "operator" {
+	if result.Target.Kind == "operator" || result.Target.Kind == "dash0" || result.Target.Kind == "googlecloud" || result.Target.Kind == "datadog" || result.Target.Kind == "newrelic" {
 		return result, nil
 	}
 	unknown := ruleStage("unknown", "activation_unverified", "Backend activation has not been verified.", "Inspect the current runtime before retrying; saved configuration alone does not prove activation.")

@@ -451,7 +451,10 @@ func allowed(role string, r *http.Request) bool {
 	if r.URL.Path == "/api/dependency-discovery/kubernetes" || r.URL.Path == "/api/slos/compile" || r.URL.Path == "/api/intents/backtest" || r.URL.Path == "/api/intents/plan" || r.URL.Path == "/api/journeys/plan" || r.URL.Path == "/api/resources/plan" || r.URL.Path == "/api/resources/validate" {
 		return true
 	}
-	if r.URL.Path == "/api/session-replays" || strings.HasPrefix(r.URL.Path, "/api/session-replays/") && strings.HasSuffix(r.URL.Path, "/links") {
+	if r.URL.Path == "/api/session-replays" {
+		return role == "editor"
+	}
+	if strings.HasPrefix(r.URL.Path, "/api/session-replays/") && strings.HasSuffix(r.URL.Path, "/links") {
 		return role == "editor" || role == "agent"
 	}
 	if r.URL.Path == "/api/intent-conversations" || strings.HasPrefix(r.URL.Path, "/api/intent-conversations/") {
@@ -461,6 +464,9 @@ func allowed(role string, r *http.Request) bool {
 		return role == "editor" || role == "agent"
 	}
 
+	if strings.Contains(r.URL.Path, "/visual-evaluations") {
+		return role == "editor"
+	}
 	if r.URL.Path == "/api/intents/draft" {
 		return role == "editor" || role == "agent"
 	}

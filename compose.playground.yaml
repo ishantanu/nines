@@ -1,7 +1,5 @@
-# Isolated, synthetic Prometheus playground. Mimir is an optional override/profile.
-# First set POSTGRES_PASSWORD through .env or your shell (no database default).
-# Web login: admin / admin, unless NINES_PLAYGROUND_PASSWORD is set.
-# docker compose -p nines-playground -f compose.playground.yaml up --build -d
+# Local playground: use ./playground --help for profiles and remembered selections.
+# PostgreSQL credentials come from .env or the shell. Web login defaults to admin / admin.
 services:
   database:
     image: postgres:17-alpine
@@ -10,40 +8,50 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or your shell}
       POSTGRES_DB: nines
     volumes:
-      - database:/var/lib/postgresql/data
+    - database:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U nines -d nines]
+      test:
+      - CMD-SHELL
+      - pg_isready -U nines -d nines
       interval: 2s
       timeout: 3s
       retries: 30
   rule-directory:
     image: python:3.13.7-alpine
-    command: [python, -c, "import os; os.chown('/rules',65532,65532); os.chmod('/rules',0o755)"]
+    command:
+    - python
+    - -c
+    - import os; os.chown('/rules',65532,65532); os.chmod('/rules',0o755)
     volumes:
-      - rules:/rules
+    - rules:/rules
   sample:
     image: python:3.13.7-alpine
-    command: [python, -u, /app/sample.py]
+    command:
+    - python
+    - -u
+    - /app/sample.py
     volumes:
-      - ./deploy/playground/sample.py:/app/sample.py:ro
+    - ./deploy/playground/sample.py:/app/sample.py:ro
     ports:
-      - "127.0.0.1:${NINES_PLAYGROUND_SAMPLE_PORT:-19092}:8000"
+    - 127.0.0.1:${NINES_PLAYGROUND_SAMPLE_PORT:-19092}:8000
   prometheus:
     image: prom/prometheus:v3.5.1
-    command: [--config.file=/etc/prometheus/prometheus.yml, --web.enable-lifecycle]
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --web.enable-lifecycle
     depends_on:
       rule-directory:
         condition: service_completed_successfully
       sample:
         condition: service_started
     volumes:
-      - ./deploy/playground/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
-      - rules:/etc/prometheus/nines:ro
-      - ./deploy/playground/ai/disabled.json:/etc/prometheus/ai-targets.json:ro
-      - ./deploy/playground/topology/disabled.json:/etc/prometheus/topology-targets.json:ro
-      - prometheus:/prometheus
+    - ${NINES_PLAYGROUND_PROMETHEUS_CONFIG:-./deploy/playground/prometheus.yaml}:/etc/prometheus/prometheus.yml:ro
+    - rules:/etc/prometheus/nines:ro
+    - ${NINES_PLAYGROUND_AI_TARGETS:-./deploy/playground/ai/disabled.json}:/etc/prometheus/ai-targets.json:ro
+    - ${NINES_PLAYGROUND_TOPOLOGY_TARGETS:-./deploy/playground/topology/disabled.json}:/etc/prometheus/topology-targets.json:ro
+    - prometheus:/prometheus
     ports:
-      - "127.0.0.1:${NINES_PLAYGROUND_PROMETHEUS_PORT:-19090}:9090"
+    - 127.0.0.1:${NINES_PLAYGROUND_PROMETHEUS_PORT:-19090}:9090
   nines:
     build: .
     depends_on:
@@ -58,39 +66,171 @@ services:
       AUTH_CONFIG_FILE: /etc/nines/auth.yaml
       NINES_PUBLIC_URL: http://127.0.0.1:${NINES_PLAYGROUND_PORT:-18080}
       NINES_BOOTSTRAP_PASSWORD: ${NINES_PLAYGROUND_PASSWORD:-admin}
-      NINES_SOURCE_HOSTS: prometheus
+      NINES_SOURCE_HOSTS: ${NINES_PLAYGROUND_SOURCE_HOSTS:-prometheus}
       NINES_SOURCE_ENCRYPTION_KEY: bmluZXMtcGxheWdyb3VuZC10ZXN0LWtleS0wMDAwMDA=
       NINES_MANAGED_RULE_DIRECTORY: /rules
+      JEV_API_KEY: ${JEV_API_KEY:-}
+      DD_API_KEY: ${DD_API_KEY:-}
+      DD_APP_KEY: ${DD_APP_KEY:-}
+      NEWRELIC_API_KEY: ${NEWRELIC_API_KEY:-}
     volumes:
-      - ./deploy/playground/tenants.yaml:/etc/nines/tenants.yaml:ro
-      - ./deploy/playground/tenants-jev.yaml:/etc/nines/tenants-jev.yaml:ro
-      - ./deploy/playground/auth.yaml:/etc/nines/auth.yaml:ro
-      - rules:/rules
+    - ${NINES_PLAYGROUND_TENANTS_FILE:-./deploy/playground/tenants.yaml}:/etc/nines/tenants.yaml:ro
+    - ${NINES_PLAYGROUND_AUTH_FILE:-./deploy/playground/auth.yaml}:/etc/nines/auth.yaml:ro
+    - ./deploy/playground/tenants-jev.yaml:/etc/nines/tenants-jev.yaml:ro
+    - rules:/rules
     ports:
-      - "127.0.0.1:${NINES_PLAYGROUND_PORT:-18080}:8080"
+    - 127.0.0.1:${NINES_PLAYGROUND_PORT:-18080}:8080
+    image: nines-playground:local
   setup:
     image: python:3.13.7-alpine
-    command: [python, -u, /app/flow.py, setup]
+    command:
+    - python
+    - -u
+    - /app/flow.py
+    - setup
     depends_on:
       nines:
         condition: service_started
       prometheus:
         condition: service_started
     volumes:
-      - ./deploy/playground/flow.py:/app/flow.py:ro
-      - ./deploy/playground/management.py:/app/management.py:ro
-      - ./deploy/playground/sample.slo.yaml:/app/sample.slo.yaml:ro
+    - ./deploy/playground/flow.py:/app/flow.py:ro
+    - ./deploy/playground/management.py:/app/management.py:ro
+    - ./deploy/playground/sample.slo.yaml:/app/sample.slo.yaml:ro
+    environment:
+      NINES_PLAYGROUND_TENANTS: ${NINES_PLAYGROUND_TENANTS:-prometheus}
   verify:
     image: python:3.13.7-alpine
-    profiles: [verify]
-    command: [python, -u, /app/flow.py, verify]
+    profiles:
+    - verify
+    command:
+    - python
+    - -u
+    - /app/flow.py
+    - verify
     environment:
       NINES_TEST_PASSWORD: ${NINES_PLAYGROUND_PASSWORD:-admin}
+      NINES_PLAYGROUND_TENANTS: ${NINES_PLAYGROUND_TENANTS:-prometheus}
     volumes:
-      - ./deploy/playground/flow.py:/app/flow.py:ro
-      - ./deploy/playground/management.py:/app/management.py:ro
-      - ./deploy/playground/sample.slo.yaml:/app/sample.slo.yaml:ro
+    - ./deploy/playground/flow.py:/app/flow.py:ro
+    - ./deploy/playground/management.py:/app/management.py:ro
+    - ./deploy/playground/sample.slo.yaml:/app/sample.slo.yaml:ro
+  mimir:
+    profiles:
+    - mimir
+    image: grafana/mimir:3.2.2
+    command:
+    - --config.file=/etc/mimir/config.yaml
+    - --ingest-storage.enabled=false
+    volumes:
+    - ./deploy/playground/mimir.yaml:/etc/mimir/config.yaml:ro
+    - mimir:/data
+    ports:
+    - 127.0.0.1:${NINES_PLAYGROUND_MIMIR_PORT:-19009}:9009
+  ai-sample:
+    profiles:
+    - ai
+    build: &id001
+      context: .
+      dockerfile: deploy/playground/ai/Dockerfile
+    ports:
+    - 127.0.0.1:${NINES_PLAYGROUND_AI_PORT:-19093}:8001
+    healthcheck:
+      test:
+      - CMD
+      - /ai-playground
+      - health
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  ai-setup:
+    profiles:
+    - ai
+    build: *id001
+    command:
+    - setup
+    network_mode: service:nines
+    depends_on:
+      nines:
+        condition: service_started
+      ai-sample:
+        condition: service_healthy
+    environment:
+      NINES_PLAYGROUND_TENANTS: ${NINES_PLAYGROUND_TENANTS:-auto}
+  ai-verify:
+    profiles:
+    - verify
+    build: *id001
+    command:
+    - verify
+    network_mode: service:nines
+    depends_on:
+      nines:
+        condition: service_started
+      ai-sample:
+        condition: service_healthy
+    environment:
+      NINES_PLAYGROUND_TENANTS: ${NINES_PLAYGROUND_TENANTS:-auto}
+  graph-gateway:
+    build:
+      context: .
+      dockerfile: examples/service-graph/Dockerfile
+    image: nines-service-graph:local
+    command:
+    - -name
+    - gateway
+    - -dependency
+    - checkout
+    - -next
+    - http://graph-checkout:8000/request
+    ports:
+    - 127.0.0.1:${NINES_PLAYGROUND_GRAPH_PORT:-19094}:8000
+    profiles:
+    - topology
+  graph-checkout:
+    image: nines-service-graph:local
+    command:
+    - -name
+    - checkout
+    - -dependency
+    - payments
+    - -next
+    - http://graph-payments:8000/request
+    depends_on:
+    - graph-gateway
+    profiles:
+    - topology
+    build:
+      context: .
+      dockerfile: examples/service-graph/Dockerfile
+  graph-payments:
+    image: nines-service-graph:local
+    command:
+    - -name
+    - payments
+    depends_on:
+    - graph-gateway
+    profiles:
+    - topology
+    build:
+      context: .
+      dockerfile: examples/service-graph/Dockerfile
+  graph-traffic:
+    image: nines-service-graph:local
+    command:
+    - -generate
+    - http://graph-gateway:8000/request
+    depends_on:
+    - graph-gateway
+    - graph-checkout
+    - graph-payments
+    profiles:
+    - topology
+    build:
+      context: .
+      dockerfile: examples/service-graph/Dockerfile
 volumes:
-  database:
-  prometheus:
-  rules:
+  database: null
+  prometheus: null
+  rules: null
+  mimir: null

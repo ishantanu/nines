@@ -3,7 +3,7 @@ import { IntentTemplateEvidence } from "./intent-evidence";
 import { IntentOutcomePanel } from "./intent-outcome";
 import { BudgetDecisionPanel } from "./budget-decision";
 import { useEffect, useId, useRef, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, canEdit, type RequestScope } from "@/lib/api";
 import {
   conversationBase,

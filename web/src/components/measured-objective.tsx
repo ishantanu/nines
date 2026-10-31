@@ -1,7 +1,7 @@
 import { FormField, FormSection } from "@/components/ui/form-layout";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, canEdit, message, type RequestScope } from "@/lib/api";
 import { type BindingManifest } from "@/lib/topology";
 import { prepareInlineObjective } from "@/lib/measurement";

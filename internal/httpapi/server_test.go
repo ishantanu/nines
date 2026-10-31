@@ -89,6 +89,12 @@ func TestAPIToPrometheusToStateAndAlertLifecycle(t *testing.T) {
 	request("GET", "/api/slos/checkout/samples", nil, 200)
 	request("POST", "/api/slos", c, 409)
 	request("GET", "/api/slos/missing/status", nil, 404)
+	good = "invalid-private-provider-value"
+	failure := request("POST", "/api/slos/checkout/collect", map[string]time.Time{"from": at.Add(-time.Minute), "to": at}, 502)
+	var response map[string]string
+	if err := json.Unmarshal(failure, &response); err != nil || response["error"] != "Telemetry collection failed; no samples were committed" {
+		t.Fatalf("incorrect or unsafe provider error: %s", failure)
+	}
 }
 func TestAuthAndStrictInput(t *testing.T) {
 	svc := service.New(store.NewMemory(), nil)

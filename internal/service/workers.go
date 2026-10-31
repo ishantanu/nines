@@ -32,7 +32,7 @@ func (s *Service) Run(ctx context.Context, log *slog.Logger) {
 				if c.Retired() {
 					continue
 				}
-				if s.CollectorFor(c) != nil && c.HasQueries() {
+				if s.AutomaticCollection(c) {
 					// Re-read the last two completed intervals after a one-step source
 					// delay. Gaps beyond this overlap need an explicit backfill.
 					end := s.Now().Add(-time.Duration(c.StepSeconds) * time.Second).UTC().Truncate(time.Duration(c.StepSeconds) * time.Second)

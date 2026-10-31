@@ -64,6 +64,20 @@ describe("documentation routes and source links", () => {
         "../../",
       ),
     ).toBe("../../docs/assets/nines-architecture.svg");
+    expect(
+      resolveDocumentLink(
+        "../../api/openapi/v1alpha1.yaml",
+        "docs/public/api.md",
+        "../../",
+      ),
+    ).toBe("../../openapi/v1alpha1.yaml");
+    expect(
+      resolveDocumentLink(
+        "../../api/mcp/v1alpha1.schema.json",
+        "docs/public/remote-mcp.md",
+        "../../",
+      ),
+    ).toBe("../../schemas/remote-mcp/v1alpha1.json");
     expect(resolveDocumentLink("#providers", source, root)).toBe("#providers");
     expect(
       resolveDocumentLink(

@@ -121,6 +121,22 @@ func Mount(m *http.ServeMux, s *Service) {
 		}
 		reply(w, s.Capabilities(), nil, 200)
 	})
+	m.HandleFunc("GET /api/intent-conversations/{id}/review-artifact", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			fail(w, model.Invalid("query fields are not supported"))
+			return
+		}
+		out, e := s.ReviewArtifact(r.Context(), r.PathValue("id"))
+		reply(w, out, e, 200)
+	})
+	m.HandleFunc("GET /api/intent-conversations/{id}/status", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			fail(w, model.Invalid("query fields are not supported"))
+			return
+		}
+		out, e := s.WorkflowStatus(r.Context(), r.PathValue("id"))
+		reply(w, out, e, 200)
+	})
 	m.HandleFunc("GET /api/intent-conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RawQuery != "" {
 			fail(w, model.Invalid("query fields are not supported"))

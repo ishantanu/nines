@@ -1456,8 +1456,9 @@ code {
   display: block;
   padding: 7px 8px;
   color: var(--folio-muted);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
 .docs-nav-group a:hover {
@@ -1541,6 +1542,22 @@ code {
 .doc-content :is(ul, ol) {
   margin: 0 0 20px;
   padding-left: 25px;
+}
+
+.doc-content ul {
+  list-style-type: disc;
+}
+
+.doc-content ol {
+  list-style-type: decimal;
+}
+
+.doc-content ul ul {
+  list-style-type: circle;
+}
+
+.doc-content li::marker {
+  color: var(--folio-reference);
 }
 
 .doc-content li {
@@ -2510,3 +2527,14 @@ code {
     transition: none;
   }
 }
+
+.docs-page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-block: 0.75rem 1rem;
+}
+.docs-page-actions a { font-size: 0.875rem; text-underline-offset: 0.2em; }
+.docs-page-actions [hidden] { display: none; }

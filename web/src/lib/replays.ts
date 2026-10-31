@@ -57,6 +57,8 @@ export const createReplay = (
     id: string;
     title: string;
     consent: boolean;
+    sharingConsent: boolean;
+    noticeVersion: string;
     policy: string;
     references: ReplayRef[];
     events: ReplayEvent[];
@@ -103,3 +105,38 @@ export function replayFromHash(path: string, tenant: string): string | null {
     ? route.id
     : null;
 }
+
+export const replayConsentNotice = "replay-sharing-v1";
+export type ReplayPrivacy = {
+  apiVersion: string;
+  tenant: string;
+  enabled: boolean;
+  noticeVersion: string;
+  policyURL: string;
+  contact: string;
+};
+export const replayPrivacy = (scope: RequestScope) =>
+  api<ReplayPrivacy>("/api/session-replays/privacy", scope).then((notice) => {
+    if (
+      notice.apiVersion !== "nines.dev/v1alpha1" ||
+      notice.tenant !== scope.tenant ||
+      notice.noticeVersion !== replayConsentNotice ||
+      typeof notice.enabled !== "boolean"
+    )
+      throw Error(
+        "Replay privacy notice or tenant mismatch; reload the portal.",
+      );
+    return notice;
+  });
+export const deleteReplay = (scope: RequestScope, replay: SessionReplay) =>
+  api<{ deleted: boolean }>(
+    `/api/session-replays/${encodeURIComponent(replay.id)}`,
+    scope,
+    {
+      method: "DELETE",
+      body: JSON.stringify({
+        expectedVersion: replay.version,
+        confirmId: replay.id,
+      }),
+    },
+  );

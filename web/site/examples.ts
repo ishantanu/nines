@@ -27,13 +27,13 @@ nines --offline validate -f support-completion.slo.yaml`,
     language: "Shell",
     code: `# Run from a Nines source checkout with Docker running.
 ([ -f .env ] || python3 scripts/setup-local.py --playground) && \\
-  docker compose -p nines-playground -f compose.playground.yaml up --build -d
+  ./playground up
 
 # Open http://127.0.0.1:18080 and sign in with admin / admin.
 # Saving the sample SLO automatically deploys its rules.
 
 # Optional: exercise collection, deployment, RBAC and alert recovery.
-docker compose -p nines-playground -f compose.playground.yaml run --rm verify`,
+./playground verify`,
     note: "The verifier deliberately injects synthetic failures and can take several minutes. Prometheus is at localhost:19090; Mimir is optional.",
     path: "docs/public/deployment/playground.md",
     link: "Playground guide",
@@ -45,15 +45,11 @@ docker compose -p nines-playground -f compose.playground.yaml run --rm verify`,
     description:
       "Compare task success, tool attempts, evaluation coverage and conditional latency with a synthetic Go workload.",
     language: "Shell",
-    code: `docker compose -p nines-playground \\
-  -f compose.playground.yaml -f compose.playground.ai.yaml \\
-  --profile ai up --build -d
+    code: `./playground up --ai
 
 # Check real collection, automatic rules and SLI degradation/recovery:
-docker compose -p nines-playground \\
-  -f compose.playground.yaml -f compose.playground.ai.yaml \\
-  --profile ai run --rm ai-verify`,
-    note: "Generate the local .env first. Sign in with admin/admin unless previously customized. No model account is required. Fixtures remain experimental and suppress paging. Synthetic verdicts do not validate model quality.",
+./playground verify`,
+    note: "The launcher creates a private .env on first use. Sign in with admin/admin unless previously customized. No model account is required. Fixtures remain experimental and suppress paging. Synthetic verdicts do not validate model quality.",
     path: "docs/public/deployment/ai-playground.md",
     link: "AI workload guide",
   },

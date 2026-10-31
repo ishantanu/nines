@@ -1,5 +1,10 @@
+import {
+  providerLabel,
+  supportsMetricDiscovery,
+} from "@/lib/telemetry-providers";
 import { useEffect, useState } from "react";
-import { parse, stringify } from "yaml";
+import { parse } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, message, type RequestScope } from "@/lib/api";
 import {
   bindingKind,
@@ -73,11 +78,14 @@ export function MeasurementBindings({ scope }: { scope: RequestScope }) {
       ),
     ])
       .then(([c, b]) => {
-        setConnections(c.connections);
+        const discoverable = c.connections.filter((item) =>
+          supportsMetricDiscovery(item.kind),
+        );
+        setConnections(discoverable);
         setSource((old) =>
-          c.connections.some((i) => i.id === old)
+          discoverable.some((i) => i.id === old)
             ? old
-            : (c.connections[0]?.id ?? ""),
+            : (discoverable[0]?.id ?? ""),
         );
         setItems(b.items);
         setCursor(b.nextCursor ?? "");
@@ -268,7 +276,7 @@ export function MeasurementBindings({ scope }: { scope: RequestScope }) {
                     <SelectContent>
                       {connections.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
-                          {c.id} · {c.kind}
+                          {c.id} · {providerLabel(c.kind)}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -22,11 +22,13 @@ type Collector interface {
 	Collect(context.Context, model.SLO, time.Time, time.Time) ([]model.Point, error)
 }
 type MetricSource struct {
-	Kind      string
-	Collector Collector
+	CollectionMode string
+	Kind           string
+	Collector      Collector
 }
 
 type Service struct {
+	CollectionMode      string
 	KubernetesDiscovery kubediscovery.Reader
 	RuleManager         *rules.Manager
 	DynamicSource       func(string) (MetricSource, bool)
@@ -313,7 +315,7 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 		return 0, model.ErrUnavailable
 	}
 	if !c.HasQueries() {
-		return 0, model.Invalid("this SLO has no Prometheus queries")
+		return 0, model.Invalid("this SLO has no telemetry queries")
 	}
 	if !aligned(from, c.StepSeconds) || !aligned(to, c.StepSeconds) || !to.After(from) || to.Sub(from) > 31*24*time.Hour || to.After(s.Now().UTC().Truncate(time.Duration(c.StepSeconds)*time.Second)) {
 		return 0, model.Invalid("collection requires aligned from < to, at most 31 days, ending in the past")
@@ -436,7 +438,37 @@ func (s *Service) CollectorFor(c model.SLO) Collector {
 	}
 	return nil
 }
+
+// AutomaticCollection controls only scheduled collection; explicit bounded
+// collection remains available for manual connections.
+func (s *Service) AutomaticCollection(c model.SLO) bool {
+	if c.Retired() || !c.HasQueries() || s.CollectorFor(c) == nil {
+		return false
+	}
+	mode := s.CollectionMode
+	if c.Source != "" && c.Source != "primary" {
+		if source, ok := s.Sources[c.Source]; ok {
+			mode = source.CollectionMode
+		} else if s.DynamicSource != nil {
+			source, _ := s.DynamicSource(c.Source)
+			mode = source.CollectionMode
+		}
+	}
+	return mode != "manual"
+}
+
 func (s *Service) ValidateSource(c model.SLO) error {
+	if validator, ok := s.CollectorFor(c).(interface{ ValidateSLO(model.SLO) error }); ok {
+		if err := validator.ValidateSLO(c); err != nil {
+			return err
+		}
+	}
+	if c.QueryLanguage != "" && c.QueryLanguage != "promql" {
+		if _, ok := s.CollectorFor(c).(interface{ ValidateSLO(model.SLO) error }); !ok {
+			return model.Invalid("this source does not support provider query validation")
+		}
+	}
+
 	if c.Source != "" && c.Source != "primary" {
 		if _, ok := s.Sources[c.Source]; !ok {
 			if s.DynamicSource != nil {

@@ -1,0 +1,131 @@
+#!/bin/sh
+# One local playground. Saved selections are data, never executable shell input.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cd "$ROOT"
+STATE=${NINES_PLAYGROUND_STATE_FILE:-$ROOT/.nines-playground.conf}
+backend=prometheus jev=0 ai=0 topology=0 providers=
+if [ -f "$STATE" ]; then
+  while IFS='=' read -r key value; do
+    case "$key" in
+      backend) backend=$value ;; jev) jev=$value ;; ai) ai=$value ;;
+      topology) topology=$value ;; providers) providers=$value ;;
+      '') ;; *) echo "Unknown playground setting: $key" >&2; exit 1 ;;
+    esac
+  done < "$STATE"
+fi
+usage() {
+  cat <<'HELP'
+Usage: ./playground COMMAND [OPTIONS]
+
+  up          Build and start; wait for sample setup to finish
+  verify      Test recording rules, burn alerts and recovery (plus AI if enabled)
+  logs        Follow Nines and setup logs
+  status      Show containers and remembered selections
+  down        Stop this playground; preserve every data volume
+
+Options (remembered by up; can appear before or after the command):
+  --mimir / --prometheus     Add Mimir or use Prometheus alone
+  --jev / --no-jev           Enable or disable Jev advice (requires JEV_API_KEY)
+  --ai / --no-ai             Add synthetic agent/LLM/inference workloads
+  --topology / --no-topology Add instrumented service dependency examples
+  --providers FILE          Use a complete private provider tenant file
+  --no-providers            Return to built-in tenant files
+  --no-build                Reuse the current image on up
+  --no-follow               Print logs and exit (useful in CI)
+
+Examples:
+  ./playground up
+  ./playground up --mimir --jev
+  ./playground up --mimir --jev --providers /private/path/tenants.yaml
+  ./playground verify
+
+Selections are saved privately in .nines-playground.conf; no keys are stored.
+A custom provider file owns its tenant/Jev routing: regenerate it when changing
+those choices. Removing connections still referenced by SLOs can prevent startup.
+Hosted telemetry ingestion remains a separate, explicit trial command.
+HELP
+}
+command= build=1 follow=1
+arg_error() { echo "$1" >&2; usage >&2; exit 2; }
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    up|verify|logs|status|down) [ -z "$command" ] || arg_error 'Choose one command'; command=$1 ;;
+    --mimir) backend=mimir ;; --prometheus) backend=prometheus ;;
+    --jev) jev=1 ;; --no-jev) jev=0 ;; --ai) ai=1 ;; --no-ai) ai=0 ;;
+    --topology) topology=1 ;; --no-topology) topology=0 ;;
+    --providers) shift; [ "$#" -gt 0 ] || arg_error '--providers requires a file'; providers=$1 ;;
+    --no-providers) providers= ;;
+    --no-build) build=0 ;;
+    --no-follow) follow=0 ;;
+    -h|--help|help) usage; exit 0 ;;
+    *) arg_error "Unknown argument: $1" ;;
+  esac
+  shift
+done
+[ -n "$command" ] || { usage; exit 2; }
+case "$backend:$jev:$ai:$topology" in
+  prometheus:[01]:[01]:[01]|mimir:[01]:[01]:[01]) ;;
+  *) echo 'Invalid saved playground settings' >&2; exit 1 ;;
+esac
+command -v docker >/dev/null 2>&1 || { echo 'Docker Compose v2 is required' >&2; exit 1; }
+if [ ! -f .env ] && [ -z "${POSTGRES_PASSWORD:-}" ]; then
+  case "$command" in
+    up) python3 scripts/setup-local.py --playground ;;
+    *) echo 'Create .env or set POSTGRES_PASSWORD first' >&2; exit 1 ;;
+  esac
+fi
+export NINES_PLAYGROUND_TENANTS=prometheus
+export NINES_PLAYGROUND_AUTH_FILE=./deploy/playground/auth.yaml
+export NINES_PLAYGROUND_PROMETHEUS_CONFIG=./deploy/playground/prometheus.yaml
+export NINES_PLAYGROUND_SOURCE_HOSTS=prometheus
+variant=tenants
+if [ "$backend" = mimir ]; then
+  variant=tenants-mimir
+  export NINES_PLAYGROUND_TENANTS=prometheus,mimir
+  export NINES_PLAYGROUND_AUTH_FILE=./deploy/playground/auth-mimir.yaml
+  export NINES_PLAYGROUND_PROMETHEUS_CONFIG=./deploy/playground/prometheus-mimir.yaml
+  export NINES_PLAYGROUND_SOURCE_HOSTS=prometheus,mimir
+fi
+[ "$jev" = 0 ] || variant=$variant-jev
+export NINES_PLAYGROUND_TENANTS_FILE=./deploy/playground/$variant.yaml
+if [ -n "$providers" ]; then
+  if [ -f "$providers" ]; then
+    providers=$(CDPATH= cd -- "$(dirname -- "$providers")" && pwd)/$(basename -- "$providers")
+  else
+    case "$command" in up|verify) echo "Provider tenant file missing: $providers" >&2; exit 1 ;; esac
+  fi
+  export NINES_PLAYGROUND_TENANTS_FILE=$providers
+  export NINES_PLAYGROUND_SOURCE_HOSTS=$NINES_PLAYGROUND_SOURCE_HOSTS,api.uk1.datadoghq.com,api.eu.newrelic.com,api.eu-west-1.aws.dash0.com
+fi
+export NINES_PLAYGROUND_AI_TARGETS=./deploy/playground/ai/disabled.json
+export NINES_PLAYGROUND_TOPOLOGY_TARGETS=./deploy/playground/topology/disabled.json
+[ "$ai" = 0 ] || export NINES_PLAYGROUND_AI_TARGETS=./deploy/playground/ai/targets.json
+[ "$topology" = 0 ] || export NINES_PLAYGROUND_TOPOLOGY_TARGETS=./deploy/playground/topology/targets.json
+# Explicit flags own profiles; inherited Compose settings must not add workloads.
+export COMPOSE_PROFILES=
+set -- docker compose -p "${NINES_PLAYGROUND_PROJECT:-nines-playground}" -f compose.playground.yaml
+[ "$backend" = prometheus ] || set -- "$@" --profile mimir
+[ "$ai" = 0 ] || set -- "$@" --profile ai
+[ "$topology" = 0 ] || set -- "$@" --profile topology
+case "$command" in
+  up)
+    # Preserve selections on failure too, so retries retain the same source routes.
+    umask 077
+    mkdir -p -- "$(dirname -- "$STATE")"
+    tmp=$(mktemp "${STATE}.XXXXXX")
+    trap 'rm -f -- "$tmp"' EXIT HUP INT TERM
+    printf 'backend=%s\njev=%s\nai=%s\ntopology=%s\nproviders=%s\n' "$backend" "$jev" "$ai" "$topology" "$providers" > "$tmp"
+    mv -- "$tmp" "$STATE"
+    trap - EXIT HUP INT TERM
+    if [ "$build" = 1 ]; then "$@" up --build -d; else "$@" up --no-build -d; fi
+    "$@" wait setup
+    [ "$ai" = 0 ] || "$@" wait ai-setup
+    echo 'Open http://localhost:18080 or http://127.0.0.1:18080 (NINES_PLAYGROUND_PORT overrides the port).'
+    echo 'Sign in: admin / admin, unless you changed the persisted account password.'
+    ;;
+  verify) "$@" run --rm verify; [ "$ai" = 0 ] || "$@" run --rm ai-verify ;;
+  logs) if [ "$follow" = 1 ]; then "$@" logs --follow --tail 60 nines setup; else "$@" logs --tail 60 nines setup; fi ;;
+  status) printf 'Backend: %s; Jev: %s; AI: %s; topology: %s\n' "$backend" "$jev" "$ai" "$topology"; "$@" ps -a ;;
+  down) "$@" --profile '*' down ;;
+esac

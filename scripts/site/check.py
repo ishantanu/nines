@@ -85,14 +85,39 @@ assert len(parsers) == len(search) + 1, "Search and published HTML routes differ
 for row in search:
     target = SITE / "docs" / row["slug"] / "index.html"
     assert target.is_file(), "Missing directly addressable guide: " + row["slug"]
+    assert (target.parent / "index.md").is_file(), (
+        "Missing Markdown guide: " + row["slug"]
+    )
 assert "thresholdSeconds" in (SITE / "llms-full.txt").read_text()
+assert (SITE / "openapi/v1alpha1.yaml").read_bytes() == (
+    ROOT / "api/openapi/v1alpha1.yaml"
+).read_bytes(), "Published OpenAPI contract must match the source"
+assert (SITE / "schemas/remote-mcp/v1alpha1.json").read_bytes() == (
+    ROOT / "api/mcp/v1alpha1.schema.json"
+).read_bytes(), "Published remote MCP schema must match the source"
 assert (SITE / "examples/request-latency.slo.yaml").read_bytes() == (
     ROOT / "examples/request-latency.slo.yaml"
 ).read_bytes(), "Downloadable examples must match the source"
 assert (
     "kind: ServiceLevelObjective" in (SITE / "docs/latency-slos/index.html").read_text()
 )
-assert ET.parse(SITE / "sitemap.xml").getroot().tag.endswith("urlset")
+sitemap = ET.parse(SITE / "sitemap.xml").getroot()
+assert sitemap.tag.endswith("urlset")
+canonical_base = "https://ishantanu.github.io/nines/"
+locations = {element.text for element in sitemap.iter() if element.tag.endswith("loc")}
+assert canonical_base in locations
+for row in search:
+    slug = row["slug"]
+    canonical = canonical_base + "docs/" + (slug + "/" if slug else "")
+    assert canonical in locations, "Missing documentation sitemap URL: " + canonical
+    html = (SITE / "docs" / slug / "index.html").read_text()
+    assert f'rel="canonical" href="{canonical}"' in html, (
+        "Incorrect canonical URL: " + slug
+    )
+llms = (SITE / "llms.txt").read_text()
+for url in re.findall(r"https://ishantanu\.github\.io/nines/docs/[^)\s]+", llms):
+    assert url in locations, "Missing LLM index documentation URL: " + url
+assert 'rel="canonical" href="' + canonical_base + '"' in page.read_text()
 assert "./nines-architecture.svg" in checked, "Architecture image must be prerendered"
 assert (SITE / "nines-architecture.svg").read_bytes() == (
     ROOT / "docs/public/brand/nines-architecture.svg"

@@ -1,0 +1,20 @@
+tenants:
+  - id: production
+    name: Production
+    access:
+      - tokenEnv: NINES_PRODUCTION_TOKEN
+        role: owner
+    source:
+      kind: manual
+    connections:
+      - name: datadog-prod
+        kind: datadog
+        url: https://api.datadoghq.eu
+        credentialsEnv:
+          apiKey: DD_API_KEY
+          applicationKey: DD_APP_KEY
+        # Optional: explicit reviewed publication with this key pair.
+        # Requires slos_read/slos_write; supports exact 7/30 day SLOs.
+        # rules:
+        #   mode: native
+        #   namespace: production

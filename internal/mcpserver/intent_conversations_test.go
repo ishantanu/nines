@@ -96,3 +96,40 @@ func TestSystemOneMCPUsesSeparateConsentAndServerTenant(t *testing.T) {
 	session, ctx := connect(t, Config{Server: server.URL, Tenant: "alpha", AllowWrites: true})
 	call(t, ctx, session, "start_intent_preparation", map[string]any{"conversationId": "chat", "input": map[string]any{"id": "assess", "expectedVersion": 1, "mode": "guided", "modelConsent": false, "systemOneConsent": true}})
 }
+
+func TestIntentWorkflowStatusMCPIsReadOnly(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method != "GET" || r.URL.Path != "/api/intent-conversations/chat/status" || r.Header.Get("X-Nines-Tenant") != "alpha" {
+			t.Error("unsafe workflow status request")
+		}
+		_, _ = fmt.Fprint(w, `{"apiVersion":"nines.dev/v1alpha1","tenant":"alpha","conversation":"chat","version":3,"phase":"approval_required","nextAction":"approve","humanRequired":true}`)
+	}))
+	defer server.Close()
+	session, ctx := connect(t, Config{Server: server.URL, Tenant: "alpha"})
+	call(t, ctx, session, "get_intent_workflow_status", map[string]any{"id": "chat"})
+	tools, err := session.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, tool := range tools.Tools {
+		if tool.Name == "get_intent_workflow_status" {
+			found = true
+			if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint {
+				t.Fatal("status is not declared read-only")
+			}
+		}
+	}
+	if !found || calls != 1 {
+		t.Fatal(found, calls)
+	}
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "get_intent_workflow_status", Arguments: map[string]any{"id": "../other"}})
+	if err == nil && !result.IsError {
+		t.Fatal("unsafe status path accepted")
+	}
+	if calls != 1 {
+		t.Fatal("invalid path reached server")
+	}
+}

@@ -125,7 +125,33 @@ func (c *Client) Draft(ctx context.Context, text string) (v1.ModelGoal, error) {
 	if err != nil || c.ContainsCredential([]byte(content)) {
 		return out, ErrUnavailable
 	}
+	if c.outputMode == "json" {
+		content, err = unwrapJSONFence(content)
+		if err != nil {
+			return out, ErrUnavailable
+		}
+	}
 	return decodeGoal(content)
+}
+
+// unwrapJSONFence accepts only one complete JSON or unlabeled Markdown code
+// fence. It never extracts a block from surrounding prose or multiple blocks.
+// The returned content still passes the same strict JSON and semantic checks.
+func unwrapJSONFence(content string) (string, error) {
+	trimmed := strings.TrimSpace(content)
+	if !strings.HasPrefix(trimmed, "```") {
+		return content, nil
+	}
+	header, body, ok := strings.Cut(trimmed, "\n")
+	header = strings.TrimSuffix(header, "\r")
+	if !ok || (header != "```json" && header != "```") {
+		return "", ErrUnavailable
+	}
+	closeAt := strings.LastIndex(body, "\n```")
+	if closeAt < 0 || strings.TrimSpace(body[closeAt+4:]) != "" {
+		return "", ErrUnavailable
+	}
+	return body[:closeAt], nil
 }
 
 // decodeGoal rejects duplicate names before decoding values. Standard JSON

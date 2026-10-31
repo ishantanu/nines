@@ -1,0 +1,30 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: checkout-availability
+  project: production
+spec:
+  displayName: Checkout availability
+  service: checkout
+  source: google-checkout
+  queryLanguage: googlecloud
+  target: 0.999
+  windowSeconds: 2419200
+  stepSeconds: 60
+  goodQuery: 'metric.type = "custom.googleapis.com/nines/requests" AND resource.type = "global" AND metric.labels.result = "good"'
+  totalQuery: 'metric.type = "custom.googleapis.com/nines/requests" AND resource.type = "global"'
+  policies:
+    - name: fast-burn
+      severity: critical
+      shortWindow: 5m
+      longWindow: 1h
+      burnRate: 14.4
+      forSeconds: 120
+      minCoverage: 1
+    - name: sustained-burn
+      severity: warning
+      shortWindow: 30m
+      longWindow: 6h
+      burnRate: 6
+      forSeconds: 300
+      minCoverage: 1

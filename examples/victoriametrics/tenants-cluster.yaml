@@ -1,0 +1,17 @@
+tenants:
+  - id: production
+    name: Production
+    access:
+      - tokenEnv: NINES_PRODUCTION_TOKEN
+        role: owner
+    source:
+      kind: manual
+    connections:
+      - name: vm-prod
+        kind: victoriametrics
+        url: https://vmselect.example.com
+        options:
+          accountID: "42"
+          projectID: "7"
+        credentialsEnv:
+          bearerToken: VM_QUERY_TOKEN

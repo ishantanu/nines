@@ -28,10 +28,13 @@ The application server, CLI, client and MCP adapter are Go. Python is limited to
 ```sh
 make ui
 make lint
+make check-api       # validates OpenAPI and documented route contracts
 make test
+make test-providers   # synthetic provider/API/CLI/MCP contracts; no paid keys
 make check
 make test-integration  # requires TEST_DATABASE_URL for a disposable database
 make test-mimir       # starts/removes only its own loopback Mimir fixture
+make test-victoriametrics # disposable backend, synthetic interval-count acceptance
 make test-operator    # private Docker API/controller; never uses your kubecontext
 make release-check
 ```

@@ -48,9 +48,7 @@ def main():
     if args.playground:
         print("Web URL: http://127.0.0.1:18080")
         print("Web password: admin (or your NINES_PLAYGROUND_PASSWORD override)")
-        print(
-            "Start with: docker compose -p nines-playground -f compose.playground.yaml up --build -d"
-        )
+        print("Start with: ./playground up")
     else:
         print("Web URL: http://127.0.0.1:8080")
         print(f"Web password: NINES_BOOTSTRAP_PASSWORD in {args.out}")

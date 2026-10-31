@@ -39,11 +39,14 @@ func replayHandler(t *testing.T) http.Handler {
 func TestReplayAPITenantRolesAndSeparatePayload(t *testing.T) {
 	h := replayHandler(t)
 	now := time.Now().Add(-time.Minute).UnixMilli()
-	body := fmt.Sprintf(`{"id":"one-session","title":"Checkout","consent":true,"policy":"masked-v1","references":[{"kind":"ServiceLevelObjective","id":"checkout","revision":1}],"events":[{"type":4,"timestamp":%d,"data":{"href":"/?secret=token","width":800,"height":600}},{"type":2,"timestamp":%d,"data":{"node":{"type":0,"id":1,"childNodes":[]},"initialOffset":{"left":0,"top":0}}}]}`, now, now+1)
+	body := fmt.Sprintf(`{"id":"one-session","title":"Checkout","consent":true,"sharingConsent":true,"noticeVersion":"replay-sharing-v1","policy":"masked-v1","references":[{"kind":"ServiceLevelObjective","id":"checkout","revision":1}],"events":[{"type":4,"timestamp":%d,"data":{"href":"/?secret=token","width":800,"height":600}},{"type":2,"timestamp":%d,"data":{"node":{"type":0,"id":1,"childNodes":[]},"initialOffset":{"left":0,"top":0}}}]}`, now, now+1)
 	if w := invRequest(h, "POST", "/api/session-replays", body, "viewer", "alpha"); w.Code != 403 {
 		t.Fatal(w.Code)
 	}
-	for _, role := range []string{"owner", "editor", "agent"} {
+	if w := invRequest(h, "POST", "/api/session-replays", body, "agent", "alpha"); w.Code != 403 {
+		t.Fatal("agent granted replay sharing consent", w.Code)
+	}
+	for _, role := range []string{"owner", "editor"} {
 		b := strings.Replace(body, "one-session", role+"-session", 1)
 		if w := invRequest(h, "POST", "/api/session-replays", b, role, "alpha"); w.Code != 201 {
 			t.Fatal(role, w.Code, w.Body.String())
@@ -51,7 +54,7 @@ func TestReplayAPITenantRolesAndSeparatePayload(t *testing.T) {
 	}
 	w := invRequest(h, "GET", "/api/session-replays", "", "viewer", "alpha")
 	var list v1.SessionReplayList
-	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &list) != nil || len(list.Items) != 3 || strings.Contains(w.Body.String(), "childNodes") {
+	if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &list) != nil || len(list.Items) != 2 || strings.Contains(w.Body.String(), "childNodes") {
 		t.Fatal(w.Code, w.Body.String())
 	}
 	for _, path := range []string{"/api/session-replays/owner-session", "/api/session-replays/owner-session/events"} {
@@ -89,5 +92,40 @@ func TestReplayPlayerUsesIsolatedPolicy(t *testing.T) {
 	}
 	if w.Header().Get("X-Frame-Options") != "SAMEORIGIN" {
 		t.Fatal("player not embeddable by same-origin app")
+	}
+}
+
+func TestReplayConsentReceiptAndOwnerDeleteBoundary(t *testing.T) {
+	h := replayHandler(t)
+	now := time.Now().Add(-time.Minute).UnixMilli()
+	body := fmt.Sprintf(`{"id":"privacy-session","title":"Synthetic capture","consent":true,"sharingConsent":true,"noticeVersion":"replay-sharing-v1","policy":"masked-v1","references":[],"events":[{"type":4,"timestamp":%d,"data":{"width":800,"height":600}},{"type":2,"timestamp":%d,"data":{"node":{"type":0,"id":1,"childNodes":[]}}}]}`, now, now+1)
+	for _, bad := range []string{strings.Replace(body, `"sharingConsent":true`, `"sharingConsent":false`, 1), strings.Replace(body, `replay-sharing-v1`, `old-notice`, 1)} {
+		if w := invRequest(h, "POST", "/api/session-replays", bad, "owner", "alpha"); w.Code != 400 {
+			t.Fatal("bad consent accepted", w.Code, w.Body.String())
+		}
+	}
+	w := invRequest(h, "POST", "/api/session-replays", body, "owner", "alpha")
+	var saved v1.SessionReplay
+	if w.Code != 201 || json.Unmarshal(w.Body.Bytes(), &saved) != nil || saved.ConsentReceipt == nil {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	path := "/api/session-replays/privacy-session"
+	deletion := `{"expectedVersion":1,"confirmId":"privacy-session"}`
+	for _, role := range []string{"viewer", "agent", "editor"} {
+		if w = invRequest(h, "DELETE", path, deletion, role, "alpha"); w.Code != 403 {
+			t.Fatal("delete permission expanded", role, w.Code)
+		}
+	}
+	if w = invRequest(h, "DELETE", path, deletion, "owner", "beta"); w.Code != 404 {
+		t.Fatal("cross tenant deletion")
+	}
+	if w = invRequest(h, "DELETE", path, strings.Replace(deletion, `"expectedVersion":1`, `"expectedVersion":2`, 1), "owner", "alpha"); w.Code != 409 {
+		t.Fatal("stale delete", w.Code)
+	}
+	if w = invRequest(h, "DELETE", path, deletion, "owner", "alpha"); w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	if w = invRequest(h, "GET", path+"/events", "", "viewer", "alpha"); w.Code != 404 {
+		t.Fatal("erased recording still readable")
 	}
 }

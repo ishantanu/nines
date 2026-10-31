@@ -231,3 +231,32 @@ nines rules resume --id checkout-success --expected-revision 2 --agent
   - Permanent deletion needs a separate `--action delete` plan and `--confirm-name ID`.
   - Mutations require a tenant owner; offline mode is refused.
   - See [SLO retirement](public/slo-retirement.md) for retained history, reference resolution and recovery.
+
+## Visual evidence and recording deletion
+
+- `nines visual assess JOURNEY` requires an exact `--revision`, fixed request `--id`, `--route-digest` from reviewed capabilities, `--image`, `--criterion` and explicit `--consent`. See [visual journey evidence](public/visual-evaluations.md) for privacy and idempotency semantics.
+- `nines visual list JOURNEY` reads bounded receipts. `nines visual review JOURNEY EVALUATION --digest ... --outcome ... --reason ...` saves a separate immutable owner/editor review. Neither command publishes SLI data.
+- `nines replays ingest` requires an owner or editor to attest both capture and tenant-sharing consent. Agent-role credentials cannot grant those attestations.
+- `nines replays delete ID --expected-version N --confirm-id ID` permanently removes the native stored recording with owner permission. It does not delete exports or backups.
+- `--agent` does not authorize consent. Agents must obtain explicit permission from the responsible human before sending images or deleting recordings.
+
+
+## Resumable headless workflows
+
+- `nines intent conversations status ID --context production --agent` returns the saved phase, next action, exact version/digests, human review gate and recorded observation outcome.
+- `nines intent conversations report ID --context production --agent` emits a verified JSON snapshot. Add `--markdown` for a portable Markdown attachment; share its potentially sensitive definitions and review notes only with authorized recipients.
+- Status is read-only. It does not call a model, query telemetry or authorize mutation. Unknown states require inspection; a committed configuration is not marked healthy.
+- Read the [headless workflow guide](public/headless-workflows.md) for the full prepare/review/apply/verify/rollback sequence and executable CLI acceptance test.
+
+## GitHub review evidence
+
+- `nines intent conversations github-plan ID` prepares a stable review plan for an explicit repository, PR number and full head commit without contacting GitHub.
+- `github-publish ID` requires the exact reviewed conversation version, change-set digest, report digest and `--confirm-sharing`. Set `NINES_GITHUB_TOKEN` privately; it is distinct from Nines authentication.
+- Comments are immutable evidence snapshots, not approval or application. See [GitHub reviews](public/github-reviews.md) for consent, retries, concurrency limits and the opt-in Actions example.
+
+## Native provider evidence
+
+- `nines native results SLO_ID --from RFC3339 --to RFC3339`: on-demand current native Datadog/New Relic evidence, separate from Nines calculations.
+- `nines native list CONNECTION`: bounded native catalog on the configured destination.
+- `nines native draft CONNECTION --native-id ID --name NAME --project PROJECT --service SERVICE`: experimental YAML for normal plan/apply review. No vendor mutation or ownership adoption. `--agent` retains the draft envelope and limitations; ordinary YAML output sends limitations to stderr.
+- These are connected, read-only operations. Offline mode prohibits them. [Provider limits](public/provider-adapters.md#native-results-and-reviewed-import) apply.

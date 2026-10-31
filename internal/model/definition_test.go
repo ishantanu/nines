@@ -1,6 +1,7 @@
 package model_test
 
 import (
+	"encoding/json"
 	"reflect"
 	"strings"
 	"testing"
@@ -64,5 +65,37 @@ func TestStrictDefinitionRejection(t *testing.T) {
 				t.Fatal("invalid definition accepted")
 			}
 		})
+	}
+}
+
+func TestDurationYAMLRetainsNumericDefinitionDigest(t *testing.T) {
+	readable, err := model.ParseDefinition([]byte(examples.APIAvailability))
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := json.Marshal(readable.Manifest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacy, err := model.ParseDefinition(runtime)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(readable, legacy) || model.DefinitionDigest(readable.Manifest()) != model.DefinitionDigest(legacy.Manifest()) {
+		t.Fatal("duration spelling changed policy identity")
+	}
+	yamlBody, err := yaml.Marshal(legacy.Manifest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(yamlBody), "shortWindowSeconds:") || !strings.Contains(string(yamlBody), "shortWindow: 5m") {
+		t.Fatal("noncanonical duration export", string(yamlBody))
+	}
+	seconds, err := model.ParseDefinition([]byte(strings.ReplaceAll(string(yamlBody), "shortWindow: 5m", "shortWindow: 300s")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if model.DefinitionDigest(seconds.Manifest()) != model.DefinitionDigest(readable.Manifest()) {
+		t.Fatal("equivalent durations changed digest")
 	}
 }

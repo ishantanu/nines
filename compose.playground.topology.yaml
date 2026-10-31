@@ -2,6 +2,7 @@
 # the same target-file override also works with its optional Mimir configuration.
 services:
   graph-gateway:
+    profiles: !reset []
     build:
       context: .
       dockerfile: examples/service-graph/Dockerfile
@@ -10,14 +11,17 @@ services:
     ports:
       - '127.0.0.1:${NINES_PLAYGROUND_GRAPH_PORT:-19094}:8000'
   graph-checkout:
+    profiles: !reset []
     image: nines-service-graph:local
     command: [-name, checkout, -dependency, payments, -next, 'http://graph-payments:8000/request']
     depends_on: [graph-gateway]
   graph-payments:
+    profiles: !reset []
     image: nines-service-graph:local
     command: [-name, payments]
     depends_on: [graph-gateway]
   graph-traffic:
+    profiles: !reset []
     image: nines-service-graph:local
     command: [-generate, 'http://graph-gateway:8000/request']
     depends_on: [graph-gateway, graph-checkout, graph-payments]

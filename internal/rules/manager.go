@@ -18,47 +18,67 @@ import (
 
 	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/dash0"
+	"github.com/ishantanu/nines/internal/datadog"
+	"github.com/ishantanu/nines/internal/googlecloud"
 	"github.com/ishantanu/nines/internal/model"
+	"github.com/ishantanu/nines/internal/newrelic"
 	"github.com/ishantanu/nines/internal/observability"
 )
 
 type Target struct {
-	AutoDeploy    bool   `json:"autoDeploy,omitempty"`
-	Publisher     string `json:"publisher,omitempty"`
-	ProviderKind  string `json:"providerKind,omitempty"`
-	Reload        bool   `json:"reload,omitempty"`
-	Connection    string `json:"connection"`
-	Kind          string `json:"kind"`
-	QueryURL      string `json:"queryURL"`
-	RulerURL      string `json:"rulerURL,omitempty"`
-	MimirOrgID    string `json:"mimirOrgID,omitempty"`
-	Namespace     string `json:"namespace"`
-	Directory     string `json:"directory,omitempty"`
-	BearerToken   string `json:"-"`
-	BasicUsername string `json:"-"`
-	BasicPassword string `json:"-"`
+	NewRelicAccountID     string `json:"newRelicAccountID,omitempty"`
+	NewRelicEntityGUID    string `json:"newRelicEntityGUID,omitempty"`
+	NewRelicUserKey       string `json:"-"`
+	DatadogAPIKey         string `json:"-"`
+	DatadogApplicationKey string `json:"-"`
+	GoogleProjectID       string `json:"googleProjectID,omitempty"`
+	GoogleServiceID       string `json:"googleServiceID,omitempty"`
+	GoogleAuth            string `json:"googleAuth,omitempty"`
+	Dataset               string `json:"dataset,omitempty"`
+	AutoDeploy            bool   `json:"autoDeploy,omitempty"`
+	Publisher             string `json:"publisher,omitempty"`
+	ProviderKind          string `json:"providerKind,omitempty"`
+	Reload                bool   `json:"reload,omitempty"`
+	Connection            string `json:"connection"`
+	Kind                  string `json:"kind"`
+	QueryURL              string `json:"queryURL"`
+	RulerURL              string `json:"rulerURL,omitempty"`
+	MimirOrgID            string `json:"mimirOrgID,omitempty"`
+	Namespace             string `json:"namespace"`
+	Directory             string `json:"directory,omitempty"`
+	BearerToken           string `json:"-"`
+	BasicUsername         string `json:"-"`
+	BasicPassword         string `json:"-"`
 }
 type Plan struct {
-	Resource        *k.Resource `json:"resource,omitempty"`
-	ResourceYAML    string      `json:"resourceYAML,omitempty"`
-	PriorUID        string      `json:"priorUID,omitempty"`
-	PriorGeneration int64       `json:"priorGeneration,omitempty"`
-	PriorSpecDigest string      `json:"priorSpecDigest,omitempty"`
-	PriorRevision   string      `json:"priorRevision,omitempty"`
-	Target          Target      `json:"target"`
-	Group           Group       `json:"group"`
-	Digest          string      `json:"digest"`
-	YAML            string      `json:"yaml"`
-	SLORevision     int64       `json:"sloRevision"`
+	NativeNewRelic    *newrelic.Publication    `json:"nativeNewRelic,omitempty"`
+	NativeDatadog     *datadog.Publication     `json:"nativeDatadog,omitempty"`
+	NativeGoogleCloud *googlecloud.Publication `json:"nativeGoogleCloud,omitempty"`
+	NativeSLO         *dash0.Publication       `json:"nativeSLO,omitempty"`
+	Resource          *k.Resource              `json:"resource,omitempty"`
+	ResourceYAML      string                   `json:"resourceYAML,omitempty"`
+	PriorUID          string                   `json:"priorUID,omitempty"`
+	PriorGeneration   int64                    `json:"priorGeneration,omitempty"`
+	PriorSpecDigest   string                   `json:"priorSpecDigest,omitempty"`
+	PriorRevision     string                   `json:"priorRevision,omitempty"`
+	Target            Target                   `json:"target"`
+	Group             Group                    `json:"group"`
+	Digest            string                   `json:"digest"`
+	YAML              string                   `json:"yaml"`
+	SLORevision       int64                    `json:"sloRevision"`
 }
 type Deployment struct {
-	Activation *v1.IntegrationStage `json:"activation,omitempty"`
-	Evaluation *v1.IntegrationStage `json:"evaluation,omitempty"`
-	State      string               `json:"state"`
-	Digest     string               `json:"digest"`
-	Target     Target               `json:"target"`
-	Group      string               `json:"group"`
-	Message    string               `json:"message"`
+	NativeQueries *newrelic.NativeQueries `json:"nativeQueries,omitempty"`
+	NativeID      string                  `json:"nativeID,omitempty"`
+	NativeURL     string                  `json:"nativeURL,omitempty"`
+	Activation    *v1.IntegrationStage    `json:"activation,omitempty"`
+	Evaluation    *v1.IntegrationStage    `json:"evaluation,omitempty"`
+	State         string                  `json:"state"`
+	Digest        string                  `json:"digest"`
+	Target        Target                  `json:"target"`
+	Group         string                  `json:"group"`
+	Message       string                  `json:"message"`
 }
 
 // ExternalDestination publishes desired resources rather than writing provider
@@ -107,6 +127,18 @@ func (m *Manager) PlanContext(ctx context.Context, s model.SLO) (Plan, error) {
 		}
 		return m.External.Plan(ctx, s, target)
 	}
+	if target.Kind == "newrelic" {
+		return m.planNewRelic(ctx, s, target)
+	}
+	if target.Kind == "datadog" {
+		return m.planDatadog(ctx, s, target)
+	}
+	if target.Kind == "googlecloud" {
+		return m.planGoogle(ctx, s, target)
+	}
+	if target.Kind == "dash0" {
+		return m.planNative(ctx, s, target)
+	}
 	group, err := Generate(s, m.Tenant)
 	if m.OwnerUID != "" {
 		group, err = GenerateOwned(s, m.Tenant, m.OwnerUID)
@@ -151,6 +183,18 @@ func (m *Manager) Apply(ctx context.Context, s model.SLO, expected string) (Depl
 			return Deployment{}, err
 		}
 		return m.External.Apply(ctx, s, p)
+	}
+	if p.Target.Kind == "newrelic" {
+		return m.applyNewRelic(ctx, s, p)
+	}
+	if p.Target.Kind == "datadog" {
+		return m.applyDatadog(ctx, s, p)
+	}
+	if p.Target.Kind == "googlecloud" {
+		return m.applyGoogle(ctx, s, p)
+	}
+	if p.Target.Kind == "dash0" {
+		return m.applyNative(ctx, s, p)
 	}
 	result := Deployment{Digest: p.Digest, Target: p.Target, Group: p.Group.Name}
 	if p.Target.Kind == "prometheus" {
@@ -409,6 +453,9 @@ func (m *Manager) OutputIdentity(ctx context.Context, s model.SLO) (model.RuleOu
 		}
 		return m.External.Identity(ctx, s, target)
 	}
+	if ok && (target.Kind == "dash0" || target.Kind == "googlecloud" || target.Kind == "datadog" || target.Kind == "newrelic") {
+		return model.RuleOutputIdentity{}, model.Invalid("native SLO publication does not produce Nines recording-rule output")
+	}
 	if _, err := m.PlanContext(ctx, s); err != nil {
 		return model.RuleOutputIdentity{}, err
 	}
@@ -426,6 +473,18 @@ func (m *Manager) Withdraw(ctx context.Context, s model.SLO, expected string) (D
 	}
 	if plan.Digest != expected || expected == "" {
 		return Deployment{}, model.ErrRevisionConflict
+	}
+	if plan.Target.Kind == "newrelic" {
+		return m.withdrawNewRelic(ctx, s, plan)
+	}
+	if plan.Target.Kind == "datadog" {
+		return m.withdrawDatadog(ctx, s, plan)
+	}
+	if plan.Target.Kind == "googlecloud" {
+		return m.withdrawGoogle(ctx, s, plan)
+	}
+	if plan.Target.Kind == "dash0" {
+		return m.withdrawNative(ctx, s, plan)
 	}
 	external, ok := m.External.(interface {
 		Withdraw(context.Context, model.SLO, Plan) (Deployment, error)

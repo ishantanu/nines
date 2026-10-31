@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -41,8 +42,36 @@ func (s *Service) cookie(r *http.Request, purpose string) (string, error) {
 	}
 	return cookies[0].Value, nil
 }
+func localAliasHost(host string) bool { return host == "localhost" || host == "127.0.0.1" }
+
 func (s *Service) ValidOrigin(r *http.Request) bool {
-	return r.Header.Get("Origin") == "" || r.Header.Get("Origin") == s.config.PublicURL
+	if len(r.Header.Values("Origin")) > 1 {
+		return false
+	}
+	origin := r.Header.Get("Origin")
+	if origin == "" || origin == s.config.PublicURL {
+		return true
+	}
+	if !s.config.AllowLoopbackAliases || r.TLS != nil {
+		return false
+	}
+	public, err := url.Parse(s.config.PublicURL)
+	if err != nil || public.Scheme != "http" || !localAliasHost(public.Hostname()) {
+		return false
+	}
+	alias, err := url.Parse(origin)
+	if err != nil || alias.Scheme != "http" || !localAliasHost(alias.Hostname()) || origin != "http://"+alias.Host || r.Host != alias.Host {
+		return false
+	}
+	// Accept only same-origin requests to the other loopback name on the
+	// configured port. Forwarded headers and DNS resolution grant no aliases.
+	port := func(u *url.URL) string {
+		if u.Port() == "" {
+			return "80"
+		}
+		return u.Port()
+	}
+	return port(alias) == port(public)
 }
 func equal(a, b string) bool { return a != "" && subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1 }
 func (s *Service) RequireCSRF(r *http.Request, a Actor) bool {

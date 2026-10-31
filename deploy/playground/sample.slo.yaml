@@ -14,15 +14,15 @@ spec:
   policies:
     - name: fast-burn
       severity: critical
-      shortWindowSeconds: 60
-      longWindowSeconds: 120
+      shortWindow: 1m
+      longWindow: 2m
       burnRate: 6
       forSeconds: 10
       minCoverage: 0.8
     - name: sustained-burn
       severity: warning
-      shortWindowSeconds: 120
-      longWindowSeconds: 300
+      shortWindow: 2m
+      longWindow: 5m
       burnRate: 2
       forSeconds: 10
       minCoverage: 0.8
