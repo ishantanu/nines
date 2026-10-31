@@ -40,7 +40,7 @@ tenants:
 
 ## Local Compose playground
 
-- Use the optional `compose.playground.jev.yaml` override with either the base Prometheus playground or its Mimir override/profile.
+- Use `./playground up --jev` or `./playground up --mimir --jev`. The launcher remembers the selection and uses the single playground Compose file.
   - The override requires `JEV_API_KEY` and selects a separate opt-in tenant file; default playground starts remain key-free. See [playground commands and UI walkthrough](deployment/playground.md#optional-jev-advice).
   - Adding a key alone does not enable a tenant route or consent to a request.
   - An existing paused admin policy must also be enabled deliberately.
@@ -118,3 +118,15 @@ NINES_SYSTEM_ONE_LIVE_TEST=1 go test -count=1 -v ./internal/systemone -run '^Tes
 - An initial eight-case run exposed descriptions that said “eligible” without specifying eligibility.
   - The revised suite retained those four descriptions as negative population cases and added fully specified positive populations. Across the final suite, **46/48 individual checks passed**.
   - Fixture transport tests and deterministic workflow guards are reported separately from these real model judgments. No automatic action threshold is enabled.
+
+## Optional image assessments
+
+- Text advice does not enable image processing. Set `systemOne.imagesEnabled: true` explicitly to enable the experimental [visual journey evidence](visual-evaluations.md) workflow.
+- Every image assessment requires a fresh user authorization, and shares the existing administrator pause and daily-request policy. Images are never sent automatically from session replay.
+
+## Live acceptance result
+
+- On 29 October 2026, the opt-in synthetic Jev acceptance suite passed 10 of 12 cases with `jev-1.14.0`. Both failures were request-serving definition-clarity cases whose probabilities fell below the existing acceptance threshold. The ambiguous and instruction-injection cases passed. This is a point-in-time result, not a guarantee of model behavior or measurement quality.
+- These tests exercise bounded Jev advice, not generative SLO drafting or tool-calling agents. Continue to review definitions and verify telemetry independently.
+
+- A follow-up on the same date repeated the original 12 cases plus two negative controls three times. The original question passed 36 of 42 case runs; all six negative controls passed. A trial question with explicit yes/no criteria passed 37 of 42, including all negative controls, but failed the agent case in all three repetitions and produced two invalid responses. The trial wording was not promoted. These small samples are not a statistically representative benchmark, and Jev advice remains advisory.

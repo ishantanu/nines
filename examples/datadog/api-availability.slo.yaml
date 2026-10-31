@@ -1,0 +1,30 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: datadog-api-availability
+  project: production
+spec:
+  displayName: API availability
+  service: api
+  source: datadog-prod
+  queryLanguage: datadog
+  target: 0.999
+  windowSeconds: 86400
+  stepSeconds: 60
+  goodQuery: sum:api.requests.good{service:api,env:production}.as_count().rollup(sum,60)
+  totalQuery: sum:api.requests.total{service:api,env:production}.as_count().rollup(sum,60)
+  policies:
+    - name: fast-burn
+      severity: critical
+      shortWindow: 5m
+      longWindow: 1h
+      burnRate: 14.4
+      forSeconds: 120
+      minCoverage: 1
+    - name: sustained-burn
+      severity: warning
+      shortWindow: 30m
+      longWindow: 6h
+      burnRate: 6
+      forSeconds: 300
+      minCoverage: 1

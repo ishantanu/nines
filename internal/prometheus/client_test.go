@@ -57,6 +57,7 @@ func TestCollectContractAndChunkBoundaries(t *testing.T) {
 }
 func TestRejectPartialAmbiguousAndMalformedData(t *testing.T) {
 	for name, body := range map[string]string{
+		"partial backend": `{"status":"success","isPartial":true,"data":{"resultType":"matrix","result":[]}}`,
 		"warnings":        `{"status":"success","warnings":["partial"],"data":{"resultType":"matrix","result":[]}}`,
 		"multiple":        `{"status":"success","data":{"resultType":"matrix","result":[{"values":[]},{"values":[]}]}}`,
 		"nan":             `{"status":"success","data":{"resultType":"matrix","result":[{"values":[[1800000060,"NaN"]]}]}}`,

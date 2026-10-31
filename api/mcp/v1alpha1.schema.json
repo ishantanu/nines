@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ishantanu/nines/blob/main/api/mcp/v1alpha1.schema.json",
+  "title": "Nines RemoteMCP configuration",
+  "description": "Server-owned OAuth resource-server configuration. Runtime validation additionally enforces HTTPS, canonical paths, distinct per-user/client credentials and dependent write flags. This is not an HTTP resource manifest applied through the Nines resource API.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion",
+    "kind",
+    "publicURL",
+    "server",
+    "tenant",
+    "issuer",
+    "introspectionURL",
+    "introspectionClientID",
+    "introspectionSecretEnv",
+    "bindings"
+  ],
+  "properties": {
+    "apiVersion": {
+      "const": "nines.dev/v1alpha1"
+    },
+    "kind": {
+      "const": "RemoteMCP"
+    },
+    "publicURL": {
+      "type": "string",
+      "format": "uri"
+    },
+    "server": {
+      "type": "string",
+      "format": "uri"
+    },
+    "issuer": {
+      "type": "string",
+      "format": "uri"
+    },
+    "introspectionURL": {
+      "type": "string",
+      "format": "uri"
+    },
+    "tenant": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{0,62}$"
+    },
+    "introspectionClientID": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "introspectionSecretEnv": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "allowedOrigins": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "allowWrites": {
+      "type": "boolean",
+      "default": false
+    },
+    "allowRuleDeployment": {
+      "type": "boolean",
+      "default": false
+    },
+    "allowRuleWithdrawal": {
+      "type": "boolean",
+      "default": false
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "subject",
+          "clientID",
+          "apiTokenEnv"
+        ],
+        "properties": {
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "clientID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "apiTokenEnv": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -17,12 +17,14 @@ import (
 )
 
 type Client struct {
-	BaseURL       string
-	BearerToken   string
-	HTTP          *http.Client
-	orgID         string
-	basicUsername string
-	basicPassword string
+	// DenyPartialResponse instructs compatible backends to fail partial queries.
+	DenyPartialResponse bool
+	BaseURL             string
+	BearerToken         string
+	HTTP                *http.Client
+	orgID               string
+	basicUsername       string
+	basicPassword       string
 }
 
 func New(base, token string) (*Client, error) {
@@ -59,10 +61,21 @@ func (c *Client) SetBasicAuth(username, password string) error {
 	return nil
 }
 
+// ValidateSLO prevents queries for a different provider reaching Prometheus.
+func (c *Client) ValidateSLO(s model.SLO) error {
+	if s.QueryLanguage != "" && s.QueryLanguage != "promql" {
+		return model.Invalid("Prometheus/Mimir requires PromQL")
+	}
+	return nil
+}
+
 // Collect evaluates disjoint, user-specified interval-count expressions.
 // The caller must use queries such as sum(increase(counter[1m])) with a 60s
 // step. Raw cumulative counters and overlapping rate windows are unsupported.
 func (c *Client) Collect(ctx context.Context, s model.SLO, from, to time.Time) ([]model.Point, error) {
+	if err := c.ValidateSLO(s); err != nil {
+		return nil, err
+	}
 	if s.ProviderWindow != nil {
 		return nil, model.Invalid("use CollectWindows for overlapping provider observations")
 	}
@@ -102,6 +115,9 @@ func (c *Client) Collect(ctx context.Context, s model.SLO, from, to time.Time) (
 
 func (c *Client) query(ctx context.Context, query string, from, to time.Time, step int64) (map[int64]float64, error) {
 	form := url.Values{"query": {query}, "start": {strconv.FormatInt(from.Unix(), 10)}, "end": {strconv.FormatInt(to.Unix(), 10)}, "step": {strconv.FormatInt(step, 10)}, "timeout": {"15s"}}
+	if c.DenyPartialResponse {
+		form.Set("deny_partial_response", "1")
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/api/v1/query_range", strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, err
@@ -135,6 +151,7 @@ func (c *Client) query(ctx context.Context, query string, from, to time.Time, st
 	}
 	var envelope struct {
 		Status   string   `json:"status"`
+		Partial  bool     `json:"isPartial"`
 		Error    string   `json:"error"`
 		Warnings []string `json:"warnings"`
 		Data     struct {
@@ -150,7 +167,7 @@ func (c *Client) query(ctx context.Context, query string, from, to time.Time, st
 	if envelope.Status != "success" {
 		return nil, fmt.Errorf("prometheus query failed")
 	}
-	if len(envelope.Warnings) > 0 {
+	if envelope.Partial || len(envelope.Warnings) > 0 {
 		return nil, fmt.Errorf("prometheus returned query warnings; refusing partial data")
 	}
 	if envelope.Data.ResultType != "matrix" || len(envelope.Data.Result) > 1 {

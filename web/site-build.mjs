@@ -82,6 +82,7 @@ try {
       path.join(destination, "index.html"),
       documentationHTML(html, page, markdown),
     );
+    await writeFile(path.join(destination, "index.md"), markdown);
     search.push({ slug: page.slug, title: page.title, text: markdown });
     corpus.push(`# ${page.title}\nSource: ${page.source}\n\n${markdown}`);
   }
@@ -116,6 +117,16 @@ try {
     path.join(root, "docs/public/brand"),
     path.join(site, "docs/assets"),
     [".svg"],
+  );
+  await mkdir(path.join(site, "openapi"), { recursive: true });
+  await writeFile(
+    path.join(site, "openapi/v1alpha1.yaml"),
+    await readFile(path.join(root, "api/openapi/v1alpha1.yaml")),
+  );
+  await mkdir(path.join(site, "schemas/remote-mcp"), { recursive: true });
+  await writeFile(
+    path.join(site, "schemas/remote-mcp/v1alpha1.json"),
+    await readFile(path.join(root, "api/mcp/v1alpha1.schema.json")),
   );
   const canonical = "https://ishantanu.github.io/nines/";
   const locations = [

@@ -21,17 +21,13 @@ func frontend() http.Handler {
 	}
 	files := http.FileServerFS(root)
 	var config struct {
-		Endpoint   string `json:"endpoint"`
-		ReplayHost string `json:"replayHost"`
+		Endpoint string `json:"endpoint"`
 	}
 	if b, err := fs.ReadFile(root, "telemetry.json"); err == nil {
 		_ = json.Unmarshal(b, &config)
 	}
 	connect := "connect-src 'self'"
 	if origin := browserTelemetryOrigin(config.Endpoint); origin != "" {
-		connect += " " + origin
-	}
-	if origin := browserReplayOrigin(config.ReplayHost); origin != "" && origin != browserTelemetryOrigin(config.Endpoint) {
 		connect += " " + origin
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -75,14 +71,6 @@ func browserTelemetryOrigin(endpoint string) string {
 		return ""
 	}
 	return u.Scheme + "://" + u.Host
-}
-
-func browserReplayOrigin(endpoint string) string {
-	u, err := url.Parse(endpoint)
-	if err != nil || u.Path != "" && u.Path != "/" {
-		return ""
-	}
-	return browserTelemetryOrigin(endpoint)
 }
 
 var portalIdentifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)

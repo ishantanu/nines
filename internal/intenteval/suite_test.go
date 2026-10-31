@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/intentmodel"
 )
 
 func TestFixtureSuite(t *testing.T) {
@@ -142,5 +143,109 @@ func TestLiveCancellationAndFailureUseActualAdapter(t *testing.T) {
 	}
 	if strings.Contains(string(data), "private-provider-response") || strings.Contains(string(data), server.URL) {
 		t.Fatal("provider content leaked")
+	}
+}
+
+func TestLiveDraftCaseSelection(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		content := `{"outcome":"availability","targetText":"99.9%","windowText":"28 days","thresholdText":null,"clarifications":[]}`
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": content}}}})
+	}))
+	defer server.Close()
+	env := map[string]string{"INTENT_MODEL_PROVIDER": "custom", "INTENT_MODEL_MODEL": "fixture", "INTENT_MODEL_ENDPOINT": server.URL + "/v1/chat/completions"}
+	lookup := func(k string) string { return env[k] }
+	for _, id := range []string{"unknown", "invented-quantity"} {
+		report, err := Live(context.Background(), lookup, "fixture", id)
+		if err == nil || report.Complete || calls.Load() != 0 {
+			t.Fatal("invalid selection contacted provider", id, report, err)
+		}
+	}
+	report, err := Live(context.Background(), lookup, "fixture", "availability")
+	if err != nil || report.SelectedCase != "availability" || len(report.Results) != 1 || report.Passed != 1 || calls.Load() != 1 {
+		t.Fatal(report, err)
+	}
+	if Summary(report) == nil {
+		t.Fatal("filtered report must not count as full acceptance")
+	}
+}
+
+// Replays synthetic local-model formatting through the real adapter and service.
+// A joint goal can become a clarification; it must never become a draft.
+func TestFencedSyntheticJointGoalRemainsReviewOnly(t *testing.T) {
+	content := "```json\n" + `{"outcome":"compound","targetText":"99%","windowText":"28 days","thresholdText":"1 dollar","clarifications":["What percentage target should apply?"]}` + "\n```"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": content}}}})
+	}))
+	defer server.Close()
+	c, err := intentmodel.NewConfigured(intentmodel.Config{Provider: "custom", Endpoint: server.URL + "/v1/chat/completions", Model: "fixture", OutputMode: "json"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases, err := Cases()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range cases {
+		if item.ID == "agent-joint-conditions" {
+			result := Evaluate(context.Background(), item, "custom", c)
+			if !result.Passed || result.Status != "needs_clarification" {
+				t.Fatal(result)
+			}
+			return
+		}
+	}
+	t.Fatal("synthetic case missing")
+}
+
+// Reports must explain failed synthetic cases without recording model-produced
+// text, extracted quantities, provider errors or credentials.
+func TestDraftDiagnosticsAreBoundedAndRedacted(t *testing.T) {
+	cases, err := Cases()
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := cases[0]
+	var original v1.ModelGoal
+	if err = json.Unmarshal([]byte(c.FixtureGoal), &original); err != nil {
+		t.Fatal(err)
+	}
+	secret := "private-model-response-and-secret"
+	invented := "private-invented-quantity"
+	modelClarification := original
+	modelClarification.Clarifications = []string{secret}
+	inventedGoal := original
+	inventedGoal.TargetText = &invented
+	for _, tc := range []struct {
+		name               string
+		drafter            scriptedDrafter
+		state, evidence    string
+		modelClarification bool
+		reason             string
+	}{
+		{"unavailable", scriptedDrafter{err: errors.New(secret)}, "unavailable", "", false, ""},
+		{"clarification", scriptedDrafter{goal: modelClarification}, "returned", "appears_in_input", true, ""},
+		{"invented", scriptedDrafter{goal: inventedGoal}, "returned", "not_in_input", false, "target_invalid"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := Evaluate(context.Background(), c, "fixture", tc.drafter)
+			diagnostic := result.DraftDiagnostic
+			if result.Passed || diagnostic == nil || diagnostic.ModelState != tc.state || diagnostic.TargetEvidence != tc.evidence || diagnostic.ModelClarification != tc.modelClarification {
+				t.Fatal(result)
+			}
+			if tc.reason != "" && (len(diagnostic.ValidationReasons) != 1 || diagnostic.ValidationReasons[0] != tc.reason) {
+				t.Fatal(diagnostic)
+			}
+			raw, e := json.Marshal(result)
+			if e != nil {
+				t.Fatal(e)
+			}
+			for _, forbidden := range []string{secret, invented, c.Text, "99.9%", "28 days"} {
+				if strings.Contains(string(raw), forbidden) {
+					t.Fatal("private model or input text appeared in report")
+				}
+			}
+		})
 	}
 }

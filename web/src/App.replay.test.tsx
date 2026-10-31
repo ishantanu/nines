@@ -53,41 +53,50 @@ beforeEach(() => {
       const tenant =
         new Headers(options?.headers).get("X-Nines-Tenant") ?? "alpha";
       const value =
-        path === "/auth/session"
-          ? authState
-          : path === "/api/tenants"
-            ? allowed
-            : path === "/api/workspace"
-              ? {
-                  mode: "server",
-                  tenant: { id: tenant, name: tenant },
-                  role:
-                    allowed.find((item) => item.id === tenant)?.role ??
-                    "viewer",
-                  source: { kind: "manual", configured: false },
-                }
-              : path === "/api/slos"
-                ? [
-                    {
-                      slo: {
-                        id: "api",
-                        name: "API availability",
-                        project: "production",
-                        service: "api",
-                        target: 0.999,
-                        windowSeconds: 86400,
-                        stepSeconds: 60,
+        path === "/api/session-replays/privacy"
+          ? {
+              apiVersion: "nines.dev/v1alpha1",
+              tenant,
+              enabled: true,
+              noticeVersion: "replay-sharing-v1",
+              policyURL: "",
+              contact: "",
+            }
+          : path === "/auth/session"
+            ? authState
+            : path === "/api/tenants"
+              ? allowed
+              : path === "/api/workspace"
+                ? {
+                    mode: "server",
+                    tenant: { id: tenant, name: tenant },
+                    role:
+                      allowed.find((item) => item.id === tenant)?.role ??
+                      "viewer",
+                    source: { kind: "manual", configured: false },
+                  }
+                : path === "/api/slos"
+                  ? [
+                      {
+                        slo: {
+                          id: "api",
+                          name: "API availability",
+                          project: "production",
+                          service: "api",
+                          target: 0.999,
+                          windowSeconds: 86400,
+                          stepSeconds: 60,
+                        },
+                        status: {
+                          reliability: null,
+                          coverage: 0,
+                          alert: { phase: "inactive" },
+                        },
                       },
-                      status: {
-                        reliability: null,
-                        coverage: 0,
-                        alert: { phase: "inactive" },
-                      },
-                    },
-                  ]
-                : path === "/api/session-replays"
-                  ? { tenant, items: [] }
-                  : [];
+                    ]
+                  : path === "/api/session-replays"
+                    ? { tenant, items: [] }
+                    : [];
       return new Response(JSON.stringify(value), { status: 200 });
     }),
   );

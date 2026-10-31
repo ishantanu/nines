@@ -1,6 +1,11 @@
+import {
+  providerLabel,
+  supportsGuidedMeasurement,
+} from "@/lib/telemetry-providers";
 import { FormField } from "@/components/ui/form-layout";
 import { useEffect, useId, useRef, useState } from "react";
-import { parse, stringify } from "yaml";
+import { parse } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, canEdit, message, type RequestScope } from "@/lib/api";
 import {
   bindingKind,
@@ -196,15 +201,22 @@ export function MeasurementFields({
                   <SelectValue placeholder="Select a connection" />
                 </SelectTrigger>
                 <SelectContent>
-                  {connections.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.id}
-                      {c.kind ? ` · ${c.kind}` : ""}
-                    </SelectItem>
-                  ))}
+                  {connections
+                    .filter((c) => supportsGuidedMeasurement(c.kind))
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.id}
+                        {c.kind ? ` · ${providerLabel(c.kind)}` : ""}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </FormField>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Guided measurement uses Prometheus or Mimir counters. For other
+              providers, use custom queries in Settings or a provider-specific
+              YAML definition.
+            </p>
           </div>
         ) : null}
         {!hideType ? (

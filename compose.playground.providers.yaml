@@ -1,0 +1,13 @@
+# Optional real trial connections in an existing playground tenant.
+# Generate NINES_PROVIDER_TENANTS_FILE first; see provider-adapters.md.
+# This overlay does not ingest data or create resources automatically.
+services:
+  nines:
+    environment:
+      NINES_SOURCE_HOSTS: prometheus,mimir,api.uk1.datadoghq.com,api.eu.newrelic.com,api.eu-west-1.aws.dash0.com
+      TENANTS_FILE: /etc/nines/tenants-providers.yaml
+      DD_API_KEY: ${DD_API_KEY:?Set DD_API_KEY privately}
+      DD_APP_KEY: ${DD_APP_KEY:?Set DD_APP_KEY privately}
+      NEWRELIC_API_KEY: ${NEWRELIC_API_KEY:?Set NEWRELIC_API_KEY privately}
+    volumes:
+      - ${NINES_PROVIDER_TENANTS_FILE:?Generate a private provider tenant file}:/etc/nines/tenants-providers.yaml:ro

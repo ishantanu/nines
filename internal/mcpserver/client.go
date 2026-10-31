@@ -22,6 +22,8 @@ var identifier = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
 
 // Config is operator-controlled. Tools cannot select a server, token or tenant.
 type Config struct {
+	protocolVersions    []string
+	requestContext      context.Context
 	Server              string
 	Tenant              string
 	Token               string
@@ -43,10 +45,11 @@ type apiHTTPError struct {
 func (e *apiHTTPError) Error() string { return fmt.Sprintf("API HTTP %d: %s", e.Status, e.Message) }
 
 type apiClient struct {
-	base   string
-	tenant string
-	token  string
-	http   *http.Client
+	requestContext context.Context
+	base           string
+	tenant         string
+	token          string
+	http           *http.Client
 }
 
 func newAPI(c Config) (*apiClient, error) {
@@ -73,7 +76,7 @@ func newAPI(c Config) (*apiClient, error) {
 		return nil, errors.New("API token contains invalid characters")
 	}
 	return &apiClient{
-		base: strings.TrimRight(c.Server, "/"), tenant: c.Tenant, token: c.Token,
+		base: strings.TrimRight(c.Server, "/"), tenant: c.Tenant, token: c.Token, requestContext: c.requestContext,
 		http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
 	}, nil
 }
@@ -102,6 +105,16 @@ func (a *apiClient) request(ctx context.Context, method, path string, body any) 
 }
 
 func (a *apiClient) requestBytes(ctx context.Context, method, path string, body any, accept string) ([]byte, error) {
+	if a.requestContext != nil {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithCancel(ctx)
+		stop := context.AfterFunc(a.requestContext, cancel)
+		if a.requestContext.Err() != nil {
+			cancel()
+		}
+		defer func() { stop(); cancel() }()
+	}
+
 	var data []byte
 	contentType := "application/json"
 	var expected *int64

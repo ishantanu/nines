@@ -1,80 +1,36 @@
 # Nines
 
-> Open source SLO management connecting critical user journeys to measurable service objectives.
+> Nines is an open-source, self-hosted service level objective (SLO) platform. It connects SLOs and critical user journeys as versioned YAML, measures with Prometheus or Mimir and experimental Datadog, New Relic, VictoriaMetrics, Dash0 and Google Cloud adapters, and provides a portal, deterministic CLI, Go client, Kubernetes operator and tenant-scoped MCP tools.
 
-Status: pre-release MVP under active development, Apache-2.0, self-hosted. Expect regular features and fixes; APIs may change before a stable release. This GitHub Pages site is product documentation, not the Nines API or an MCP endpoint.
+Nines is a pre-release MVP. Model-assisted intent workflows are experimental and optional. Agents can prepare proposals; humans review measurements and approve exact changes. A saved SLO or uploaded rule is not proof of healthy telemetry or rule evaluation.
 
-## Resource contracts
+## Start here
 
-SLOs and CriticalUserJourney resources use YAML with apiVersion nines.dev/v1alpha1. Journey steps explicitly refer to SLOs. Sources include configured Prometheus and Grafana Mimir connections. Metrics, windows, budgets and burn-rate calculations are deterministic.
+- [How to define an SLO](https://ishantanu.github.io/nines/docs/slo-guide/): SLIs, good and eligible events, rolling windows, error budgets, examples and review.
+- [Documentation](https://ishantanu.github.io/nines/docs/): Product setup and guides.
+- [Source repository](https://github.com/ishantanu/nines): Code, examples, issues and license.
+- [Full documentation text](https://ishantanu.github.io/nines/llms-full.txt): Generated from the published documentation.
 
-## Agent interfaces
+## SLO use cases
 
-The Cobra CLI supports offline validation and recording-rule generation. Connected commands require an explicit server and tenant context. Use --agent for JSON output, plan before apply, and check the expected resource revision. The MCP adapter uses stdio and the same HTTP resource contracts. Model-assisted intent and review workflows are experimental. Models are optional, provider-configurable, and may run locally.
+- [SLOs and measurements](https://ishantanu.github.io/nines/docs/measurements/): Define an SLI, target and window.
+- [Latency SLOs](https://ishantanu.github.io/nines/docs/latency-slos/): Histogram buckets, threshold ratios and percentiles.
+- [Critical user journeys](https://ishantanu.github.io/nines/docs/critical-user-journeys/): Link SLOs to user outcomes.
+- [Agent, LLM and inference SLOs](https://ishantanu.github.io/nines/docs/agent-slos/): Task, rubric and serving measurements.
+- [SLI menus and templates](https://ishantanu.github.io/nines/docs/slo-templates/): Editable starting points.
 
-Intent change sets require explicit owner/editor approval of the exact digest and revision checks before apply; the agent role cannot approve or apply them. The UI shows measurement evidence, assumptions and backtest provenance. Provider streaming progress is aggregate phase/byte count read through conversation polling, not raw tokens. Transaction failures roll back atomically. Recommendations freeze rationale, parameter diffs, model/skill provenance, measurement evidence and matching backtest summaries into the reviewed digest. Approval reasons are required by the server for every client. Approval and apply require different owner/editor subjects, including for rollback; use individually assigned SSO accounts for human attribution. The portal supports rejection or approval withdrawal. The Audit log portal and nines audit list/show/export expose an independently retained tenant journal with filters, frozen proposal snapshots and NDJSON export. Conversation audit exports paginate a stable event range and verify hash links. Apply persistence failures are recorded as uncertain when possible; exact retries recover durable receipts without applying twice. Optional per-tenant S3 or S3-compatible Object Lock archival verifies bytes, version, encryption and COMPLIANCE retention before persisting receipts. It is disabled until an owner configures the destination and retention policy. For a non-AWS gateway set provider=s3-compatible and an explicit HTTPS endpoint, omit AWS expectedBucketOwner/kmsKeyID, and configure SSE-S3 on the gateway. Ceph RGW is the open-source target; make test-ceph provides disposable Ceph 20.2.4/OpenBao 2.5.0 acceptance covering trusted TLS, AES256, single-version retries and COMPLIANCE deletion/shortening denial. Production provider/HA acceptance and real AWS testing remain separate. Use nines audit status or the Audit log external archive panel; asynchronous failures remain pending/retrying. See https://ishantanu.github.io/nines/docs/deployment/audit-archive/. Existing definitions support separately reviewed configuration rollback with exact revision/digest guards and retry receipts. New-resource creation has no prior revision and shows rollback blocked; no deletion is implied. External rule delivery follows the owner-configured source policy: automatic reconciliation after saved definition changes, otherwise separate reviewed redeployment. Restoring configuration cannot undo consumed error budget. See https://ishantanu.github.io/nines/docs/intent-governance/.
+## Interfaces and deployment
 
-The evaluation guide distinguishes scripted contract coverage from real model behavior. A small local Qwen model passed 7/10 drafting cases but failed the native workflow corpus; real Anthropic validation remains unverified. These are documented limitations, not successful model acceptance. The alpha hardening issue #20 is closed with this caveat; remaining real-provider acceptance is tracked at https://github.com/ishantanu/nines/issues/34.
+- [HTTP API](https://ishantanu.github.io/nines/docs/api/): Tenant-scoped authentication and common endpoints.
+- [OpenAPI contract](https://ishantanu.github.io/nines/openapi/v1alpha1.yaml): Versioned partial contract for SLO and reviewed intent operations.
+- [CLI](https://ishantanu.github.io/nines/docs/cli/): Offline validation and rule generation; tenant-scoped connected commands.
+- [MCP](https://ishantanu.github.io/nines/docs/mcp/): Scoped agent tools and review boundaries.
+- [GitHub reviews](https://ishantanu.github.io/nines/docs/github-reviews/): Explicitly publish a reviewed snapshot for a chosen PR commit; no SLO approval or application.
+- [Headless workflows](https://ishantanu.github.io/nines/docs/headless-workflows/): Preparation, independent review, application, verification and rollback.
+- [Prometheus and Mimir](https://ishantanu.github.io/nines/docs/deployment/metrics-and-rules/): Query authentication, tenant mapping and rule delivery.
+- [Kubernetes operator](https://ishantanu.github.io/nines/docs/deployment/operator/): Reconcile SLO definitions and rules.
+- [Model evaluation](https://ishantanu.github.io/nines/docs/intent-evaluations/): Provider-neutral synthetic evaluation and documented limitations.
 
-## Guided measurement setup
+- Telemetry providers: https://ishantanu.github.io/nines/docs/provider-adapters/
 
-In the portal, Define objective defaults to Measurement. Users define metric names, exact population and success labels, or a classic histogram latency threshold inside the SLO. Compilation verifies telemetry and returns one self-contained SLO plan. The form saves only the reviewed SLO; no binding resource is required or created. Intents own the same measurement and stepSeconds. Owner/editor confirmation pins its measurement and intent digests before change-set approval. CLI telemetry verify, Go CompileMeasurement and MCP verify_slo_measurement provide read-only verification. The operator supports inline SLO and intent measurements without a binding CR. An owner can enable rules.autoDeploy so saved SLO revisions reconcile automatically; the playground enables it. Manual sources still require reviewed rule apply. Advanced query and YAML paths remain available. See https://ishantanu.github.io/nines/docs/measurements/.
-
-## Architecture diagram
-
-The #architecture section includes a downloadable nines-architecture.svg. Telemetry flows from applications through scraping or an OpenTelemetry Collector to Prometheus or Mimir. Nines plans reviewed rules and delivers them through shared Prometheus files with opt-in reload, the Mimir ruler API, or the Nines operator. Query feedback verifies recorded output separately from deployment status and SLO coverage. GitOps can use the operator independently of the Nines server and database.
-
-## Runnable examples
-
-The product site's #examples section covers the Docker Compose Prometheus playground, offline CLI validation and rule generation, tenant contexts and SSO, recorded SLI/burn metrics, the typed Go client and read-only MCP configuration. The intent-checks example runs 105 drafting, 120 deterministic template and 70 workflow fixture checks without contacting a model or a real Nines server. Fixture workflows use disposable in-memory workspaces and simulate reviewed writes. The #as-code section includes complete SLO, critical user journey, latency SLO and experimental SLO intent YAML from the source repository. Prometheus recording results are queried through /query, not its /metrics instrumentation endpoint.
-
-Alpha binary archives are prepared for Linux/macOS on amd64/arm64. Releases include the CLI, server and MCP adapter, SHA256SUMS, source commit metadata and dependency licenses. Tagged alpha releases are drafted for maintainer review before publication. See https://github.com/ishantanu/nines/releases.
-
-Integration status keeps collection, stored deployment and external evaluation separate. Rule stages expose diagnostic codes and corrective nextAction text. Inspect before retrying an ambiguous rule deployment. Exact Mimir readback can verify stored content without proving evaluation or notification delivery. Alertmanager owns receivers, routing, grouping, inhibition and silences.
-
-## Community credits
-
-Nines takes inspiration from Sloth (https://github.com/slok/sloth) and Pyrra (https://github.com/pyrra-dev/pyrra) for SLOs as code, Prometheus rules, and approachable SLO workflows.
-
-## Documentation
-
-- [Source and setup](https://github.com/ishantanu/nines)
-- [Deployment guides](https://ishantanu.github.io/nines/docs/deployment/)
-- [Architecture](https://ishantanu.github.io/nines/docs/architecture/)
-- [CLI and deterministic skills](https://ishantanu.github.io/nines/docs/cli/)
-- [Configuration and tenant boundaries](https://ishantanu.github.io/nines/docs/configuration/)
-- [Operational limits](https://ishantanu.github.io/nines/docs/operations/)
-- [Intent evaluation commands, provider configuration and measured limitations](https://ishantanu.github.io/nines/docs/intent-evaluations/)
-- [Session replay and portable HTML export](https://ishantanu.github.io/nines/docs/session-replay/)
-- [Experimental features](https://ishantanu.github.io/nines/docs/experimental/)
-- [Release checklist](https://ishantanu.github.io/nines/docs/release/)
-
-Rule output evidence: nines integration SLO_ID --agent exposes ruleOutput separately from deployment/evaluation. A fresh nines:rule_definition:info marker must match tenant, source, SLO, definition digest, revision and optional resource UID through query credentials. Missing output may mean an older rule group, ingestion delay or query/ruler routing mismatch; it does not prove a particular cause. Adding markers requires deployment of the new rules through the configured automatic or manual policy. make test-mimir verifies dataset visibility and independent policy pending/recovery; make test-operator verifies upstream selection, Nines CRD/RBAC reconciliation, generation-scoped status, garbage collection, lease failover, Mimir cleanup and the packaged runtime in a private agentless API; workload pod scheduling and scale remain outside the fixture.
-
-Kubernetes operator is a supported alpha deployment mode and ships as nines-operator in release archives. It requires no Nines API server, PostgreSQL or model. Kubernetes RBAC, namespace/tenant/project bindings and GitOps desired state control it; standalone GitOps CRDs are not imported into the portal. The server can publish owner-reviewed portal SLOs into a configured namespace using rules.mode=operator, a stable publisher identity and a dedicated service account. Provider kind/org, tenant, ownership, portal revision and Kubernetes UID are checked. rules withdraw preserves the portal definition and releases the persistent deployment-route pin only after owned cleanup. Use deploy/operator manifests and the operator deployment guide for installation, independent status evidence, provider Secret mounts, standby replicas, upgrades and rollback.
-
-Rule activation: generation is offline; owner-reviewed apply writes files or stores a Mimir group. Prometheus connections can opt into rules.reload=true against their trusted query origin with lifecycle enabled and a shared rule_files mount. Apply returns separate activation and evaluation evidence; HTTP 200 can mean file written with reload failed. Inspect these fields and integration ruleOutput before claiming success. Mimir activates by ruler polling; Kubernetes uses the first-class Nines operator. Unknown SLO health still requires measurement collection and sufficient coverage.
-
-## Automatic rule deployment
-
-rules.autoDeploy: true enables owner-authorized reconciliation of existing and future saved SLOs. Prometheus requires a shared writable/readable rule directory, matching rule_files, rules.reload: true and lifecycle enablement. Mimir uploads owned groups to its pinned ruler organization/namespace. Operator mode can automatically publish owned Kubernetes SLOs. A five-second startup/periodic scan, persisted exponential retry state and minute drift checks drive delivery; run one collecting server. Integration evidence separates automation, persisted configuration, activation, runtime evaluation, recorded output and attainment. Owners can pause/resume an SLO through UI, revision-fenced CLI rules pause/resume, API or Go SetRuleAutomation. Pause retains loaded rules and persists with PostgreSQL across edits/restarts. Operator withdrawal pauses before cleanup. MCP adds no automation mutation tool. Agent roles still cannot confirm or approve/apply intent changes. See https://ishantanu.github.io/nines/docs/deployment/automatic-rules/.
-
-Website-hosted documentation: https://ishantanu.github.io/nines/docs/ includes hierarchical guides, latency bucket/ratio semantics, critical user journeys, intents, CLI, MCP, identity and deployment. Full guide text is available at https://ishantanu.github.io/nines/llms-full.txt. Source-backed YAML examples are downloadable from the same site.
-
-Session replay acceptance: capture has explicit consent, sensitive-page pauses and discard on tenant/session changes. Stored events are verified against their digest; invalid or missing players fail visibly. Automated DOM/API/PostgreSQL checks do not establish Chrome/Firefox/Safari or direct offline HTML playback. The maintainer accepted experimental-alpha replay on 2026-10-24 and deferred the additional desktop-browser matrix. Issue 21 may close on implementation merge with Chrome/Firefox/Safari compatibility explicitly unverified; see https://ishantanu.github.io/nines/docs/session-replay/#issue-21-alpha-acceptance.
-
-Session replay selective-v2 keeps explicitly annotated product-owned navigation, controls and known UI states readable using a finite shared browser/server catalog. Dynamic names, queries, metric values and entered text remain masked; private screens pause capture. Legacy masked-v1 recordings retain blanket masking. New readability requires recapture.
-
-SLI menus and templates: https://ishantanu.github.io/nines/docs/slo-templates/
-Agent, LLM and inference SLOs: https://ishantanu.github.io/nines/docs/agent-slos/
-The 15 shipped templates cover six categories. All drafts start experimental with unverified illustrative instrumentation and targets. CLI, tenant API, Go SDK, portal and read-only MCP share the catalog. Rendering is deterministic and does not authorize writes. Evaluation pass-rate counters must declare the rubric, sampling and missing-verdict policy. The durable preparation worker can discover and render tenant templates with pinned digests, preserve typed goal commitments and pause for human measurement confirmation. Recipe provenance is audited and frozen into review evidence. make selection-eval runs 45 scripted template-selection contracts. --suite template-selection --live explicitly evaluates nine synthetic scenarios against a configured model, scoring model decisions separately from server guardrails. A blocked unsafe suggestion remains a model failure. Full live acceptance, filtered probes and fixture-only results are distinguished. The 25 October local Ollama 0.40.11 / Qwen3 0.6B run failed all nine cases while passing all 27 server guardrail checks; this configuration is unsuitable. The catalog attack was not exercised because the model did not reach discovery. Model suitability is experimental and must be evaluated for the exact serving configuration.
-
-Declarative SLO extensions: https://ishantanu.github.io/nines/docs/slo-extensions/
-Teams can distribute versioned YAML bundles independently. Typed recipe inputs, policy presets, evaluation contracts and positive/rejection tests use nines.dev/v1alpha1. The CLI installs local files, public HTTPS artifacts or Git bundles using a trusted expected SHA-256. Git sources require a full commit ID and bundle path; local clones work offline, remote Git uses public HTTPS without inherited credentials; runtime catalogs use pinned local files only. Server catalogs can be tenant-private. Rendering requires the selected extension template digest and creates a self-contained SLO. Extension text grants no tool authority. OCI resolution, publisher signature verification, executable extensions and new provider adapters are not implemented.
-
-AI workload playground: https://ishantanu.github.io/nines/docs/deployment/ai-playground/
-Add compose.playground.ai.yaml and --profile ai to the normal playground, after the Mimir override when enabled. A Go fixture emits synthetic task, tool, budget, evaluation and inference metrics. Nine shared templates plus a separate evaluation-completion SLO remain experimental with paging suppressed. ai-setup preserves existing resources; ai-verify checks automatic rules, current output, all ten SLI ratios, degradation/recovery and journey links. These are synthetic measurement tests, not model-quality acceptance.
-
-System One advice with Jev: https://ishantanu.github.io/nines/docs/system-one/
-
-Platform administration: https://ishantanu.github.io/nines/docs/platform-administration/
+- [Remote MCP with OAuth](https://ishantanu.github.io/nines/docs/remote-mcp/): stateless Streamable HTTP, per-client/user scope bindings, setup and verified limitations.

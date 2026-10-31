@@ -127,6 +127,9 @@ func (s *Service) qualityFromRecord(r model.Record, x model.Snapshot, now time.T
 	if !historical && r.Collection.SLORevision == model.ConfigRevision(c) && r.Collection.State == "failed" {
 		add("collection", "warning", "The most recent collection failed; retained samples do not prove current source availability.")
 	}
+	if source, ok := s.CollectorFor(c).(interface{ MeasurementLimitations() []string }); ok {
+		q.Limitations = append(q.Limitations, source.MeasurementLimitations()...)
+	}
 	return q
 }
 

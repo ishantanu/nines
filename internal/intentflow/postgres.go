@@ -42,6 +42,9 @@ func NewPostgres(ctx context.Context, dsn string) (Repository, error) {
 		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_audit_archives(tenant text NOT NULL,target text NOT NULL,record_id uuid NOT NULL,token text NOT NULL,lease_until timestamptz NOT NULL,next_attempt timestamptz NOT NULL,retain_until timestamptz NOT NULL,attempts integer NOT NULL,last_error text NOT NULL DEFAULT '',receipt jsonb,PRIMARY KEY(tenant,target,record_id));CREATE INDEX IF NOT EXISTS intent_audit_archive_queue ON intent_audit_archives(tenant,target,next_attempt,lease_until) WHERE receipt IS NULL`)
 	}
 	if e == nil {
+		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_webhook_deliveries(tenant text NOT NULL,target text NOT NULL,record_id uuid NOT NULL,token text NOT NULL,lease_until timestamptz NOT NULL,next_attempt timestamptz NOT NULL,attempts integer NOT NULL,last_error text NOT NULL DEFAULT '',delivered boolean NOT NULL DEFAULT false,PRIMARY KEY(tenant,target,record_id));CREATE INDEX IF NOT EXISTS intent_webhook_queue ON intent_webhook_deliveries(tenant,target,next_attempt,lease_until) WHERE NOT delivered`)
+	}
+	if e == nil {
 		e = tx.Commit(ctx)
 	}
 	if e != nil {

@@ -1,0 +1,77 @@
+# Opt-in example. Install as a workflow only after configuring its environment,
+# protected self-hosted runner, repository access and the candidate Nines CLI.
+name: Nines SLO review
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [plan, publish]
+        default: plan
+      conversation:
+        type: string
+        required: true
+      pull_request:
+        type: string
+        required: true
+      head:
+        type: string
+        required: true
+      expected_version:
+        type: string
+        default: '0'
+      expected_digest:
+        type: string
+      expected_report_digest:
+        type: string
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: nines-review-${{ github.repository }}-${{ inputs.pull_request }}
+  cancel-in-progress: false
+jobs:
+  review:
+    runs-on: [self-hosted, nines-review]
+    environment: nines-review
+    timeout-minutes: 5
+    env:
+      NINES_URL: ${{ vars.NINES_URL }}
+      NINES_TENANT: ${{ vars.NINES_TENANT }}
+      NINES_API_KEY: ${{ secrets.NINES_REVIEW_API_KEY }}
+      NINES_REVIEW_CONVERSATION: ${{ inputs.conversation }}
+      NINES_REVIEW_PR: ${{ inputs.pull_request }}
+      NINES_REVIEW_HEAD: ${{ inputs.head }}
+    steps:
+      - name: Prepare the current report
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          nines intent conversations github-plan "$NINES_REVIEW_CONVERSATION" \
+            --server "$NINES_URL" --tenant "$NINES_TENANT" \
+            --repository "$GITHUB_REPOSITORY" --pull-request "$NINES_REVIEW_PR" \
+            --head "$NINES_REVIEW_HEAD" --agent > "$RUNNER_TEMP/nines-github-review-plan.json"
+          jq -r '.markdown' "$RUNNER_TEMP/nines-github-review-plan.json" >> "$GITHUB_STEP_SUMMARY"
+          jq '{version, changeSetDigest, reportDigest}' "$RUNNER_TEMP/nines-github-review-plan.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish the explicitly reviewed snapshot
+        if: inputs.mode == 'publish'
+        shell: bash
+        env:
+          NINES_GITHUB_TOKEN: ${{ github.token }}
+          NINES_REVIEW_VERSION: ${{ inputs.expected_version }}
+          NINES_REVIEW_DIGEST: ${{ inputs.expected_digest }}
+          NINES_REVIEW_REPORT_DIGEST: ${{ inputs.expected_report_digest }}
+        run: |
+          set -euo pipefail
+          nines intent conversations github-publish "$NINES_REVIEW_CONVERSATION" \
+            --server "$NINES_URL" --tenant "$NINES_TENANT" \
+            --repository "$GITHUB_REPOSITORY" --pull-request "$NINES_REVIEW_PR" \
+            --head "$NINES_REVIEW_HEAD" --expected-version "$NINES_REVIEW_VERSION" \
+            --expected-digest "$NINES_REVIEW_DIGEST" \
+            --expected-report-digest "$NINES_REVIEW_REPORT_DIGEST" \
+            --confirm-sharing --agent
+      - name: Remove the private temporary plan
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/nines-github-review-plan.json"

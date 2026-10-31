@@ -54,6 +54,7 @@ func conversationCommand(action string, o *options) *cobra.Command {
 	file := f.StringP("file", "f", "", "operational YAML request file")
 	namespace := f.String("namespace", "", "explicit Kubernetes export namespace")
 	digest := f.String("digest", "", "exact reviewed change-set digest")
+	markdown := f.Bool("markdown", false, "emit a portable Markdown review artifact")
 	cursor := f.String("cursor", "", "metadata page cursor")
 	after := f.Int64("after", 0, "Continue conversation audit after this sequence")
 	through := f.Int64("through", 0, "Freeze audit export at this sequence (zero: current)")
@@ -76,7 +77,7 @@ func conversationCommand(action string, o *options) *cobra.Command {
 		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 		defer cancel()
 		var result any
-		if action != "list" && action != "show" && action != "verify" && action != "kubernetes" && action != "rollback-kubernetes" && action != "audit" && *file == "" {
+		if action != "list" && action != "show" && action != "status" && action != "report" && action != "verify" && action != "kubernetes" && action != "rollback-kubernetes" && action != "audit" && *file == "" {
 			return fmt.Errorf("provide -f with an explicit operational YAML request")
 		}
 		switch action {
@@ -131,6 +132,28 @@ func conversationCommand(action string, o *options) *cobra.Command {
 					result, e = c.ApplyIntentChangeSet(ctx, id, in)
 				}
 			}
+		case "report":
+			artifact, err := c.IntentReviewArtifact(ctx, id)
+			if err != nil {
+				return err
+			}
+			if *markdown {
+				data, err := json.MarshalIndent(artifact, "", "  ")
+				if err != nil {
+					return err
+				}
+				// JSON is escaped, but may contain Markdown fences from user data.
+				// A fence longer than any backtick run keeps all content inert.
+				fence := "```"
+				for bytes.Contains(data, []byte(fence)) {
+					fence += "`"
+				}
+				_, err = fmt.Fprintf(out, "# Nines SLO change review\n\nThis artifact may contain sensitive information. Verify the current version and digest before acting.\n\n%sjson\n%s\n%s\n", fence, data, fence)
+				return err
+			}
+			result = artifact
+		case "status":
+			result, e = c.IntentWorkflowStatus(ctx, id)
 		case "verify":
 			result, e = c.VerifyIntentChangeSet(ctx, id)
 

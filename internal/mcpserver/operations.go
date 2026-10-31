@@ -37,6 +37,8 @@ type deployRulesInput struct {
 var ruleDigest = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
 func addOperations(s *mcp.Server, a *apiClient, c Config) {
+	addNativeSLOOperations(s, a)
+	register(s, a, "get_slo_integration", "Read independent saved-definition, collection, publication, evaluator and recorded-output evidence for an SLO. Stored native definitions and observed attainment do not prove alert delivery. This never deploys or resumes rules.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/slos/", "/integration"))
 	register(s, a, "list_connections", "Read server-configured metric connections and rule destinations. Tools cannot override credentials, Mimir tenant or endpoints.", true, func(ctx context.Context, _ emptyInput) (any, error) {
 		return a.request(ctx, http.MethodGet, "/api/connections", nil)
 	})
@@ -50,7 +52,7 @@ func addOperations(s *mcp.Server, a *apiClient, c Config) {
 		}
 		return a.request(ctx, http.MethodGet, path, nil)
 	})
-	register(s, a, "plan_slo_rules", "Preview generated recording/alert rules, SLO revision, exact configured dataset/namespace and deployment digest. Does not deploy or contact the ruler.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/slos/", "/rules"))
+	register(s, a, "plan_slo_rules", "Preview generated recording/alert rules, SLO revision, exact configured dataset/namespace and deployment digest. Does not deploy; native publication plans may read provider metadata and existing definitions.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/slos/", "/rules"))
 	register(s, a, "export_slo", "Export the current SLO definition as canonical YAML. Previous definitions and retained measurement evidence are available through the SLO revision APIs.", true, func(ctx context.Context, in idInput) (any, error) {
 		if err := validID(in.ID); err != nil {
 			return nil, err

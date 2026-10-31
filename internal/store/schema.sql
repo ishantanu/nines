@@ -91,3 +91,11 @@ CREATE TABLE IF NOT EXISTS slo_tombstones (
  slo_id text PRIMARY KEY,
  document jsonb NOT NULL
 );
+
+-- Visual judgments retain hashes, consent and review only, never image pixels.
+CREATE TABLE IF NOT EXISTS visual_evaluations (
+ id text PRIMARY KEY, journey_id text NOT NULL, expires_at timestamptz NOT NULL,
+ created_at timestamptz NOT NULL, document jsonb NOT NULL
+);
+CREATE INDEX IF NOT EXISTS visual_evaluations_journey ON visual_evaluations(journey_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS visual_evaluations_expiry ON visual_evaluations(expires_at);

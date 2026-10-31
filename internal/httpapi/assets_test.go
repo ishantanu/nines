@@ -1,6 +1,8 @@
 package httpapi
 
 import (
+	"encoding/xml"
+	"io/fs"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -22,14 +24,6 @@ func TestBrowserTelemetryCSPOrigin(t *testing.T) {
 		t.Fatal(csp)
 	}
 }
-func TestReplayOriginPreservesStrictScriptPolicy(t *testing.T) {
-	for _, tt := range []struct{ value, want string }{{"https://replay.example/", "https://replay.example"}, {"http://127.0.0.1:9900", "http://127.0.0.1:9900"}, {"http://replay.example", ""}, {"https://replay.example/path", ""}, {"https://user:secret@replay.example", ""}, {"https://replay.example?url=secret", ""}, {"https://replay.example;script-src *", ""}} {
-		if got := browserReplayOrigin(tt.value); got != tt.want {
-			t.Fatal(tt.value, got)
-		}
-	}
-}
-
 func TestPortalDeepLinksAndAssetMisses(t *testing.T) {
 	handler := frontend()
 	for _, path := range []string{"/", "/login", "/login/?returnTo=%2Ftenants%2Falpha%2Fslos", "/tenants/alpha/home", "/tenants/alpha/slos/api-latency", "/tenants/alpha/critical-user-journeys/checkout", "/tenants/alpha/reviews/incident-1", "/tenants/alpha/intents/chat-1", "/tenants/alpha/replays/session-1", "/tenants/alpha/data-sources/", "/tenants/alpha/telemetry-connections", "/tenants/alpha/telemetry-connections/", "/tenants/alpha/access-control", "/tenants/alpha/clients"} {
@@ -62,5 +56,30 @@ func TestPortalDeepLinksAndAssetMisses(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest("POST", "/login", nil))
 	if response.Code != 405 {
 		t.Fatalf("POST login: %d", response.Code)
+	}
+}
+
+func TestProviderSVGAssetsServeAsImages(t *testing.T) {
+	for _, provider := range []string{"prometheus", "mimir", "datadog", "newrelic", "victoriametrics", "dash0", "googlecloud"} {
+		t.Run(provider, func(t *testing.T) {
+			paths, err := fs.Glob(webFiles, "web/assets/"+provider+"-*.svg")
+			if err != nil || len(paths) != 1 {
+				t.Fatalf("expected one bundled %s SVG: %v", provider, err)
+			}
+			response := httptest.NewRecorder()
+			frontend().ServeHTTP(response, httptest.NewRequest("GET", strings.TrimPrefix(paths[0], "web"), nil))
+			if response.Code != 200 || !strings.HasPrefix(response.Header().Get("Content-Type"), "image/svg+xml") {
+				t.Fatal("provider asset was not served as SVG", response.Code)
+			}
+			var svg struct {
+				XMLName xml.Name `xml:"svg"`
+				Paths   []struct {
+					Data string `xml:"d,attr"`
+				} `xml:"path"`
+			}
+			if err = xml.Unmarshal(response.Body.Bytes(), &svg); err != nil || svg.XMLName.Space != "http://www.w3.org/2000/svg" || len(svg.Paths) == 0 || svg.Paths[0].Data == "" {
+				t.Fatal("provider SVG has no usable artwork", err)
+			}
+		})
 	}
 }

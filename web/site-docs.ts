@@ -9,6 +9,40 @@ export function siteDocs(): Plugin {
     configureServer(server) {
       server.middlewares.use(async (request, response, next) => {
         const pathname = (request.url ?? "").split("?")[0];
+        if (pathname === "/schemas/remote-mcp/v1alpha1.json") {
+          try {
+            response.setHeader(
+              "Content-Type",
+              "application/schema+json; charset=utf-8",
+            );
+            response.setHeader("X-Content-Type-Options", "nosniff");
+            response.end(
+              await readFile(
+                new URL("../api/mcp/v1alpha1.schema.json", import.meta.url),
+              ),
+            );
+          } catch (error) {
+            next(error);
+          }
+          return;
+        }
+        if (pathname === "/openapi/v1alpha1.yaml") {
+          try {
+            response.setHeader(
+              "Content-Type",
+              "application/yaml; charset=utf-8",
+            );
+            response.setHeader("X-Content-Type-Options", "nosniff");
+            response.end(
+              await readFile(
+                new URL("../api/openapi/v1alpha1.yaml", import.meta.url),
+              ),
+            );
+          } catch (error) {
+            next(error);
+          }
+          return;
+        }
         if (
           pathname.startsWith("/examples/") ||
           pathname.startsWith("/docs/assets/")
@@ -71,6 +105,27 @@ export function siteDocs(): Plugin {
             next(error);
           }
           return;
+        }
+        if (pathname.endsWith("/index.md")) {
+          const page = pageForPath(pathname.slice(0, -"index.md".length));
+          if (page) {
+            try {
+              const renderer = await server.ssrLoadModule("/render.tsx");
+              const markdown = await renderer.loadDocumentationSource(
+                fileURLToPath(new URL("..", import.meta.url)),
+                page,
+              );
+              response.setHeader(
+                "Content-Type",
+                "text/markdown; charset=utf-8",
+              );
+              response.setHeader("X-Content-Type-Options", "nosniff");
+              response.end(markdown);
+            } catch (error) {
+              next(error);
+            }
+            return;
+          }
         }
         const page = pageForPath(pathname);
         if (!page) return next();

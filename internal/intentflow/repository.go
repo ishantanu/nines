@@ -82,10 +82,11 @@ func claim(r *record, token string, now time.Time) error {
 func touch(r *record, now time.Time) { r.Session.Version++; r.Session.UpdatedAt = now }
 
 type memory struct {
-	mu       sync.Mutex
-	values   map[string]record
-	journal  []v1.AuditRecord
-	archives map[string]archiveState
+	mu            sync.Mutex
+	values        map[string]record
+	journal       []v1.AuditRecord
+	archives      map[string]archiveState
+	notifications map[string]workflowEventState
 }
 
 func NewMemory() Repository { return &memory{values: map[string]record{}} }

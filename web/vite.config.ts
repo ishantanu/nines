@@ -12,11 +12,7 @@ export default defineConfig(({ mode, command }) => {
     define:
       command === "build"
         ? Object.fromEntries(
-            [
-              "VITE_POSTHOG_PROJECT_TOKEN",
-              "VITE_POSTHOG_HOST",
-              "VITE_OTEL_EXPORTER_OTLP_ENDPOINT",
-            ].map((key) => [
+            ["VITE_OTEL_EXPORTER_OTLP_ENDPOINT"].map((key) => [
               `import.meta.env.${key}`,
               JSON.stringify(env[key] ?? ""),
             ]),
@@ -94,9 +90,6 @@ export default defineConfig(({ mode, command }) => {
             fileName: "telemetry.json",
             source: JSON.stringify({
               endpoint: env.VITE_OTEL_EXPORTER_OTLP_ENDPOINT ?? "",
-              replayHost: env.VITE_POSTHOG_PROJECT_TOKEN?.trim()
-                ? (env.VITE_POSTHOG_HOST?.trim() ?? "")
-                : "",
             }),
           });
         },

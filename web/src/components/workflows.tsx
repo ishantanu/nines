@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { parse, stringify } from "yaml";
+import { parse } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { BookOpen, Bot, FileCheck2, Plus, RefreshCw } from "lucide-react";
 import {
   api,

@@ -1,3 +1,8 @@
+import { MeasurementLabels } from "./measurement-labels";
+import {
+  providerLabel,
+  supportsMetricDiscovery,
+} from "@/lib/telemetry-providers";
 import { ReplayLabel } from "@/components/replay-label";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -99,7 +104,7 @@ export function SourceMeasurements({
         setNotice(
           result.collected > 0
             ? `Read ${result.collected} measurements from ${source}. SLI values and charts are refreshing.`
-            : `The source responded but the saved measurement queries returned no matching samples. Browse its metrics and review the metric name, labels and scrape interval. No SLI value is available.`,
+            : `The source responded but the saved measurement queries returned no matching samples. Check the query filters, time range and whether fresh telemetry is arriving. No SLI value is available for this read.`,
         );
         onCollected();
       } else if (kind === "metrics") {
@@ -153,11 +158,13 @@ export function SourceMeasurements({
             <p className="text-sm">
               <ReplayLabel>Source</ReplayLabel>{" "}
               <span className="font-medium">{source}</span>
-              {selected ? ` · ${selected.kind}` : ""}
+              {selected ? ` · ${providerLabel(selected.kind)}` : ""}
             </p>
             <p className="text-xs text-muted-foreground">
               Reads use this SLO’s saved queries and the server-configured
-              source credentials. Automatic collection runs every 15 seconds.
+              source credentials. Collection follows this connection’s
+              configured schedule; manual connections collect only when
+              requested.
             </p>
           </div>
           <Button
@@ -175,21 +182,19 @@ export function SourceMeasurements({
         collection.state === "succeeded" &&
         collection.points === 0 ? (
           <p role="status" className="text-sm">
-            The latest source read returned no matching samples. Check whether
-            the saved metric names and labels exist in this source using the
-            metric browser below.
+            The latest source read returned no matching samples. Review the
+            saved queries, connection scope and telemetry time range.
           </p>
         ) : null}
         {collection?.state === "failed" ? (
           <p role="status" className="text-sm text-destructive">
-            The latest source read failed. Check the telemetry connection
-            connection, query permissions and saved measurement.
+            The latest source read failed. Check the telemetry connection, query
+            permissions and saved measurement.
           </p>
         ) : null}
         {!configured ? (
           <p className="text-sm text-muted-foreground">
-            Configure a Prometheus or Mimir telemetry connection for this SLO to
-            read metrics.
+            Configure a telemetry connection for this SLO to read metrics.
           </p>
         ) : !queries ? (
           <p className="text-sm text-muted-foreground">
@@ -199,8 +204,8 @@ export function SourceMeasurements({
         ) : null}
         {!canEdit(scope) ? (
           <p className="text-xs text-muted-foreground">
-            Editors and owners can collect samples. You can browse source
-            metrics with read access.
+            Editors and owners can collect samples. Viewers can inspect saved
+            queries and browse metrics where supported.
           </p>
         ) : null}
         {error ? (
@@ -248,91 +253,120 @@ export function SourceMeasurements({
             </div>
           </dl>
         </details>
-        <details>
-          <summary className="cursor-pointer text-sm font-medium">
-            <ReplayLabel>Browse metrics in this source</ReplayLabel>
-          </summary>
-          <div className="mt-3 space-y-3">
-            <Label htmlFor="source-metric-prefix">
-              Metric prefix (optional)
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="source-metric-prefix"
-                maxLength={100}
-                placeholder="Filter metric names"
-                value={prefix}
-                onChange={(e) => setPrefix(e.target.value)}
-              />
-              <Button
-                variant="outline"
-                disabled={
-                  busy ||
-                  !configured ||
-                  (prefix !== "" && !/^[a-zA-Z_:][a-zA-Z0-9_:]*$/.test(prefix))
-                }
-                onClick={() => run("metrics")}
-              >
-                Browse metrics
-              </Button>
-            </div>
-            {metrics ? (
-              <div>
-                <p className="mb-2 text-xs text-muted-foreground">
-                  {metrics.names.length} metric{" "}
-                  {metrics.names.length === 1 ? "name" : "names"}
-                  {metrics.truncated
-                    ? " · More available; narrow the prefix"
-                    : ""}
-                  . Select one to inspect its observed labels.
-                </p>
-                {metrics.names.length ? (
-                  <div className="max-h-48 overflow-auto rounded-md border">
-                    {metrics.names.map((name) => (
-                      <button
-                        disabled={busy}
-                        key={name}
-                        className="block w-full break-all border-b px-3 py-2 text-left font-mono text-xs last:border-0 hover:bg-muted"
-                        onClick={() => run("inspect", name)}
-                      >
-                        {name}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm">
-                    No metrics match this prefix in the selected source. Try a
-                    different prefix or check its scrape/ingestion
-                    configuration.
+        {selected && supportsMetricDiscovery(selected.kind) ? (
+          <details>
+            <summary className="cursor-pointer text-sm font-medium">
+              <ReplayLabel>Browse metrics in this source</ReplayLabel>
+            </summary>
+            <div className="mt-3 space-y-3">
+              <Label htmlFor="source-metric-prefix">
+                Metric prefix (optional)
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="source-metric-prefix"
+                  maxLength={100}
+                  placeholder="Filter metric names"
+                  value={prefix}
+                  onChange={(e) => setPrefix(e.target.value)}
+                />
+                <Button
+                  variant="outline"
+                  disabled={
+                    busy ||
+                    !configured ||
+                    (prefix !== "" &&
+                      !/^[a-zA-Z_:][a-zA-Z0-9_:]*$/.test(prefix))
+                  }
+                  onClick={() => run("metrics")}
+                >
+                  Browse metrics
+                </Button>
+              </div>
+              {metrics ? (
+                <div>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    {metrics.names.length} metric{" "}
+                    {metrics.names.length === 1 ? "name" : "names"}
+                    {metrics.truncated
+                      ? " · More available; narrow the prefix"
+                      : ""}
+                    . Select one to inspect its observed labels.
                   </p>
-                )}
-              </div>
-            ) : null}
-            {discovery ? (
-              <div className="space-y-2">
-                <p className="text-xs font-medium">
-                  {discovery.metric} · {discovery.series.length} observed series
-                  {discovery.truncated ? " (truncated)" : ""}
-                </p>
-                <pre className="max-h-48 overflow-auto rounded-md border p-3 text-xs">
-                  {JSON.stringify(discovery.series.slice(0, 10), null, 2)}
-                </pre>
-                <p className="text-xs text-muted-foreground">
-                  Series presence is index evidence, not an SLI calculation.
-                  Review the measurement before saving; browsing never rewrites
-                  the SLO.
-                </p>
-                {canEdit(scope) ? (
-                  <ObjectiveCreate
-                    scope={scope}
-                    resource={slo}
-                    onCreated={onCollected}
-                  />
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </details>
+                  {metrics.names.length ? (
+                    <div className="max-h-48 overflow-auto rounded-md border">
+                      {metrics.names.map((name) => (
+                        <button
+                          disabled={busy}
+                          key={name}
+                          className="block w-full break-all border-b px-3 py-2 text-left font-mono text-xs last:border-0 hover:bg-muted"
+                          onClick={() => run("inspect", name)}
+                        >
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm">
+                      No metrics match this prefix in the selected source. Try a
+                      different prefix or check its scrape/ingestion
+                      configuration.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+              {discovery ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium">
+                    {discovery.metric} · {discovery.series.length} observed
+                    series
+                    {discovery.truncated ? " (truncated)" : ""}
+                  </p>
+                  <details className="border-y py-3 text-sm">
+                    <summary className="cursor-pointer font-medium">
+                      Inspect observed labels
+                    </summary>
+                    <ul
+                      aria-label="Observed series"
+                      className="mt-3 max-h-64 divide-y overflow-auto"
+                    >
+                      {discovery.series.slice(0, 10).map((labels, index) => (
+                        <li key={index} className="py-3 first:pt-0">
+                          <p className="mb-2 text-xs font-medium">
+                            Series {index + 1}
+                          </p>
+                          <MeasurementLabels labels={labels} />
+                        </li>
+                      ))}
+                    </ul>
+                    {discovery.series.length > 10 ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Showing 10 of {discovery.series.length} observed series.
+                      </p>
+                    ) : null}
+                  </details>
+                  <p className="text-xs text-muted-foreground">
+                    Series presence is index evidence, not an SLI calculation.
+                    Review the measurement before saving; browsing never
+                    rewrites the SLO.
+                  </p>
+                  {canEdit(scope) ? (
+                    <ObjectiveCreate
+                      scope={scope}
+                      resource={slo}
+                      onCreated={onCollected}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </details>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Metric browsing is unavailable for this connection. Review the saved
+            queries above and use Collect samples to check their results.
+          </p>
+        )}
       </CardContent>
     </Card>
   );

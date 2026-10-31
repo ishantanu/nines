@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { Plus, Settings2, FileCheck2 } from "lucide-react";
 import {
   Dialog,

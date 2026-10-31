@@ -1,5 +1,30 @@
 # Prometheus playground
 
+- Open the portal at `http://127.0.0.1:18080` or `http://localhost:18080` (or the configured playground port). Both support username/password login and authenticated actions.
+- Playground authentication explicitly enables `allowLoopbackAliases: true`. It accepts only HTTP requests whose Origin matches the request host, using `localhost` or `127.0.0.1` on the configured public port. Other hosts, ports and schemes remain rejected; CSRF tokens are still required.
+- Cookies remain host-only: signing in on one hostname does not sign you in on the other. Refresh the page after rebuilding/restarting to obtain current login state. Production authentication retains exact public-origin checks by default, and SSO callbacks continue to use the configured public URL.
+
+
+## One local command
+
+```sh
+./playground up                         # Prometheus; creates private .env if absent
+./playground up --mimir --jev           # Add Mimir and Jev (key configured privately)
+./playground up --ai --topology         # Add synthetic AI and service dependencies
+./playground verify                     # Verify the selected setup
+./playground logs                       # Follow startup/server logs
+./playground status
+./playground down                       # Preserve all volumes
+```
+
+- Requires Docker Compose v2 and Python 3 only for first-run credential generation. Setting `POSTGRES_PASSWORD` privately skips generation. Existing `.env` files are never overwritten.
+- One file, `compose.playground.yaml`, defines the stack. `mimir`, `ai` and `topology` are optional profiles. Use the launcher to coordinate profiles with source configuration; `--profile mimir` alone cannot switch tenant files or remote-write settings.
+- Selections are saved in the ignored, private `.nines-playground.conf`; no keys are stored there. Flags add to saved choices. Use `--prometheus`, `--no-jev`, `--no-ai`, `--no-topology` and `--no-providers` to turn features off.
+- For existing hosted trial SLOs, select their complete private tenant file once: `./playground up --mimir --jev --providers /private/path/tenants.yaml`. The path is remembered. Restore that file after a reboot if stored under a temporary directory. The file owns tenant/model routing; regenerate it before changing the backend or Jev configuration. Removing a still-referenced connection can prevent startup.
+- Ordinary playground startup never seeds hosted Datadog/New Relic telemetry. The separate `compose.provider-trial.yaml` fixture requires explicit trial commands.
+- The previous overlay files remain for compatibility; new local instructions use the single-file launcher. Do not mix the two workflows. Persistent deployment remains in `compose.yaml`.
+
+
 This synthetic local stack demonstrates the complete measurement and rule flow with Prometheus.
 
 - It needs Docker Compose v2 and a `POSTGRES_PASSWORD` supplied through your shell or a private `.env`.
@@ -29,8 +54,8 @@ From the repository root:
 ```sh
 # Fresh checkout only; skip if .env or POSTGRES_PASSWORD is already configured.
 python3 scripts/setup-local.py --playground
-docker compose -p nines-playground -f compose.playground.yaml up --build -d
-docker compose -p nines-playground -f compose.playground.yaml logs -f setup
+./playground up
+./playground logs
 ```
 
 - The setup service waits for Nines, creates `checkout-success` in the **Playground Prometheus** workspace and exits. Re-running it preserves existing definitions. A setup failure is visible in its exit code and logs; container startup alone does not prove the flow works.
@@ -92,7 +117,7 @@ bin/nines integration checkout-success --tenant prometheus --agent
 - This command verifies that saving the sample SLO automatically deploys its rules without calling rule apply, waits for collection/evaluation/recorded series, checks local user CRUD, session revocation, RBAC and encrypted source management, injects 10% synthetic failures, checks critical and warning alert policies in Nines and Prometheus, restores successful traffic and checks recovery. It exits nonzero on timeout or failed assertions. Allow several minutes:
 
 ```sh
-docker compose -p nines-playground -f compose.playground.yaml run --rm verify
+./playground verify
 ```
 
 The verifier restores successful traffic in a `finally` block after alert testing. If interrupted or killed, reset it explicitly. To control failures manually:
@@ -107,19 +132,15 @@ curl -fsS -X POST 'http://127.0.0.1:19092/failure?percent=0'
 
 ## Optional Mimir profile
 
-Use this configuration to test remote-write ingestion, tenant headers and Mimir ruler destinations alongside Prometheus. Both the override file and `mimir` profile are required:
+Use this configuration to test remote-write ingestion, tenant headers and Mimir ruler destinations alongside Prometheus. Use the launcher to select Mimir; it configures the Compose profile, tenant files, authentication memberships and Prometheus remote write together:
 
 ```sh
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.mimir.yaml \
-  --profile mimir up --build -d
+./playground up --mimir
 
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.mimir.yaml \
-  --profile mimir run --rm verify
+./playground verify
 ```
 
-- The override adds a **Playground Mimir** workspace and owner membership, enables Prometheus remote write to Mimir, and tells setup/verification to exercise both backends.
+- The Mimir selection adds a **Playground Mimir** workspace and owner membership, enables Prometheus remote write to Mimir, and tells setup/verification to exercise both backends.
   - Prometheus sends only source metrics; its Nines recording rules are excluded so Mimir evaluates its own group.
   - Each workspace has its own PostgreSQL schema.
   - Select **Playground Mimir** to inspect its automatically deployed rules in ruler namespace `playground`, pinned to organization `playground`.
@@ -134,15 +155,13 @@ curl -fsSG http://127.0.0.1:19009/prometheus/api/v1/query \
 bin/nines integration checkout-success --tenant mimir --agent
 ```
 
-Use the same override/profile selection for logs and shutdown. To return to Prometheus-only mode, stop the optional configuration first, then start the base configuration:
+The launcher remembers the backend and optional features for logs, verification and shutdown. To return to Prometheus-only mode, stop the optional configuration first, then start the base configuration:
 
 ```sh
 # Preserve the database, rules and both backends' history:
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.mimir.yaml \
-  --profile mimir down
+./playground down
 
-docker compose -p nines-playground -f compose.playground.yaml up --build -d
+./playground up --prometheus --no-jev --no-providers
 ```
 
 - This also applies to playgrounds started before Prometheus became the default.
@@ -168,7 +187,7 @@ For the default Prometheus-only stack:
 
 ```sh
 # Stop while keeping playground data and deployed rules:
-docker compose -p nines-playground -f compose.playground.yaml down
+./playground down
 # Delete only this configuration's synthetic database, Prometheus data and rules:
 docker compose -p nines-playground -f compose.playground.yaml down -v
 ```
@@ -199,7 +218,7 @@ docker compose -p nines-playground -f compose.playground.yaml down -v
 - On narrow screens, the navigation dropdown includes Telemetry connections and Access control.
   - Existing playground volumes preserve prior SLO definitions.
   - To try the sample policies against an existing stack, review and apply `deploy/playground/sample.slo.yaml` through the YAML editor; startup does not overwrite user definitions.
-- When updating an existing playground that used the earlier `rule-reloader` service, use the same Compose project and full file/profile selection with `up --build -d --remove-orphans`.
+- When updating an existing playground that used the earlier `rule-reloader` service, review obsolete containers before removing them. The launcher preserves existing data and does not remove orphans automatically.
   - This removes its obsolete watcher; native reviewed apply now requests reload directly.
   - Do not run two reload owners for the same directory.
 
@@ -212,24 +231,14 @@ docker compose -p nines-playground -f compose.playground.yaml down -v
 
 ```sh
 # Prometheus plus optional Jev advice:
-docker compose -p nines-playground \
-  -f compose.playground.yaml -f compose.playground.jev.yaml \
-  up --build -d
+./playground up --jev
 
 # Prometheus and Mimir plus optional Jev advice:
-docker compose -p nines-playground \
-  -f compose.playground.yaml \
-  -f compose.playground.mimir.yaml \
-  -f compose.playground.jev.yaml \
-  --profile mimir up --build -d
+./playground up --mimir --jev
 ```
 
-- Choose one configuration and keep its complete file/profile selection for later operations.
-  - The Jev override changes `TENANTS_FILE` to the optional variant: `tenants-jev.yaml` for Prometheus or `tenants-mimir-jev.yaml` for the dual-backend profile.
-  - The latter explicitly enables Jev for both playground tenants.
-  - The normal tenant files contain no model configuration, so setting a key without selecting the override enables no calls.
-  - Provider credentials stay in the server environment.
-  - Existing database, rule and backend volumes are preserved when Nines is recreated with this override.
+- The launcher remembers these choices. `./playground up`, `verify`, `logs`, `status` and `down` reuse them without repeating flags.
+- A Jev key alone enables no calls. The selected tenant file controls advice, and each guided run still requires consent. Existing accounts and volumes are preserved.
 - Sign in with **admin / admin**, select the intended tenant, and open **SLO intents**.
   - Save a conversation with a typed goal, expand **Run options**, keep **Guided preparation**, select the separate TypeSafe/Jev consent checkbox, then choose **Prepare proposal**.
   - Expand the latest **Guided run → System One advice → Assessment receipt** to inspect the model, judgments and token usage.
@@ -239,8 +248,8 @@ docker compose -p nines-playground \
   - Daily tenant limits and run consent remain independent.
   - New policies default to enabled with a 1,000-request UTC-day limit only after a server route is explicitly configured; inspect the policy rather than assuming a previously paused tenant was reset.
   - An unavailable/paused assessment remains visible while normal preparation continues.
-- To stop including Jev, omit only its override on the next `up -d`, keeping the same Mimir override/profile when applicable.
-  - Compose recreates Nines with the ordinary tenant file and no Jev key injection.
+- To stop including Jev, use `./playground up --no-jev`. If using a custom provider file, regenerate it without Jev before restarting.
+  - The launcher selects the ordinary tenant file; a key alone does not enable Jev.
   - Recorded conversations and audit receipts remain in PostgreSQL.
   - See [System One advice](../system-one.md) for the exact outbound fields, CLI/MCP requests and provider-failure behavior.
 

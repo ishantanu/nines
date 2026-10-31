@@ -1,0 +1,12 @@
+tenants:
+  - id: production
+    name: Production
+    access:
+      - tokenEnv: NINES_PRODUCTION_TOKEN
+        role: owner
+    source:
+      kind: manual
+    connections:
+      - name: vm-prod
+        kind: victoriametrics
+        url: http://victoriametrics:8428

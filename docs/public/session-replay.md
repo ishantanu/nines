@@ -1,5 +1,7 @@
 # Session replay
 
+Recording and playback use Nines storage and rrweb. No external analytics or recording service is required. Capture starts only after explicit consent in Session replay; signing in does not start recording.
+
 Session replay captures the current Nines application tab after consent. It preserves page layout and interactions.
 
 - Approved navigation, control labels and known UI states remain readable; resource names, queries, metric values and entered text stay masked.
@@ -121,3 +123,35 @@ env -i PATH="$PATH" ./bin/nines-server -demo -addr 127.0.0.1:18221
   - The in-app-browser run and generated standalone artifact do not establish the unverified desktop rows.
   - The maintainer reported successful offline playback without a browser/version matrix.
   - Any later browser results should name the exact version, OS and tested commit; do not replace unverified entries with inferred passes.
+
+## Privacy and consent
+
+- Capture is optional and off by default. The browser asks permission before recording this tab. Declining does not restrict workspace access.
+- Only tenant owners and editors can attest recording and sharing consent and ingest a new replay. Agents can inspect authorized recordings and link existing evidence, but cannot attest consent for someone else. API consent fields are attestations, not independent proof of consent.
+- Recording consent and sharing consent are separate. A stopped capture remains local until the user explicitly agrees to share it with authorized readers in the selected tenant and selects **Save recording**. The server rejects ingestion without both attestations and the current `replay-sharing-v1` notice version.
+- **Withdraw consent and discard** stops capture and removes the unsaved recording from this tab. Starting another recording requires fresh consent. Stopping capture alone does not delete a saved recording.
+- The portal checks that the server notice version and tenant match its own displayed notice. If they differ, recording remains disabled until the portal and server are updated together.
+- The consent receipt records the policy version, authenticated actor, server acceptance time and purpose. API attestations are not independent proof of a human click or a lawful basis.
+- Approved static control labels can remain readable. Inputs, resource values and private screens are masked or excluded, but masking is a protective control, not a guarantee that all identifying data is removed. Styles, layout and interactions can still reveal context.
+- Saved recordings expire after seven days and the existing retention worker removes their payload and metadata. Owners can use **Delete recording** and confirm its exact ID to remove a stored recording and its links sooner. **Archive** only hides the session; it is not erasure.
+- Permanent deletion is revision-checked and owner-only. It removes the live stored payload and metadata. It cannot remove downloaded HTML, screenshots, backups, browser caches or external provider copies. Operators must handle those separately under their retention and deletion procedures.
+- New recording/sharing can be disabled per tenant, while existing authorized recordings remain readable until deletion or expiry:
+
+```yaml
+replayPrivacy:
+  disabled: true
+  policyURL: https://example.org/privacy
+  contact: privacy@example.org
+```
+
+- `policyURL` and `contact` are optional operator-supplied values displayed with the built-in factual notice. Nines supplies no invented contact or operator legal policy. Use the actual organization's notice and contact before collecting other people's data.
+- An owner can also delete through the deterministic CLI:
+
+```sh
+nines replays delete RECORDING_ID \
+  --expected-version 1 --confirm-id RECORDING_ID --context production --agent
+```
+
+- The Go client exposes `DeleteSessionReplay`. The API is `DELETE /api/session-replays/{id}` with `expectedVersion` and matching `confirmId`. Existing identity auditing records the attempt and result without the recorded DOM. Minimal access/audit records can remain under the operator’s separate audit-retention policy.
+- Recording consent does not authorize external AI processing. No replay frames are automatically extracted or sent to Jev. [Visual evidence](visual-evaluations.md) requires a separately selected image and one-assessment sharing authorization.
+- These controls support privacy-conscious operation. They are not a GDPR compliance certification or a substitute for the operator's lawful-basis assessment, notices, processing agreements, access policy and handling of data-subject requests.

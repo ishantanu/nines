@@ -29,6 +29,7 @@ type Repository interface {
 	Read(context.Context, string) (record, error)
 	List(context.Context) ([]v1.SessionReplay, error)
 	Update(context.Context, string, func(*record) error) (record, error)
+	Delete(context.Context, string, int64) error
 	Prune(context.Context) error
 	Close()
 }
@@ -122,4 +123,21 @@ func (m *memory) Update(ctx context.Context, id string, fn func(*record) error) 
 	}
 	m.values[id] = clone(r)
 	return clone(r), nil
+}
+
+func (m *memory) Delete(ctx context.Context, id string, version int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if e := ctx.Err(); e != nil {
+		return e
+	}
+	r, ok := m.values[id]
+	if !ok || !r.Meta.ExpiresAt.After(time.Now()) {
+		return ErrNotFound
+	}
+	if r.Meta.Version != version {
+		return ErrConflict
+	}
+	delete(m.values, id)
+	return nil
 }

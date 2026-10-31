@@ -9,7 +9,7 @@ func (c *Client) payload(text string) map[string]any {
 	instruction := prompt
 	if c.outputMode == "json" {
 		b, _ := json.Marshal(schema)
-		instruction += " Return one JSON object matching this JSON Schema: " + string(b) + `. Example JSON: {"outcome":"availability","targetText":null,"windowText":null,"thresholdText":null,"clarifications":["State a percentage and rolling duration."]}`
+		instruction += " Return one JSON object matching this JSON Schema: " + string(b)
 	}
 	switch c.apiStyle {
 	case "anthropic":

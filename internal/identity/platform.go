@@ -258,7 +258,10 @@ type controlledSystemOne struct {
 
 func (s *Service) ControlSystemOne(tenant string, inner systemone.Assessor) systemone.Assessor {
 	if existing, ok := inner.(*controlledSystemOne); ok && existing.service == s {
-		return inner
+		if existing.tenant == tenant {
+			return inner
+		}
+		inner = existing.inner
 	}
 	return &controlledSystemOne{s, tenant, inner}
 }
@@ -270,6 +273,13 @@ func (c *controlledSystemOne) ContainsCredential(raw []byte) bool {
 	return false
 }
 func (c *controlledSystemOne) Assess(ctx context.Context, in systemone.Input) (v1.SystemOneAssessment, error) {
+	if err := c.reserve(ctx); err != nil {
+		return v1.SystemOneAssessment{}, err
+	}
+	return c.inner.Assess(ctx, in)
+}
+
+func (c *controlledSystemOne) reserve(ctx context.Context) error {
 	err := c.service.repo.Update(ctx, "platform-ai:"+c.tenant, func(tx Tx) error {
 		p, err := policy(tx, c.tenant)
 		if err != nil {
@@ -293,11 +303,31 @@ func (c *controlledSystemOne) Assess(ctx context.Context, in systemone.Input) (v
 	})
 	if err != nil {
 		if errors.Is(err, systemone.ErrPaused) || errors.Is(err, systemone.ErrBudgetExhausted) {
-			return v1.SystemOneAssessment{}, err
+			return err
 		}
-		return v1.SystemOneAssessment{}, systemone.ErrPolicyUnavailable
+		return systemone.ErrPolicyUnavailable
 	}
-	return c.inner.Assess(ctx, in)
+	return nil
+}
+func (c *controlledSystemOne) VisualEnabled() bool {
+	v, ok := c.inner.(systemone.VisualAssessor)
+	return ok && v.VisualEnabled()
+}
+func (c *controlledSystemOne) VisualDescriptor() v1.SystemOneRoute {
+	if v, ok := c.inner.(systemone.VisualAssessor); ok {
+		return v.VisualDescriptor()
+	}
+	return v1.SystemOneRoute{}
+}
+func (c *controlledSystemOne) AssessVisual(ctx context.Context, in systemone.VisualInput) (v1.VisualAssessment, error) {
+	v, ok := c.inner.(systemone.VisualAssessor)
+	if !ok || !v.VisualEnabled() {
+		return v1.VisualAssessment{}, systemone.ErrPaused
+	}
+	if e := c.reserve(ctx); e != nil {
+		return v1.VisualAssessment{}, e
+	}
+	return v.AssessVisual(ctx, in)
 }
 
 func (s *Service) platformReasonSafe(reason string) bool {

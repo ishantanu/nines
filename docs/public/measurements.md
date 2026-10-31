@@ -49,8 +49,8 @@ spec:
   policies:
     - name: fast-burn
       severity: critical
-      shortWindowSeconds: 300
-      longWindowSeconds: 3600
+      shortWindow: 5m
+      longWindow: 1h
       burnRate: 14.4
       forSeconds: 120
       minCoverage: 1
@@ -104,15 +104,15 @@ spec:
   policies:
     - name: fast-burn
       severity: critical
-      shortWindowSeconds: 300
-      longWindowSeconds: 3600
+      shortWindow: 5m
+      longWindow: 1h
       burnRate: 14.4
       forSeconds: 120
       minCoverage: 1
     - name: sustained-burn
       severity: warning
-      shortWindowSeconds: 1800
-      longWindowSeconds: 21600
+      shortWindow: 30m
+      longWindow: 6h
       burnRate: 6
       forSeconds: 300
       minCoverage: 1
@@ -213,11 +213,19 @@ nines collect api-availability --recent --tenant production --agent
 
 ### Chart accessibility
 
-- Use the labelled **Time point** slider to inspect the same values as pointer inspection.
+- Hover or tap the chart to inspect an observation. Keyboard users can focus the chart directly; no separate time-point scrubber is required.
   - Arrow keys select adjacent observations; Home/End select the first/last, and Page Up/Down move through the range.
-  - The slider announces the UTC timestamp, measured value, incomplete-window coverage when applicable, and target. **View data** opens the equivalent table, including missing observations.
+  - The chart announces the selected timestamp, measured value, incomplete-window coverage when applicable, and target. A compact readout shows the selected time and values; raw per-sample tables are not part of the chart interface. UTC is retained consistently with the date-range controls.
   - Burn-rate windows use different stroke patterns as well as color; below-target complete-window values use triangular markers.
 - Chart labels and controls use theme-aware colors checked against [WCAG 2.2 contrast requirements](https://www.w3.org/TR/WCAG22/#contrast-minimum).
   - Panels grow with their text rather than clipping readouts.
   - Date/time fields, focus indicators and tables remain available for keyboard use.
   - Automated semantic checks and light/dark token-contrast tests cover these chart components; they do not establish conformance of every product screen or assistive-technology combination.
+
+## Burn alert window durations
+
+- Prefer `shortWindow: 5m` and `longWindow: 1h` in policies. `300s` and `1h30m` are also accepted.
+- Use positive whole-number `h`, `m` and `s` components. Day units, datetime strings, fractional components and subsecond units are not accepted for these windows.
+- Existing `shortWindowSeconds` and `longWindowSeconds` inputs remain supported. Specify exactly one representation per window; supplying both is an error.
+- YAML exports use readable duration fields. Runtime JSON responses, stored policy values and deterministic calculations retain numeric seconds. `forSeconds`, `windowSeconds` and other existing fields keep their current names and units.
+- The CLI, API, MCP resource apply and Kubernetes operator use the same parser and policy constraints. Duration syntax does not change burn-rate thresholds, alignment requirements or evaluation behavior.

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/ishantanu/nines/internal/providers"
 	"github.com/ishantanu/nines/skills"
 )
 
@@ -58,7 +59,7 @@ func commandCatalog(root *cobra.Command) any {
 		}
 	}
 	walk(root)
-	return map[string]any{"apiVersion": "nines.dev/v1alpha1", "kind": "CLICapabilities", "commands": items, "authentication": map[string]any{"environmentKeys": []string{"NINES_API_KEY", "API_TOKEN"}, "browser": "Nines authorization code with S256 PKCE; existing OIDC/LDAP identity", "tenantHeader": "X-Nines-Tenant", "nativeSAML": false}, "exitCodes": map[string]string{"0": "success", "1": "execution or validation", "2": "usage", "3": "unauthenticated", "4": "forbidden", "5": "conflict", "6": "unavailable"}}
+	return map[string]any{"apiVersion": "nines.dev/v1alpha1", "kind": "CLICapabilities", "commands": items, "telemetryProviders": providers.Default.List(), "authentication": map[string]any{"environmentKeys": []string{"NINES_API_KEY", "API_TOKEN"}, "browser": "Nines authorization code with S256 PKCE; existing OIDC/LDAP identity", "tenantHeader": "X-Nines-Tenant", "nativeSAML": false}, "integrations": map[string]any{"github": map[string]any{"credentialEnvironment": "NINES_GITHUB_TOKEN", "effect": "PR comment publication only; no Nines approval or application"}}, "exitCodes": map[string]string{"0": "success", "1": "execution or validation", "2": "usage", "3": "unauthenticated", "4": "forbidden", "5": "conflict", "6": "unavailable"}}
 }
 func skillsCommand(o *options) *cobra.Command {
 	root := &cobra.Command{Use: "skills", Short: "Read bundled provider-neutral agent guidance offline"}

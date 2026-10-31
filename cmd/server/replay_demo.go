@@ -55,7 +55,7 @@ func seedReplay(ctx context.Context, s *replay.Service) error {
 		refs = append(refs, v1.ReplayReference{Kind: v1.JourneyKind, ID: j.Manifest.Metadata.Name, Revision: j.Revision})
 	}
 	ctx = tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: s.Platform.TenantID, Role: "owner", Subject: "synthetic-demo", Kind: "demo", Name: "Synthetic demo fixture"})
-	_, err = s.Create(ctx, v1.CreateSessionReplay{ID: "synthetic-checkout-session", Title: "Checkout navigation (synthetic)", Consent: true, Policy: replay.Policy, References: refs, Events: raw})
+	_, err = s.Create(ctx, v1.CreateSessionReplay{ID: "synthetic-checkout-session", Title: "Checkout navigation (synthetic)", Consent: true, SharingConsent: true, NoticeVersion: v1.ReplayConsentNotice, Policy: replay.Policy, References: refs, Events: raw})
 	if err != nil {
 		return fmt.Errorf("seed synthetic replay: %w", err)
 	}

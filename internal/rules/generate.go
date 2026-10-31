@@ -73,6 +73,9 @@ func validateExpressions(group Group) error {
 }
 
 func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
+	if s.QueryLanguage != "" && s.QueryLanguage != "promql" {
+		return Group{}, model.Invalid("recording rule generation requires PromQL; this provider does not support rule deployment")
+	}
 	if err := s.Validate(); err != nil {
 		return Group{}, err
 	}

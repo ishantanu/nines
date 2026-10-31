@@ -1,8 +1,10 @@
+import { SLOProvider } from "./provider-identity";
+import type { Workspace } from "@/lib/api";
 import { SLORetirement } from "./slo-retirement";
 import { useChartSize } from "@/lib/use-chart-size";
 import { ReplayLabel } from "@/components/replay-label";
 import { lazy, Suspense, useEffect, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { definitionFromSLO } from "@/lib/definitions";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -53,11 +55,13 @@ const RecordingRules = lazy(() =>
 );
 export function Objectives({
   items,
+  connections,
   journeys,
   onSelect,
   onJourney,
 }: {
   items: Objective[];
+  connections?: Workspace["connections"];
   journeys: Journey[];
   onSelect: (id: string) => void;
   onJourney: (id: string) => void;
@@ -130,6 +134,9 @@ export function Objectives({
                   </button>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {o.slo.project} / {o.slo.service}
+                  </div>
+                  <div className="mt-2">
+                    <SLOProvider slo={o.slo} connections={connections} />
                   </div>
                 </TableCell>
                 <TableCell>
@@ -265,6 +272,7 @@ function SamplePlot({ points }: { points: Point[] }) {
 }
 export function ObjectiveDetail({
   objective,
+  connections,
   scope,
   journeys,
   onClose,
@@ -275,6 +283,7 @@ export function ObjectiveDetail({
   refreshKey = 0,
 }: {
   objective: Objective | undefined;
+  connections?: Workspace["connections"];
   scope: RequestScope;
   journeys: Journey[];
   onClose: () => void;
@@ -374,6 +383,9 @@ export function ObjectiveDetail({
         title={objective?.slo.name ?? "Objective"}
         description={`${objective?.slo.project} / ${objective?.slo.service} · ${objective?.slo.id}`}
       >
+        {objective ? (
+          <SLOProvider slo={objective.slo} connections={connections} />
+        ) : null}
         {objective ? <SLOAlertState status={objective.status} /> : null}
         {onReplays ? (
           <Button variant="outline" size="sm" onClick={onReplays}>
@@ -746,38 +758,39 @@ export function ObjectiveDetail({
           </div>
         </TabsContent>
         <TabsContent value="config" className="detail-panel space-y-4">
-          {objective && !objective.slo.retirement && canEdit(scope) ? (
-            <Suspense fallback={null}>
-              <ObjectiveCreate
-                scope={scope}
-                resource={objective.slo}
-                onCreated={() => {
-                  onRefresh();
-                  setRefresh((n) => n + 1);
-                }}
-              />
-            </Suspense>
-          ) : null}
-          <Button
-            size="sm"
-            variant="outline"
-            className="mb-3"
-            onClick={() => {
-              if (!objective) return;
-              const blob = new Blob(
-                [stringify(definitionFromSLO(objective.slo))],
-                { type: "application/yaml" },
-              );
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = `${objective.slo.id}.slo.yaml`;
-              link.click();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
-            }}
-          >
-            Download YAML
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {objective && !objective.slo.retirement && canEdit(scope) ? (
+              <Suspense fallback={null}>
+                <ObjectiveCreate
+                  scope={scope}
+                  resource={objective.slo}
+                  onCreated={() => {
+                    onRefresh();
+                    setRefresh((n) => n + 1);
+                  }}
+                />
+              </Suspense>
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (!objective) return;
+                const blob = new Blob(
+                  [stringify(definitionFromSLO(objective.slo))],
+                  { type: "application/yaml" },
+                );
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `${objective.slo.id}.slo.yaml`;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              }}
+            >
+              Download YAML
+            </Button>
+          </div>
           <pre className="code-block">
             {objective ? stringify(definitionFromSLO(objective.slo)) : ""}
           </pre>

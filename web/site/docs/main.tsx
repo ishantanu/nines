@@ -129,6 +129,13 @@ export function mountDocumentation(root: HTMLElement) {
     pending.set(path, request);
     return request;
   };
+  const enablePageCopy = () => {
+    const button = root.querySelector<HTMLButtonElement>(
+      "button[data-copy-page]",
+    );
+    if (button) button.hidden = false;
+  };
+  enablePageCopy();
   const saveScroll = () =>
     history.replaceState(
       { ...history.state, docsScroll: [scrollX, scrollY] },
@@ -165,6 +172,7 @@ export function mountDocumentation(root: HTMLElement) {
         .querySelector(".docs-outline")!
         .replaceWith(page.outline.cloneNode(true));
       root.dataset.doc = page.slug;
+      enablePageCopy();
       root
         .querySelector(".skip-link")
         ?.setAttribute("href", new URL("#main", url).href);
@@ -205,6 +213,36 @@ export function mountDocumentation(root: HTMLElement) {
   };
   const click = (event: MouseEvent) => {
     if (!(event.target instanceof Element)) return;
+    const pageCopy = event.target.closest<HTMLButtonElement>(
+      "button[data-copy-page]",
+    );
+    if (pageCopy) {
+      const link = pageCopy.parentElement?.querySelector<HTMLAnchorElement>(
+        "a[data-markdown-link]",
+      );
+      if (link) {
+        pageCopy.disabled = true;
+        void (async () => {
+          try {
+            const response = await fetch(link.href);
+            if (!response.ok) throw new Error("Markdown unavailable");
+            await navigator.clipboard.writeText(await response.text());
+            pageCopy.textContent = "Copied";
+          } catch {
+            pageCopy.textContent = "Open Markdown to copy";
+          } finally {
+            pageCopy.disabled = false;
+          }
+          if (disposed) return;
+          const timer = setTimeout(() => {
+            pageCopy.textContent = "Copy page";
+            timers.delete(timer);
+          }, 2200);
+          timers.add(timer);
+        })();
+      }
+      return;
+    }
     const copy = event.target.closest<HTMLButtonElement>(
       "button[data-copy-code]",
     );

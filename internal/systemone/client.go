@@ -24,9 +24,10 @@ const DefaultModel = "jev-1.14.0"
 
 // Explicit tenant opt-in is required. Merely setting a key enables no requests.
 type Config struct {
-	Provider  string `json:"provider,omitempty" yaml:"provider,omitempty"`
-	Model     string `json:"model,omitempty" yaml:"model,omitempty"`
-	APIKeyEnv string `json:"apiKeyEnv,omitempty" yaml:"apiKeyEnv,omitempty"`
+	ImagesEnabled bool   `json:"imagesEnabled,omitempty" yaml:"imagesEnabled,omitempty"`
+	Provider      string `json:"provider,omitempty" yaml:"provider,omitempty"`
+	Model         string `json:"model,omitempty" yaml:"model,omitempty"`
+	APIKeyEnv     string `json:"apiKeyEnv,omitempty" yaml:"apiKeyEnv,omitempty"`
 }
 type Input struct {
 	Description      string `json:"description"`
@@ -38,6 +39,7 @@ type Assessor interface {
 }
 type Client struct {
 	key, name string
+	images    bool
 	http      *http.Client
 }
 
@@ -77,7 +79,7 @@ func New(config *Config, lookup func(string) string) (*Client, error) {
 	if len(key) < 8 || len(key) > 4096 || strings.TrimSpace(key) != key || strings.ContainsAny(key, "\r\n") {
 		return nil, errors.New("systemOne requires a valid API key environment variable")
 	}
-	return &Client{key: key, name: name, http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{key: key, name: name, images: config.ImagesEnabled, http: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) Descriptor() v1.SystemOneRoute {
 	return v1.SystemOneRoute{Provider: "typesafe", Model: c.name, ContractDigest: model.DefinitionDigest(questions())}

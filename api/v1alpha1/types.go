@@ -51,6 +51,7 @@ func (l SLOLifecycle) Valid() bool {
 }
 
 type SLOSpec struct {
+	QueryLanguage      string                    `json:"queryLanguage,omitempty" yaml:"queryLanguage,omitempty"`
 	ErrorBudgetPolicy  *ErrorBudgetPolicy        `json:"errorBudgetPolicy,omitempty" yaml:"errorBudgetPolicy,omitempty"`
 	Quality            *MeasurementQualityPolicy `json:"quality,omitempty" yaml:"quality,omitempty"`
 	Lifecycle          SLOLifecycle              `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`

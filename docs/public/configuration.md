@@ -49,7 +49,7 @@ See the [deployment guides](deployment.md) for container, Linux, Kubernetes, ide
 - `ALERT_WEBHOOK_URL` enables at-least-once delivery of alert transitions.
   - Deduplicate the stable event ID at the receiver.
   - Configure standard `OTEL_*` variables to export server telemetry.
-  - Browser OTLP/PostHog settings are build-time `VITE_*` configuration and are empty by default.
+  - Browser OTLP settings are build-time `VITE_*` configuration and are empty by default.
   - Do not put a private server credential in browser configuration.
 - Models are optional.
   - Intent/review model calls require explicit workflow consent and trusted provider configuration.

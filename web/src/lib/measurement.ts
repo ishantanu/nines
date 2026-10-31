@@ -6,7 +6,7 @@ import {
 import { api, type RequestScope, type BurnRatePolicy } from "./api";
 import type { SLODefinition } from "./definitions";
 import { durationSeconds } from "./history";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 
 export type LabelFilter = { label: string; value: string };
 export type MeasurementDraft = {
