@@ -23,6 +23,8 @@ import {
 
 type LocalVisualEvidence = { id: string; preview: string; criterion: string };
 
+const ALLOWED_VISUAL_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
+
 function Receipt({
   receipt,
   scope,
@@ -342,12 +344,17 @@ export function VisualEvidence({
                 pending.current = "";
                 setError("");
                 if (!chosen) return;
+                const mimeType = chosen.type.toLowerCase();
+                if (!ALLOWED_VISUAL_MIME_TYPES.has(mimeType)) {
+                  setError("Please upload a PNG or JPEG image.");
+                  return;
+                }
                 try {
                   const value = await readVisualFile(chosen);
                   if (version !== selection.current || scope.signal.aborted)
                     return;
                   setImage(value);
-                  setPreview(`data:${chosen.type};base64,${value}`);
+                  setPreview(`data:${mimeType};base64,${value}`);
                 } catch (e) {
                   if (version === selection.current) setError(message(e));
                 }
