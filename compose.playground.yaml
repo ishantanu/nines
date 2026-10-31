@@ -108,9 +108,10 @@ services:
     - -u
     - /app/flow.py
     - verify
-    network_mode: service:nines
     depends_on:
       nines:
+        condition: service_started
+      prometheus:
         condition: service_started
     environment:
       NINES_TEST_PASSWORD: ${NINES_PLAYGROUND_PASSWORD:-admin}
