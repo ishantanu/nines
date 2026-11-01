@@ -55,7 +55,22 @@ export function renderDocumentation(page: DocPage, markdown: string) {
               root,
             )}
             alt={alt ?? ""}
-            loading="lazy"
+            loading={
+              typeof src === "string" && src.endsWith("nines-architecture.svg")
+                ? "eager"
+                : "lazy"
+            }
+            decoding="async"
+            width={
+              typeof src === "string" && src.endsWith("nines-architecture.svg")
+                ? 1200
+                : undefined
+            }
+            height={
+              typeof src === "string" && src.endsWith("nines-architecture.svg")
+                ? 870
+                : undefined
+            }
           />
         ),
         table: ({ children }) => (

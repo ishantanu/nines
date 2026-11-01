@@ -14,7 +14,7 @@ import intent from "../../examples/api-success.intent.yaml?raw";
 import { examples } from "./examples";
 import { documentationLink } from "./docs/navigation";
 
-const logo = "./nines.svg";
+import { inlineWordmark as logo } from "./brand";
 const repo = "https://github.com/ishantanu/nines";
 const start =
   "git clone https://github.com/ishantanu/nines.git\ncd nines\ngo run ./cmd/server -demo";

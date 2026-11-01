@@ -159,3 +159,15 @@ it("takes table-of-contents text from parsed heading nodes without stripping HTM
   expect(markup).toContain("Literal &amp;lt;img&amp;gt;");
   expect(markup).not.toContain("<script>");
 });
+
+it("renders branding without a network request and reserves the early architecture image", () => {
+  const page = docPages.find((page) => page.slug === "architecture")!;
+  const { markup } = renderDocumentation(
+    page,
+    "# Architecture\n\n![Nines architecture](brand/nines-architecture.svg)",
+  );
+  expect(markup).toContain('src="data:image/svg+xml,');
+  expect(markup).toMatch(
+    /<img[^>]*nines-architecture\.svg[^>]*loading="eager"[^>]*width="1200"[^>]*height="870"/,
+  );
+});

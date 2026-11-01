@@ -10,7 +10,8 @@
     "format": "prettier --write src vite.config.ts tsconfig.json components.json index.html",
     "format:check": "prettier --check src vite.config.ts tsconfig.json components.json index.html",
     "dev:site": "vite --config vite.site.config.ts --host 127.0.0.1",
-    "build:site": "tsc --noEmit -p tsconfig.site.json && vite build --config vite.site.config.ts && node site-build.mjs"
+    "build:site": "tsc --noEmit -p tsconfig.site.json && vite build --config vite.site.config.ts && node site-build.mjs",
+    "test:charts": "vitest run src/components/timeline.test.tsx src/components/chart-time-range.test.tsx src/lib/chart-contrast.test.ts src/lib/chart-range.test.ts src/lib/history.test.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "1.10.0",
