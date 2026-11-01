@@ -310,20 +310,28 @@ export function App() {
           </div>
           <WorkspacePreview />
         </section>
-        <div className="stack-bar">
+        <div className="stack-bar" id="providers">
           <div className="container">
             <span>
-              Telemetry providers
+              Connect your observability stack
               <br />
-              <small>Vendor adapters are experimental</small>
+              <small>Five additional adapters, currently experimental</small>
             </span>
-            <ul aria-label="Supported foundations">
-              <li>Prometheus</li>
-              <li>Grafana Mimir</li>
+            <ul aria-label="Telemetry provider integrations">
+              <li>
+                <a href="./docs/deployment/metrics-and-rules/">Prometheus</a>
+              </li>
+              <li>
+                <a href="./docs/deployment/metrics-and-rules/">Grafana Mimir</a>
+              </li>
               <li>
                 <a href="./docs/provider-adapters/">
-                  Datadog / New Relic{" "}
-                  <span className="sr-only">(experimental)</span>
+                  Datadog <span className="sr-only">(experimental)</span>
+                </a>
+              </li>
+              <li>
+                <a href="./docs/new-relic/">
+                  New Relic <span className="sr-only">(experimental)</span>
                 </a>
               </li>
               <li>
@@ -333,7 +341,8 @@ export function App() {
               </li>
               <li>
                 <a href="./docs/google-cloud/">
-                  Google Cloud <span className="sr-only">(experimental)</span>
+                  Google Cloud Monitoring{" "}
+                  <span className="sr-only">(experimental)</span>
                 </a>
               </li>
               <li>
@@ -371,7 +380,7 @@ export function App() {
               <h3>Measure the objective</h3>
               <p>
                 Compare observed SLI with a target, rolling window and error
-                budget using configured Prometheus or Mimir sources.{" "}
+                budget using your configured telemetry provider.{" "}
                 <a href="./docs/slo-guide/#read-sli-budget-and-burn-rate-charts">
                   See the performance charts.
                 </a>
@@ -395,17 +404,23 @@ export function App() {
           aria-labelledby="architecture-title"
         >
           <div className="section-heading">
-            <h2 id="architecture-title">From telemetry to reviewed rules.</h2>
+            <h2 id="architecture-title">
+              Your telemetry stack. One SLO workflow.
+            </h2>
             <p>
-              Keep metrics in Prometheus or Mimir. Nines connects objectives and
-              critical user journeys to those signals, then delivers rules to
-              your configured destination after review.
+              Connect Prometheus, Mimir, Datadog, New Relic, Dash0, Google Cloud
+              Monitoring or VictoriaMetrics. Keep telemetry with your provider;
+              define SLOs and critical user journeys in Nines. Additional vendor
+              adapters are experimental, with provider-specific query and
+              publication capabilities.
             </p>
           </div>
           <details className="architecture-details">
             <summary>
               Explore the deployment architecture{" "}
-              <span>Portal, CLI, MCP, operator and rule destinations</span>
+              <span>
+                Provider APIs, reviewed publication, CLI, MCP and operator
+              </span>
             </summary>
             <figure className="architecture-figure">
               <div
@@ -420,14 +435,15 @@ export function App() {
                   height="870"
                   loading="lazy"
                   decoding="async"
-                  alt="Applications send metrics through scraping or an OpenTelemetry Collector to Prometheus or Mimir. Portal, CLI and MCP clients use Nines for tenant-scoped SLO plans. Reviewed rules deploy through shared Prometheus files and reload, the Mimir ruler API, or the Nines Kubernetes operator. Nines queries measurements and recorded output to verify results. GitOps can also use the operator independently of the server."
+                  alt="Nines reads telemetry from Prometheus, Mimir, Datadog, New Relic, Dash0, Google Cloud Monitoring and VictoriaMetrics through provider APIs. Portal, CLI and MCP share tenant-scoped SLO review. Prometheus and Mimir receive recording and burn-rate rules; Datadog, New Relic, Dash0 and Google Cloud support reviewed native SLO publication within supported subsets. The standalone Kubernetes operator targets Prometheus and Mimir. Additional vendor adapters are experimental."
                 />
               </div>
               <figcaption>
                 <span>
-                  Saved SLOs deploy rules automatically when enabled on the data
-                  source. Stored configuration, runtime evaluation and SLO
-                  health have separate status checks.
+                  Prometheus/Mimir rules reconcile automatically when enabled.
+                  Native vendor SLO publication has a separate review and apply
+                  flow. Configuration, evaluation and attainment remain separate
+                  evidence.
                 </span>
                 <a
                   className="text-link"
@@ -441,10 +457,15 @@ export function App() {
           </details>
           <div className="architecture-notes">
             <p>
-              <strong>Reviewed delivery.</strong> The server can write a shared
-              Prometheus rule file and request reload, store a Mimir ruler
-              group, or publish an SLO resource for our Kubernetes operator to
-              reconcile. Each route requires a configured destination.
+              <strong>Provider-specific publication.</strong> Deliver recording
+              and burn-rate rules to Prometheus or Mimir. Publish reviewed
+              native SLOs to Datadog, New Relic, Dash0 or Google Cloud within
+              supported subsets. VictoriaMetrics currently supports collection
+              only. Native vendor alert creation is not included.{" "}
+              <a className="text-link" href="./docs/provider-adapters/">
+                Compare provider capabilities{" "}
+                <ArrowRight size={15} aria-hidden="true" />
+              </a>
             </p>
             <p>
               <strong>Independent operator.</strong> Apply GitOps resources
