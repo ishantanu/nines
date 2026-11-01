@@ -56,7 +56,7 @@ func New(endpoint, accountID, projectID, bearer, username, password string) (*Cl
 	}
 	c.DenyPartialResponse = true
 	c.HTTP.Transport = observability.Transport{PeerService: "victoriametrics"}
-	fingerprint := model.DefinitionDigest(struct{ Kind, URL, CredentialIdentity string }{"victoriametrics", base, model.DefinitionDigest([]string{bearer, username, password})})
+	fingerprint := model.DefinitionDigest(struct{ Kind, URL, CredentialIdentity string }{"victoriametrics", base, model.CredentialIdentity(bearer, username, password)})
 	return &Client{client: c, fingerprint: fingerprint}, nil
 }
 func (c *Client) SourceFingerprint() string    { return c.fingerprint }

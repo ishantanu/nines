@@ -166,8 +166,8 @@ func (s *Service) Append(ctx context.Context, id string, in v1.AppendIntentConve
 		if active(*r) || r.Session.Version != in.ExpectedVersion {
 			return ErrConflict
 		}
-		if len(r.Session.Messages) >= 40 {
-			return ErrLimit
+		if len(r.Session.Messages) >= maxMessages {
+			return &CapacityError{Resource: "messages", Limit: maxMessages}
 		}
 		if in.Goal != nil {
 			if e := model.ValidateIntent(*in.Goal); e != nil {
@@ -277,8 +277,14 @@ func (s *Service) Start(ctx context.Context, id string, in v1.CreateIntentFlowRu
 			return ErrConflict
 		}
 		body, _ := json.Marshal(r)
-		if len(body) > 1<<20 || len(r.Session.Runs) >= 8 || len(r.Session.Messages) >= 38 {
-			return ErrLimit
+		if len(body) > maxPreparationBytes {
+			return &CapacityError{Resource: "preparation_bytes", Limit: maxPreparationBytes}
+		}
+		if len(r.Session.Runs) >= maxRuns {
+			return &CapacityError{Resource: "preparation_runs", Limit: maxRuns}
+		}
+		if len(r.Session.Messages) >= maxMessages-2 {
+			return &CapacityError{Resource: "messages", Limit: maxMessages}
 		}
 		if r.Session.Goal == nil && s.Platform.IntentDrafter != nil && !in.ModelConsent {
 			return model.Invalid("consent is required before sending the goal to the configured drafting model")

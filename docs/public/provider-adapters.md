@@ -484,3 +484,7 @@ nines apply -f imported-availability.slo.yaml --expected-revision 0
 - `--agent` returns a JSON draft envelope including limitations. Go clients expose `NativeSLOResults`, `NativeSLOCatalog` and `NativeSLODraft`. MCP exposes `native_slo_results`, `list_native_slos` and `draft_native_slo_import`; all three are read-only. Existing plan/apply approval controls remain in force.
 
 API references: [Datadog SLO history](https://docs.datadoghq.com/api/latest/service-level-objectives/get-an-slos-history/) and [New Relic service-level results](https://docs.newrelic.com/docs/service-level-management/consume-slm/). These experimental readers have synthetic fixtures and bounded live synthetic Datadog UK / New Relic EU acceptance; other account/query profiles are not certified.
+
+### Credential identity changes
+
+Connection fingerprints use a stable Argon2id-derived credential identity, separate from fast definition/content digests. The derivation is cached when a provider connection is constructed. Credential rotation changes source identity; a fingerprint is not a password verifier. Updating from an older fingerprint format requires fresh source evidence and review of any pending route-bound plan. Local account passwords retain their separate salted password-verification storage.

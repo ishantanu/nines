@@ -50,3 +50,17 @@ An intent expresses the reliability outcome you want to measure.
   - Newly created resources have no previous definition and block this restore path.
   - Applying a restore cannot undo consumed error budget or recover missing historical telemetry.
 - See [recommendation governance](intent-governance.md) for approval withdrawal, audit export and revision-safe rollback, and [MCP and skills](mcp.md) for agent access.
+
+## Keep duration units explicit
+
+- Latency form fields accept units such as `30ms`, `300us` or `0.03s`; unitless form input is rejected.
+- Natural-language drafting preserves the exact unit in the quoted evidence. A draft cannot substitute `30s` for an entered `30ms`.
+- Versioned numeric `thresholdSeconds` fields remain seconds: `30ms` is serialized as `0.03`, not `30`. Burn windows remain whole-second windows and reject subsecond values instead of rounding them.
+
+## Continue when a conversation is full
+
+- Each conversation permits eight preparation runs and forty messages, with two message slots reserved when starting preparation. Preparation and stored records also have byte limits.
+- The portal identifies a full conversation and offers **Start new conversation with this goal**. Only the typed goal is copied; evidence, confirmations, approvals and change sets are not copied.
+- The original conversation and audit history remain available. Verify telemetry and review the new proposal again before applying it.
+- API clients receive HTTP 429 with an `intent_*_limit` code and the applicable limit. A conversation-capacity error needs a new conversation; retrying the same request does not free capacity.
+- The tenant-wide saved-conversation limit is separate. Contact an administrator when that limit is reached; history is not silently deleted.

@@ -100,6 +100,8 @@ export type IntentConversation = ConversationSummary & {
   changeSetHistory?: IntentChangeSet[];
 };
 export type FlowCapabilities = {
+  maxRuns?: number;
+  maxMessages?: number;
   systemOneEnabled?: boolean;
   systemOneRoute?: SystemOneRoute;
   tenant: string;

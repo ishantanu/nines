@@ -392,3 +392,29 @@ func TestSourceChangeDuringDiscoveryRejectsEvidence(t *testing.T) {
 		})
 	}
 }
+
+func TestLatencyGoalUnitEvidenceCannotBeReinterpreted(t *testing.T) {
+	s, _, err := testtelemetry.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fake := &draftModel{goal: v1.ModelGoal{Outcome: "latency", TargetText: ptr("99.9%"), WindowText: ptr("28 days")}}
+	s.IntentDrafter = fake
+	in := v1.DraftIntentInput{Metadata: v1.Metadata{Name: "latency-units", Project: "test"}, Service: "api", Source: "primary", Population: map[string]string{"service": "api"}, NoDataPolicy: "unknown"}
+	for text, want := range map[string]float64{"30ms": .03, "30 milliseconds": .03, "30s": 30, "300us": .0003, "300µs": .0003, "1ns": 1e-9} {
+		in.Text = "99.9% of attempts finish within " + text + " over 28 days"
+		fake.goal.ThresholdText = ptr(text)
+		out, err := s.DraftIntent(context.Background(), in)
+		if err != nil || out.Intent == nil || out.Intent.Spec.ThresholdSeconds == nil || *out.Intent.Spec.ThresholdSeconds != want {
+			t.Fatalf("%s lost unit: %+v %v", text, out, err)
+		}
+	}
+	in.Text = "99.9% of attempts finish within 30ms over 28 days"
+	for _, invented := range []string{"30s", "30"} {
+		fake.goal.ThresholdText = ptr(invented)
+		out, err := s.DraftIntent(context.Background(), in)
+		if err != nil || out.Intent != nil || out.Status != "needs_clarification" {
+			t.Fatal("model changed or omitted the explicit unit", out, err)
+		}
+	}
+}

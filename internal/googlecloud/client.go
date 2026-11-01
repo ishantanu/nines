@@ -54,7 +54,7 @@ func New(endpoint, project, service, auth, token string) (*Client, error) {
 			return nil, model.Invalid("Google Cloud access-token auth requires a bounded bearer credential")
 		}
 		source = oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
-		identity = model.DefinitionDigest(token)
+		identity = model.CredentialIdentity(token)
 	case "adc":
 		if token != "" {
 			return nil, model.Invalid("Google Cloud ADC and access-token authentication cannot be combined")
@@ -70,10 +70,7 @@ func New(endpoint, project, service, auth, token string) (*Client, error) {
 			return nil, err
 		}
 		source = credentials.TokenSource
-		identity = model.DefinitionDigest(struct {
-			Mode, Project string
-			Config        []byte
-		}{"adc", credentials.ProjectID, credentials.JSON})
+		identity = model.CredentialIdentity("adc", credentials.ProjectID, string(credentials.JSON))
 	default:
 		return nil, model.Invalid("Google Cloud requires explicit options.auth: adc or access-token")
 	}

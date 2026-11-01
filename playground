@@ -108,6 +108,23 @@ set -- docker compose -p "${NINES_PLAYGROUND_PROJECT:-nines-playground}" -f comp
 [ "$backend" = prometheus ] || set -- "$@" --profile mimir
 [ "$ai" = 0 ] || set -- "$@" --profile ai
 [ "$topology" = 0 ] || set -- "$@" --profile topology
+# Docker wait reports the actual container exit code even when a one-shot
+# service already finished; Compose wait can fail on that successful state.
+wait_setup() {
+  setup_service=$1
+  shift
+  setup_id=$("$@" ps -a -q "$setup_service") || return 1
+  if [ -z "$setup_id" ]; then
+    echo "Setup container missing: $setup_service" >&2
+    return 1
+  fi
+  setup_exit=$(docker wait "$setup_id") || return 1
+  if [ "$setup_exit" != 0 ]; then
+    "$@" logs --no-color --tail 40 "$setup_service" >&2 || true
+    echo "Setup failed: $setup_service (exit $setup_exit)" >&2
+    return 1
+  fi
+}
 case "$command" in
   up)
     # Preserve selections on failure too, so retries retain the same source routes.
@@ -119,8 +136,8 @@ case "$command" in
     mv -- "$tmp" "$STATE"
     trap - EXIT HUP INT TERM
     if [ "$build" = 1 ]; then "$@" up --build -d; else "$@" up --no-build -d; fi
-    "$@" wait setup
-    [ "$ai" = 0 ] || "$@" wait ai-setup
+    wait_setup setup "$@"
+    [ "$ai" = 0 ] || wait_setup ai-setup "$@"
     echo 'Open http://localhost:18080 or http://127.0.0.1:18080 (NINES_PLAYGROUND_PORT overrides the port).'
     echo 'Sign in: admin / admin, unless you changed the persisted account password.'
     ;;

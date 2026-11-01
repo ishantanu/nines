@@ -112,6 +112,11 @@ export function IntentWorkspace({
   const writable = scope.role !== "viewer";
   const run = value?.runs.at(-1);
   const running = run?.status === "queued" || run?.status === "running";
+  const conversationFull =
+    !!value &&
+    (value.runs.length >= (caps?.maxRuns ?? 8) ||
+      value.messages.length >= (caps?.maxMessages ?? 40) - 2 ||
+      error.includes("continue in a new conversation"));
   const sharesModel =
     mode === "model" || (!value?.goal && !!caps?.draftEnabled);
   useEffect(() => {
@@ -483,6 +488,30 @@ export function IntentWorkspace({
             {error}
           </p>
         ) : null}
+        {conversationFull ? (
+          <div
+            role="status"
+            className="space-y-3 rounded-md border p-4 text-sm"
+          >
+            <p>
+              This conversation has reached its preparation limit. Start a new
+              conversation to continue. Existing evidence and approvals remain
+              in this conversation; new proposals need fresh checks and review.
+            </p>
+            <Button
+              variant="outline"
+              disabled={!writable || busy || running}
+              onClick={() => {
+                if (value?.goal) void create(value.goal);
+                else setCreateOpen(true);
+              }}
+            >
+              {value?.goal
+                ? "Start new conversation with this goal"
+                : "Start new conversation"}
+            </Button>
+          </div>
+        ) : null}
         {createOpen ? (
           <Card>
             <CardHeader>
@@ -608,7 +637,13 @@ export function IntentWorkspace({
                     <Button
                       variant="outline"
                       size="sm"
-                      disabled={!writable || busy || running || !reply.trim()}
+                      disabled={
+                        !writable ||
+                        busy ||
+                        running ||
+                        conversationFull ||
+                        !reply.trim()
+                      }
                       onClick={() =>
                         void action(async () => {
                           await mutate("/messages", {
@@ -628,6 +663,7 @@ export function IntentWorkspace({
                         !writable ||
                         busy ||
                         running ||
+                        conversationFull ||
                         (sharesModel && !consent)
                       }
                       onClick={() => void action(prepare)}

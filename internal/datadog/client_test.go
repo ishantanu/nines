@@ -263,8 +263,11 @@ func TestProbeAndCredentialIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := c.SourceFingerprint()
-	c.apiKey = "rotated-synthetic-key"
-	if old == c.SourceFingerprint() || strings.Contains(c.SourceFingerprint(), "rotated") {
+	rotated, err := New(c.endpoint, "rotated-synthetic-key", c.applicationKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if old == rotated.SourceFingerprint() || strings.Contains(rotated.SourceFingerprint(), "rotated") {
 		t.Fatal("account credential identity was not pinned")
 	}
 }

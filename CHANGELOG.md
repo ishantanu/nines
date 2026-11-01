@@ -2,6 +2,14 @@
 
 ## Unreleased (v0.1.0-alpha.3)
 
+- Catch up delayed scheduled collection from the last successful source watermark, with bounded requests and regression coverage for alert recovery; add focused diagnostics to packaged recovery tests.
+
+- Separate provider credential identities from content digests using Argon2id; remove the ineffective CodeQL suppression.
+- Preserve explicit subsecond latency units in forms and natural-language drafts; reject unitless form thresholds.
+- Show actionable intent capacity limits and offer a fresh goal-only conversation while retaining the original audit history.
+- Give playground checkout counters a 2s scrape cadence for their 10s increase windows, avoiding sparse-input coverage gaps without weakening burn-alert thresholds.
+- Check actual one-shot setup exit codes in the playground launcher, including setup containers that finished before the wait began.
+
 - Prefer shortWindow/longWindow duration strings in burn-policy YAML, with strict parsing, legacy seconds input and matching portal/CLI/operator exports.
 
 - Treat New Relic no-event notices as empty measurements without fabricated coverage; use provider-neutral collection failure text.

@@ -30,7 +30,7 @@ test("latency form requires an explicit threshold and explains histogram limitat
   const html = renderToStaticMarkup(
     <MeasurementFields draft={d} connections={[]} onChange={() => {}} />,
   );
-  expect(html).toContain("Good events complete within (seconds)");
+  expect(html).toContain("Good events complete within");
   expect(html).toContain("exact threshold bucket");
   expect(html).not.toContain("Add success filter");
 });

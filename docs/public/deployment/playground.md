@@ -83,7 +83,7 @@ python3 scripts/setup-local.py --playground
 3. Open the SLO's **Rules** tab to inspect the generated group and destination. A separate apply is not required in the playground. **Apply reviewed rules** remains an owner retry/override. Nines writes the owned file to a shared volume and requests its configured Prometheus to reload using the native `rules.reload: true` setting. Configuration, activation and runtime evaluation have separate results. Production deployments can explicitly enable the same trusted reload path, arrange their own reload, or use the Kubernetes operator.
 4. The Integration status panel refreshes every 15 seconds, or use **Check status**. **Rule configuration** reports whether the destination matches the current definition. **Rules evaluating** requires the expected loaded group and recent successful evaluations of every rule. Failed, stale, missing, changed and unavailable evidence stay distinct.
 
-- Prometheus scrapes a synthetic checkout service every five seconds and evaluates its own Nines recording and alert rules.
+- Prometheus scrapes the synthetic checkout service every two seconds and evaluates its own Nines recording and alert rules. The sample uses ten-second counter increases; several scrapes per interval avoid sparse-input gaps. Other jobs retain the five-second default cadence.
   - The default stack has no remote-write destination, Mimir container or Mimir workspace.
   - No telemetry or model account is required.
 - The example has a 10-minute SLO window, 10-second measurement intervals and 60/120-second critical and 120/300-second warning burn windows. They are intentionally short for testing.

@@ -108,7 +108,7 @@ func (p *postgres) Create(ctx context.Context, r record) (record, error) {
 		return record{}, e
 	}
 	if n >= maxSessions {
-		return record{}, ErrLimit
+		return record{}, &CapacityError{Resource: "tenant_conversations", Limit: maxSessions}
 	}
 	if e = validSize(r); e != nil {
 		return record{}, e

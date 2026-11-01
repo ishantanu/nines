@@ -300,13 +300,12 @@ export function MeasurementFields({
         <div>
           <FormField
             htmlFor={`${id}-threshold`}
-            label="Good events complete within (seconds)"
+            label="Good events complete within"
           >
             <Input
               id={`${id}-threshold`}
-              type="number"
-              step="any"
-              min="0"
+              type="text"
+              placeholder="30ms or 0.03s"
               value={draft.threshold}
               onChange={(e) => field("threshold", e.target.value)}
             />

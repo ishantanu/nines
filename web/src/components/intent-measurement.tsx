@@ -1,3 +1,4 @@
+import { latencyDuration } from "@/lib/latency-duration";
 import { useState } from "react";
 import type { IntentDocument } from "@/lib/intent";
 import { duration } from "@/lib/history";
@@ -29,7 +30,7 @@ export function goalWithMeasurement(
       threshold:
         goal.spec.thresholdSeconds == null
           ? ""
-          : String(goal.spec.thresholdSeconds),
+          : latencyDuration(goal.spec.thresholdSeconds),
     },
     String(Number((goal.spec.target * 100).toPrecision(12))),
     duration(goal.spec.windowSeconds),

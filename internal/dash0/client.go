@@ -20,6 +20,7 @@ var datasetPattern = regexp.MustCompile(`^[a-zA-Z0-9_-]{3,26}$`)
 var hosts = map[string]bool{"api.eu-west-1.aws.dash0.com": true, "api.eu-central-1.aws.dash0.com": true, "api.us-east-1.aws.dash0.com": true, "api.us-west-2.aws.dash0.com": true, "api.europe-west4.gcp.dash0.com": true}
 
 type Client struct {
+	credentialIdentity       string
 	query                    *prometheus.Client
 	endpoint, dataset, token string
 	http                     *http.Client
@@ -40,7 +41,7 @@ func New(endpoint, dataset, token string) (*Client, error) {
 	}
 	transport := datasetTransport{next: observability.Transport{PeerService: "dash0"}, dataset: dataset, origin: endpoint}
 	p.HTTP.Transport = transport
-	return &Client{query: p, endpoint: endpoint, dataset: dataset, token: token, http: &http.Client{Transport: transport.next, Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{query: p, endpoint: endpoint, dataset: dataset, token: token, credentialIdentity: model.CredentialIdentity(token), http: &http.Client{Transport: transport.next, Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
 // Dash0 documents GET query APIs. Adapt the private shared transport rather
@@ -73,7 +74,7 @@ func (t datasetTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	return t.next.RoundTrip(copy)
 }
 func (c *Client) SourceFingerprint() string {
-	return model.DefinitionDigest(struct{ Kind, Endpoint, Dataset, Key string }{"dash0", c.endpoint, c.dataset, model.DefinitionDigest(c.token)})
+	return model.DefinitionDigest(struct{ Kind, Endpoint, Dataset, Key string }{"dash0", c.endpoint, c.dataset, c.credentialIdentity})
 }
 func (c *Client) SupportsRuleDeployment() bool { return false }
 func (c *Client) ValidateSLO(s model.SLO) error {

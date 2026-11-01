@@ -42,7 +42,14 @@ func fail(w http.ResponseWriter, e error) {
 		status = 403
 		message = ErrForbidden.Error()
 	}
-	reply(w, map[string]string{"error": message}, nil, status)
+	payload := map[string]any{"error": message}
+	var capacity *CapacityError
+	if errors.As(e, &capacity) {
+		payload["error"] = capacity.Error()
+		payload["code"] = "intent_" + capacity.Resource + "_limit"
+		payload["limit"] = capacity.Limit
+	}
+	reply(w, payload, nil, status)
 }
 func decode(w http.ResponseWriter, r *http.Request, out any) error {
 	typ, _, e := mime.ParseMediaType(r.Header.Get("Content-Type"))

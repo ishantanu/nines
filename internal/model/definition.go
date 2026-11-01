@@ -66,9 +66,8 @@ func decodeDefinition(body []byte, out any) error {
 	}
 	return nil
 }
+
 // DefinitionDigest computes a content digest for definition versioning and change detection.
-// This is NOT password hashing - SHA256 is appropriate for content integrity checks.
-// lgtm[go/weak-crypto-algorithm]
 func DefinitionDigest(manifest any) string {
 	b, _ := json.Marshal(manifest)
 	sum := sha256.Sum256(b)

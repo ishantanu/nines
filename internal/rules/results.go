@@ -180,5 +180,5 @@ func (m *Manager) NativeDraft(ctx context.Context, source, nativeID, name, proje
 
 // Credential identities are private and must not be serialized as API evidence.
 func nativeReadRouteDigest(t Target) string {
-	return model.DefinitionDigest(struct{ Route, DDKey, DDApp, NRKey string }{RouteDigest(t), model.DefinitionDigest(t.DatadogAPIKey), model.DefinitionDigest(t.DatadogApplicationKey), model.DefinitionDigest(t.NewRelicUserKey)})
+	return model.DefinitionDigest(struct{ Route, CredentialIdentity string }{RouteDigest(t), model.CredentialIdentity(t.DatadogAPIKey, t.DatadogApplicationKey, t.NewRelicUserKey)})
 }

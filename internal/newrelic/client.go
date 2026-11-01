@@ -29,9 +29,10 @@ const countDocument = `query NinesCounts($account: Int!, $good: Nrql!, $total: N
 const probeDocument = `query NinesConnection($account: Int!) { actor { account(id: $account) { id } } }`
 
 type Client struct {
-	endpoint, userKey string
-	account           int64
-	http              *http.Client
+	credentialIdentity string
+	endpoint, userKey  string
+	account            int64
+	http               *http.Client
 }
 
 func New(endpoint, accountID, userKey string) (*Client, error) {
@@ -51,13 +52,13 @@ func New(endpoint, accountID, userKey string) (*Client, error) {
 			return nil, model.Invalid("invalid New Relic user key")
 		}
 	}
-	return &Client{endpoint: endpoint, account: account, userKey: userKey, http: &http.Client{Timeout: 20 * time.Second, Transport: observability.Transport{PeerService: "newrelic"}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{endpoint: endpoint, account: account, userKey: userKey, credentialIdentity: model.CredentialIdentity(userKey), http: &http.Client{Timeout: 20 * time.Second, Transport: observability.Transport{PeerService: "newrelic"}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) SourceFingerprint() string {
 	return model.DefinitionDigest(struct {
 		Kind, Endpoint, KeyIdentity string
 		Account                     int64
-	}{"newrelic", c.endpoint, model.DefinitionDigest(c.userKey), c.account})
+	}{"newrelic", c.endpoint, c.credentialIdentity, c.account})
 }
 func (c *Client) ValidateSLO(s model.SLO) error {
 	if s.QueryLanguage != "nrql" || s.ProviderWindow != nil || s.Measurement != nil || s.MeasurementBinding != nil {

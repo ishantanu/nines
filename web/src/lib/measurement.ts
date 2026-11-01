@@ -1,3 +1,4 @@
+import { latencySeconds, latencyDuration } from "./latency-duration";
 import {
   bindingStarter,
   type BindingManifest,
@@ -46,7 +47,8 @@ export function measurementDraft(
       value,
     })),
     countFrom: s.countFrom ?? "counter",
-    threshold: String(s.thresholdSeconds ?? ""),
+    threshold:
+      s.thresholdSeconds == null ? "" : latencyDuration(s.thresholdSeconds),
     step: String(s.stepSeconds),
     scrape: String(s.scrapeIntervalSeconds ?? ""),
     observationPoint: s.observationPoint,
@@ -115,14 +117,8 @@ export function bindingFromDraft(
     b.spec.countFrom = d.countFrom;
     b.spec.successLabels = success;
   } else {
-    const threshold = Number(d.threshold);
-    if (
-      validate &&
-      (!Number.isFinite(threshold) || threshold <= 0 || threshold > 86400)
-    )
-      throw new Error(
-        "Enter a latency threshold in seconds greater than zero and at most 86400.",
-      );
+    const threshold =
+      !validate && !d.threshold.trim() ? 0 : latencySeconds(d.threshold);
     b.spec.thresholdSeconds = threshold;
   }
   return b;

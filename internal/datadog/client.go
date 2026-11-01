@@ -20,6 +20,7 @@ import (
 )
 
 type Client struct {
+	credentialIdentity               string
 	endpoint, apiKey, applicationKey string
 	http                             *http.Client
 }
@@ -36,10 +37,10 @@ func New(endpoint, apiKey, applicationKey string) (*Client, error) {
 			return nil, model.Invalid("Datadog requires API and application credentials")
 		}
 	}
-	return &Client{endpoint: strings.TrimRight(endpoint, "/"), apiKey: apiKey, applicationKey: applicationKey, http: &http.Client{Transport: observability.Transport{PeerService: "datadog"}, Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	return &Client{endpoint: strings.TrimRight(endpoint, "/"), apiKey: apiKey, applicationKey: applicationKey, credentialIdentity: model.CredentialIdentity(apiKey, applicationKey), http: &http.Client{Transport: observability.Transport{PeerService: "datadog"}, Timeout: 20 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 func (c *Client) SourceFingerprint() string {
-	return model.DefinitionDigest(struct{ Kind, Endpoint, CredentialIdentity string }{"datadog", c.endpoint, model.DefinitionDigest([]string{c.apiKey, c.applicationKey})})
+	return model.DefinitionDigest(struct{ Kind, Endpoint, CredentialIdentity string }{"datadog", c.endpoint, c.credentialIdentity})
 }
 func (c *Client) ValidateSLO(s model.SLO) error {
 	if s.QueryLanguage != "datadog" || s.ProviderWindow != nil || s.Measurement != nil || s.MeasurementBinding != nil {

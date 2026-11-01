@@ -5,6 +5,8 @@ rule_files:
   - /etc/prometheus/nines/*.yaml
 scrape_configs:
   - job_name: playground-checkout
+    # The sample uses disjoint 10s increases; allow several scrapes per interval.
+    scrape_interval: 2s
     static_configs:
       - targets: [sample:8000]
   - job_name: playground-ai

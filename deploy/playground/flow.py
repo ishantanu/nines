@@ -33,7 +33,7 @@ def api(tenant, path, body=None, media="application/json", match=None):
     return request("http://nines:8080", path, body, headers)
 
 
-def wait(label, check, timeout=150):
+def wait(label, check, timeout=150, details=None):
     end = time.monotonic() + timeout
     last = None
     while time.monotonic() < end:
@@ -45,6 +45,14 @@ def wait(label, check, timeout=150):
         except (OSError, ValueError, AssertionError) as error:
             last = type(error).__name__
         time.sleep(3)
+    if details is not None:
+        try:
+            print(json.dumps({"check": label, "diagnostics": details()}), flush=True)
+        except (OSError, ValueError, AssertionError) as error:
+            print(
+                json.dumps({"check": label, "diagnosticsError": type(error).__name__}),
+                flush=True,
+            )
     raise RuntimeError(f"{label}: timed out (last error: {last})")
 
 
@@ -103,6 +111,30 @@ def integration(tenant):
 
 def status(tenant):
     return api(tenant, f"/api/slos/{SLO}/status")
+
+
+def alerts_recovered(tenant):
+    snapshot = status(tenant)
+    alert = snapshot["alert"]
+    return alert["phase"] == "inactive" and all(
+        policy["phase"] == "inactive" for policy in alert.get("policies", {}).values()
+    )
+
+
+def alert_diagnostics(tenant):
+    snapshot = status(tenant)
+    record = api(tenant, f"/api/slos/{SLO}")
+    collection = record.get("collection", {})
+    return {
+        "tenant": tenant,
+        "at": snapshot.get("at"),
+        "coverage": snapshot.get("coverage"),
+        "alert": snapshot.get("alert"),
+        "collection": {
+            key: collection.get(key)
+            for key in ("state", "errorCode", "from", "to", "completedAt", "points")
+        },
+    }
 
 
 def failure(percent):
@@ -203,12 +235,9 @@ def verify():
         )
         wait(
             tenant + " Nines burn alert recovered",
-            lambda t=tenant: status(t)["alert"]["phase"] == "inactive"
-            and all(
-                p["phase"] == "inactive"
-                for p in status(t)["alert"].get("policies", {}).values()
-            ),
+            lambda t=tenant: alerts_recovered(t),
             90,
+            details=lambda t=tenant: alert_diagnostics(t),
         )
     print(
         json.dumps(

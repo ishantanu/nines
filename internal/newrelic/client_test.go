@@ -211,8 +211,11 @@ func TestNRQLProbeAndRouteValidation(t *testing.T) {
 		t.Fatal("account identity lost")
 	}
 	c.account--
-	c.userKey = "rotated"
-	if old == c.SourceFingerprint() {
+	rotated, err := New(c.endpoint, strconv.FormatInt(c.account, 10), "rotated")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if old == rotated.SourceFingerprint() {
 		t.Fatal("credential identity lost")
 	}
 }

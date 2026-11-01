@@ -26,6 +26,11 @@ func TestPlaygroundLauncherRemembersSelectionsWithoutCredentials(t *testing.T) {
  printf '<%s>\n' "$@"
  printf 'TENANTS=%s\nAUTH=%s\nPROMETHEUS=%s\nAI=%s\nTOPOLOGY=%s\n' "$NINES_PLAYGROUND_TENANTS_FILE" "$NINES_PLAYGROUND_AUTH_FILE" "$NINES_PLAYGROUND_PROMETHEUS_CONFIG" "$NINES_PLAYGROUND_AI_TARGETS" "$NINES_PLAYGROUND_TOPOLOGY_TARGETS"
 } >> "$PLAYGROUND_TEST_TRACE"
+case "$*" in *"ps -a -q"*) printf 'synthetic-setup-container\n';; esac
+if [ "$1" = wait ] && [ "${PLAYGROUND_FAIL_WAIT:-}" != 1 ]; then
+ printf '%s\n' "${PLAYGROUND_TEST_SETUP_EXIT:-0}"
+ exit 0
+fi
 if [ "${PLAYGROUND_FAIL_WAIT:-}" = 1 ]; then
  for arg in "$@"; do [ "$arg" != wait ] || exit 7; done
 fi
@@ -44,7 +49,7 @@ fi
 			}
 		}
 		cmd.Env = append(cmd.Env, "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"), "POSTGRES_PASSWORD=synthetic-private-password", "JEV_API_KEY=synthetic-private-key", "NINES_PLAYGROUND_STATE_FILE="+state, "PLAYGROUND_TEST_TRACE="+trace)
-		if fail {
+		if fail && os.Getenv("PLAYGROUND_TEST_SETUP_EXIT") == "" {
 			cmd.Env = append(cmd.Env, "PLAYGROUND_FAIL_WAIT=1")
 		}
 		out, e := cmd.CombinedOutput()
@@ -87,6 +92,12 @@ fi
 	if strings.Contains(out, "Open http") {
 		t.Fatal("reported readiness after setup failure")
 	}
+	t.Setenv("PLAYGROUND_TEST_SETUP_EXIT", "9")
+	out = run(true, "up", "--no-build")
+	if strings.Contains(out, "Open http") || !strings.Contains(out, "exit 9") {
+		t.Fatal("successful docker wait masked a failed setup", out)
+	}
+	t.Setenv("PLAYGROUND_TEST_SETUP_EXIT", "")
 	// Losing a temporary provider file must not prevent safe logs or shutdown.
 	if err = os.Remove(provider); err != nil {
 		t.Fatal(err)

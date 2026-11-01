@@ -229,3 +229,9 @@ nines collect api-availability --recent --tenant production --agent
 - Existing `shortWindowSeconds` and `longWindowSeconds` inputs remain supported. Specify exactly one representation per window; supplying both is an error.
 - YAML exports use readable duration fields. Runtime JSON responses, stored policy values and deterministic calculations retain numeric seconds. `forSeconds`, `windowSeconds` and other existing fields keep their current names and units.
 - The CLI, API, MCP resource apply and Kubernetes operator use the same parser and policy constraints. Duration syntax does not change burn-rate thresholds, alignment requirements or evaluation behavior.
+
+## Delayed scheduled collection
+
+- Automatic collection follows its last successful source watermark when a polling round is delayed. Each request is capped at 300 intervals and the SLO retention boundary.
+- Catch-up queries fetch actual telemetry; they do not turn gaps into zero errors or force an alert to recover.
+- Longer outages and late telemetry outside the bounded overlap still require an explicit backfill. Manual connections remain manual.

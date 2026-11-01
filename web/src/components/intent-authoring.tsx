@@ -1,3 +1,4 @@
+import { latencySeconds, latencyDuration } from "@/lib/latency-duration";
 import { MeasurementLabels } from "./measurement-labels";
 import { ProviderIdentity } from "./provider-identity";
 import { BudgetPolicyEditor } from "./budget-policy-editor";
@@ -160,7 +161,7 @@ export function IntentAuthoring({
           ...intentGoal(draft.target, draft.window),
           noDataPolicy: "unknown",
           ...(draft.outcome === "latency"
-            ? { thresholdSeconds: Number(draft.threshold) }
+            ? { thresholdSeconds: latencySeconds(draft.threshold) }
             : {}),
           ...(alerts
             ? {
@@ -227,7 +228,9 @@ export function IntentAuthoring({
           target: String(Number((spec.target * 100).toPrecision(12))),
           window: duration(spec.windowSeconds),
           threshold:
-            spec.thresholdSeconds == null ? "" : String(spec.thresholdSeconds),
+            spec.thresholdSeconds == null
+              ? ""
+              : latencyDuration(spec.thresholdSeconds),
         }));
       }
     } catch (e) {
@@ -377,7 +380,7 @@ export function IntentAuthoring({
                 </Select>
               </div>
               {draft.outcome === "latency" ? (
-                input("threshold", "Maximum duration (seconds)", "0.3")
+                input("threshold", "Maximum duration", "30ms or 0.03s")
               ) : (
                 <p className="self-end text-sm text-muted-foreground">
                   Define the metric and success labels below.
