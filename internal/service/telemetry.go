@@ -17,21 +17,33 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/prometheus"
 	"github.com/ishantanu/nines/internal/store"
+	"github.com/ishantanu/nines/internal/telemetryprovider"
 )
 
 var ErrTelemetry = errors.New("configured telemetry source could not supply bounded, complete evidence")
 
+// Separate optional interfaces allow discovery-only adapters without dependency stubs.
 type TelemetrySource interface {
-	MetricNames(context.Context, string, time.Time) ([]string, bool, error)
-	Discover(context.Context, string, map[string]string, time.Time) (v1.TelemetryDiscovery, error)
-	ObserveDependencies(context.Context, v1.GraphObservation, time.Time) ([]v1.ObservedEdge, bool, error)
+	telemetryprovider.MetricNamesSource
+	telemetryprovider.MetricDiscoverySource
+	telemetryprovider.DependencySource
 }
 
-func (s *Service) telemetrySource(source string) (TelemetrySource, error) {
+func (s *Service) telemetrySource(source string) (telemetryprovider.MetricDiscoverySource, error) {
 	if !validResourceID(source) {
 		return nil, model.Invalid("invalid configured source name")
 	}
-	c, ok := s.CollectorFor(model.SLO{Source: source}).(TelemetrySource)
+	c, ok := s.CollectorFor(model.SLO{Source: source}).(telemetryprovider.MetricDiscoverySource)
+	if !ok {
+		return nil, model.ErrUnavailable
+	}
+	return c, nil
+}
+func (s *Service) dependencySource(source string) (telemetryprovider.DependencySource, error) {
+	if !validResourceID(source) {
+		return nil, model.Invalid("invalid configured source name")
+	}
+	c, ok := s.CollectorFor(model.SLO{Source: source}).(telemetryprovider.DependencySource)
 	if !ok {
 		return nil, model.ErrUnavailable
 	}
@@ -39,9 +51,13 @@ func (s *Service) telemetrySource(source string) (TelemetrySource, error) {
 }
 func (s *Service) DiscoverMetricNames(ctx context.Context, source, prefix string) (v1.MetricNames, error) {
 	out := v1.MetricNames{APIVersion: v1.APIVersion, Tenant: s.TenantID, Source: source, ObservedAt: s.Now().UTC().Truncate(time.Second)}
-	c, err := s.telemetrySource(source)
-	if err != nil {
-		return out, err
+	if !validResourceID(source) {
+		return out, model.Invalid("invalid configured source name")
+	}
+	c, ok := s.CollectorFor(model.SLO{Source: source}).(telemetryprovider.MetricNamesSource)
+	var err error
+	if !ok {
+		return out, model.ErrUnavailable
 	}
 	out.Names, out.Truncated, err = c.MetricNames(ctx, prefix, out.ObservedAt)
 	if err != nil {
@@ -111,7 +127,7 @@ func (s *Service) validateTopology(ctx context.Context, d model.Definition) erro
 		return err
 	}
 	if g.Spec.Observed != nil {
-		if _, err := s.telemetrySource(g.Spec.Observed.Source); err != nil {
+		if _, err := s.dependencySource(g.Spec.Observed.Source); err != nil {
 			return err
 		}
 	}
@@ -483,7 +499,7 @@ func (s *Service) DependencyView(ctx context.Context, id string, expected int64)
 		out.From = &from
 		out.To = &to
 		out.ObservationState = "unavailable"
-		c, err := s.telemetrySource(o.Source)
+		c, err := s.dependencySource(o.Source)
 		if err == nil {
 			var edges []v1.ObservedEdge
 			var truncated bool

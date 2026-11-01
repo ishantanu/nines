@@ -398,3 +398,37 @@ func TestPlatformRejectsScopedMachineCredentialsAndSecretReasons(t *testing.T) {
 		request(t, c, "POST", h.URL+"/api/platform/system-one/save", csrf, string(body), 400)
 	}
 }
+
+func (f *systemOneFixture) VisualEnabled() bool                 { return true }
+func (f *systemOneFixture) VisualDescriptor() v1.SystemOneRoute { return f.Descriptor() }
+func (f *systemOneFixture) AssessVisual(context.Context, systemone.VisualInput) (v1.VisualAssessment, error) {
+	f.calls.Add(1)
+	return v1.VisualAssessment{Status: "assessed"}, nil
+}
+func TestVisualRequestsShareAdminQuotaAndPause(t *testing.T) {
+	s, h := platformFixture(t, NewMemory())
+	cookie, _ := platformLogin(t, h, "admin", "platform-fixture-password")
+	actor := platformActor(t, s, h, cookie)
+	ctx := context.Background()
+	if e := s.savePlatformAI(ctx, actor, "alpha", PlatformAIPolicy{Enabled: true, DailyRequestLimit: 1}); e != nil {
+		t.Fatal(e)
+	}
+	inner := &systemOneFixture{}
+	wrapped := s.ControlSystemOne("alpha", inner)
+	visual := wrapped.(systemone.VisualAssessor)
+	if !visual.VisualEnabled() {
+		t.Fatal("visual capability lost")
+	}
+	if _, e := visual.AssessVisual(ctx, systemone.VisualInput{}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := wrapped.Assess(ctx, systemone.Input{Description: "synthetic"}); !errors.Is(e, systemone.ErrBudgetExhausted) {
+		t.Fatal("separate text/image quota", e)
+	}
+	if e := s.savePlatformAI(ctx, actor, "alpha", PlatformAIPolicy{Version: 1, Enabled: false, DailyRequestLimit: 10}); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := visual.AssessVisual(ctx, systemone.VisualInput{}); !errors.Is(e, systemone.ErrPaused) || inner.calls.Load() != 1 {
+		t.Fatal("pause bypassed", e, inner.calls.Load())
+	}
+}

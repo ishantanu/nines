@@ -42,7 +42,14 @@ func fail(w http.ResponseWriter, e error) {
 		status = 403
 		message = ErrForbidden.Error()
 	}
-	reply(w, map[string]string{"error": message}, nil, status)
+	payload := map[string]any{"error": message}
+	var capacity *CapacityError
+	if errors.As(e, &capacity) {
+		payload["error"] = capacity.Error()
+		payload["code"] = "intent_" + capacity.Resource + "_limit"
+		payload["limit"] = capacity.Limit
+	}
+	reply(w, payload, nil, status)
 }
 func decode(w http.ResponseWriter, r *http.Request, out any) error {
 	typ, _, e := mime.ParseMediaType(r.Header.Get("Content-Type"))
@@ -120,6 +127,22 @@ func Mount(m *http.ServeMux, s *Service) {
 			return
 		}
 		reply(w, s.Capabilities(), nil, 200)
+	})
+	m.HandleFunc("GET /api/intent-conversations/{id}/review-artifact", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			fail(w, model.Invalid("query fields are not supported"))
+			return
+		}
+		out, e := s.ReviewArtifact(r.Context(), r.PathValue("id"))
+		reply(w, out, e, 200)
+	})
+	m.HandleFunc("GET /api/intent-conversations/{id}/status", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			fail(w, model.Invalid("query fields are not supported"))
+			return
+		}
+		out, e := s.WorkflowStatus(r.Context(), r.PathValue("id"))
+		reply(w, out, e, 200)
 	})
 	m.HandleFunc("GET /api/intent-conversations/{id}", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RawQuery != "" {

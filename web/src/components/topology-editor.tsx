@@ -3,7 +3,7 @@ import { api, message, type RequestScope } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { DependencyDesigner } from "./dependency-designer";
 import { DependencyDiscovery } from "./dependency-discovery";
 import { dependencyManifest } from "@/lib/dependency-editor";

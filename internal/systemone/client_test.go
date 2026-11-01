@@ -221,3 +221,28 @@ func TestLiveAcceptance(t *testing.T) {
 		})
 	}
 }
+
+// Negative controls ensure the clarity question does not infer success from a target.
+func TestLiveAcceptanceMissingSuccessCondition(t *testing.T) {
+	if os.Getenv("NINES_SYSTEM_ONE_LIVE_TEST") != "1" {
+		t.Skip("set NINES_SYSTEM_ONE_LIVE_TEST=1 for synthetic Jev acceptance")
+	}
+	c, err := New(&Config{}, os.Getenv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ name, description string }{
+		{"target-only", "Count every checkout API request received by the server at terminal completion. Our SLO target is 99.9 percent."},
+		{"vague-success", "Count every checkout API request received by the server at terminal completion. Good means a successful request."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out, err := c.Assess(context.Background(), Input{Description: tc.description})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if out.Judgments.GoodEventsDefined >= .5 {
+				t.Errorf("undefined success condition classified as defined: %g", out.Judgments.GoodEventsDefined)
+			}
+		})
+	}
+}

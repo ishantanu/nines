@@ -1,8 +1,7 @@
-import { useId, useRef, useState } from "react";
+import { useId, useRef } from "react";
 import { duration, type HistoryPoint, type SLOHistory } from "@/lib/history";
 import { nearestPointIndex } from "@/lib/chart-range";
 import { useChartSize } from "@/lib/use-chart-size";
-import { Button } from "@/components/ui/button";
 import { ReplayLabel } from "@/components/replay-label";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 interface Line {
@@ -42,8 +41,7 @@ export function Timeline({
 }) {
   const { ref, width, height } = useChartSize();
   const id = useId();
-  const slider = useRef<HTMLInputElement>(null);
-  const [showData, setShowData] = useState(false);
+  const plot = useRef<SVGSVGElement>(null);
   const finite = (v: number | null): v is number =>
     v !== null && Number.isFinite(v);
   const values = history.points
@@ -144,7 +142,7 @@ export function Timeline({
       : "No data";
   };
   const selectedText = selected
-    ? `${utcStamp(selected.at)}. ${lines.map((line) => `${line.name}: ${valueText(line, selected)}`).join(". ")}. ${thresholdLabel}`
+    ? `${new Date(selected.at).toUTCString()}. ${lines.map((line) => `${line.name}: ${valueText(line, selected)}`).join(". ")}. ${thresholdLabel}`
     : "No measurements available";
   const ticks = Math.max(2, Math.min(6, Math.floor((right - left) / 120) + 1));
   function inspect(clientX: number, bounds: DOMRect) {
@@ -166,16 +164,6 @@ export function Timeline({
           <h3 className="text-base font-semibold">
             <ReplayLabel>{title}</ReplayLabel>
           </h3>
-          <Button
-            size="sm"
-            variant="outline"
-            aria-expanded={showData}
-            aria-controls={`${id}-data`}
-            onClick={() => setShowData(!showData)}
-          >
-            {showData ? "Hide data" : "View data"}
-            <span className="sr-only"> for {title}</span>
-          </Button>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-foreground">
           {lines.map((line) => (
@@ -214,8 +202,42 @@ export function Timeline({
         >
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="absolute inset-0 block size-full touch-pan-y"
-            role="img"
+            className="chart-inspection-plot absolute inset-0 block size-full touch-pan-y rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            ref={plot}
+            role="slider"
+            tabIndex={0}
+            aria-orientation="horizontal"
+            aria-valuemin={0}
+            aria-valuemax={Math.max(0, history.points.length - 1)}
+            aria-valuenow={selectedIndex}
+            aria-valuetext={selectedText}
+            aria-disabled={!history.points.length}
+            onKeyDown={(event) => {
+              if (!history.points.length) return;
+              const moves: Record<string, number> = {
+                ArrowLeft: selectedIndex - 1,
+                ArrowDown: selectedIndex - 1,
+                ArrowRight: selectedIndex + 1,
+                ArrowUp: selectedIndex + 1,
+                Home: 0,
+                End: history.points.length - 1,
+                PageDown:
+                  selectedIndex -
+                  Math.max(1, Math.ceil(history.points.length / 10)),
+                PageUp:
+                  selectedIndex +
+                  Math.max(1, Math.ceil(history.points.length / 10)),
+              };
+              if (Object.hasOwn(moves, event.key)) {
+                event.preventDefault();
+                onIndex(
+                  Math.max(
+                    0,
+                    Math.min(history.points.length - 1, moves[event.key]),
+                  ),
+                );
+              }
+            }}
             aria-labelledby={`${id}-title`}
             aria-describedby={`${id}-description`}
             onPointerMove={(event) =>
@@ -225,7 +247,7 @@ export function Timeline({
               )
             }
             onPointerDown={(event) => {
-              slider.current?.focus({ preventScroll: true });
+              plot.current?.focus({ preventScroll: true });
               inspect(
                 event.clientX,
                 event.currentTarget.getBoundingClientRect(),
@@ -234,9 +256,11 @@ export function Timeline({
           >
             <title id={`${id}-title`}>{title}</title>
             <desc id={`${id}-description`}>
-              {thresholdLabel}. Use the time point slider below to inspect
-              values, or choose View data for a table. Times are UTC. Gaps
-              indicate missing measurements or no traffic.{" "}
+              {thresholdLabel}. Hover or tap the plot to inspect values. Focus
+              the chart and use arrow keys to select adjacent observations, Home
+              or End for the first or last observation, and Page Up or Page Down
+              to move through the range. Times are UTC. Gaps indicate missing
+              measurements or no traffic.{" "}
               {hasPartial
                 ? "Dashed SLI segments indicate incomplete history."
                 : ""}
@@ -423,59 +447,28 @@ export function Timeline({
             </p>
           ) : null}
         </div>
-        <div className="mt-3 space-y-2 border-t pt-3 text-sm">
-          <div className="flex items-center gap-3">
-            <label className="shrink-0 font-medium" htmlFor={`${id}-time`}>
-              Time point
-            </label>
-            <input
-              ref={slider}
-              id={`${id}-time`}
-              type="range"
-              min={0}
-              max={Math.max(0, history.points.length - 1)}
-              step={1}
-              value={selectedIndex}
-              disabled={!history.points.length}
-              aria-label={`${title} time point`}
-              aria-valuetext={selectedText}
-              className="chart-time-slider h-8 min-w-0 flex-1 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              onChange={(event) => onIndex(Number(event.target.value))}
-              onKeyDown={(event) => {
-                if (!history.points.length) return;
-                const moves: Record<string, number> = {
-                  ArrowLeft: selectedIndex - 1,
-                  ArrowDown: selectedIndex - 1,
-                  ArrowRight: selectedIndex + 1,
-                  ArrowUp: selectedIndex + 1,
-                  Home: 0,
-                  End: history.points.length - 1,
-                  PageDown:
-                    selectedIndex -
-                    Math.max(1, Math.ceil(history.points.length / 10)),
-                  PageUp:
-                    selectedIndex +
-                    Math.max(1, Math.ceil(history.points.length / 10)),
-                };
-                if (event.key in moves) {
-                  event.preventDefault();
-                  onIndex(
-                    Math.max(
-                      0,
-                      Math.min(history.points.length - 1, moves[event.key]),
-                    ),
-                  );
-                }
-              }}
-            />
-          </div>
-          <p className="break-words tabular-nums text-muted-foreground">
-            {selected ? utcStamp(selected.at) : "No selected interval"}
-          </p>
+        <div
+          className="mt-3 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2 border-t pt-3 text-xs"
+          aria-live="off"
+        >
+          {selected ? (
+            <time
+              dateTime={selected.at}
+              title={selected.at}
+              className="tabular-nums text-muted-foreground"
+            >
+              {utcStamp(selected.at, history.stepSeconds < 60)}
+            </time>
+          ) : (
+            <span className="text-muted-foreground">No selected interval</span>
+          )}
           {selected ? (
             <dl className="flex flex-wrap gap-x-5 gap-y-2">
               {lines.map((line) => (
-                <div key={line.name} className="min-w-0">
+                <div
+                  key={line.name}
+                  className="flex min-w-0 flex-wrap items-baseline gap-x-2"
+                >
                   <dt className="text-muted-foreground">{line.name}</dt>
                   <dd className="break-words font-medium tabular-nums">
                     {valueText(line, selected)}
@@ -485,57 +478,27 @@ export function Timeline({
             </dl>
           ) : null}
         </div>
-        {showData ? (
-          <div
-            id={`${id}-data`}
-            role="region"
-            aria-label={`${title} data`}
-            tabIndex={0}
-            className="mt-4 max-h-80 overflow-auto rounded-sm border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <table className="w-full text-left text-sm">
-              <caption className="p-3 text-left font-medium">
-                {title}. {thresholdLabel}. All times UTC.
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col" className="p-3">
-                    Time (UTC)
-                  </th>
-                  {lines.map((line) => (
-                    <th key={line.name} scope="col" className="p-3">
-                      {line.name}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {history.points.map((point) => (
-                  <tr key={point.at} className="border-t">
-                    <th
-                      scope="row"
-                      className="whitespace-nowrap p-3 font-normal tabular-nums"
-                    >
-                      {utcStamp(point.at)}
-                    </th>
-                    {lines.map((line) => (
-                      <td key={line.name} className="p-3 tabular-nums">
-                        {valueText(line, point)}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!history.points.length ? (
-              <p className="p-3">No measurements available in this range.</p>
-            ) : null}
-          </div>
-        ) : null}
       </CardContent>
     </Card>
   );
 }
-function utcStamp(iso: string) {
-  return new Date(iso).toISOString().slice(0, 19).replace("T", " ") + " UTC";
+const compactTime = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+const preciseTime = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "UTC",
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+function utcStamp(iso: string, seconds = false) {
+  return (seconds ? preciseTime : compactTime).format(new Date(iso)) + " UTC";
 }

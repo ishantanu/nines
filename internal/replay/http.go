@@ -12,6 +12,28 @@ import (
 )
 
 func Mount(m *http.ServeMux, s *Service) {
+	m.HandleFunc("GET /api/session-replays/privacy", func(w http.ResponseWriter, r *http.Request) {
+		reply(w, map[string]any{"apiVersion": v1.APIVersion, "tenant": s.Platform.TenantID, "enabled": !s.Privacy.Disabled, "noticeVersion": v1.ReplayConsentNotice, "policyURL": s.Privacy.PolicyURL, "contact": s.Privacy.Contact}, nil, 200)
+	})
+	m.HandleFunc("DELETE /api/session-replays/{id}", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			ExpectedVersion int64  `json:"expectedVersion"`
+			ConfirmID       string `json:"confirmId"`
+		}
+		if e := decode(w, r, &in); e != nil {
+			fail(w, e)
+			return
+		}
+		if in.ConfirmID != r.PathValue("id") {
+			fail(w, model.Invalid("confirmId must match the recording ID"))
+			return
+		}
+		if e := s.Delete(r.Context(), r.PathValue("id"), in.ExpectedVersion); e != nil {
+			fail(w, e)
+			return
+		}
+		reply(w, map[string]any{"apiVersion": v1.APIVersion, "tenant": s.Platform.TenantID, "deleted": true}, nil, 200)
+	})
 	m.HandleFunc("GET /api/session-replays", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
 		for k, v := range q {

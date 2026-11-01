@@ -1,0 +1,886 @@
+openapi: 3.1.1
+info:
+  title: 'Nines HTTP API: reviewed SLO workflows'
+  version: 0.1.0-alpha.2
+  description: Versioned initial contract for the listed operations only. Other server endpoints and complete
+    resource schemas are not yet covered. Resource manifests use nines.dev/v1alpha1; existing HTTP paths
+    are not URL-versioned.
+servers:
+- url: /
+  description: The configured Nines server origin.
+security:
+- bearerAuth: []
+paths:
+  /api/slos:
+    get:
+      operationId: listSLOs
+      summary: List SLOs
+      description: ''
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SLOView'
+        '400': &id001
+          $ref: '#/components/responses/Error'
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+  /api/slos/{id}:
+    get:
+      operationId: getSLO
+      summary: Read an SLO
+      description: ''
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - &id002
+        $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SLOView'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+  /api/slos/{id}/manifest:
+    get:
+      operationId: getSLOManifest
+      summary: Read versioned SLO YAML
+      description: ''
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/yaml:
+              schema:
+                $ref: '#/components/schemas/Manifest'
+          headers:
+            ETag:
+              description: Quoted current configuration revision.
+              schema:
+                type: string
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+  /api/resources/validate:
+    post:
+      operationId: validateResource
+      summary: Validate a resource manifest
+      description: Validation does not check telemetry or activate recording rules.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Manifest'
+  /api/resources/plan:
+    post:
+      operationId: planResource
+      summary: Plan a resource manifest
+      description: Review the returned revision and warnings before applying.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourcePlan'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Manifest'
+  /api/resources/apply:
+    post:
+      operationId: applyResource
+      summary: Apply a reviewed resource manifest
+      description: Requires the quoted expected revision. Owner-configured automatic rule delivery may
+        run after the definition is saved; this response does not prove evaluation.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceRevision'
+          headers:
+            ETag:
+              description: Quoted saved revision.
+              schema:
+                type: string
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Manifest'
+  /api/intent-conversations/{id}/status:
+    get:
+      operationId: getIntentWorkflowStatus
+      summary: Read saved workflow status
+      description: Does not run a model or grant authorization.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowStatus'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+  /api/intent-conversations/{id}/review-artifact:
+    get:
+      operationId: getIntentReviewArtifact
+      summary: Export an audit-verified review snapshot
+      description: Contains sensitive definitions and review notes. Concurrent changes and incomplete
+        or invalid audit evidence fail the export.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewArtifact'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+  /api/intent-conversations/{id}/change-set:
+    post:
+      operationId: prepareIntentChangeSet
+      summary: Freeze a proposal for review
+      description: ''
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentConversation'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpectedVersion'
+  /api/intent-conversations/{id}/change-set/approve:
+    post:
+      operationId: approveIntentChangeSet
+      summary: Approve an exact proposal
+      description: Human owner/editor approval and a reason are required.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentConversation'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+  /api/intent-conversations/{id}/change-set/apply:
+    post:
+      operationId: applyIntentChangeSet
+      summary: Apply an approved proposal
+      description: The applying subject must differ from the approver. A matching digest and version are
+        required.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentConversation'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewRequest'
+  /api/slos/{id}/native-results:
+    get:
+      operationId: readNativeSLOResults
+      summary: Read independent native Datadog or New Relic results
+      description: Read-only, tenant-scoped and on demand. Requires a configured native
+        destination. No credential, endpoint, account or entity overrides are accepted.
+        Native result ranges are past whole-second bounds of at most 31 days; New Relic
+        clips inward to complete buckets and returns effective bounds. Results describe
+        the requested range, not necessarily the SLO window. Drafts require a separate
+        reviewed plan/apply and do not import alerts, notifications or synchronization.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeSLOResults'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/connections/{connection}/native-slos:
+    get:
+      operationId: listNativeSLOs
+      summary: Discover native SLOs on a server-approved connection
+      description: Read-only, tenant-scoped and on demand. Requires a configured native
+        destination. No credential, endpoint, account or entity overrides are accepted.
+        Native result ranges are past whole-second bounds of at most 31 days; New Relic
+        clips inward to complete buckets and returns effective bounds. Results describe
+        the requested range, not necessarily the SLO window. Drafts require a separate
+        reviewed plan/apply and do not import alerts, notifications or synchronization.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: connection
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeSLOCatalog'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/connections/{connection}/native-slo-draft:
+    get:
+      operationId: draftNativeSLOImport
+      summary: Prepare experimental YAML without saving or changing vendor ownership
+      description: Read-only, tenant-scoped and on demand. Requires a configured native
+        destination. No credential, endpoint, account or entity overrides are accepted.
+        Native result ranges are past whole-second bounds of at most 31 days; New Relic
+        clips inward to complete buckets and returns effective bounds. Results describe
+        the requested range, not necessarily the SLO window. Drafts require a separate
+        reviewed plan/apply and do not import alerts, notifications or synchronization.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: connection
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+      - name: nativeID
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 512
+      - name: name
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 512
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 512
+      - name: service
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 512
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NativeSLODraft'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Nines API key or CLI session token. Browser session authentication is outside this
+        profile.
+  parameters:
+    Tenant:
+      name: X-Nines-Tenant
+      in: header
+      required: false
+      description: Select an authorized Nines tenant. Required when the server cannot select a default
+        or unique tenant.
+      schema: &id003
+        type: string
+    ID:
+      name: id
+      in: path
+      required: true
+      schema: *id003
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Quoted nonnegative expected configuration revision, for example "0".
+      schema:
+        type: string
+        pattern: ^"(0|[1-9][0-9]*)"$
+  responses:
+    Error:
+      description: Error; the HTTP status and error message describe the failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      required:
+      - error
+      properties:
+        error: *id003
+      additionalProperties: true
+    Manifest:
+      type: object
+      description: YAML resource. The authoritative semantic validation is performed by Nines. The spec
+        does not yet exhaustively describe all resource fields.
+      required:
+      - apiVersion
+      - kind
+      - metadata
+      - spec
+      properties:
+        apiVersion:
+          const: nines.dev/v1alpha1
+        kind: *id003
+        metadata: &id004
+          type: object
+          additionalProperties: true
+        spec: *id004
+      additionalProperties: true
+    SLOView:
+      type: object
+      required:
+      - slo
+      - status
+      properties:
+        slo: *id004
+        status: *id004
+        quality: *id004
+        budgetDecision: *id004
+        collection: *id004
+        measurementHealth: *id004
+      additionalProperties: true
+    ValidationResult:
+      type: object
+      required:
+      - apiVersion
+      - kind
+      - metadata
+      - digest
+      - status
+      properties:
+        apiVersion: *id003
+        kind: *id003
+        metadata: *id004
+        digest: *id003
+        status:
+          const: valid
+    ResourcePlan:
+      type: object
+      required:
+      - apiVersion
+      - kind
+      - action
+      - expectedRevision
+      - digest
+      - manifest
+      properties:
+        apiVersion: *id003
+        kind: *id003
+        action: *id003
+        expectedRevision:
+          type: integer
+          format: int64
+        digest: *id003
+        manifest: *id004
+        previous: *id004
+        warnings:
+          type: array
+          items: *id003
+        measurementChanged:
+          type: boolean
+      additionalProperties: true
+    ResourceRevision:
+      type: object
+      required:
+      - manifest
+      - revision
+      - digest
+      properties:
+        manifest: *id004
+        revision:
+          type: integer
+          format: int64
+        digest: *id003
+    ExpectedVersion:
+      type: object
+      required:
+      - expectedVersion
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+      additionalProperties: false
+    ReviewRequest:
+      type: object
+      required:
+      - expectedVersion
+      - digest
+      - confirm
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+        digest: *id003
+        confirm:
+          type: boolean
+        reason: *id003
+        safetyExceptionReason: *id003
+      additionalProperties: false
+    IntentConversation:
+      type: object
+      description: Conversation snapshot; further fields are described by the public Go types.
+      required:
+      - apiVersion
+      - tenant
+      - id
+      - version
+      - state
+      properties:
+        apiVersion: *id003
+        tenant: *id003
+        id: *id003
+        version:
+          type: integer
+          format: int64
+        state: *id003
+        changeSet: *id004
+      additionalProperties: true
+    WorkflowStatus:
+      type: object
+      required:
+      - apiVersion
+      - tenant
+      - conversation
+      - version
+      - state
+      - phase
+      - nextAction
+      - humanRequired
+      - independentApplierRequired
+      - message
+      properties:
+        apiVersion: *id003
+        tenant: *id003
+        conversation: *id003
+        state: *id003
+        phase: *id003
+        nextAction: *id003
+        changeSetDigest: *id003
+        rollbackDigest: *id003
+        intentDigest: *id003
+        message: *id003
+        version:
+          type: integer
+          format: int64
+        humanRequired:
+          type: boolean
+        independentApplierRequired:
+          type: boolean
+        retryAt:
+          type: string
+          format: date-time
+        outcome: *id004
+      additionalProperties: true
+    ReviewArtifact:
+      type: object
+      required:
+      - apiVersion
+      - tenant
+      - conversation
+      - version
+      - capturedAt
+      - status
+      - changeSet
+      - auditIntegrity
+      - auditThrough
+      - audit
+      - limitations
+      properties:
+        apiVersion: *id003
+        tenant: *id003
+        conversation: *id003
+        version:
+          type: integer
+          format: int64
+        capturedAt:
+          type: string
+          format: date-time
+        status:
+          $ref: '#/components/schemas/WorkflowStatus'
+        changeSet: *id004
+        auditIntegrity:
+          const: verified
+        auditThrough:
+          type: integer
+          format: int64
+        audit:
+          type: array
+          items: *id004
+        limitations:
+          type: array
+          items: *id003
+      additionalProperties: true
+
+    NativeSLOResults:
+      type: object
+      required:
+      - apiVersion
+      - kind
+      - tenant
+      - source
+      - sloId
+      - provider
+      - nativeID
+      - url
+      - state
+      - budgetBasis
+      - revision
+      - from
+      - to
+      - checkedAt
+      - target
+      - attainment
+      - budgetRemaining
+      - points
+      - warnings
+      properties:
+        apiVersion:
+          const: nines.dev/v1alpha1
+        kind:
+          type: string
+        tenant:
+          type: string
+        source:
+          type: string
+        sloId:
+          type: string
+        provider:
+          type: string
+        nativeID:
+          type: string
+        url:
+          type: string
+        state:
+          type: string
+        budgetBasis:
+          type: string
+        revision:
+          type: integer
+          minimum: 1
+        from:
+          type: string
+          format: date-time
+        to:
+          type: string
+          format: date-time
+        checkedAt:
+          type: string
+          format: date-time
+        target:
+          type: number
+          exclusiveMinimum: 0
+          exclusiveMaximum: 1
+        attainment:
+          type:
+          - number
+          - 'null'
+          minimum: 0
+          maximum: 1
+        budgetRemaining:
+          type:
+          - number
+          - 'null'
+          maximum: 1
+        points:
+          type: array
+          maxItems: 2000
+          items:
+            type: object
+            required:
+            - time
+            - attainment
+            properties:
+              time:
+                type: string
+                format: date-time
+              attainment:
+                type:
+                - number
+                - 'null'
+                minimum: 0
+                maximum: 1
+        warnings:
+          type: array
+          items:
+            type: string
+    NativeSLOCatalog:
+      type: object
+      required:
+      - apiVersion
+      - kind
+      - tenant
+      - source
+      - provider
+      - items
+      properties:
+        apiVersion:
+          const: nines.dev/v1alpha1
+        kind:
+          type: string
+        tenant:
+          type: string
+        source:
+          type: string
+        provider:
+          type: string
+        items:
+          type: array
+          maxItems: 1000
+          items:
+            type: object
+            required:
+            - id
+            - name
+            - url
+            - importable
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              url:
+                type: string
+              importable:
+                type: boolean
+              reason:
+                type: string
+    NativeSLODraft:
+      type: object
+      required:
+      - apiVersion
+      - kind
+      - tenant
+      - source
+      - nativeID
+      - manifest
+      - warnings
+      properties:
+        apiVersion:
+          const: nines.dev/v1alpha1
+        kind:
+          type: string
+        tenant:
+          type: string
+        source:
+          type: string
+        nativeID:
+          type: string
+        manifest:
+          type: string
+        warnings:
+          type: array
+          items:
+            type: string

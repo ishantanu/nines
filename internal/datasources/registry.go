@@ -6,7 +6,6 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
-	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"net/url"
@@ -17,41 +16,50 @@ import (
 
 	"github.com/ishantanu/nines/internal/identity"
 	"github.com/ishantanu/nines/internal/model"
-	"github.com/ishantanu/nines/internal/prometheus"
+	"github.com/ishantanu/nines/internal/providers"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
+	"github.com/ishantanu/nines/internal/telemetryprovider"
 	"github.com/ishantanu/nines/internal/tenancy"
 )
 
 type Input struct {
-	AutoDeploy       bool   `json:"autoDeploy"`
-	Name             string `json:"name"`
-	Kind             string `json:"kind"`
-	URL              string `json:"url"`
-	MimirOrgID       string `json:"mimirOrgID"`
-	BearerToken      string `json:"bearerToken"`
-	ClearCredentials bool   `json:"clearCredentials"`
-	Reload           bool   `json:"reload"`
-	RulesEnabled     bool   `json:"rulesEnabled"`
-	RulerURL         string `json:"rulerURL"`
-	ExpectedVersion  int64  `json:"expectedVersion"`
+	NativeEntityGUID string            `json:"nativeEntityGUID,omitempty"`
+	Options          map[string]string `json:"options,omitempty"`
+	Credentials      map[string]string `json:"credentials,omitempty"`
+	CollectionMode   string            `json:"collectionMode,omitempty"`
+	AutoDeploy       bool              `json:"autoDeploy"`
+	Name             string            `json:"name"`
+	Kind             string            `json:"kind"`
+	URL              string            `json:"url"`
+	MimirOrgID       string            `json:"mimirOrgID"`
+	BearerToken      string            `json:"bearerToken"`
+	ClearCredentials bool              `json:"clearCredentials"`
+	Reload           bool              `json:"reload"`
+	RulesEnabled     bool              `json:"rulesEnabled"`
+	RulerURL         string            `json:"rulerURL"`
+	ExpectedVersion  int64             `json:"expectedVersion"`
 }
 type record struct {
-	AutoDeploy   bool   `json:"autoDeploy,omitempty"`
-	Reload       bool   `json:"reload,omitempty"`
-	Name         string `json:"name"`
-	Kind         string `json:"kind"`
-	URL          string `json:"url"`
-	MimirOrgID   string `json:"mimirOrgID,omitempty"`
-	RulesEnabled bool   `json:"rulesEnabled"`
-	RulerURL     string `json:"rulerURL,omitempty"`
-	Version      int64  `json:"version"`
-	Secret       []byte `json:"encryptedSecret,omitempty"`
+	NativeEntityGUID string            `json:"nativeEntityGUID,omitempty"`
+	Options          map[string]string `json:"options,omitempty"`
+	CollectionMode   string            `json:"collectionMode,omitempty"`
+	CredentialFormat string            `json:"credentialFormat,omitempty"`
+	AutoDeploy       bool              `json:"autoDeploy,omitempty"`
+	Reload           bool              `json:"reload,omitempty"`
+	Name             string            `json:"name"`
+	Kind             string            `json:"kind"`
+	URL              string            `json:"url"`
+	MimirOrgID       string            `json:"mimirOrgID,omitempty"`
+	RulesEnabled     bool              `json:"rulesEnabled"`
+	RulerURL         string            `json:"rulerURL,omitempty"`
+	Version          int64             `json:"version"`
+	Secret           []byte            `json:"encryptedSecret,omitempty"`
 }
 type entry struct {
 	record
-	client *prometheus.Client
+	client service.Collector
 	target *rules.Target
 }
 type Registry struct {
@@ -63,10 +71,17 @@ type Registry struct {
 	directory             string
 	store                 store.Store
 	entries               map[string]entry
+	routes                ProviderRoutes
 }
 
-func New(ctx context.Context, repo identity.Repository, tenant string, reserved, hosts, orgs map[string]bool, key, directory string, st store.Store) (*Registry, error) {
+func New(ctx context.Context, repo identity.Repository, tenant string, reserved, hosts, orgs map[string]bool, key, directory string, st store.Store, policy ...ProviderRoutes) (*Registry, error) {
 	r := &Registry{repo: repo, tenant: tenant, reserved: reserved, hosts: hosts, orgs: orgs, directory: directory, store: st, entries: map[string]entry{}}
+	r.routes = ProviderRoutes{}
+	for _, routes := range policy {
+		for kind, values := range routes {
+			r.routes[kind] = append(r.routes[kind], values...)
+		}
+	}
 	if key != "" {
 		b, e := base64.StdEncoding.DecodeString(key)
 		if e != nil || len(b) != 32 {
@@ -110,7 +125,7 @@ func (r *Registry) Source(name string) (service.MetricSource, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	e, ok := r.entries[name]
-	return service.MetricSource{Kind: e.Kind, Collector: e.client}, ok
+	return service.MetricSource{Kind: e.Kind, Collector: e.client, CollectionMode: e.CollectionMode}, ok
 }
 func (r *Registry) Target(name string) (rules.Target, bool) {
 	r.mu.RLock()
@@ -124,13 +139,21 @@ func (r *Registry) Target(name string) (rules.Target, bool) {
 func (r *Registry) public(e entry) map[string]any {
 	auth := "none"
 	if len(e.Secret) > 0 {
-		auth = "bearer"
+		auth = "provider_credentials"
+		if e.Kind == "prometheus" || e.Kind == "mimir" || e.Kind == "dash0" || e.Kind == "victoriametrics" {
+			auth = "bearer"
+		}
 	}
 	var destination *tenancy.RuleDestination
 	if e.target != nil {
 		destination = &tenancy.RuleDestination{Namespace: e.target.Namespace, Directory: e.target.Directory, RulerURL: e.target.RulerURL, Reload: e.target.Reload, AutoDeploy: e.target.AutoDeploy}
+		if e.Kind == "datadog" || e.Kind == "newrelic" {
+			destination.Mode = "native"
+			destination.EntityGUID = e.NativeEntityGUID
+		}
 	}
-	return map[string]any{"id": e.Name, "kind": e.Kind, "endpoint": e.URL, "mimirOrgID": e.MimirOrgID, "authentication": auth, "configuration": "managed", "version": e.Version, "rules": destination}
+	descriptor, _ := providers.Default.Describe(e.Kind)
+	return map[string]any{"capabilities": descriptor.Capabilities, "queryLanguages": descriptor.QueryLanguages, "id": e.Name, "kind": e.Kind, "endpoint": e.URL, "mimirOrgID": e.MimirOrgID, "authentication": auth, "configuration": "managed", "version": e.Version, "rules": destination, "options": copyOptions(e.Options), "collectionMode": collectionMode(e.CollectionMode)}
 }
 func (r *Registry) List() []map[string]any {
 	r.mu.RLock()
@@ -151,33 +174,36 @@ func (r *Registry) validURL(raw string) bool {
 	return e == nil && u.Host != "" && u.User == nil && u.RawQuery == "" && u.Fragment == "" && (u.Scheme == "http" || u.Scheme == "https") && r.hosts[strings.ToLower(u.Hostname())]
 }
 func (r *Registry) prepare(v record) (entry, error) {
-	if !tenancy.ValidID(v.Name) || v.Name == "primary" || (v.Kind != "prometheus" && v.Kind != "mimir") || !r.validURL(v.URL) {
-		return entry{}, model.Invalid("select prometheus or mimir and an endpoint hostname allowed by the server")
+	if !tenancy.ValidID(v.Name) || v.Name == "primary" || !managedKind(v.Kind) || !r.validURL(v.URL) {
+		return entry{}, model.Invalid("select a supported provider and an endpoint hostname allowed by the server")
+	}
+	if v.CollectionMode != "" && v.CollectionMode != "automatic" && v.CollectionMode != "manual" {
+		return entry{}, model.Invalid("collectionMode must be automatic or manual")
 	}
 	if v.Kind == "mimir" && (!tenancy.ValidMimirID(v.MimirOrgID) || !r.orgs[v.MimirOrgID]) {
 		return entry{}, model.Invalid("Mimir organization is not authorized for this tenant")
 	}
-	if v.Kind == "prometheus" && (v.MimirOrgID != "" || v.RulerURL != "") {
-		return entry{}, model.Invalid("Prometheus connections cannot set a Mimir organization or ruler URL")
+	if v.Kind != "mimir" && v.MimirOrgID != "" {
+		return entry{}, model.Invalid("only Mimir connections can set a Mimir organization")
 	}
-	token := ""
-	if len(v.Secret) > 0 {
-		if r.key == nil || len(v.Secret) < r.key.NonceSize() {
-			return entry{}, model.Invalid("managed source credentials require the configured encryption key")
-		}
-		b, e := r.key.Open(nil, v.Secret[:r.key.NonceSize()], v.Secret[r.key.NonceSize():], []byte(r.tenant+"/"+v.Name))
-		if e != nil {
-			return entry{}, errors.New("cannot decrypt managed source credentials")
-		}
-		token = string(b)
+	if (v.Kind == "datadog" || v.Kind == "newrelic") && (v.AutoDeploy || v.Reload || v.RulerURL != "") {
+		return entry{}, model.Invalid("native publication is reviewed only; automatic deployment, reload and ruler endpoints are unsupported")
 	}
-	var c *prometheus.Client
-	var err error
-	if v.Kind == "mimir" {
-		c, err = prometheus.NewMimir(v.URL, v.MimirOrgID, token)
-	} else {
-		c, err = prometheus.New(v.URL, token)
+	if v.Kind != "prometheus" && v.Kind != "mimir" && v.Kind != "datadog" && v.Kind != "newrelic" && (v.RulesEnabled || v.AutoDeploy || v.Reload || v.RulerURL != "") {
+		return entry{}, model.Invalid("managed provider connections collect telemetry only; configure native publishing separately")
 	}
+	if v.Kind == "prometheus" && v.RulerURL != "" {
+		return entry{}, model.Invalid("Prometheus connections cannot set a ruler URL")
+	}
+	if err := r.validateProviderRoute(v); err != nil {
+		return entry{}, err
+	}
+	credentials, err := r.credentials(v)
+	if err != nil {
+		return entry{}, err
+	}
+	token := credentials["bearerToken"]
+	c, err := providers.Default.Open(v.Kind, telemetryprovider.Configuration{Endpoint: v.URL, Dataset: v.MimirOrgID, Credentials: credentials, Options: v.Options})
 	if err != nil {
 		return entry{}, err
 	}
@@ -190,7 +216,15 @@ func (r *Registry) prepare(v record) (entry, error) {
 	}
 	if v.RulesEnabled {
 		t := rules.Target{AutoDeploy: v.AutoDeploy, Connection: v.Name, Kind: v.Kind, QueryURL: v.URL, Namespace: r.tenant + "-" + v.Name, MimirOrgID: v.MimirOrgID, BearerToken: token}
-		if v.Kind == "mimir" {
+		switch v.Kind {
+		case "newrelic":
+			t.NewRelicAccountID = v.Options["accountID"]
+			t.NewRelicEntityGUID = v.NativeEntityGUID
+			t.NewRelicUserKey = credentials["userKey"]
+		case "datadog":
+			t.DatadogAPIKey = credentials["apiKey"]
+			t.DatadogApplicationKey = credentials["applicationKey"]
+		case "mimir":
 			t.RulerURL = v.RulerURL
 			if t.RulerURL == "" {
 				t.RulerURL = v.URL
@@ -198,7 +232,7 @@ func (r *Registry) prepare(v record) (entry, error) {
 			if !r.validURL(t.RulerURL) {
 				return entry{}, model.Invalid("ruler hostname is not allowed by the server")
 			}
-		} else {
+		default:
 			if r.directory == "" {
 				return entry{}, model.Invalid("server has no managed Prometheus rule directory")
 			}
@@ -263,22 +297,20 @@ func (r *Registry) Save(ctx context.Context, in Input) (map[string]any, error) {
 	if !exists && len(r.entries)+len(r.reserved) >= 21 {
 		return nil, model.Invalid("tenant connection limit reached")
 	}
-	v := record{Name: in.Name, Kind: in.Kind, URL: strings.TrimRight(in.URL, "/"), MimirOrgID: in.MimirOrgID, RulesEnabled: in.RulesEnabled, Reload: in.Reload, AutoDeploy: in.AutoDeploy, RulerURL: strings.TrimRight(in.RulerURL, "/"), Version: in.ExpectedVersion + 1, Secret: old.Secret}
-	if exists && (old.URL != v.URL || old.Kind != v.Kind || old.MimirOrgID != v.MimirOrgID || old.RulesEnabled != v.RulesEnabled || old.RulerURL != v.RulerURL) && r.referenced(ctx, in.Name) {
+	v := record{NativeEntityGUID: in.NativeEntityGUID, Name: in.Name, Kind: in.Kind, URL: strings.TrimRight(in.URL, "/"), MimirOrgID: in.MimirOrgID, RulesEnabled: in.RulesEnabled, Reload: in.Reload, AutoDeploy: in.AutoDeploy, RulerURL: strings.TrimRight(in.RulerURL, "/"), Version: in.ExpectedVersion + 1, Secret: old.Secret, CredentialFormat: old.CredentialFormat, Options: copyOptions(in.Options), CollectionMode: in.CollectionMode}
+	publicationChanged := old.RulesEnabled != v.RulesEnabled || old.NativeEntityGUID != v.NativeEntityGUID
+	if (v.Kind == "datadog" || v.Kind == "newrelic") && !old.RulesEnabled && v.RulesEnabled {
+		publicationChanged = false
+	}
+	if exists && (old.URL != v.URL || old.Kind != v.Kind || old.MimirOrgID != v.MimirOrgID || publicationChanged || old.RulerURL != v.RulerURL || model.DefinitionDigest(copyOptions(old.Options)) != model.DefinitionDigest(v.Options)) && r.referenced(ctx, in.Name) {
 		return nil, model.Invalid("source is referenced by an SLO or measurement binding; create a new connection and review definition changes")
 	}
-	if in.ClearCredentials {
+	if old.Kind != v.Kind {
 		v.Secret = nil
+		v.CredentialFormat = ""
 	}
-	if in.BearerToken != "" {
-		if r.key == nil || len(in.BearerToken) > 8192 || strings.ContainsAny(in.BearerToken, "\r\n") {
-			return nil, model.Invalid("credential encryption key is required, and tokens must be single-line")
-		}
-		nonce := make([]byte, r.key.NonceSize())
-		if _, e := rand.Read(nonce); e != nil {
-			return nil, e
-		}
-		v.Secret = r.key.Seal(nonce, nonce, []byte(in.BearerToken), []byte(r.tenant+"/"+in.Name))
+	if err := r.updateCredentials(&v, in); err != nil {
+		return nil, err
 	}
 	next, err := r.prepare(v)
 	if err != nil {

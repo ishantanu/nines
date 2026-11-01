@@ -20,7 +20,7 @@ type IntentDrafter interface {
 }
 
 var goalPercent = regexp.MustCompile(`(?i)^\s*([0-9]+(?:\.[0-9]+)?)\s*(?:%|percent)\s*$`)
-var goalDuration = regexp.MustCompile(`(?i)^\s*([0-9]+(?:\.[0-9]+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(ms|milliseconds?|s|seconds?|m|minutes?|h|hours?|d|days?|w|weeks?)\s*$`)
+var goalDuration = regexp.MustCompile(`(?i)^\s*([0-9]+(?:\.[0-9]+)?|one|two|three|four|five|six|seven|eight|nine|ten)\s*(ns|nanoseconds?|us|µs|μs|microseconds?|ms|milliseconds?|s|seconds?|m|minutes?|h|hours?|d|days?|w|weeks?)\s*$`)
 
 func phrase(text string, p *string) (string, bool) {
 	if p == nil || strings.TrimSpace(*p) == "" || !strings.Contains(text, *p) {
@@ -40,6 +40,10 @@ func durationPhrase(text string) (float64, bool) {
 	unit := strings.ToLower(m[2])
 	factor := float64(1)
 	switch {
+	case unit == "ns" || strings.HasPrefix(unit, "nanosecond"):
+		factor = 1e-9
+	case unit == "us" || unit == "µs" || unit == "μs" || strings.HasPrefix(unit, "microsecond"):
+		factor = 1e-6
 	case unit == "ms" || strings.HasPrefix(unit, "millisecond"):
 		factor = .001
 	case unit == "m" || strings.HasPrefix(unit, "minute"):

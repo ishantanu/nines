@@ -49,6 +49,11 @@ export const docGroups: DocGroup[] = [
     title: "Define reliability",
     pages: [
       page(
+        "slo-guide",
+        "How to define an SLO",
+        "Understand SLIs, targets and error budgets with a practical SLO example.",
+      ),
+      page(
         "slo-extensions",
         "SLO extensions",
         "Publish typed measurement recipes, pinned bundles and evaluation contracts.",
@@ -82,6 +87,26 @@ export const docGroups: DocGroup[] = [
         "provider-adapters",
         "Provider adapters",
         "Understand supported backends and the boundaries for native provider extensions.",
+      ),
+      page(
+        "new-relic",
+        "New Relic",
+        "Find custom-event data and publish reviewed native service levels on approved entities.",
+      ),
+      page(
+        "dash0",
+        "Dash0",
+        "Configure dataset-scoped collection and review native SLO publication.",
+      ),
+      page(
+        "openslo",
+        "OpenSLO interoperability",
+        "Export a supported OpenSLO subset and inspect omitted Nines semantics.",
+      ),
+      page(
+        "google-cloud",
+        "Google Cloud Monitoring",
+        "Collect exact event counts and review native Cloud Monitoring SLO revisions.",
       ),
       page(
         "latency-slos",
@@ -119,6 +144,11 @@ export const docGroups: DocGroup[] = [
     title: "Work with agents",
     pages: [
       page(
+        "visual-evaluations",
+        "Visual journey evidence",
+        "Assess consented screenshots, inspect model receipts and record human review.",
+      ),
+      page(
         "system-one",
         "System One advice",
         "Use optional Jev judgments for template category and definition clarity.",
@@ -127,6 +157,21 @@ export const docGroups: DocGroup[] = [
         "intents",
         "SLO intents",
         "Move from a reliability goal to confirmed measurements and reviewed changes.",
+      ),
+      page(
+        "headless-workflows",
+        "Headless workflows",
+        "Prepare, review, apply, verify and restore SLO changes through CLI, API and MCP.",
+      ),
+      page(
+        "github-reviews",
+        "GitHub reviews",
+        "Publish explicitly reviewed SLO evidence for a selected PR commit.",
+      ),
+      page(
+        "workflow-webhooks",
+        "Workflow webhooks",
+        "Send signed, tenant-scoped workflow notifications to your integrations.",
       ),
       page(
         "intent-governance",
@@ -139,6 +184,11 @@ export const docGroups: DocGroup[] = [
         "Configure providers and understand measured workflow limitations.",
       ),
       page(
+        "api",
+        "HTTP API",
+        "Authenticate, inspect SLOs and integrate reviewed workflows over HTTP.",
+      ),
+      page(
         "cli",
         "CLI reference",
         "Use deterministic offline commands and tenant-scoped connected operations.",
@@ -148,6 +198,11 @@ export const docGroups: DocGroup[] = [
         "mcp",
         "MCP and skills",
         "Connect agent clients using scoped tools and deterministic CLI skills.",
+      ),
+      page(
+        "remote-mcp",
+        "Remote MCP with OAuth",
+        "Connect managed agent clients through scoped HTTP authorization and explicit tenant bindings.",
       ),
       page(
         "experimental",

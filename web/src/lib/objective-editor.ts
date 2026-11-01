@@ -1,3 +1,4 @@
+import { normalizeBurnWindows } from "./definition-yaml";
 import { parse } from "yaml";
 import { RESOURCE_API_VERSION, type SLODefinition } from "./definitions";
 import type { SLO, BurnRatePolicy } from "./api";
@@ -216,7 +217,7 @@ const policy = (v: unknown) =>
     ["critical", "warning", "info"].includes(String(x)),
   );
 export function parseObjectiveDefinition(text: string): SLODefinition {
-  const v: unknown = parse(text);
+  const v: unknown = normalizeBurnWindows(parse(text));
   if (
     !record(v) ||
     v.apiVersion !== RESOURCE_API_VERSION ||

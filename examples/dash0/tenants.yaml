@@ -1,0 +1,20 @@
+tenants:
+  - id: production
+    name: Production
+    access:
+      - tokenEnv: NINES_PRODUCTION_OWNER_TOKEN
+        role: owner
+    source:
+      kind: manual
+    connections:
+      - name: dash0-production
+        kind: dash0
+        url: https://api.eu-west-1.aws.dash0.com
+        options:
+          dataset: production
+        credentialsEnv:
+          bearerToken: DASH0_READ_TOKEN
+        rules:
+          mode: native
+          namespace: nines-production
+          bearerTokenEnv: DASH0_PUBLISH_TOKEN

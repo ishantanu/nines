@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const ReplayConsentNotice = "replay-sharing-v1"
+
 type ReplayReference struct {
 	Kind     string     `json:"kind"`
 	ID       string     `json:"id"`
@@ -13,6 +15,7 @@ type ReplayReference struct {
 	At       *time.Time `json:"at,omitempty"`
 }
 type SessionReplay struct {
+	ConsentReceipt *EvidenceConsent   `json:"consentReceipt,omitempty"`
 	APIVersion     string             `json:"apiVersion"`
 	Tenant         string             `json:"tenant"`
 	ID             string             `json:"id"`
@@ -32,12 +35,14 @@ type SessionReplay struct {
 	Archived       bool               `json:"archived"`
 }
 type CreateSessionReplay struct {
-	ID         string            `json:"id"`
-	Title      string            `json:"title"`
-	Consent    bool              `json:"consent"`
-	Policy     string            `json:"policy"`
-	References []ReplayReference `json:"references"`
-	Events     []json.RawMessage `json:"events"`
+	ID             string            `json:"id"`
+	Title          string            `json:"title"`
+	SharingConsent bool              `json:"sharingConsent"`
+	NoticeVersion  string            `json:"noticeVersion"`
+	Consent        bool              `json:"consent"`
+	Policy         string            `json:"policy"`
+	References     []ReplayReference `json:"references"`
+	Events         []json.RawMessage `json:"events"`
 }
 type UpdateReplayLinks struct {
 	ExpectedVersion int64             `json:"expectedVersion"`
@@ -60,4 +65,10 @@ type ReplayEvents struct {
 	ID         string            `json:"id"`
 	Digest     string            `json:"digest"`
 	Events     []json.RawMessage `json:"events"`
+}
+
+type ReplayPrivacy struct {
+	Disabled  bool   `json:"disabled,omitempty" yaml:"disabled,omitempty"`
+	PolicyURL string `json:"policyURL,omitempty" yaml:"policyURL,omitempty"`
+	Contact   string `json:"contact,omitempty" yaml:"contact,omitempty"`
 }

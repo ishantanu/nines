@@ -74,3 +74,19 @@ it("preserves provider windows and binding lineage when exporting/editing YAML",
   expect(roundtrip.spec).not.toHaveProperty("goodQuery");
   expect(roundtrip.spec).not.toHaveProperty("totalQuery");
 });
+
+it("preserves the provider query language when exporting an SLO", () => {
+  const definition = definitionFromSLO({
+    id: "dd",
+    project: "prod",
+    service: "api",
+    name: "API",
+    target: 0.99,
+    windowSeconds: 3600,
+    stepSeconds: 60,
+    queryLanguage: "datadog",
+    goodQuery: "sum:api.good{*}.as_count().rollup(sum,60)",
+    totalQuery: "sum:api.total{*}.as_count().rollup(sum,60)",
+  });
+  expect(parse(stringify(definition)).spec.queryLanguage).toBe("datadog");
+});

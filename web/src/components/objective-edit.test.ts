@@ -163,3 +163,25 @@ test("visiting Settings preserves an unchanged legacy alert policy representatio
   expect(after.spec.policy).toEqual(d.spec.policy);
   expect(after.spec.policies).toBeUndefined();
 });
+
+test("custom query edits preserve or explicitly change the vendor query language", () => {
+  const base = definitionFromSLO({
+    id: "vendor",
+    name: "Vendor",
+    project: "p",
+    service: "api",
+    target: 0.99,
+    windowSeconds: 86400,
+    stepSeconds: 60,
+    source: "newrelic-trial",
+    queryLanguage: "nrql",
+    goodQuery: "FROM Requests SELECT count(*) WHERE success = true",
+    totalQuery: "FROM Requests SELECT count(*)",
+  });
+  const draft = objectiveDraft(base);
+  expect(objectiveDefinition(base, draft).spec.queryLanguage).toBe("nrql");
+  draft.queryLanguage = "googlecloud";
+  expect(objectiveDefinition(base, draft).spec.queryLanguage).toBe(
+    "googlecloud",
+  );
+});

@@ -206,3 +206,27 @@ func (c *Client) ExportIntentRollbackKubernetes(ctx context.Context, id, namespa
 	}
 	return out, e
 }
+
+func (c *Client) IntentWorkflowStatus(ctx context.Context, id string) (v1.IntentWorkflowStatus, error) {
+	var out v1.IntentWorkflowStatus
+	p, err := conversationPath(id)
+	if err == nil {
+		err = c.scopedRequest(ctx, "GET", p+"/status", nil, 64<<10, &out)
+	}
+	if err == nil && out.Conversation != id {
+		err = errors.New("unexpected workflow conversation identity")
+	}
+	return out, err
+}
+
+func (c *Client) IntentReviewArtifact(ctx context.Context, id string) (v1.IntentReviewArtifact, error) {
+	var out v1.IntentReviewArtifact
+	p, err := conversationPath(id)
+	if err == nil {
+		err = c.scopedRequest(ctx, "GET", p+"/review-artifact", nil, 8<<20, &out)
+	}
+	if err == nil && (out.Conversation != id || out.AuditIntegrity != "verified") {
+		err = errors.New("unexpected or unverified review artifact")
+	}
+	return out, err
+}

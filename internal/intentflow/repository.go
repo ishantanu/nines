@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -22,6 +23,31 @@ var errLease = errors.New("intent workflow lease lost")
 
 const maxDocument = 2 << 20
 const maxSessions = 200
+const maxRuns = 8
+const maxMessages = 40
+const maxPreparationBytes = 1 << 20
+
+type CapacityError struct {
+	Resource string
+	Limit    int
+}
+
+func (e *CapacityError) Error() string {
+	if e.Resource == "tenant_conversations" {
+		return fmt.Sprintf("%s: tenant has reached %d saved conversations; contact the administrator", ErrLimit, e.Limit)
+	}
+	label := map[string]string{
+		"messages":          "message count",
+		"preparation_runs":  "preparation run",
+		"preparation_bytes": "preparation data size in bytes",
+		"document_bytes":    "saved conversation size in bytes",
+	}[e.Resource]
+	if label == "" {
+		label = "conversation"
+	}
+	return fmt.Sprintf("%s: %s limit (%d); continue in a new conversation and prepare fresh evidence", ErrLimit, label, e.Limit)
+}
+func (e *CapacityError) Unwrap() error { return ErrLimit }
 
 type record struct {
 	MessageDigests map[string]string       `json:"messageDigests,omitempty"`
@@ -57,7 +83,7 @@ func validSize(r record) error {
 		return e
 	}
 	if len(b) > maxDocument {
-		return ErrLimit
+		return &CapacityError{Resource: "document_bytes", Limit: maxDocument}
 	}
 	return nil
 }
@@ -82,10 +108,11 @@ func claim(r *record, token string, now time.Time) error {
 func touch(r *record, now time.Time) { r.Session.Version++; r.Session.UpdatedAt = now }
 
 type memory struct {
-	mu       sync.Mutex
-	values   map[string]record
-	journal  []v1.AuditRecord
-	archives map[string]archiveState
+	mu            sync.Mutex
+	values        map[string]record
+	journal       []v1.AuditRecord
+	archives      map[string]archiveState
+	notifications map[string]workflowEventState
 }
 
 func NewMemory() Repository { return &memory{values: map[string]record{}} }
@@ -103,7 +130,7 @@ func (m *memory) Create(ctx context.Context, r record) (record, error) {
 		return clone(old), nil
 	}
 	if len(m.values) >= maxSessions {
-		return record{}, ErrLimit
+		return record{}, &CapacityError{Resource: "tenant_conversations", Limit: maxSessions}
 	}
 	if err := validSize(r); err != nil {
 		return record{}, err

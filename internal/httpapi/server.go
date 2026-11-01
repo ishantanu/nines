@@ -84,21 +84,25 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 			role = p.Role
 		}
 		count := 0
+		connections := []map[string]string{}
 		kinds := map[string]bool{}
 		if s.Collector != nil {
 			count++
 			kinds[s.SourceKind] = true
+			connections = append(connections, map[string]string{"id": "primary", "kind": s.SourceKind})
 		}
-		for _, source := range s.Sources {
+		for name, source := range s.Sources {
 			if source.Collector != nil {
 				count++
 				kinds[source.Kind] = true
+				connections = append(connections, map[string]string{"id": name, "kind": source.Kind})
 			}
 		}
 		if workspace.ManagedSources != nil {
 			for _, connection := range workspace.ManagedSources.List() {
 				count++
 				kinds[connection["kind"].(string)] = true
+				connections = append(connections, map[string]string{"id": connection["id"].(string), "kind": connection["kind"].(string)})
 			}
 		}
 		kind := "manual"
@@ -108,8 +112,12 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 		if len(kinds) > 1 {
 			kind = "multiple"
 		}
-		write(w, 200, map[string]any{"mode": mode, "prometheusConfigured": count > 0, "journeysConfigured": s.Journeys != nil, "tenant": map[string]string{"id": s.TenantID, "name": s.TenantName}, "source": map[string]any{"kind": kind, "configured": count > 0, "connectionCount": count}, "role": role, "workflowsConfigured": workflows != nil})
+		write(w, 200, map[string]any{"mode": mode, "connections": connections, "prometheusConfigured": count > 0, "journeysConfigured": s.Journeys != nil, "tenant": map[string]string{"id": s.TenantID, "name": s.TenantName}, "source": map[string]any{"kind": kind, "configured": count > 0, "connectionCount": count}, "role": role, "workflowsConfigured": workflows != nil, "replayCaptureEnabled": workspace.Replays != nil && !workspace.Replays.Privacy.Disabled})
 	})
+	api.HandleFunc("GET /api/visual-evaluations/capabilities", a.visualCapabilities)
+	api.HandleFunc("GET /api/journeys/{id}/visual-evaluations", a.visualList)
+	api.HandleFunc("POST /api/journeys/{id}/visual-evaluations", a.visualCreate)
+	api.HandleFunc("POST /api/journeys/{id}/visual-evaluations/{evaluation}/review", a.visualReview)
 	api.HandleFunc("GET /api/slo-templates", a.sloTemplates)
 	api.HandleFunc("GET /api/slo-templates/{template}", a.sloTemplate)
 	api.HandleFunc("POST /api/slo-templates/{template}/render", a.renderSLOTemplate)
@@ -126,6 +134,9 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 	api.HandleFunc("POST /api/slos/{id}/retirement/apply", a.retirementApply)
 	api.HandleFunc("POST /api/slos/{id}/retirement/retry", a.retirementRetry)
 	api.HandleFunc("GET /api/slos/{id}/integration", a.integrationStatus)
+	api.HandleFunc("GET /api/slos/{id}/native-results", a.nativeSLOResults)
+	api.HandleFunc("GET /api/connections/{connection}/native-slos", a.nativeSLOCatalog)
+	api.HandleFunc("GET /api/connections/{connection}/native-slo-draft", a.nativeSLODraft)
 	api.HandleFunc("GET /api/slos/{id}/rules", a.rulePlan)
 	api.HandleFunc("POST /api/slos/{id}/rules/plan", a.rulePlan)
 	api.HandleFunc("POST /api/slos/{id}/rules/apply", a.ruleApply)
@@ -204,12 +215,13 @@ func (a *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		write(w, 500, map[string]string{"error": "operation failed"})
 	}
 }
-func decode(w http.ResponseWriter, r *http.Request, v any) error {
+func decode(w http.ResponseWriter, r *http.Request, v any) error { return decodeLimit(w, r, v, 2<<20) }
+func decodeLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) error {
 	typ, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 	if err != nil || typ != "application/json" {
 		return model.Invalid("Content-Type must be application/json")
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	defer func() {
 		_ = r.Body.Close()
 	}()
@@ -328,7 +340,7 @@ func (a *Server) collect(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if strings.HasPrefix(err.Error(), "collection failed:") {
 			a.Log.ErrorContext(r.Context(), "source collection failed", "slo", r.PathValue("id"), "error", err)
-			write(w, 502, map[string]string{"error": "Prometheus collection failed; no samples were committed"})
+			write(w, 502, map[string]string{"error": "Telemetry collection failed; no samples were committed"})
 			return
 		}
 		a.fail(w, r, err)

@@ -24,8 +24,8 @@ spec:
     observationPoint: Completed API requests, including failures. Requests never reaching the server are excluded.
   # Optional alert policy. These values are explicitly authored, not inferred.
   policy:
-    shortWindowSeconds: 300
-    longWindowSeconds: 3600
+    shortWindow: 5m
+    longWindow: 1h
     burnRate: 14.4
     forSeconds: 120
     minCoverage: 1

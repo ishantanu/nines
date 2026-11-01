@@ -176,3 +176,69 @@ test("System One preparation needs its own opt-in and resets after submission", 
   await act(async () => complete(response("existing")));
   expect(checkbox.checked).toBe(false);
 });
+
+test("a full conversation offers a new goal-only conversation without copying approval evidence", async () => {
+  const full = await response("full").json();
+  full.runs = Array.from({ length: 8 }, (_, i) => ({
+    id: `run-${i}`,
+    skill: { id: "intent", version: "1", digest: "synthetic" },
+    status: "succeeded",
+    steps: [],
+    modelCalls: 0,
+  }));
+  full.goal = {
+    apiVersion: "nines.dev/v1alpha1",
+    kind: "ServiceLevelObjectiveIntent",
+    metadata: { name: "api", project: "production" },
+    spec: {
+      description: "99.9% availability over 28 days",
+      service: "api",
+      source: "primary",
+      population: { service: "api" },
+      noDataPolicy: "unknown",
+      outcome: "availability",
+      target: 0.999,
+      windowSeconds: 2419200,
+    },
+  };
+  full.changeSet = undefined;
+  vi.mocked(fetch).mockImplementation(async (path, init) => {
+    if (init?.method === "POST")
+      return new Promise<Response>((resolve) => {
+        complete = resolve;
+      });
+    if (String(path).endsWith("/capabilities"))
+      return new Response(
+        JSON.stringify({
+          tenant: "alpha",
+          modelEnabled: false,
+          draftEnabled: false,
+          maxRuns: 8,
+          skill: { id: "intent" },
+        }),
+      );
+    if (String(path) === "/api/intent-conversations")
+      return new Response(JSON.stringify({ tenant: "alpha", items: [] }));
+    return new Response(JSON.stringify(full));
+  });
+  await act(async () => navigateTo(workspacePath("alpha", "intents", "full")));
+  expect(button("Prepare proposal").disabled).toBe(true);
+  expect(host.textContent).toContain(
+    "new proposals need fresh checks and review",
+  );
+  await act(async () =>
+    button("Start new conversation with this goal").click(),
+  );
+  const request = vi
+    .mocked(fetch)
+    .mock.calls.find(
+      ([path, init]) =>
+        path === "/api/intent-conversations" && init?.method === "POST",
+    )!;
+  const input = JSON.parse(String(request[1]?.body));
+  expect(input.goal).toEqual(full.goal);
+  expect(input).not.toHaveProperty("changeSet");
+  expect(input).not.toHaveProperty("runs");
+  expect(input.id).not.toBe("full");
+  await act(async () => complete(response()));
+});

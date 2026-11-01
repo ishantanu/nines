@@ -85,3 +85,37 @@ func TestIntentConversationAPIRolesScopeAndStrictRequests(t *testing.T) {
 		t.Fatal("conversation applied definition")
 	}
 }
+
+func TestIntentWorkflowStatusIsScopedReadOnly(t *testing.T) {
+	workspaces := []Workspace{}
+	for _, id := range []string{"alpha", "beta"} {
+		s, _, err := testtelemetry.New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.TenantID = id
+		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, IntentConversations: intentflow.New(s, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}}})
+	}
+	h, err := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"id":"status-chat","title":"API availability","text":"Review API success","scope":{"metadata":{"name":"new-slo","project":"test"},"service":"api","source":"primary","population":{"service":"api"},"noDataPolicy":"unknown"}}`
+	if w := invRequest(h, "POST", "/api/intent-conversations", body, "owner", "alpha"); w.Code != 201 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	path := "/api/intent-conversations/status-chat/status"
+	for range 2 {
+		w := invRequest(h, "GET", path, "", "viewer", "alpha")
+		var out v1.IntentWorkflowStatus
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &out) != nil || out.Version != 1 || out.NextAction != "run" || out.Tenant != "alpha" || w.Header().Get("Cache-Control") != "no-store" {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	if w := invRequest(h, "GET", path, "", "viewer", "beta"); w.Code != 404 {
+		t.Fatal("cross-tenant status", w.Code)
+	}
+	if w := invRequest(h, "GET", path+"?tenant=beta", "", "viewer", "alpha"); w.Code != 400 {
+		t.Fatal("status query accepted", w.Code)
+	}
+}

@@ -7,13 +7,14 @@
 
 Service level objectives and critical user journeys as versioned YAML, with a portal, CLI, Go client, Kubernetes operator and optional agent workflows.
 
-- **Measure reliability:** connect Prometheus or Mimir and inspect SLI attainment, coverage, error budgets and burn alerts.
+- **Measure reliability:** connect Prometheus or Mimir (or try experimental [Datadog, New Relic, VictoriaMetrics, Dash0 and Google Cloud collection](docs/public/provider-adapters.md)) and inspect SLI attainment, coverage, error budgets and burn alerts.
+- **Publish reviewed objectives:** create native [Datadog](docs/public/provider-adapters.md#publish-a-native-datadog-slo), [New Relic](docs/public/new-relic.md), [Dash0](docs/public/dash0.md) or [Google Cloud](docs/public/google-cloud.md) SLOs within their supported subsets. Native burn-monitor publishing remains separate.
 - **Map user outcomes:** link SLOs to critical user journey steps and service dependencies.
 - **Review changes:** plan, approve and apply exact revisions, with audit records and separately reviewed rollback.
-- **Work with agents:** use provider-configurable models, deterministic CLI skills and tenant-scoped MCP tools.
+- **Work with agents:** use provider-configurable models, deterministic CLI skills and tenant-scoped MCP tools over stdio or opt-in [remote OAuth HTTP](docs/public/remote-mcp.md).
 - **Run it yourself:** use native binaries, Docker Compose or Kubernetes.
 
-**Pre-release MVP, under active development.** APIs use `nines.dev/v1alpha1` and may change. Model-assisted workflows and session replay are experimental; production-scale readiness has not been established.
+**Pre-release MVP, under active development.** APIs use `nines.dev/v1alpha1` and may change. Model-assisted workflows, visual evaluations and session replay are experimental; production-scale readiness has not been established.
 
 <a href="docs/public/brand/nines-overview.jpg">
   <img src="docs/public/brand/nines-overview.jpg" alt="Nines overview with synthetic SLO attainment, error budgets and linked critical user journeys" width="760">
@@ -42,27 +43,33 @@ Service level objectives and critical user journeys as versioned YAML, with a po
 - Resets on restart; keep this demonstration on loopback.
 - Node is not required to run the committed UI build.
 
+## Provider support
+
+- **Prometheus / Mimir:** collection, discovery, recording and burn-rate rules; portal or tenant-file configuration.
+- **Datadog / New Relic:** experimental collection, reviewed native SLO publication, on-demand native results and reviewed YAML import drafts; portal or tenant-file configuration.
+- **Dash0:** experimental collection and native OpenSLO publication; configure publication in the tenant file.
+- **Google Cloud Monitoring:** experimental DELTA-count collection and native SLO publication; tenant-file configuration with ADC or an access token.
+- **VictoriaMetrics:** experimental interval-count collection; tenant-file configuration.
+- Provider symbols beside SLOs identify the telemetry connection. Native publication has separate review and verification evidence; native vendor alert creation is not included.
+- See the [support matrix, query validation and acceptance limits](https://ishantanu.github.io/nines/docs/provider-adapters/).
+
 ## Test Prometheus locally
 
-1. With Docker Compose available, configure a database password once:
+1. Start with Docker Compose v2 and Python 3 available. The launcher creates a private `.env` on first use and preserves existing credentials:
 
    ```sh
-   # Fresh checkout only; skip if .env or POSTGRES_PASSWORD is configured.
-   python3 scripts/setup-local.py --playground
+   ./playground up
    ```
 
-2. Start the self-contained stack:
+2. Open [localhost:18080](http://localhost:18080), sign in with **admin / admin**, and select **Playground Prometheus**.
+3. Run the optional end-to-end verifier; allow several minutes:
 
    ```sh
-   docker compose -p nines-playground -f compose.playground.yaml up --build -d
+   ./playground verify
    ```
 
-3. Open [localhost:18080](http://127.0.0.1:18080), sign in with **admin / admin**, and select **Playground Prometheus**.
-4. Run the optional end-to-end verifier; allow several minutes:
-
-   ```sh
-   docker compose -p nines-playground -f compose.playground.yaml run --rm verify
-   ```
+- Add options once: `./playground up --mimir --jev`, `--ai`, `--topology` or `--providers /private/path/tenants.yaml`. Subsequent commands remember the selection.
+- Use `./playground logs`, `./playground status` and `./playground down`. Shutdown preserves data.
 
 - Includes PostgreSQL, Prometheus and a synthetic checkout service.
 - Automatically deploys the sample SLO's recording and alert rules.
@@ -173,6 +180,7 @@ make release-check
 
 ## Acknowledgements
 
+- [OpenSLO](https://openslo.com/): the interoperability format used for bounded export and native Dash0 SLO publication.
 - [Sloth](https://github.com/slok/sloth): SLOs as code and Prometheus rule generation.
 - [Pyrra](https://github.com/pyrra-dev/pyrra): approachable SLO workflows and visualisation.
 - *Site Reliability Engineering: How Google Runs Production Systems*, [first edition (2016)](https://sre.google/sre-book/table-of-contents/) and [second edition (2026)](https://sre.google/books/): SLO lifecycle, measurement and operational practices. Thank you to their editors and contributors.

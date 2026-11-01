@@ -26,7 +26,7 @@ func recording() v1.CreateSessionReplay {
 	raw := fmt.Sprintf(`[{"type":4,"timestamp":%d,"data":{"href":"https://evil.example/?secret=token","width":800,"height":600}},{"type":2,"timestamp":%d,"data":{"node":{"type":0,"id":1,"childNodes":[{"type":2,"id":2,"tagName":"html","attributes":{},"childNodes":[{"type":2,"id":3,"tagName":"body","attributes":{"onclick":"secret-handler","title":"secret-title"},"childNodes":[{"type":3,"id":4,"textContent":"secret@example.com"},{"type":2,"id":5,"tagName":"script","attributes":{"src":"https://evil.example/secret"},"childNodes":[{"type":3,"id":6,"textContent":"secret-script"}]}]}]}]},"initialOffset":{"left":0,"top":0}}},{"type":3,"timestamp":%d,"data":{"source":5,"id":4,"text":"secret-password","isChecked":false}},{"type":3,"timestamp":%d,"data":{"source":11,"secret":"plugin-secret"}}]`, t, t+1, t+1000, t+2000)
 	var events []json.RawMessage
 	_ = json.Unmarshal([]byte(raw), &events)
-	return v1.CreateSessionReplay{ID: "capture-1", Title: "Checkout sample", Consent: true, Policy: Policy, References: []v1.ReplayReference{{Kind: v1.SLOKind, ID: "checkout", Revision: 1}}, Events: events}
+	return v1.CreateSessionReplay{ID: "capture-1", Title: "Checkout sample", Consent: true, SharingConsent: true, NoticeVersion: v1.ReplayConsentNotice, Policy: Policy, References: []v1.ReplayReference{{Kind: v1.SLOKind, ID: "checkout", Revision: 1}}, Events: events}
 }
 func fixture(t *testing.T, pg bool) (*Service, context.Context, string) {
 	t.Helper()
@@ -315,6 +315,10 @@ func TestReplayReadIdentityIntegrityAndPhysicalRetention(t *testing.T) {
 		}
 		if _, err := s.Create(otherUser, in); err == nil {
 			t.Fatal("viewer ingested replay")
+		}
+		agent := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "alpha", Role: "agent", Subject: "agent", Kind: "api_token"})
+		if _, err := s.Create(agent, in); err == nil {
+			t.Fatal("agent granted replay consent")
 		}
 		if _, err := s.Repository.Update(ctx, created.ID, func(r *record) error {
 			r.Events[0] = json.RawMessage(`{"type":4,"timestamp":1,"data":{"href":"/tampered"}}`)

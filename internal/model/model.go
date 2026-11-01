@@ -11,6 +11,7 @@ import (
 
 	v1alpha1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/promqlvalidate"
+	"github.com/ishantanu/nines/internal/queryspec"
 )
 
 var (
@@ -39,6 +40,7 @@ type SLO struct {
 	Intent             *v1alpha1.IntentSpec               `json:"intent,omitempty"`
 	ProviderWindow     *v1alpha1.ProviderWindow           `json:"providerWindow,omitempty"`
 	MeasurementBinding *v1alpha1.BindingReference         `json:"measurementBinding,omitempty"`
+	QueryLanguage      string                             `json:"queryLanguage,omitempty"`
 	Source             string                             `json:"source,omitempty"`
 	Revision           int64                              `json:"revision,omitempty"`
 	ID                 string                             `json:"id"`
@@ -63,6 +65,12 @@ func (s SLO) Retired() bool { return s.Retirement != nil }
 
 func (s SLO) HasQueries() bool { return s.ProviderWindow != nil || s.GoodQuery != "" }
 func (s SLO) Validate() error {
+	if s.QueryLanguage != "" && !queryspec.Supports(s.QueryLanguage) {
+		return Invalid("query language is not installed")
+	}
+	if s.QueryLanguage != "" && s.QueryLanguage != "promql" && (s.ProviderWindow != nil || s.Measurement != nil || s.MeasurementBinding != nil || s.GoodQuery == "" || s.TotalQuery == "") {
+		return Invalid("provider queries require goodQuery and totalQuery without Prometheus measurements or bindings")
+	}
 	if err := validateBudgetPolicy(s.ErrorBudgetPolicy); err != nil {
 		return err
 	}
@@ -130,7 +138,7 @@ func (s SLO) Validate() error {
 	}
 	for _, q := range []struct{ field, text string }{{"goodQuery", s.GoodQuery}, {"totalQuery", s.TotalQuery}} {
 		if q.text != "" {
-			if _, err := promqlvalidate.InstantVector(q.text); err != nil {
+			if err := queryspec.Validate(s.QueryLanguage, q.text, s.StepSeconds); err != nil {
 				return Invalid("%s: %v", q.field, err)
 			}
 		}

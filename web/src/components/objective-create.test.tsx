@@ -182,7 +182,7 @@ test("YAML can change measurement type and rehydrates the matching guided fields
   expect(input("Histogram metric family (seconds)").value).toBe(
     "duration_seconds",
   );
-  expect(input("Good events complete within (seconds)").value).toBe("0.3");
+  expect(input("Good events complete within").value).toBe("300ms");
   expect(input("Target (%)").value).toBe("99");
   await tab("YAML");
   expect(

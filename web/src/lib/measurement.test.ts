@@ -54,7 +54,7 @@ test("invalid scrape cadence blocks compilation and changing outcome drops hidde
   expect(() => bindingFromDraft(d)).toThrow("evenly spaced scrapes");
   d.scrape = "15";
   d.measurement = "latency";
-  d.threshold = ".3";
+  d.threshold = "300ms";
   d.success = [{ label: "invalid=label", value: "200" }];
   const compiled = bindingFromDraft(d);
   expect(compiled.spec.successLabels).toBeUndefined();

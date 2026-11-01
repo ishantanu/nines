@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 )
 
 func TestSelectiveLabelsAreBoundedAndIdempotent(t *testing.T) {
@@ -95,6 +97,40 @@ func TestRecordingConsentPolicyIsPreserved(t *testing.T) {
 			if _, err := svc.Create(ctx, in); err != ErrConflict {
 				t.Fatalf("changed consent retry = %v", err)
 			}
+		}
+	})
+}
+
+func TestReplaySeparateSharingConsentAndPermanentDeletion(t *testing.T) {
+	modes(t, func(t *testing.T, pg bool) {
+		svc, ctx, _ := fixture(t, pg)
+		in := recording()
+		for _, change := range []func(*v1.CreateSessionReplay){func(r *v1.CreateSessionReplay) { r.SharingConsent = false }, func(r *v1.CreateSessionReplay) { r.NoticeVersion = "stale-notice" }} {
+			bad := in
+			change(&bad)
+			if _, e := svc.Create(ctx, bad); e == nil {
+				t.Fatal("implicit/stale sharing consent accepted")
+			}
+		}
+		saved, e := svc.Create(ctx, in)
+		if e != nil || saved.ConsentReceipt == nil || saved.ConsentReceipt.Actor.Subject == "" || saved.ConsentReceipt.NoticeVersion != v1.ReplayConsentNotice {
+			t.Fatal(saved, e)
+		}
+		if e = svc.Delete(ctx, saved.ID, saved.Version+1); e != ErrConflict {
+			t.Fatal("stale deletion accepted", e)
+		}
+		if e = svc.Delete(ctx, saved.ID, saved.Version); e != nil {
+			t.Fatal(e)
+		}
+		if _, e = svc.Events(ctx, saved.ID); e != ErrNotFound {
+			t.Fatal("deleted event payload retained", e)
+		}
+		if _, e = svc.Read(ctx, saved.ID); e != ErrNotFound {
+			t.Fatal("deleted metadata retained", e)
+		}
+		svc.Privacy.Disabled = true
+		if _, e = svc.Create(ctx, in); e == nil {
+			t.Fatal("disabled replay accepted")
 		}
 	})
 }

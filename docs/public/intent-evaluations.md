@@ -92,7 +92,7 @@ go run ./integration/intent-eval --suite template-selection --live \
   --out intent-evaluation-template-selection.json
 ```
 
-- The same command works with the native Anthropic/Gemini or other configured provider routes below. A single-case probe adds `--case api-availability`. Provider charges require explicit `--live`; CI uses fixtures only.
+- The same command works with the native Anthropic/Gemini or other configured provider routes below. A single-case template-selection probe adds `--case api-availability`. Provider charges require explicit `--live`; CI uses fixtures only.
 - Selection reports include the suite SHA-256, built-in catalog digest, worker skill version/digest, safe model route identity, call counts and named model/guardrail checks.
   - The suite digest also covers the embedded adversarial extension bytes. `acceptance.status` is `fixture_only`, `partial`, `passed`, `failed` or `incomplete`.
   - Only a complete live run of all nine scenarios with every check passing receives `passed`; a successful filtered live run remains `partial`.
@@ -265,3 +265,32 @@ make test-integration
 ## System One assessments
 
 - Jev is a separate typed-judgment adapter, not a drafting/tool-calling provider. See [System One advice](system-one.md) for tenant configuration, per-run consent, the synthetic live acceptance command and its calibration limits.
+
+## Local generative probe, 29 October 2026
+
+A bounded synthetic drafting probe used cached Qwen3-0.6B through a temporary, unconstrained CPU Transformers adapter. Six cases passed, nine failed and the final case was cancelled at the 90-second limit; the run was incomplete. The separate template-selection probe could not exercise the model because that adapter did not implement tool calling. This is a result for that exact small model and experimental adapter, not an assessment of Qwen generally or acceptance of a supported production provider. No customer data was used.
+
+## Focused draft diagnostics
+
+Use a single synthetic live case to investigate one drafting failure without running the entire corpus:
+
+```sh
+INTENT_MODEL_PROVIDER=ollama \
+INTENT_MODEL_MODEL=qwen3:4b \
+go run ./integration/intent-eval --suite draft --live --case availability \
+  --out intent-draft-case.json
+```
+
+Set the provider, model, endpoint and credentials for your own environment; the command is illustrative. Only non-fixture-only case IDs from the synthetic draft corpus are accepted. The report identifies `selectedCase`; a passing filtered probe does not establish full-suite acceptance. Unknown and fixture-only case IDs are rejected before any provider call.
+
+JSON output mode sends the output schema without appending an unrelated missing-target example. Exact numeric phrases, ambiguity checks, tenant scope and review gates remain enforced by deterministic code. Provider outputs are not retained in the normal report.
+
+On 29 October 2026, after removing the extra JSON-mode example, a complete synthetic draft run against the same cached Qwen3-0.6B and unconstrained CPU adapter passed 9 of 16 live cases; five adversarial fixture-only cases were skipped as designed. Seven cases still failed. In focused before/after probes, availability and latency changed from clarification to draft, and missing target changed from unavailable to clarification. These results do not establish full model acceptance or tool-calling support. The model sometimes rewrote exact quantities or emitted a response outside the required schema; Nines continued to reject those outputs rather than silently changing the SLO.
+
+A follow-up added support for one complete JSON Markdown fence in portable JSON mode. The fenced content still goes through strict JSON decoding, duplicate and unknown field rejection, literal quantity checks and human review. A captured synthetic joint-condition response was replayed through the adapter and service and remained a clarification. This was a deterministic replay, not a new live-model acceptance run; the preceding 9-of-16 result is unchanged.
+
+## Diagnosing draft failures
+
+When a draft case has an unexpected status, the synthetic evaluation report includes a bounded `draftDiagnostic` object. It records whether the model call returned or was unavailable, its allowlisted outcome, whether the model requested clarification, and whether each extracted quantity appears literally in the synthetic input. Fixed validation-reason codes identify which deterministic checks requested clarification. They are diagnostic evidence, not proof that a literal phrase is semantically correct.
+
+The report does not include input text, extracted values, clarification text, provider responses, endpoint URLs or credentials. `unavailable` combines provider transport failures and responses rejected by the adapter; it does not identify the cause. Diagnostics never change case pass criteria or authorize a change.

@@ -48,3 +48,23 @@ func TestIntentConversationCLIUsesScopedYAMLRequests(t *testing.T) {
 		t.Fatal("unknown scope field reached API", e)
 	}
 }
+
+func TestIntentReviewMarkdownKeepsUntrustedTextInFence(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/intent-conversations/chat/review-artifact" || r.Header.Get("X-Nines-Tenant") != "alpha" {
+			t.Error("unexpected request")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"apiVersion": "nines.dev/v1alpha1", "tenant": "alpha", "conversation": "chat", "version": 3, "auditIntegrity": "verified", "changeSet": map[string]any{"approvalReason": "triple ``` followed by <script>"}})
+	}))
+	defer server.Close()
+	t.Setenv("NINES_URL", server.URL)
+	t.Setenv("NINES_TENANT", "alpha")
+	t.Setenv("API_TOKEN", "fixture")
+	var out bytes.Buffer
+	if e := run([]string{"intent", "conversations", "report", "chat", "--markdown", "--agent"}, &out); e != nil {
+		t.Fatal(e)
+	}
+	if !strings.Contains(out.String(), "````json\n") || !strings.HasSuffix(out.String(), "\n````\n") || strings.Contains(out.String(), "<script>") {
+		t.Fatal(out.String())
+	}
+}

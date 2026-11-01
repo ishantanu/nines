@@ -1,0 +1,20 @@
+tenants:
+  - id: production
+    name: Production
+    access:
+      - tokenEnv: NINES_PRODUCTION_OWNER_TOKEN
+        role: owner
+    source:
+      kind: manual
+    connections:
+      - name: google-checkout
+        kind: googlecloud
+        url: https://monitoring.googleapis.com
+        options:
+          projectID: nines-demo-project
+          serviceID: checkout
+          auth: adc
+        # Omit rules for collection-only access.
+        rules:
+          mode: native
+          namespace: nines-production

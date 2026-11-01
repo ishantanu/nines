@@ -1,7 +1,7 @@
 import { DependencyEvidence } from "./dependency-evidence";
 import { SLIValue } from "@/components/sli-value";
 import { useEffect, useId, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { RefreshCw } from "lucide-react";
 import { api, date, message, type RequestScope } from "@/lib/api";
 import {

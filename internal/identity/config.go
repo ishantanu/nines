@@ -16,12 +16,13 @@ import (
 )
 
 type Config struct {
-	PlatformAdmins []PlatformAdmin  `yaml:"platformAdmins"`
-	PublicURLEnv   string           `yaml:"publicURLEnv"`
-	PublicURL      string           `yaml:"publicURL"`
-	SessionHours   int              `yaml:"sessionHours"`
-	Providers      []ProviderConfig `yaml:"providers"`
-	Bootstrap      []Bootstrap      `yaml:"bootstrap"`
+	AllowLoopbackAliases bool             `yaml:"allowLoopbackAliases"`
+	PlatformAdmins       []PlatformAdmin  `yaml:"platformAdmins"`
+	PublicURLEnv         string           `yaml:"publicURLEnv"`
+	PublicURL            string           `yaml:"publicURL"`
+	SessionHours         int              `yaml:"sessionHours"`
+	Providers            []ProviderConfig `yaml:"providers"`
+	Bootstrap            []Bootstrap      `yaml:"bootstrap"`
 }
 type ProviderConfig struct {
 	AllowDemoCredentials bool          `yaml:"allowDemoCredentials"`
@@ -98,6 +99,9 @@ func ParseConfig(b []byte, lookup func(string) string) (Config, error) {
 		return c, fmt.Errorf("publicURL must be an HTTPS origin; HTTP is allowed only for loopback development")
 	}
 	c.PublicURL = strings.TrimRight(c.PublicURL, "/")
+	if c.AllowLoopbackAliases && (u.Scheme != "http" || !localAliasHost(u.Hostname())) {
+		return c, fmt.Errorf("allowLoopbackAliases requires an HTTP localhost or 127.0.0.1 publicURL")
+	}
 	if c.SessionHours == 0 {
 		c.SessionHours = 12
 	}

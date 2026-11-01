@@ -1,14 +1,12 @@
 import { ReplayLabel } from "@/components/replay-label";
 import { Brand } from "@/components/brand";
-import type { ReactNode } from "react";
+import { type ReactNode } from "react";
 import { DropdownMenu as Menu } from "radix-ui";
 import {
   Moon,
   RefreshCw,
   Settings2,
   Sun,
-  Video,
-  VideoOff,
   UserRound,
   ChevronDown,
   LogOut,
@@ -34,18 +32,12 @@ export function WorkspaceHeader({
   onPlatformAdmin,
   darkMode,
   onToggleTheme,
-  replayConfigured,
-  replayEnabled,
-  onToggleReplay,
 }: {
   onPlatformAdmin?: () => void;
   identityLabel?: string;
   onSignOut?: () => void;
   darkMode: boolean;
   onToggleTheme: () => void;
-  replayConfigured: boolean;
-  replayEnabled: boolean;
-  onToggleReplay: () => void;
   tenants: Tenant[];
   tenant: string;
   role: string;
@@ -77,30 +69,6 @@ export function WorkspaceHeader({
           </Badge>
         ) : null}
         <div className="flex items-center border-l pl-2">
-          {demo && replayConfigured ? (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={onToggleReplay}
-              aria-label={
-                replayEnabled
-                  ? "Stop operator diagnostics recording"
-                  : "Allow operator diagnostics recording"
-              }
-              aria-pressed={replayEnabled}
-              title={
-                replayEnabled
-                  ? "Stop operator diagnostics recording"
-                  : "Allow operator diagnostics recording"
-              }
-            >
-              {replayEnabled ? (
-                <Video className="size-4" aria-hidden="true" />
-              ) : (
-                <VideoOff className="size-4" aria-hidden="true" />
-              )}
-            </Button>
-          ) : null}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -202,7 +170,7 @@ export function PageHeader({
   return (
     <div className="page-header">
       <div className="min-w-0">
-        <h1 className="break-words text-2xl font-semibold tracking-tight">
+        <h1 className="page-title break-words text-2xl font-semibold tracking-tight">
           {replayTitle ? <ReplayLabel>{title}</ReplayLabel> : title}
         </h1>
         <p className="mt-1.5 max-w-3xl break-words text-sm leading-6 text-muted-foreground">

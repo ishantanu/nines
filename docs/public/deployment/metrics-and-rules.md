@@ -38,6 +38,14 @@ tenants:
   - Verify the actual gateway routes in your Mimir installation.
   - Use a query credential and a separate scoped ruler-write credential where your gateway supports that separation.
 
+## Authentication and tenant mapping
+
+- For YAML-configured query connections, use `bearerTokenEnv` or the pair `basicUsername` and `basicPasswordEnv`. Rule destinations can specify their own bearer token or basic credentials. Credentials are resolved by the server, not taken from the user, SLO or model. Query and ruler credentials can therefore be scoped separately. If no separate ruler credentials are configured, Nines reuses the query credentials.
+- Nines sends the configured `mimirOrgID` as `X-Scope-OrgID` on Mimir queries and ruler operations. Nines tenant IDs and Mimir tenant IDs are separate; the administrator explicitly maps each Nines tenant's connection to a Mimir tenant. Federation using multiple Mimir IDs is not supported.
+- Nines teams and SSO mappings grant roles within a Nines tenant. They do not automatically map a team or an SSO claim to a Mimir tenant. Tenant members who can use a connection use that connection's fixed upstream identity. Use separate Nines tenants and suitably scoped upstream credentials when isolation requires separate datasets. Do not rely on `X-Scope-OrgID` alone as authentication; enforce authentication and authorization at the Mimir gateway.
+- Managed connections created in the portal support bearer credentials, encrypted at rest when the server's source-encryption key is configured. Managed Mimir organization IDs must already be present in that Nines tenant's trusted YAML connections. Managed connections do not provide separate basic or ruler credentials.
+- Arbitrary custom request headers are not currently supported. For a gateway requiring a nonstandard header, use an appropriately authenticated, trusted proxy or extend the server's connection configuration; do not place secrets in URLs or SLO YAML.
+
 ## Automatic or manual delivery
 
 - Enable `rules.autoDeploy: true` per source to reconcile saved SLOs automatically.
@@ -253,3 +261,9 @@ make test-operator
   - It also checks the packaged nonroot container's service-account authentication, probes, sample reconciliation and shutdown.
   - No host kubeconfig/context or existing cluster is used.
   - It does not schedule workload pods or establish production scale. See [operator acceptance](operator.md#run-operator-acceptance-locally) for exact scope. Fixtures remove only resources they create.
+
+## Vendor-native SLO publication
+
+- [Datadog](../provider-adapters.md#publish-a-native-datadog-slo), [New Relic](../new-relic.md), [Dash0](../dash0.md) and [Google Cloud](../google-cloud.md) support explicit reviewed native SLO publication with provider-specific limits.
+- Native publication is separate from Prometheus recording rules, Nines SLI collection and burn-policy evaluation. It does not publish vendor-native burn monitors or notification destinations.
+- Inspect the native plan warnings and verify readback. Saving an SLO does not automatically publish it. Operator-native publication support varies; Datadog and New Relic currently require the server's reviewed publication path.

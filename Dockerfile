@@ -1,11 +1,7 @@
 FROM node:24-alpine AS ui
 WORKDIR /ui
-ARG VITE_POSTHOG_PROJECT_TOKEN
 ARG VITE_OTEL_EXPORTER_OTLP_ENDPOINT
-ARG VITE_POSTHOG_HOST
-ENV VITE_POSTHOG_PROJECT_TOKEN=${VITE_POSTHOG_PROJECT_TOKEN}
 ENV VITE_OTEL_EXPORTER_OTLP_ENDPOINT=${VITE_OTEL_EXPORTER_OTLP_ENDPOINT}
-ENV VITE_POSTHOG_HOST=${VITE_POSTHOG_HOST}
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY web/ ./
@@ -29,10 +25,10 @@ RUN apk add --no-cache python3
 COPY --from=ui /ui/node_modules ./web/node_modules
 RUN python3 scripts/release/licenses.py --out /out/LICENSES
 
-FROM scratch
+FROM alpine:3.20
+RUN apk add --no-cache wget ca-certificates
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /licenses/
 COPY --from=notices /out/LICENSES /licenses/dependencies/
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /out/nines-server /nines-server
 COPY --from=build /out/nines-mcp /nines-mcp
 USER 65532:65532

@@ -1,3 +1,4 @@
+import { MeasurementLabels } from "./measurement-labels";
 import type { IntentPlan } from "@/lib/intent";
 import type {
   FlowRun,
@@ -82,15 +83,20 @@ export function IntentEvidence({
         <div>
           <dt className="text-muted-foreground">Measurement population</dt>
           <dd className="mt-1 break-all font-mono">
-            {JSON.stringify(spec.labels)}
+            <MeasurementLabels labels={spec.labels} />
           </dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Success condition</dt>
           <dd className="mt-1 break-all">
-            {spec.measurement === "latency"
-              ? `Attempt duration at most ${spec.thresholdSeconds} seconds`
-              : JSON.stringify(spec.successLabels ?? {})}
+            {spec.measurement === "latency" ? (
+              `Attempt duration at most ${spec.thresholdSeconds} seconds`
+            ) : (
+              <MeasurementLabels
+                labels={spec.successLabels}
+                empty="No success labels specified"
+              />
+            )}
           </dd>
         </div>
         <div>

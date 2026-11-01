@@ -33,6 +33,18 @@ func (m *Manager) Inspect(ctx context.Context, s model.SLO, now time.Time) (depl
 		}
 		return m.External.Inspect(ctx, s, target, now)
 	}
+	if target, ok := m.target(ConnectionID(s)); ok && target.Kind == "dash0" {
+		return m.inspectNative(ctx, s, target, now)
+	}
+	if target, ok := m.target(ConnectionID(s)); ok && target.Kind == "newrelic" {
+		return m.inspectNewRelic(ctx, s, target, now)
+	}
+	if target, ok := m.target(ConnectionID(s)); ok && target.Kind == "datadog" {
+		return m.inspectDatadog(ctx, s, target, now)
+	}
+	if target, ok := m.target(ConnectionID(s)); ok && target.Kind == "googlecloud" {
+		return m.inspectGoogle(ctx, s, target, now)
+	}
 	p, err := m.PlanContext(ctx, s)
 	if err != nil {
 		deployment = ruleStage("unknown", "rule_plan_invalid", "The current definition cannot produce a deployable rule plan.", "Validate the definition and destination before requesting another plan.")

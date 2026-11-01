@@ -1,3 +1,4 @@
+import { providerLabel } from "@/lib/telemetry-providers";
 import { FormField } from "@/components/ui/form-layout";
 import { SLORevisionHistory } from "./slo-revision-history";
 import { MeasuredObjective } from "./measured-objective";
@@ -6,7 +7,7 @@ import { QualityPolicyEditor } from "./quality-policy-editor";
 import { SLOLifecycleSelect } from "./slo-lifecycle";
 import { PolicyEditor } from "./policy-editor";
 import { useEffect, useRef, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import {
   newObjectiveDefinition,
   inlineObjectiveDraft,
@@ -43,6 +44,7 @@ type Draft = {
   displayName: string;
   service: string;
   source: string;
+  queryLanguage: string;
   target: string;
   window: string;
   step: string;
@@ -73,6 +75,7 @@ export function objectiveDraft(
     displayName: d.spec.displayName,
     service: d.spec.service,
     source: d.spec.source ?? "",
+    queryLanguage: d.spec.queryLanguage ?? "",
     target: String(d.spec.target),
     window: duration(d.spec.windowSeconds),
     step: duration(d.spec.stepSeconds),
@@ -135,6 +138,7 @@ export function objectiveDefinition(
         ? undefined
         : d.totalQuery || undefined,
     source: d.source || undefined,
+    queryLanguage: d.queryLanguage || undefined,
     policy: undefined,
     policies: d.enabled ? d.policies : undefined,
   };
@@ -552,18 +556,54 @@ export function ObjectiveCreate({
                           disabled={busy || measurementLocked}
                           onChange={(e) => setField("source", e.target.value)}
                         >
-                          <option value="">Primary (default)</option>
+                          <option value="">
+                            {connections.some((c) => c.id === "primary")
+                              ? `Primary · ${providerLabel(connections.find((c) => c.id === "primary")!.kind)}`
+                              : "Primary (not configured)"}
+                          </option>
                           {connections
                             .filter((c) => c.id !== "primary")
                             .map((c) => (
                               <option key={c.id} value={c.id}>
-                                {c.id} · {c.kind}
+                                {c.id} · {providerLabel(c.kind)}
                               </option>
                             ))}
                         </select>
                       </FormField>
                     </div>
                   </div>
+                  {!measurementLocked ? (
+                    <div className="space-y-2">
+                      <FormField
+                        htmlFor="slo-query-language"
+                        label="Query language"
+                      >
+                        <select
+                          id="slo-query-language"
+                          className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                          value={draft.queryLanguage}
+                          disabled={busy}
+                          onChange={(e) =>
+                            setField("queryLanguage", e.target.value)
+                          }
+                        >
+                          <option value="">PromQL (default)</option>
+                          <option value="promql">PromQL</option>
+                          <option value="datadog">Datadog count query</option>
+                          <option value="nrql">NRQL event count</option>
+                          <option value="metricsql">MetricsQL</option>
+                          <option value="googlecloud">
+                            Google Cloud Monitoring filter
+                          </option>
+                        </select>
+                      </FormField>
+                      <p className="text-xs text-muted-foreground">
+                        Use the query language supported by the selected
+                        connection. Changing it does not translate your queries.
+                        Provider compatibility is checked during review.
+                      </p>
+                    </div>
+                  ) : null}
                   <div className="grid gap-3">
                     <div>
                       <FormField

@@ -176,15 +176,14 @@ nines dependencies discover --namespace commerce \
 
 ### Run an instrumented example
 
-- The optional topology overlay adds three small HTTP services and a traffic generator.
+- The optional topology profile adds three small HTTP services and a traffic generator.
   - Each service exposes request counters; outbound HTTP wrappers expose `traces_service_graph_request_total`. This example measures real calls directly.
   - It does not run a trace processor or claim tracing coverage.
   - Production deployments can supply the same service-graph counter through a tracing pipeline such as Tempo's metrics generator.
 
 ```sh
 # Prepare .env and its generated secrets as described in the playground guide.
-docker compose -p nines-playground -f compose.playground.yaml \
-  -f compose.playground.topology.yaml up --build -d
+./playground up --topology
 
 nines apply --server http://localhost:18080 --tenant prometheus \
   -f examples/service-graph/gateway.slo.yaml --expected-revision 0
@@ -199,7 +198,7 @@ nines apply --server http://localhost:18080 --tenant prometheus \
 ```
 
 - Use your configured tenant context or `NINES_API_KEY`; do not put API keys in shell arguments.
-  - For Mimir, also include `-f compose.playground.mimir.yaml --profile mimir` in the Compose command.
+  - For Mimir, add `--mimir` when starting the playground.
   - The existing Prometheus remote-write route forwards the example counters to Mimir organization `playground`.
   - Use `--tenant mimir` when applying the examples to the Mimir workspace; tenant identifiers and provider organization IDs are separate.
   - Open **Service dependencies → Checkout services** after at least two scrapes.

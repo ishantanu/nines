@@ -1,3 +1,4 @@
+import { providerLabel } from "@/lib/telemetry-providers";
 import { ReplayLabel } from "@/components/replay-label";
 import { Brand } from "@/components/brand";
 import {
@@ -87,10 +88,6 @@ import type { ReplayRef } from "@/lib/replays";
 import { MaskedReplayCapture } from "@/lib/replay-capture";
 import type { ReplayOption } from "@/components/session-replays";
 import { DemoLogin } from "@/components/demo-login";
-import {
-  isSessionReplayConfigured,
-  startDemoSessionReplay,
-} from "@/lib/session-replay";
 
 import { ObjectiveDetail, Objectives } from "@/components/objectives";
 import { cn } from "@/lib/utils";
@@ -325,7 +322,6 @@ export default function App() {
   const route = useRoute();
   const [token, setToken] = useState("");
   const [demoAuthenticated, setDemoAuthenticated] = useState(false);
-  const [demoReplayConsent, setDemoReplayConsent] = useState(false);
   const [darkMode, setDarkMode] = useState(initialDarkMode);
   const [connection, setConnection] = useState(0);
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -657,23 +653,16 @@ export default function App() {
           darkMode={darkMode}
           onToggleTheme={() => setDarkMode((current) => !current)}
           demoAuthenticated={demoAuthenticated}
-          demoReplayConsent={demoReplayConsent}
-          onDemoSignIn={(allowReplay) => {
+          onDemoSignIn={() => {
             const next = loginReturnPath();
             navigateTo(next ?? workspacePath(session.scope.tenant), true);
             clearLoginReturn();
             setDemoAuthenticated(true);
-            setDemoReplayConsent(allowReplay);
-          }}
-          onToggleDemoReplay={() => {
-            const allowReplay = !demoReplayConsent;
-            setDemoReplayConsent(allowReplay);
           }}
           onDemoSignOut={() => {
             clearLoginReturn();
             navigateTo("/login", true);
             setDemoAuthenticated(false);
-            setDemoReplayConsent(false);
           }}
         />
       ) : auth?.enabled && !auth.authenticated && !token && !loading ? (
@@ -764,9 +753,7 @@ function TenantWorkspace({
   darkMode,
   onToggleTheme,
   demoAuthenticated,
-  demoReplayConsent,
   onDemoSignIn,
-  onToggleDemoReplay,
   onDemoSignOut,
 }: {
   platformAdmin?: boolean;
@@ -775,9 +762,7 @@ function TenantWorkspace({
   darkMode: boolean;
   onToggleTheme: () => void;
   demoAuthenticated: boolean;
-  demoReplayConsent: boolean;
-  onDemoSignIn: (allowReplay: boolean) => void;
-  onToggleDemoReplay: () => void;
+  onDemoSignIn: () => void;
   onDemoSignOut: () => void;
   scope: RequestScope;
   tenants: Tenant[];
@@ -811,7 +796,6 @@ function TenantWorkspace({
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
   const [query, setQuery] = useState("");
-  const [replayError, setReplayError] = useState("");
   const [replayFilter, setReplayFilter] = useState("all");
   const [updated, setUpdated] = useState<Date | null>(null);
   useEffect(() => {
@@ -886,7 +870,10 @@ function TenantWorkspace({
   }, [data, isDemo, demoAuthenticated, route, scope.tenant]);
 
   useLayoutEffect(() => {
-    if (isDemo && !demoAuthenticated) {
+    if (
+      (isDemo && !demoAuthenticated) ||
+      data?.workspace.replayCaptureEnabled === false
+    ) {
       nativeCapture.discard();
       return;
     }
@@ -900,7 +887,14 @@ function TenantWorkspace({
         .resume()
         .catch(() => nativeCapture.stop("Recording could not resume."));
     }
-  }, [nativeCapture, page, credentialsOpen, isDemo, demoAuthenticated]);
+  }, [
+    nativeCapture,
+    page,
+    credentialsOpen,
+    isDemo,
+    demoAuthenticated,
+    data?.workspace.replayCaptureEnabled,
+  ]);
   const replayOptions: ReplayOption[] = [
     ...objectives.map((o) => ({
       label: `SLO: ${o.slo.name} · revision ${o.slo.revision ?? 1}`,
@@ -929,52 +923,6 @@ function TenantWorkspace({
         },
       })),
   ];
-  const sensitivePage = ["access", "connections", "clients", "audit"].includes(
-    page,
-  );
-  useLayoutEffect(() => {
-    if (
-      !isDemo ||
-      !demoAuthenticated ||
-      !demoReplayConsent ||
-      credentialsOpen ||
-      sensitivePage
-    ) {
-      return;
-    }
-    const replayAbort = new AbortController();
-    let cancelled = false;
-    let stopRecording: (() => void) | undefined;
-    void startDemoSessionReplay(replayAbort.signal)
-      .then((stop) => {
-        if (cancelled) {
-          stop();
-          return;
-        }
-        stopRecording = stop;
-        setReplayError("");
-      })
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setReplayError(
-            cause instanceof Error
-              ? cause.message
-              : "Unable to start session replay.",
-          );
-        }
-      });
-    return () => {
-      cancelled = true;
-      replayAbort.abort();
-      stopRecording?.();
-    };
-  }, [
-    isDemo,
-    demoAuthenticated,
-    demoReplayConsent,
-    credentialsOpen,
-    sensitivePage,
-  ]);
   const visibleJourneys =
     page === "agents"
       ? journeys.filter((j) => j.resource.manifest.spec.agentic)
@@ -1015,8 +963,6 @@ function TenantWorkspace({
         darkMode={darkMode}
         onToggleTheme={onToggleTheme}
         onSignIn={onDemoSignIn}
-        replayConfigured={isSessionReplayConfigured()}
-        replayConsent={demoReplayConsent}
       />
     );
   }
@@ -1029,7 +975,7 @@ function TenantWorkspace({
         Skip to content
       </a>
       <aside className="sidebar" aria-label="Workspace navigation">
-        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b px-5">
+        <div className="sidebar-brand">
           <Brand />
         </div>
         <nav className="sidebar-navigation" aria-label="Main navigation">
@@ -1110,9 +1056,6 @@ function TenantWorkspace({
           }
           darkMode={darkMode}
           onToggleTheme={onToggleTheme}
-          replayConfigured={isSessionReplayConfigured()}
-          replayEnabled={demoReplayConsent}
-          onToggleReplay={onToggleDemoReplay}
         />
         <nav className="mobile-navigation" aria-label="Mobile navigation">
           <Select
@@ -1208,6 +1151,7 @@ function TenantWorkspace({
             </div>
           ) : slo && objectives.some((o) => o.slo.id === slo) ? (
             <ObjectiveDetail
+              connections={data?.workspace.connections}
               refreshKey={updated?.getTime() ?? 0}
               objective={objectives.find((o) => o.slo.id === slo)}
               scope={scope}
@@ -1283,14 +1227,6 @@ function TenantWorkspace({
                       <ReplayLabel>Retry</ReplayLabel>
                     </Button>
                   </div>
-                </div>
-              ) : null}
-              {replayError ? (
-                <div
-                  role="alert"
-                  className="mb-6 rounded-md border p-4 text-sm"
-                >
-                  Session replay could not start: {replayError}
                 </div>
               ) : null}
               {loading && !data ? (
@@ -1569,6 +1505,7 @@ function TenantWorkspace({
                               }
                             >
                               <JourneyDetail
+                                connections={data.workspace.connections}
                                 key={chosen.resource.manifest.metadata.name}
                                 refreshKey={updated?.getTime() ?? 0}
                                 journey={chosen}
@@ -1612,6 +1549,7 @@ function TenantWorkspace({
                     )
                   ) : page === "objectives" ? (
                     <Objectives
+                      connections={data.workspace.connections}
                       items={objectives.filter((o) =>
                         JSON.stringify(o.slo).toLowerCase().includes(search),
                       )}
@@ -1707,9 +1645,7 @@ function TenantWorkspace({
               : data.workspace.source.configured
                 ? (data.workspace.source.connectionCount ?? 1) > 1
                   ? `${data.workspace.source.connectionCount} metrics connections`
-                  : data.workspace.source.kind === "mimir"
-                    ? "Mimir"
-                    : "Prometheus"
+                  : providerLabel(data.workspace.source.kind)
                 : "Manual ingestion"
           }
           updated={updated}

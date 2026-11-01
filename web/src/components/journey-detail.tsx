@@ -1,6 +1,9 @@
+import { SLOProvider } from "./provider-identity";
+import type { Workspace } from "@/lib/api";
+import { VisualEvidence } from "./visual-evidence";
 import { SLIValue } from "@/components/sli-value";
 import { useEffect, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import {
   Bot,
   GitCommitHorizontal,
@@ -140,6 +143,7 @@ function RunRecorder({
 }
 export function JourneyDetail({
   journey,
+  connections,
   scope,
   onSLO,
   onRefresh,
@@ -149,6 +153,7 @@ export function JourneyDetail({
   refreshKey = 0,
 }: {
   journey: Journey;
+  connections?: Workspace["connections"];
   scope: RequestScope;
   onSLO: (id: string) => void;
   onRefresh: () => void;
@@ -275,6 +280,9 @@ export function JourneyDetail({
                           {l.slo.name}
                           <ExternalLink className="ml-1 inline size-3" />
                         </button>
+                        <div className="mt-1">
+                          <SLOProvider slo={l.slo} connections={connections} />
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {l.link.dimension}
                         </div>
@@ -356,6 +364,12 @@ export function JourneyDetail({
             </p>
           </TabsContent>
           <TabsContent value="evidence">
+            <VisualEvidence
+              key={`${scope.tenant}:${resource.manifest.metadata.name}:${resource.revision}`}
+              scope={scope}
+              journeyID={resource.manifest.metadata.name}
+              revision={resource.revision}
+            />
             {a ? (
               <>
                 <div className="mb-4 flex items-center justify-between gap-2">

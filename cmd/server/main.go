@@ -177,6 +177,9 @@ func run(log *slog.Logger) error {
 		if *demo {
 			workers.Go(func() { runDemo(ctx, svc, tenantLog) })
 		}
+		if runtime.WorkflowWebhook != nil {
+			workers.Go(func() { runtime.WorkflowWebhook.Run(ctx, tenantLog) })
+		}
 		if runtime.Webhook != "" {
 			dispatcher := service.NewDispatcher(svc.Store, runtime.Webhook)
 			dispatcher.TenantID = runtime.Workspace.ID

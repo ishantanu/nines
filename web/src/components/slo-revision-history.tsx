@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, message, type RequestScope } from "@/lib/api";
 import type { SLODefinition } from "@/lib/definitions";
 import { Button } from "@/components/ui/button";

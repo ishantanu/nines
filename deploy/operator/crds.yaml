@@ -153,6 +153,10 @@ spec:
                                                 forSeconds:
                                                     format: int64
                                                     type: integer
+                                                longWindow:
+                                                    maxLength: 64
+                                                    pattern: ^([0-9]+[hms])+$
+                                                    type: string
                                                 longWindowSeconds:
                                                     format: int64
                                                     type: integer
@@ -166,16 +170,23 @@ spec:
                                                     type: string
                                                 severity:
                                                     type: string
+                                                shortWindow:
+                                                    maxLength: 64
+                                                    pattern: ^([0-9]+[hms])+$
+                                                    type: string
                                                 shortWindowSeconds:
                                                     format: int64
                                                     type: integer
                                             required:
-                                                - shortWindowSeconds
-                                                - longWindowSeconds
                                                 - burnRate
                                                 - forSeconds
                                                 - minCoverage
                                             type: object
+                                            x-kubernetes-validations:
+                                                - message: Specify exactly one of shortWindow or shortWindowSeconds.
+                                                  rule: has(self.shortWindow) != has(self.shortWindowSeconds)
+                                                - message: Specify exactly one of longWindow or longWindowSeconds.
+                                                  rule: has(self.longWindow) != has(self.longWindowSeconds)
                                         maxItems: 1000
                                         type: array
                                     policy:
@@ -186,6 +197,10 @@ spec:
                                             forSeconds:
                                                 format: int64
                                                 type: integer
+                                            longWindow:
+                                                maxLength: 64
+                                                pattern: ^([0-9]+[hms])+$
+                                                type: string
                                             longWindowSeconds:
                                                 format: int64
                                                 type: integer
@@ -199,16 +214,23 @@ spec:
                                                 type: string
                                             severity:
                                                 type: string
+                                            shortWindow:
+                                                maxLength: 64
+                                                pattern: ^([0-9]+[hms])+$
+                                                type: string
                                             shortWindowSeconds:
                                                 format: int64
                                                 type: integer
                                         required:
-                                            - shortWindowSeconds
-                                            - longWindowSeconds
                                             - burnRate
                                             - forSeconds
                                             - minCoverage
                                         type: object
+                                        x-kubernetes-validations:
+                                            - message: Specify exactly one of shortWindow or shortWindowSeconds.
+                                              rule: has(self.shortWindow) != has(self.shortWindowSeconds)
+                                            - message: Specify exactly one of longWindow or longWindowSeconds.
+                                              rule: has(self.longWindow) != has(self.longWindowSeconds)
                                     population:
                                         additionalProperties:
                                             type: string
@@ -324,6 +346,10 @@ spec:
                                         forSeconds:
                                             format: int64
                                             type: integer
+                                        longWindow:
+                                            maxLength: 64
+                                            pattern: ^([0-9]+[hms])+$
+                                            type: string
                                         longWindowSeconds:
                                             format: int64
                                             type: integer
@@ -337,16 +363,23 @@ spec:
                                             type: string
                                         severity:
                                             type: string
+                                        shortWindow:
+                                            maxLength: 64
+                                            pattern: ^([0-9]+[hms])+$
+                                            type: string
                                         shortWindowSeconds:
                                             format: int64
                                             type: integer
                                     required:
-                                        - shortWindowSeconds
-                                        - longWindowSeconds
                                         - burnRate
                                         - forSeconds
                                         - minCoverage
                                     type: object
+                                    x-kubernetes-validations:
+                                        - message: Specify exactly one of shortWindow or shortWindowSeconds.
+                                          rule: has(self.shortWindow) != has(self.shortWindowSeconds)
+                                        - message: Specify exactly one of longWindow or longWindowSeconds.
+                                          rule: has(self.longWindow) != has(self.longWindowSeconds)
                                 maxItems: 1000
                                 type: array
                             policy:
@@ -357,6 +390,10 @@ spec:
                                     forSeconds:
                                         format: int64
                                         type: integer
+                                    longWindow:
+                                        maxLength: 64
+                                        pattern: ^([0-9]+[hms])+$
+                                        type: string
                                     longWindowSeconds:
                                         format: int64
                                         type: integer
@@ -370,16 +407,23 @@ spec:
                                         type: string
                                     severity:
                                         type: string
+                                    shortWindow:
+                                        maxLength: 64
+                                        pattern: ^([0-9]+[hms])+$
+                                        type: string
                                     shortWindowSeconds:
                                         format: int64
                                         type: integer
                                 required:
-                                    - shortWindowSeconds
-                                    - longWindowSeconds
                                     - burnRate
                                     - forSeconds
                                     - minCoverage
                                 type: object
+                                x-kubernetes-validations:
+                                    - message: Specify exactly one of shortWindow or shortWindowSeconds.
+                                      rule: has(self.shortWindow) != has(self.shortWindowSeconds)
+                                    - message: Specify exactly one of longWindow or longWindowSeconds.
+                                      rule: has(self.longWindow) != has(self.longWindowSeconds)
                             providerWindow:
                                 nullable: true
                                 properties:
@@ -416,6 +460,8 @@ spec:
                                         type: number
                                 required: []
                                 type: object
+                            queryLanguage:
+                                type: string
                             service:
                                 type: string
                             source:
@@ -799,6 +845,10 @@ spec:
                                         forSeconds:
                                             format: int64
                                             type: integer
+                                        longWindow:
+                                            maxLength: 64
+                                            pattern: ^([0-9]+[hms])+$
+                                            type: string
                                         longWindowSeconds:
                                             format: int64
                                             type: integer
@@ -812,16 +862,23 @@ spec:
                                             type: string
                                         severity:
                                             type: string
+                                        shortWindow:
+                                            maxLength: 64
+                                            pattern: ^([0-9]+[hms])+$
+                                            type: string
                                         shortWindowSeconds:
                                             format: int64
                                             type: integer
                                     required:
-                                        - shortWindowSeconds
-                                        - longWindowSeconds
                                         - burnRate
                                         - forSeconds
                                         - minCoverage
                                     type: object
+                                    x-kubernetes-validations:
+                                        - message: Specify exactly one of shortWindow or shortWindowSeconds.
+                                          rule: has(self.shortWindow) != has(self.shortWindowSeconds)
+                                        - message: Specify exactly one of longWindow or longWindowSeconds.
+                                          rule: has(self.longWindow) != has(self.longWindowSeconds)
                                 maxItems: 1000
                                 type: array
                             policy:
@@ -832,6 +889,10 @@ spec:
                                     forSeconds:
                                         format: int64
                                         type: integer
+                                    longWindow:
+                                        maxLength: 64
+                                        pattern: ^([0-9]+[hms])+$
+                                        type: string
                                     longWindowSeconds:
                                         format: int64
                                         type: integer
@@ -845,16 +906,23 @@ spec:
                                         type: string
                                     severity:
                                         type: string
+                                    shortWindow:
+                                        maxLength: 64
+                                        pattern: ^([0-9]+[hms])+$
+                                        type: string
                                     shortWindowSeconds:
                                         format: int64
                                         type: integer
                                 required:
-                                    - shortWindowSeconds
-                                    - longWindowSeconds
                                     - burnRate
                                     - forSeconds
                                     - minCoverage
                                 type: object
+                                x-kubernetes-validations:
+                                    - message: Specify exactly one of shortWindow or shortWindowSeconds.
+                                      rule: has(self.shortWindow) != has(self.shortWindowSeconds)
+                                    - message: Specify exactly one of longWindow or longWindowSeconds.
+                                      rule: has(self.longWindow) != has(self.longWindowSeconds)
                             population:
                                 additionalProperties:
                                     type: string

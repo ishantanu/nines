@@ -244,7 +244,9 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 		}
 		if action == "validate" {
 			note := "schema validated; plan/apply also checks source and SLO references"
-			if definition.SLO != nil && definition.SLO.SLO().HasQueries() {
+			if definition.SLO != nil && definition.SLO.Spec.QueryLanguage != "" && definition.SLO.Spec.QueryLanguage != "promql" {
+				note = "schema and installed provider query validator checked offline; source compatibility, metric types, availability and count semantics require server/provider evidence; external rule generation is not supported"
+			} else if definition.SLO != nil && definition.SLO.SLO().HasQueries() {
 				if _, err := rules.Generate(definition.SLO.SLO(), "validation"); err != nil {
 					return err
 				}

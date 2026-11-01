@@ -120,6 +120,10 @@ export function documentationHTML(
     .replace(/(?:src|href)="\.\//g, (match) => match.replace("./", data.root))
     .replace(/<title>[\s\S]*?<\/title>/, `<title>${title}</title>`)
     .replace(
+      /<link rel="canonical" href="[^"]*"\s*\/>/,
+      `<link rel="canonical" href="https://ishantanu.github.io/nines/docs/${attribute(page.slug ? page.slug + "/" : "")}" />`,
+    )
+    .replace(
       /(<meta\s+(?:name="description"|property="og:description")\s+content=")[^"]*("\s*\/?>)/g,
       `$1${description}$2`,
     )

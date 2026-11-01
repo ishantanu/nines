@@ -1,6 +1,11 @@
+import {
+  providerLabel,
+  supportsGuidedMeasurement,
+} from "@/lib/telemetry-providers";
 import { FormField } from "@/components/ui/form-layout";
 import { useEffect, useId, useRef, useState } from "react";
-import { parse, stringify } from "yaml";
+import { parse } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, canEdit, message, type RequestScope } from "@/lib/api";
 import {
   bindingKind,
@@ -196,15 +201,22 @@ export function MeasurementFields({
                   <SelectValue placeholder="Select a connection" />
                 </SelectTrigger>
                 <SelectContent>
-                  {connections.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.id}
-                      {c.kind ? ` · ${c.kind}` : ""}
-                    </SelectItem>
-                  ))}
+                  {connections
+                    .filter((c) => supportsGuidedMeasurement(c.kind))
+                    .map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.id}
+                        {c.kind ? ` · ${providerLabel(c.kind)}` : ""}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </FormField>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Guided measurement uses Prometheus or Mimir counters. For other
+              providers, use custom queries in Settings or a provider-specific
+              YAML definition.
+            </p>
           </div>
         ) : null}
         {!hideType ? (
@@ -288,13 +300,12 @@ export function MeasurementFields({
         <div>
           <FormField
             htmlFor={`${id}-threshold`}
-            label="Good events complete within (seconds)"
+            label="Good events complete within"
           >
             <Input
               id={`${id}-threshold`}
-              type="number"
-              step="any"
-              min="0"
+              type="text"
+              placeholder="30ms or 0.03s"
               value={draft.threshold}
               onChange={(e) => field("threshold", e.target.value)}
             />

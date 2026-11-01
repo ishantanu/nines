@@ -117,6 +117,21 @@ export function DocsLayout({
             <span aria-hidden="true">/</span>
             <span aria-current="page">{page.title}</span>
           </nav>
+          <div className="docs-page-actions">
+            <a data-markdown-link href={root + docPath(page) + "index.md"}>
+              View Markdown
+            </a>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              data-copy-page
+              hidden
+              aria-live="polite"
+            >
+              Copy page
+            </Button>
+          </div>
           <article
             id="doc-content"
             className="doc-content"

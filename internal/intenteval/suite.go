@@ -59,7 +59,82 @@ type AcceptanceSummary struct {
 	GuardrailChecksPassed int    `json:"guardrailChecksPassed"`
 	GuardrailChecksFailed int    `json:"guardrailChecksFailed"`
 }
+
+// DraftDiagnostic contains only fixed categories from synthetic evaluation.
+// It never includes user text, extracted values, model responses or provider errors.
+type DraftDiagnostic struct {
+	ModelState         string   `json:"modelState"`
+	Outcome            string   `json:"outcome,omitempty"`
+	ModelClarification bool     `json:"modelClarification"`
+	TargetEvidence     string   `json:"targetEvidence,omitempty"`
+	WindowEvidence     string   `json:"windowEvidence,omitempty"`
+	ThresholdEvidence  string   `json:"thresholdEvidence,omitempty"`
+	ValidationReasons  []string `json:"validationReasons,omitempty"`
+}
+
+type trackedDrafter struct {
+	service.IntentDrafter
+	called bool
+	goal   v1.ModelGoal
+	err    error
+}
+
+func (d *trackedDrafter) Draft(ctx context.Context, text string) (v1.ModelGoal, error) {
+	d.called = true
+	d.goal, d.err = d.IntentDrafter.Draft(ctx, text)
+	return d.goal, d.err
+}
+func (d *trackedDrafter) diagnostic(input string, clarifications []string) *DraftDiagnostic {
+	if !d.called {
+		return &DraftDiagnostic{ModelState: "not_called"}
+	}
+	if d.err != nil {
+		return &DraftDiagnostic{ModelState: "unavailable"}
+	}
+	out := &DraftDiagnostic{ModelState: "returned", ModelClarification: len(d.goal.Clarifications) > 0}
+	switch d.goal.Outcome {
+	case "availability", "latency", "compound", "unsupported":
+		out.Outcome = d.goal.Outcome
+	default:
+		out.Outcome = "invalid"
+	}
+	evidence := func(value *string) string {
+		if value == nil || strings.TrimSpace(*value) == "" {
+			return "missing"
+		}
+		if strings.Contains(input, *value) {
+			return "appears_in_input"
+		}
+		return "not_in_input"
+	}
+	out.TargetEvidence = evidence(d.goal.TargetText)
+	out.WindowEvidence = evidence(d.goal.WindowText)
+	out.ThresholdEvidence = evidence(d.goal.ThresholdText)
+	modelCount := len(d.goal.Clarifications)
+	if modelCount > len(clarifications) {
+		modelCount = len(clarifications)
+	}
+	for _, message := range clarifications[modelCount:] {
+		var reason string
+		switch message {
+		case "State the target as an explicit percentage, for example 99.9%.":
+			reason = "target_invalid"
+		case "State an explicit rolling duration, for example 28 days, rather than a calendar month.":
+			reason = "window_invalid"
+		case "State the maximum attempt duration, for example 300 milliseconds.":
+			reason = "threshold_invalid"
+		case "Availability and a duration condition need a joint measurement contract; choose one outcome.", "This goal requires a separate instrumentation contract. Choose availability or latency; a joint condition cannot be inferred from two ratios.":
+			reason = "unsupported_or_joint_outcome"
+		default:
+			reason = "other_validation"
+		}
+		out.ValidationReasons = append(out.ValidationReasons, reason)
+	}
+	return out
+}
+
 type Result struct {
+	DraftDiagnostic      *DraftDiagnostic  `json:"draftDiagnostic,omitempty"`
 	Checks               []EvaluationCheck `json:"checks,omitempty"`
 	ModelCalls           int               `json:"modelCalls,omitempty"`
 	ToolAttempts         int               `json:"toolAttempts,omitempty"`
@@ -136,7 +211,8 @@ func Evaluate(ctx context.Context, c Case, provider string, drafter service.Inte
 		return r
 	}
 	s.TenantID = "evaluation"
-	s.IntentDrafter = drafter
+	tracked := &trackedDrafter{IntentDrafter: drafter}
+	s.IntentDrafter = tracked
 	input := v1.DraftIntentInput{Text: c.Text, Metadata: v1.Metadata{Name: "evaluation-draft", Project: "test"}, Service: "api", Source: "primary", Population: map[string]string{"service": "api"}, NoDataPolicy: "unknown"}
 	out, err := s.DraftIntent(ctx, input)
 	r.DurationMilliseconds = time.Since(started).Milliseconds()
@@ -158,6 +234,7 @@ func Evaluate(ctx context.Context, c Case, provider string, drafter service.Inte
 		return r
 	}
 	if r.Status != c.Expected.Status {
+		r.DraftDiagnostic = tracked.diagnostic(c.Text, out.Clarifications)
 		r.Failure = "unexpected_status"
 		return r
 	}
@@ -187,6 +264,9 @@ func Evaluate(ctx context.Context, c Case, provider string, drafter service.Inte
 	return r
 }
 func Summary(r Report) error {
+	if r.Suite == "draft" && r.SelectedCase != "" {
+		return errors.New("filtered report is not full acceptance")
+	}
 	if !r.Complete {
 		return errors.New("intent evaluation incomplete")
 	}

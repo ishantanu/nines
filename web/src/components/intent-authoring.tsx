@@ -1,9 +1,12 @@
+import { latencySeconds, latencyDuration } from "@/lib/latency-duration";
+import { MeasurementLabels } from "./measurement-labels";
+import { ProviderIdentity } from "./provider-identity";
 import { BudgetPolicyEditor } from "./budget-policy-editor";
 import { QualityPolicyEditor } from "./quality-policy-editor";
 import type { MeasurementQualityPolicy } from "@/lib/api";
 import { SLOLifecycleSelect } from "./slo-lifecycle";
 import { useEffect, useState } from "react";
-import { stringify } from "yaml";
+import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, message, type Journey, type RequestScope } from "@/lib/api";
 import { RESOURCE_API_VERSION } from "@/lib/definitions";
 import {
@@ -158,7 +161,7 @@ export function IntentAuthoring({
           ...intentGoal(draft.target, draft.window),
           noDataPolicy: "unknown",
           ...(draft.outcome === "latency"
-            ? { thresholdSeconds: Number(draft.threshold) }
+            ? { thresholdSeconds: latencySeconds(draft.threshold) }
             : {}),
           ...(alerts
             ? {
@@ -225,7 +228,9 @@ export function IntentAuthoring({
           target: String(Number((spec.target * 100).toPrecision(12))),
           window: duration(spec.windowSeconds),
           threshold:
-            spec.thresholdSeconds == null ? "" : String(spec.thresholdSeconds),
+            spec.thresholdSeconds == null
+              ? ""
+              : latencyDuration(spec.thresholdSeconds),
         }));
       }
     } catch (e) {
@@ -349,7 +354,7 @@ export function IntentAuthoring({
                   <SelectContent>
                     {sources.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.id} ({s.kind})
+                        <ProviderIdentity kind={s.kind} connection={s.id} />
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -375,7 +380,7 @@ export function IntentAuthoring({
                 </Select>
               </div>
               {draft.outcome === "latency" ? (
-                input("threshold", "Maximum duration (seconds)", "0.3")
+                input("threshold", "Maximum duration", "30ms or 0.03s")
               ) : (
                 <p className="self-end text-sm text-muted-foreground">
                   Define the metric and success labels below.
@@ -611,9 +616,14 @@ export function IntentAuthoring({
                   <div>
                     <dt className="text-muted-foreground">Success criteria</dt>
                     <dd className="break-all">
-                      {c.definition.spec.measurement === "latency"
-                        ? `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
-                        : JSON.stringify(c.definition.spec.successLabels)}
+                      {c.definition.spec.measurement === "latency" ? (
+                        `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
+                      ) : (
+                        <MeasurementLabels
+                          labels={c.definition.spec.successLabels}
+                          empty="No success labels specified"
+                        />
+                      )}
                     </dd>
                   </div>
                   <div>

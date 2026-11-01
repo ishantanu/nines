@@ -57,7 +57,7 @@ func (a *Server) ruleMutation(w http.ResponseWriter, r *http.Request, withdraw b
 			a.fail(w, r, err)
 			return
 		}
-		if target.Kind == "operator" {
+		if target.Kind == "operator" || target.Kind == "dash0" || target.Kind == "googlecloud" || target.Kind == "datadog" || target.Kind == "newrelic" {
 			result, err = a.Workspace.Rules.Withdraw(ctx, record.SLO, body.ExpectedDigest)
 		} else {
 			plan, planErr := a.Workspace.Rules.PlanContext(ctx, record.SLO)

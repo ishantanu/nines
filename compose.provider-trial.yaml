@@ -1,0 +1,58 @@
+# Opt-in hosted-provider acceptance. This sends two custom Datadog series and
+# optionally 600 New Relic events. Use integration/providertrial/run.sh.
+services:
+  seed:
+    build:
+      context: .
+      dockerfile: integration/providertrial/Dockerfile
+    image: nines-provider-trial:local
+    command: [seed]
+    restart: "no"
+    environment:
+      NINES_TRIAL_NEWRELIC: ${NINES_TRIAL_NEWRELIC:-0}
+      NEWRELIC_ACCOUNT_ID: ${NEWRELIC_ACCOUNT_ID:-}
+    secrets: [dd_api_key, newrelic_ingest_key]
+    volumes: [trial-state:/state]
+  seed-newrelic:
+    image: nines-provider-trial:local
+    profiles: [newrelic]
+    command: [seed-newrelic]
+    restart: "no"
+    environment:
+      NEWRELIC_ACCOUNT_ID: ${NEWRELIC_ACCOUNT_ID:-}
+    secrets: [newrelic_ingest_key]
+    volumes: [trial-state:/state]
+  nines:
+    image: nines-provider-trial:local
+    command: [serve]
+    restart: "no"
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment:
+      NEWRELIC_ACCOUNT_ID: ${NEWRELIC_ACCOUNT_ID:-}
+    secrets: [dd_api_key, dd_app_key, newrelic_user_key, nines_token]
+    volumes: [trial-state:/state:ro]
+    ports: ["127.0.0.1:${NINES_TRIAL_PORT:-18180}:8080"]
+  verify:
+    image: nines-provider-trial:local
+    profiles: [verify]
+    command: [verify]
+    restart: "no"
+    environment:
+      NINES_TRIAL_URL: http://nines:8080
+    secrets: [nines_token]
+    volumes: [trial-state:/state:ro]
+secrets:
+  dd_api_key:
+    environment: DD_API_KEY
+  dd_app_key:
+    environment: DD_APP_KEY
+  newrelic_user_key:
+    environment: NEWRELIC_API_KEY
+  newrelic_ingest_key:
+    environment: NEWRELIC_INGEST_KEY
+  nines_token:
+    file: ${NINES_TRIAL_TOKEN_FILE:?Use integration/providertrial/run.sh}
+volumes:
+  trial-state:

@@ -26,13 +26,13 @@ jobs:
           "$RUNNER_TEMP/nines-lint/bin/python" -m pip install -r requirements-lint.txt
           echo "$RUNNER_TEMP/nines-lint/bin" >> "$GITHUB_PATH"
       - run: make lint
+      - name: Validate versioned API contract
+        run: make check-api
   test:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       VITE_OTEL_EXPORTER_OTLP_ENDPOINT: ''
-      VITE_POSTHOG_PROJECT_TOKEN: ''
-      VITE_POSTHOG_HOST: ''
       NINES_TEST_COMPOSE_CONFIG: '1'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -41,7 +41,7 @@ jobs:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.27.3'
-      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: npm
@@ -114,6 +114,17 @@ jobs:
         with:
           go-version: '1.27.3'
       - run: make test-prometheus
+  victoriametrics:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.3'
+      - run: make test-victoriametrics
   dependencies:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -194,7 +205,7 @@ jobs:
           set -euo pipefail
           export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
           printf '::add-mask::%s\n' "$POSTGRES_PASSWORD"
-          compose=(docker compose -p nines-ci-playground -f compose.playground.yaml)
+          compose=(docker compose -p nines-playground -f compose.playground.yaml)
           if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
             compose+=(-f compose.playground.mimir.yaml --profile mimir)
           fi
@@ -210,3 +221,35 @@ jobs:
           "${compose[@]}" up --build -d
           "${compose[@]}" run --rm verify
           "${compose[@]}" run --rm ai-verify
+          # Exercise the supported launcher against already-completed setup
+          # containers as well as the explicit Compose compatibility path.
+          export NINES_PLAYGROUND_PROJECT=nines-playground
+          export NINES_PLAYGROUND_STATE_FILE="$RUNNER_TEMP/nines-playground.conf"
+          launcher_flags=(--ai --no-jev --no-providers --no-topology --no-build)
+          if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
+            launcher_flags+=(--mimir)
+          else
+            launcher_flags+=(--prometheus)
+          fi
+          ./playground up "${launcher_flags[@]}"
+
+  ci:
+    name: CI
+    if: always()
+    needs: [lint, test, mimir, prometheus, victoriametrics, dependencies, topology, operator, identity, container]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI job to succeed
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, sys
+          results = json.loads(os.environ["CI_JOB_RESULTS"])
+          blocked = {name: job["result"] for name, job in results.items() if job["result"] != "success"}
+          if not results or blocked:
+              print("CI did not pass:", json.dumps(blocked, sort_keys=True))
+              sys.exit(1)
+          print("All required CI jobs passed.")
+          PYTHON

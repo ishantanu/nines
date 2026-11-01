@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ishantanu/nines/internal/datasources"
 	"github.com/ishantanu/nines/internal/model"
+	"github.com/ishantanu/nines/internal/providers"
 	"github.com/ishantanu/nines/internal/tenancy"
 )
 
@@ -76,6 +78,9 @@ func (a *Server) connections(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		auth := "none"
+		if len(connection.CredentialsEnv) > 0 {
+			auth = "provider_credentials"
+		}
 		if connection.BearerTokenEnv != "" {
 			auth = "bearer"
 		} else if connection.BasicUsername != "" {
@@ -83,13 +88,18 @@ func (a *Server) connections(w http.ResponseWriter, r *http.Request) {
 		} else if connection.Name == "primary" && a.Workspace.SourceAuth != "" {
 			auth = a.Workspace.SourceAuth
 		}
-		items = append(items, map[string]any{"id": connection.Name, "kind": connection.Kind, "endpoint": connection.URL, "mimirOrgID": connection.MimirOrgID, "authentication": auth, "configuration": "server_configuration", "rules": connection.Rules})
+		descriptor, _ := providers.Default.Describe(connection.Kind)
+		items = append(items, map[string]any{"capabilities": descriptor.Capabilities, "queryLanguages": descriptor.QueryLanguages, "id": connection.Name, "kind": connection.Kind, "endpoint": connection.URL, "mimirOrgID": connection.MimirOrgID, "authentication": auth, "configuration": "server_configuration", "collectionMode": connection.CollectionMode, "rules": connection.Rules, "options": connection.Options})
 	}
 	managed := a.Workspace.ManagedSources != nil && a.Workspace.ManagedSources.Enabled()
 	if a.Workspace.ManagedSources != nil {
 		items = append(items, a.Workspace.ManagedSources.List()...)
 	}
-	write(w, 200, map[string]any{"management": "server_configuration", "managedConnectionsEnabled": managed, "connections": items, "manualIngestion": true, "maxConnections": 21})
+	routes := datasources.ProviderRoutes{}
+	if a.Workspace.ManagedSources != nil {
+		routes = a.Workspace.ManagedSources.AllowedProviderRoutes()
+	}
+	write(w, 200, map[string]any{"management": "server_configuration", "managedConnectionsEnabled": managed, "providers": providers.Default.List(), "connections": items, "manualIngestion": true, "maxConnections": 21, "managedProviderRoutes": routes})
 }
 
 func (a *Server) connectionTest(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +120,14 @@ func (a *Server) connectionTest(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
+	if probe, ok := collector.(interface{ Probe(context.Context) error }); ok {
+		if err := probe.Probe(ctx); err != nil {
+			write(w, 502, map[string]string{"status": "failed", "error": "Configured provider authentication probe failed; check credentials and availability"})
+			return
+		}
+		write(w, 200, map[string]any{"status": "reachable", "testedAt": time.Now().UTC(), "scope": "configured tenant", "check": "Provider authentication probe only; metric permissions and SLO coverage are not verified"})
+		return
+	}
 	at := time.Now().UTC().Truncate(time.Minute)
 	points, err := collector.Collect(ctx, model.SLO{StepSeconds: 60, GoodQuery: "vector(1)", TotalQuery: "vector(1)"}, at.Add(-time.Minute), at)
 	if err != nil || len(points) != 1 {

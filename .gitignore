@@ -39,3 +39,6 @@ backups/
 
 # Local Impeccable design-tool preferences and scratch files.
 /.impeccable/
+
+# Remembered local playground selections (no secrets).
+/.nines-playground.conf

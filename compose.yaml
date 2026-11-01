@@ -18,9 +18,7 @@ services:
     build:
       context: .
       args:
-        VITE_POSTHOG_PROJECT_TOKEN: ${VITE_POSTHOG_PROJECT_TOKEN:-}
         VITE_OTEL_EXPORTER_OTLP_ENDPOINT: ${VITE_OTEL_EXPORTER_OTLP_ENDPOINT:-}
-        VITE_POSTHOG_HOST: ${VITE_POSTHOG_HOST:-}
     depends_on:
       database:
         condition: service_healthy

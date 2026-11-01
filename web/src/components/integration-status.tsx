@@ -42,7 +42,7 @@ const labels: Record<string, string> = {
   collected: "Collected",
   deployed: "Configured",
   written: "File written",
-  stored: "Stored in ruler",
+  stored: "Stored",
   configured: "Resource configured",
   submitted: "Awaiting operator",
   withdrawing: "Withdrawal pending",

@@ -48,7 +48,7 @@ class LocalSetupTests(unittest.TestCase):
                     self.assertNotIn(values[name], result.stdout)
                 if playground:
                     self.assertIn("Web password: admin ", result.stdout)
-                    self.assertIn("compose.playground.yaml", result.stdout)
+                    self.assertIn("./playground up", result.stdout)
                     self.assertNotIn("NINES_BOOTSTRAP_PASSWORD", result.stdout)
                 else:
                     self.assertIn("NINES_BOOTSTRAP_PASSWORD", result.stdout)

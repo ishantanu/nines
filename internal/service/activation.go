@@ -65,6 +65,20 @@ func (s *Service) IntegrationStatus(ctx context.Context, id string) (v1.Integrat
 			output = v1.IntegrationStage{State: "unknown", Code: "rule_output_source_changed", Message: "The query source changed during verification.", NextAction: "Refresh integration status against the current source before relying on the evidence."}
 		}
 	}
+	native := false
+	if s.RuleManager != nil {
+		target, ok := s.RuleManager.TargetFor(record.SLO)
+		native = ok && (target.Kind == "dash0" || target.Kind == "googlecloud" || target.Kind == "datadog" || target.Kind == "newrelic")
+	}
+	if native {
+		output = v1.IntegrationStage{State: "unsupported", Code: "native_slo_no_recordings", Message: "Native SLO publication does not install Nines recording rules.", NextAction: "Inspect collected Nines SLI and native provider evaluation separately."}
+	}
+	if capability, ok := s.CollectorFor(record.SLO).(interface{ SupportsRuleDeployment() bool }); ok && !capability.SupportsRuleDeployment() && !native {
+		stage := v1.IntegrationStage{State: "unsupported", Code: "provider_rules_unsupported", Message: "This provider collects measurements; external rule deployment and verification are not supported.", NextAction: "Inspect collected SLI data and Nines burn alerts. Configure provider-native monitors separately."}
+		out.Deployment = stage
+		out.Evaluation = stage
+		output = stage
+	}
 	out.Automation = s.RuleAutomationStatus(record, s.RuleManager)
 	out.RuleOutput = &output
 	return out, nil

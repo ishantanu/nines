@@ -39,7 +39,7 @@ func TestReplayClientPreservesScopeAndSeparatesPayload(t *testing.T) {
 	if err := json.Unmarshal([]byte(fmt.Sprintf(`[{"type":4,"timestamp":%d,"data":{"href":"/?token=secret"}},{"type":2,"timestamp":%d,"data":{"node":{"type":0,"id":1,"childNodes":[{"type":3,"id":2,"textContent":"private input"}]}}}]`, now, now+1)), &events); err != nil {
 		t.Fatal(err)
 	}
-	in := v1.CreateSessionReplay{ID: "sdk-capture", Title: "SDK recording", Consent: true, Policy: replay.Policy, Events: events}
+	in := v1.CreateSessionReplay{ID: "sdk-capture", Title: "SDK recording", Consent: true, SharingConsent: true, NoticeVersion: v1.ReplayConsentNotice, Policy: replay.Policy, Events: events}
 	ctx := context.Background()
 	created, err := c.CreateSessionReplay(ctx, in)
 	if err != nil || created.ID != in.ID || created.Tenant != "alpha" {
@@ -71,5 +71,31 @@ func TestReplayClientPreservesScopeAndSeparatesPayload(t *testing.T) {
 	}
 	if _, err = c.SessionReplay(ctx, "../beta"); err == nil {
 		t.Fatal("unsafe replay ID accepted")
+	}
+}
+
+func TestReplayClientDeletionUsesScopedResponse(t *testing.T) {
+	s := service.New(store.NewMemory(), nil)
+	s.TenantID = "alpha"
+	rp := replay.New(s, replay.NewMemory())
+	h, e := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Service: s, Replays: rp, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if e != nil {
+		t.Fatal(e)
+	}
+	server := httptest.NewServer(h)
+	defer server.Close()
+	api, _ := client.New(client.Config{URL: server.URL, Tenant: "alpha", Token: "owner"})
+	now := time.Now().Add(-time.Minute).UnixMilli()
+	var events []json.RawMessage
+	_ = json.Unmarshal([]byte(fmt.Sprintf(`[{"type":4,"timestamp":%d,"data":{}},{"type":2,"timestamp":%d,"data":{"node":{"type":0,"id":1,"childNodes":[]}}}]`, now, now+1)), &events)
+	r, e := api.CreateSessionReplay(context.Background(), v1.CreateSessionReplay{ID: "delete-me", Title: "Synthetic", Consent: true, SharingConsent: true, NoticeVersion: v1.ReplayConsentNotice, Policy: replay.Policy, Events: events})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = api.DeleteSessionReplay(context.Background(), r.ID, r.Version, r.ID); e != nil {
+		t.Fatal(e)
+	}
+	if _, e = api.ReplayEvents(context.Background(), r.ID); e == nil {
+		t.Fatal("deleted events returned")
 	}
 }

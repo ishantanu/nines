@@ -28,6 +28,10 @@ export function resolveDocumentLink(
     return documentationLink(path, root) + suffix;
   if (path.startsWith("docs/public/brand/"))
     return `${root}docs/assets/${path.slice("docs/public/brand/".length)}${suffix}`;
+  if (path === "api/openapi/v1alpha1.yaml")
+    return `${root}openapi/v1alpha1.yaml${suffix}`;
+  if (path === "api/mcp/v1alpha1.schema.json")
+    return `${root}schemas/remote-mcp/v1alpha1.json${suffix}`;
   if (path.startsWith("examples/")) return `${root}${path}${suffix}`;
   return `${repository}/${path.endsWith("/") ? "tree" : "blob"}/main/${path}${suffix}`;
 }

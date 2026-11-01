@@ -7,16 +7,6 @@
     "sha256": "e49e62397b603438476e0d6b5ca3b6e6d4f23a80594e596aff29ac04fa3e1b1c"
   },
   {
-    "package": "@posthog/browser-common",
-    "version": "0.9.5",
-    "file": "licenses/posthog-js.LICENSE",
-    "sourcePackage": "posthog-js@1.438.13",
-    "sourceIntegrity": "sha512-fcRhMZ/TKvpDjmDGTlf4KCBqqTnpLWLplZ76NfeLNEE1P6N6qCGGZzqZ6gEzJoOfYLNLgjd0sRM5fC8F/Ky9fA==",
-    "repository": "https://github.com/PostHog/posthog-js",
-    "sha256": "d3fb92ac01f0bef4078f89aac9f20f76da3383ad45becf6204abdf5495f43f8f",
-    "reviewNote": "Supplied MIT notice from the installed parent PostHog repository package; explicit maintainer review required."
-  },
-  {
     "package": "react-remove-scroll-bar",
     "repository": "https://github.com/theKashey/react-remove-scroll-bar",
     "version": "2.3.8",

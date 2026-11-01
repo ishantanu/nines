@@ -40,7 +40,7 @@ func FromDefinition(d model.Definition, namespace string) (k.Resource, error) {
 	if !tenancy.ValidID(namespace) {
 		return k.Resource{}, model.Invalid("namespace must be a DNS label")
 	}
-	b, e := json.Marshal(d.Manifest())
+	b, e := domain.CanonicalDefinitionJSON(d.Manifest())
 	if e != nil {
 		return k.Resource{}, e
 	}
@@ -192,6 +192,21 @@ func schemaFor(t reflect.Type) map[string]any {
 			if !strings.Contains(opts, "omitempty") {
 				required = append(required, name)
 			}
+		}
+		if t == reflect.TypeOf(domain.BurnRatePolicy{}) {
+			filtered := []string{}
+			for _, field := range required {
+				if field != "shortWindowSeconds" && field != "longWindowSeconds" {
+					filtered = append(filtered, field)
+				}
+			}
+			for _, field := range []string{"shortWindow", "longWindow"} {
+				properties[field] = map[string]any{"type": "string", "maxLength": 64, "pattern": domain.BurnWindowPattern}
+			}
+			return map[string]any{"type": "object", "properties": properties, "required": filtered, "x-kubernetes-validations": []any{
+				map[string]any{"rule": "has(self.shortWindow) != has(self.shortWindowSeconds)", "message": "Specify exactly one of shortWindow or shortWindowSeconds."},
+				map[string]any{"rule": "has(self.longWindow) != has(self.longWindowSeconds)", "message": "Specify exactly one of longWindow or longWindowSeconds."},
+			}}
 		}
 		return map[string]any{"type": "object", "properties": properties, "required": required}
 	default:

@@ -1,5 +1,6 @@
+import { ProviderIdentity } from "./provider-identity";
 import { DataSourceForm } from "./data-source-form";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Check, Minus, RefreshCw, PlugZap } from "lucide-react";
 import { api, message, type RequestScope } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ interface Access {
 }
 interface Connections {
   managedConnectionsEnabled?: boolean;
+  managedProviderRoutes?: Record<string, string[]>;
   management: string;
   connections: {
     id: string;
@@ -36,6 +38,8 @@ interface Connections {
     endpoint: string;
     mimirOrgID: string;
     authentication: string;
+    options?: Record<string, string>;
+    collectionMode?: string;
     rules?: {
       namespace: string;
       autoDeploy?: boolean;
@@ -180,6 +184,75 @@ export function AccessControl({ scope }: { scope: RequestScope }) {
     </div>
   );
 }
+function ConnectionTest({
+  scope,
+  id,
+  version,
+}: {
+  scope: RequestScope;
+  id: string;
+  version?: number;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState("");
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => {
+    setBusy(false);
+    setResult("");
+    return () => {
+      pending.current?.abort();
+      pending.current = null;
+    };
+  }, [scope, id, version]);
+  async function test() {
+    if (pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    setBusy(true);
+    setResult("");
+    try {
+      const r = await api<{ status: string }>(
+        `/api/connections/${encodeURIComponent(id)}/test`,
+        scope,
+        { method: "POST", signal: controller.signal },
+      );
+      if (controller.signal.aborted || scope.signal.aborted) return;
+      setResult(
+        r.status === "reachable"
+          ? `${id}: configured endpoint responded to a test query. No samples were stored.`
+          : "Connection test failed.",
+      );
+    } catch (e) {
+      if (!controller.signal.aborted && !scope.signal.aborted)
+        setResult(message(e));
+    } finally {
+      if (pending.current === controller) pending.current = null;
+      if (!controller.signal.aborted && !scope.signal.aborted) setBusy(false);
+    }
+  }
+  return (
+    <div className="space-y-2">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={busy || scope.role !== "owner"}
+        onClick={test}
+      >
+        <RefreshCw
+          aria-hidden="true"
+          className={busy ? "size-4 animate-spin" : "size-4"}
+        />
+        {busy ? "Testing…" : "Test connection"}
+      </Button>
+      {result ? (
+        <p role="status" className="text-sm">
+          {result}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function Connections({ scope }: { scope: RequestScope }) {
   const [refresh, setRefresh] = useState(0);
   const { value, error } = useSettings<Connections>(
@@ -187,28 +260,6 @@ export function Connections({ scope }: { scope: RequestScope }) {
     scope,
     refresh,
   );
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState("");
-  async function test(id: string) {
-    setBusy(true);
-    setResult("");
-    try {
-      const r = await api<{ status: string }>(
-        `/api/connections/${id}/test`,
-        scope,
-        { method: "POST" },
-      );
-      setResult(
-        r.status === "reachable"
-          ? `${id}: configured endpoint responded to a test query. No samples were stored.`
-          : "Connection test failed.",
-      );
-    } catch (e) {
-      setResult(message(e));
-    } finally {
-      setBusy(false);
-    }
-  }
   if (error)
     return (
       <p role="alert" className="text-sm text-destructive">
@@ -225,9 +276,11 @@ export function Connections({ scope }: { scope: RequestScope }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Tenant metrics connections and recording-rule destinations.
+          Tenant telemetry connections, recording rules and native SLO
+          destinations.
         </p>
         <DataSourceForm
+          allowedRoutes={value.managedProviderRoutes}
           scope={scope}
           enabled={!!value.managedConnectionsEnabled}
           onSaved={() => setRefresh((n) => n + 1)}
@@ -246,7 +299,7 @@ export function Connections({ scope }: { scope: RequestScope }) {
               <div className="panel-header">
                 <h2 className="text-sm font-semibold">Connection: {c.id}</h2>
                 <Badge variant="secondary" className="capitalize">
-                  {c.kind}
+                  <ProviderIdentity kind={c.kind} />
                 </Badge>
               </div>
               <CardContent className="space-y-4 p-5">
@@ -262,24 +315,70 @@ export function Connections({ scope }: { scope: RequestScope }) {
                     },
                     ...(c.rules
                       ? [
-                          { label: "Rule namespace", value: c.rules.namespace },
                           {
-                            label: "Rule deployment",
+                            label:
+                              c.rules.mode === "native"
+                                ? "Publication scope"
+                                : "Rule namespace",
+                            value: c.rules.namespace,
+                          },
+                          {
+                            label:
+                              c.rules.mode === "native"
+                                ? "Native SLO publication"
+                                : "Rule deployment",
                             value: c.rules.autoDeploy
                               ? "Automatic after SLO saves"
                               : "Manual reviewed apply",
                           },
                           {
-                            label: "Rule destination",
+                            label:
+                              c.rules.mode === "native"
+                                ? "Native SLO destination"
+                                : "Rule destination",
                             value:
-                              c.rules.mode === "operator"
-                                ? `Kubernetes operator (${c.rules.publisher})`
-                                : (c.rules.rulerURL ??
-                                  c.rules.directory ??
-                                  "Not configured"),
+                              c.rules.mode === "native"
+                                ? "Provider API (reviewed apply)"
+                                : c.rules.mode === "operator"
+                                  ? `Kubernetes operator (${c.rules.publisher})`
+                                  : (c.rules.rulerURL ??
+                                    c.rules.directory ??
+                                    "Not configured"),
                           },
                         ]
                       : []),
+                    ...(c.options?.accountID
+                      ? [
+                          {
+                            label: "New Relic account",
+                            value: c.options.accountID,
+                          },
+                        ]
+                      : []),
+                    ...(c.options?.projectID
+                      ? [
+                          {
+                            label: "Google Cloud project",
+                            value: c.options.projectID,
+                          },
+                        ]
+                      : []),
+                    ...(c.options?.serviceID
+                      ? [
+                          {
+                            label: "Google Cloud service",
+                            value: c.options.serviceID,
+                          },
+                        ]
+                      : []),
+                    ...(c.options?.dataset
+                      ? [{ label: "Dash0 dataset", value: c.options.dataset }]
+                      : []),
+                    {
+                      label: "Metric collection",
+                      value:
+                        c.collectionMode === "manual" ? "Manual" : "Automatic",
+                    },
                     ...(c.mimirOrgID
                       ? [{ label: "Mimir tenant", value: c.mimirOrgID }]
                       : []),
@@ -292,19 +391,10 @@ export function Connections({ scope }: { scope: RequestScope }) {
                     </div>
                   ))}
                 </dl>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy || scope.role !== "owner"}
-                  onClick={() => test(c.id)}
-                >
-                  <RefreshCw
-                    className={busy ? "size-4 animate-spin" : "size-4"}
-                  />
-                  {busy ? "Testing…" : "Test connection"}
-                </Button>
+                <ConnectionTest scope={scope} id={c.id} version={c.version} />
                 {c.configuration === "managed" ? (
                   <DataSourceForm
+                    allowedRoutes={value.managedProviderRoutes}
                     scope={scope}
                     enabled={!!value.managedConnectionsEnabled}
                     connection={c}
@@ -315,11 +405,6 @@ export function Connections({ scope }: { scope: RequestScope }) {
                     Managed by server configuration
                   </p>
                 )}
-                {result ? (
-                  <p role="status" className="text-sm">
-                    {result}
-                  </p>
-                ) : null}
               </CardContent>
             </Card>
           ))}

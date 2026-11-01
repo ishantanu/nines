@@ -312,13 +312,36 @@ export function App() {
         </section>
         <div className="stack-bar">
           <div className="container">
-            <span>Built around your observability stack</span>
+            <span>
+              Telemetry providers
+              <br />
+              <small>Vendor adapters are experimental</small>
+            </span>
             <ul aria-label="Supported foundations">
               <li>Prometheus</li>
               <li>Grafana Mimir</li>
-              <li>OpenTelemetry</li>
-              <li>PostgreSQL</li>
-              <li>Go</li>
+              <li>
+                <a href="./docs/provider-adapters/">
+                  Datadog / New Relic{" "}
+                  <span className="sr-only">(experimental)</span>
+                </a>
+              </li>
+              <li>
+                <a href="./docs/dash0/">
+                  Dash0 <span className="sr-only">(experimental)</span>
+                </a>
+              </li>
+              <li>
+                <a href="./docs/google-cloud/">
+                  Google Cloud <span className="sr-only">(experimental)</span>
+                </a>
+              </li>
+              <li>
+                <a href="./docs/provider-adapters/">
+                  VictoriaMetrics{" "}
+                  <span className="sr-only">(experimental)</span>
+                </a>
+              </li>
             </ul>
           </div>
         </div>

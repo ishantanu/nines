@@ -11,6 +11,7 @@ import (
 )
 
 type Memory struct {
+	visual     map[string]v1.VisualEvaluation
 	tombstones map[string]v1.RetirementReceipt
 	batches    map[string]definitionReceipt
 	archives   map[string]map[int64]SLOArchive

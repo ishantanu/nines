@@ -1,4 +1,32 @@
-# Local MVP verification
+# Release verification
+
+## Portal simplification, 2026-10-30
+
+- Removed the optional PostHog diagnostics recorder, its configuration, external recording consent and CSP destination. Native rrweb capture, explicit per-recording consent, tenant/role restrictions, sensitive-page pauses and offline HTML playback remain.
+- The overview uses compact nonzero health counts, aligned SLO/journey panels and natural page scrolling on mobile. Measurement populations, success labels and observed series use readable label/value fields instead of JSON objects. Complete technical evidence remains available through existing disclosures and exports.
+- The removed SDK no longer emits a large external-recorder chunk. Twelve npm dependencies and the obsolete fallback license notice/provenance were removed; OpenTelemetry remains independently configurable.
+- Synthetic desktop/mobile and light/dark checks use current components and build output. They are not production-data acceptance or blanket WCAG certification. Native capture/consent and API regression checks are retained.
+
+## Provider and remote MCP candidate, 2026-10-30
+
+- Provider acceptance uses no paid-platform credentials. `make test-providers` runs synthetic HTTP contracts for Datadog, New Relic, Dash0, Google Cloud and VictoriaMetrics, including query validation, native publication/results where supported, tenant boundaries and failure handling. Shared API DTOs, Go client, actual Cobra commands and MCP tools have contract coverage.
+- Real disposable Prometheus, Mimir and VictoriaMetrics integration gates passed. These verify local collection/evaluation and rule paths; synthetic hosted-provider fixtures do not certify current vendor accounts, production alert delivery or live Dash0/Google Cloud acceptance.
+- Remote MCP is opt-in and experimental. Official SDK OAuth discovery, S256 PKCE/resource binding, revocation, distinct identities, scope gates, actual Nines RBAC, legacy request cancellation and chunked body limits passed. The executable passed metadata discovery, unauthenticated denial and graceful shutdown. See the [configuration and client acceptance matrix](remote-mcp.md).
+- The portal passed 309 tests across 72 files. Portal and 55-page static documentation builds passed, including the downloadable OpenAPI/remote MCP schema and local links. Existing bundle-size and Vite future-loader warnings are advisory; this does not establish blanket accessibility certification.
+- The complete Go race suite passed 1,431 tests/subtests with disposable PostgreSQL and no required database skips. Remote transport regressions also passed separately after the final configuration-reader hardening.
+- Go/Python lint, Go vet, versioned OpenAPI/JSON Schema checks, 20 release-script tests, source publication preflight and all four native executable builds passed locally. The isolated server smoke passed. The Go scan found no reachable or imported-package vulnerabilities; three advisories remain in required modules outside imported packages. The npm audit reported no vulnerabilities.
+- CI now includes the existing real VictoriaMetrics integration fixture. Schema changes trigger the documentation workflow. The pinned checkout/setup-go/setup-node revisions were verified on GitHub.
+- Hosted managed-agent and production OAuth-provider acceptance remain unverified. The transport requires an external authorization server supporting the documented introspection profile and explicit per-user/client Nines credential bindings. It does not automatically provision SSO roles.
+- These are local candidate checks. No commit, push, tag, public documentation deployment, issue closure or release publication was performed by this pass. Build official release artifacts from the final clean commit after GitHub CI passes.
+
+## Dependency consolidation, 2026-10-30
+
+- Consolidated Dependabot PRs #46–#53 into the local release candidate: setup-node 7.1.0 (verified full commit pin), Prometheus v0.315.1, x/time v0.16.0, Lucide 1.61.0, PostHog 1.438.21 and Vitest 5.0.5.
+- OpenTelemetry uses a coordinated SDK 3.0.0/API 1.10.0/OTLP exporter 0.300.0 upgrade. Removed obsolete trace-web, trace-base and api-logs dependencies. A local OTLP receiver verifies traces, metrics and logs and rejects leaked request IDs, query tokens or authorization credentials in exported payloads.
+- A clean npm install, 310 frontend tests, portal/docs builds, Go/Python lint, Go vet, versioned contracts, full race/database acceptance, binary builds, server smoke, module integrity and release tooling passed. The updated native dependency license inventory passed with 445 entries. PostHog's exact-version notice provenance was refreshed after verifying unchanged retained notice bytes.
+- npm reported no vulnerabilities; Go reported no reachable or imported-package vulnerabilities, with the same three unused-module advisories. This is local evidence, not a GitHub CI run. Dependency PR closure does not commit, push or publish the combined change.
+
+## Historical local MVP verification, 2026-10-21
 
 Verified on 2026-10-21 against a local candidate using the `github.com/ishantanu/nines` module path.
 
@@ -91,7 +119,7 @@ Verified on 2026-10-21 against a local candidate using the `github.com/ishantanu
 ## Prometheus-first playground, 2026-10-22
 
 - The base Compose configuration now contains only the Prometheus workspace/backend, without a Mimir service, dependency, volume or remote-write destination.
-  - The optional `compose.playground.mimir.yaml` override with `--profile mimir` adds the second backend and its remote-write, tenant/auth and verifier settings.
+  - `./playground up --mimir` adds the second backend and its remote-write, tenant/auth and verifier settings. Subsequent `./playground verify` reuses that selection.
   - Release-source export includes the override and all three optional configuration fixtures.
   - CI now has separate Prometheus-only and dual-backend matrix runs; the definitions passed actionlint, but those matrix jobs still need execution on GitHub.
 - Both isolated local configurations passed local login, the exact expected workspace list, user CRUD/RBAC/session revocation, managed-source CRUD/redaction/host bounds, measurement collection, reviewed rule deployment, external evaluation, recorded SLI, critical/warning alert firing and recovery.
@@ -749,3 +777,41 @@ Verified on 2026-10-21 against a local candidate using the `github.com/ishantanu
   - It preserves the existing shadcn/ui identity and does not introduce a new visual design system.
   - The user's normal playground was not restarted or reconfigured.
   - No commit, push, tag, issue closure or release publication was performed by this pass.
+
+
+## Visual journey evidence and replay consent, 2026-10-28
+
+- The full Go race suite passed 1,099 tests/subtests with a disposable PostgreSQL fixture. Affected API, provider, identity, replay, SDK, CLI and server race checks passed after the visual contract changes; final API/SDK/CLI regressions also passed.
+- All 282 frontend tests passed. Go vet, Go/Python lint, 20 release-script tests, source publication preflight, the embedded portal build and the 45-page documentation build/link check passed locally. The existing large JavaScript chunk warning remains.
+- A synthetic isolated server passed the native CLI capability/list flow. Desktop and 390-pixel mobile inspection verified the image-sharing form and replay consent layout, with no horizontal document overflow. Recording stayed off and no image was submitted.
+- Tests cover tenant boundaries, role restrictions, separate capture/sharing consent, stale provider-contract rejection, duplicate request prevention, human review, quota/pause controls, receipt expiry and owner-only permanent replay deletion.
+- No real Jev image request was made. Vision accuracy, probability calibration and production provider data-handling acceptance remain unverified; image assessment is experimental and disabled by default. These checks do not constitute a legal or GDPR compliance assessment.
+
+
+## Headless intent lifecycle, 2026-10-28
+
+- The full Go suite, affected workflow/API/MCP/SDK/CLI race checks, Go vet, Go/Python lint, 20 release-script checks and publication source preflight passed locally. Unconfigured external integration fixtures retain their normal skips.
+- The 46-page website build and local link/fragment checks passed.
+- The new `TestHeadlessCLIReviewedChangeAndRollback` executes the real Cobra/client/HTTP/tenant/workflow/compiler path without a browser. It verifies measurement confirmation, denial of agent approval, separate approver/applier identities, wrong-digest rejection, retry-safe application/restoration, revisioned rollback and verified audit integrity.
+- Status reads were checked for tenant isolation, viewer access, strict query rejection, read-only MCP exposure and conservative handling of missing/failed runtime evidence. Configuration commit does not produce a successful runtime result.
+- Telemetry is synthetic. This pass makes no real model calls or production changes and does not replace the separate live Prometheus/Mimir deployment acceptance. Signed outbound webhooks and PR/chat approval adapters are not implemented by this change.
+
+
+## Headless workflow and consent review, 2026-10-28
+
+- Reviewed status and replay consent boundaries. Regression checks cover missing observations, rejected and unrecognized rollback states, agent replay-ingestion denial, tenant/notice mismatches, and consent reset on tenant switch.
+- The affected workflow, API, replay, image adapter, store, MCP, SDK and CLI packages passed race checks. The store, replay and workflow packages also passed against a disposable PostgreSQL 17 container, which was removed after testing.
+- The frontend suite passed 286 tests. The portal and documentation builds, documentation link checks, Go/Python lint and `git diff --check` passed locally.
+- The image evaluator remains experimental; this review did not send screenshots to Jev, test production provider retention, or establish privacy-law compliance.
+
+## Workflow integration checks, 2026-10-29
+
+- The complete Go suite and golangci-lint passed. The webhook retry and review-artifact tests passed with the race detector against a disposable PostgreSQL container. Signing, tampering, timestamp, tenant isolation and secret serialization are covered by local tests.
+- The static website build and link checks passed with 47 documentation pages. Deterministic draft, workflow, template-selection and template evaluation suites passed.
+- The opt-in synthetic Jev suite passed 10 of 12 cases. Two request-serving definition-clarity judgments failed the existing threshold; see [System One advice](system-one.md). Generative-model acceptance and production webhook receivers remain unverified in this run. These local checks are not a GitHub CI run.
+
+## SLO discovery and Jev follow-up, 2026-10-29
+
+- Added a source-backed SLO guide, concise LLM documentation index and canonical links for all published pages. The site build checks sitemap coverage, canonical URLs and documentation links in the index; publishing and search-engine indexing were not performed.
+- The unchanged Jev question passed 36 of 42 repeated synthetic case runs including six successful negative controls. Trial criteria passed 37 of 42 but consistently failed the agent example and had two invalid responses, so the trial was not adopted. Neither run establishes production reliability; live generative drafting acceptance remains outstanding.
+- Mimir bearer/basic authentication and organization isolation were checked in the existing query and rule tests; team-to-Mimir mapping is explicit tenant configuration, not automatic SSO mapping.

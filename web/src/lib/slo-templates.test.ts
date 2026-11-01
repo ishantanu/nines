@@ -61,7 +61,7 @@ test("latency template uses the threshold and classic histogram family without s
   };
   const draft = draftFromSLOTemplate(latency);
   expect(draft.measurement).toBe("latency");
-  expect(draft.threshold).toBe("0.5");
+  expect(draft.threshold).toBe("500ms");
   expect(draft.success).toEqual([]);
   expect(
     sloFromMeasurementDraft(draft, "99", "28d", []).spec.measurement,

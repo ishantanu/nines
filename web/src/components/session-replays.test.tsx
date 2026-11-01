@@ -11,6 +11,7 @@ import { SessionReplays } from "./session-replays";
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   create: vi.fn(),
+  privacy: vi.fn(),
   events: vi.fn(),
   stop: vi.fn(),
   record: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("@/lib/replays", async (original) => ({
   listReplays: mocks.list,
   createReplay: mocks.create,
   replayEvents: mocks.events,
+  replayPrivacy: mocks.privacy,
 }));
 let host: HTMLDivElement, root: Root;
 function metadata(): SessionReplay {
@@ -52,6 +54,12 @@ beforeEach(() => {
     return mocks.stop;
   });
   vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+  mocks.privacy.mockResolvedValue({
+    enabled: true,
+    noticeVersion: "replay-sharing-v1",
+    policyURL: "",
+    contact: "",
+  });
   mocks.list.mockResolvedValue({ tenant: "alpha", items: [] });
   mocks.events.mockResolvedValue({
     tenant: "alpha",
@@ -118,6 +126,10 @@ async function pendingSave() {
       new Promise<SessionReplay>((r) => {
         resolve = r;
       }),
+  );
+  expect(button("Save recording").disabled).toBe(true);
+  await act(async () =>
+    host.querySelector<HTMLInputElement>("#replay-sharing-consent")!.click(),
   );
   expect(button("Save recording").disabled).toBe(false);
   await act(async () => button("Save recording").click());
@@ -222,4 +234,59 @@ test("foreign-tenant save responses cannot discard the unsaved recording", async
     scope.close();
     capture.discard();
   });
+});
+
+test("agent role cannot authorize a recording", async () => {
+  const scope = createTenantSession("", "alpha", "agent");
+  await act(async () =>
+    root.render(
+      <SessionReplays
+        scope={scope}
+        capture={new MaskedReplayCapture()}
+        options={[]}
+        onResource={() => {}}
+      />,
+    ),
+  );
+  await settle();
+  await act(async () => host.querySelector("summary")!.click());
+  const label = [...host.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("I agree to record this tab"),
+  );
+  expect(label?.querySelector("input")?.disabled).toBe(true);
+  expect(host.textContent).toContain(
+    "Only a tenant owner or editor can record and share a session.",
+  );
+  expect(button("Start recording").disabled).toBe(true);
+  scope.close();
+});
+
+test("tenant switch clears previous recording consent until the new notice loads", async () => {
+  const { capture, scope } = await render();
+  await act(async () => host.querySelector("summary")!.click());
+  const label = [...host.querySelectorAll("label")].find((node) =>
+    node.textContent?.includes("I agree to record this tab"),
+  );
+  const consent = label?.querySelector("input") as HTMLInputElement;
+  await act(async () => consent.click());
+  expect(button("Start recording").disabled).toBe(false);
+  mocks.privacy.mockImplementation(() => new Promise(() => {}));
+  const next = createTenantSession("", "beta", "owner");
+  mocks.list.mockResolvedValue({ tenant: "beta", items: [] });
+  await act(async () =>
+    root.render(
+      <StrictMode>
+        <SessionReplays
+          scope={next}
+          capture={capture}
+          options={[]}
+          onResource={() => {}}
+        />
+      </StrictMode>,
+    ),
+  );
+  expect(consent.checked).toBe(false);
+  expect(button("Start recording").disabled).toBe(true);
+  scope.close();
+  next.close();
 });

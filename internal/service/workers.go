@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/store"
 )
@@ -32,16 +33,13 @@ func (s *Service) Run(ctx context.Context, log *slog.Logger) {
 				if c.Retired() {
 					continue
 				}
-				if s.CollectorFor(c) != nil && c.HasQueries() {
-					// Re-read the last two completed intervals after a one-step source
-					// delay. Gaps beyond this overlap need an explicit backfill.
-					end := s.Now().Add(-time.Duration(c.StepSeconds) * time.Second).UTC().Truncate(time.Duration(c.StepSeconds) * time.Second)
+				if s.AutomaticCollection(c) {
 					job, cancel := context.WithTimeout(ctx, 45*time.Second)
-					overlap := int64(2)
-					if c.ProviderWindow != nil {
-						overlap = max(overlap, (int64(collectionInterval/time.Second)+c.StepSeconds-1)/c.StepSeconds+1)
+					from, end, boundsErr := s.scheduledCollectionRange(job, c)
+					err = boundsErr
+					if err == nil {
+						_, err = s.Collect(job, c.ID, from, end)
 					}
-					_, err = s.Collect(job, c.ID, end.Add(-time.Duration(overlap*c.StepSeconds)*time.Second), end)
 					cancel()
 					if err != nil {
 						log.Error("collect", "slo", c.ID, "error", err)
@@ -53,6 +51,34 @@ func (s *Service) Run(ctx context.Context, log *slog.Logger) {
 			}
 		}
 	}
+}
+
+// Keep collection contiguous across delayed rounds, without inventing missing
+// data or issuing unbounded backfills. Manual sources never enter this path.
+func (s *Service) scheduledCollectionRange(ctx context.Context, c model.SLO) (time.Time, time.Time, error) {
+	now := s.Now().UTC()
+	step := time.Duration(c.StepSeconds) * time.Second
+	end := now.Add(-step).Truncate(step)
+	overlap := max(int64(2), (int64(collectionInterval/time.Second)+c.StepSeconds-1)/c.StepSeconds+1)
+	from := end.Add(-time.Duration(overlap) * step)
+	r, err := s.Store.Read(ctx, c.ID)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	h := r.Collection
+	if h.SLORevision == model.ConfigRevision(c) && h.SourceDigest == collectorFingerprint(s.CollectorFor(c), c.Source) && !h.SourceTo.IsZero() && aligned(h.SourceTo, c.StepSeconds) && h.SourceTo.Before(from) {
+		from = h.SourceTo.Add(-step)
+	}
+	// At most 300 intervals per request (also within the provider adapters' bounds).
+	floor := end.Add(-300 * step)
+	retention := now.Truncate(step).Add(-2 * time.Duration(c.WindowSeconds) * time.Second)
+	if retention.After(floor) {
+		floor = retention
+	}
+	if from.Before(floor) {
+		from = floor
+	}
+	return from, end, nil
 }
 
 type Dispatcher struct {

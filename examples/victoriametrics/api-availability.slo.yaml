@@ -1,0 +1,30 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceLevelObjective
+metadata:
+  name: vm-api-availability
+  project: production
+spec:
+  displayName: API availability
+  service: api
+  source: vm-prod
+  queryLanguage: metricsql
+  target: 0.999
+  windowSeconds: 86400
+  stepSeconds: 60
+  goodQuery: sum(increase_prometheus(http_requests_total{service="api",code="200"}[1m]))
+  totalQuery: sum(increase_prometheus(http_requests_total{service="api"}[1m]))
+  policies:
+    - name: fast-burn
+      severity: critical
+      shortWindow: 5m
+      longWindow: 1h
+      burnRate: 14.4
+      forSeconds: 120
+      minCoverage: 1
+    - name: sustained-burn
+      severity: warning
+      shortWindow: 30m
+      longWindow: 6h
+      burnRate: 6
+      forSeconds: 300
+      minCoverage: 1

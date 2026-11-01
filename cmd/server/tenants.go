@@ -20,7 +20,7 @@ import (
 	"github.com/ishantanu/nines/internal/investigation"
 	"github.com/ishantanu/nines/internal/kubediscovery"
 	"github.com/ishantanu/nines/internal/operator"
-	"github.com/ishantanu/nines/internal/prometheus"
+	"github.com/ishantanu/nines/internal/providers"
 	"github.com/ishantanu/nines/internal/replay"
 	rm "github.com/ishantanu/nines/internal/reviewmodel"
 	"github.com/ishantanu/nines/internal/rules"
@@ -28,11 +28,14 @@ import (
 	"github.com/ishantanu/nines/internal/slotemplates"
 	"github.com/ishantanu/nines/internal/store"
 	"github.com/ishantanu/nines/internal/systemone"
+	"github.com/ishantanu/nines/internal/telemetryprovider"
 	"github.com/ishantanu/nines/internal/tenancy"
 	"github.com/ishantanu/nines/internal/workflow"
+	"github.com/ishantanu/nines/internal/workflowhook"
 )
 
 type tenantRuntime struct {
+	WorkflowWebhook     *workflowhook.Dispatcher
 	ManagedSources      *datasources.Registry
 	IntentConversations intentflow.Repository
 	Replays             replay.Repository
@@ -136,22 +139,13 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 		}
 		var collector service.Collector
 		if t.Config.Source.Kind != "manual" {
-			var c *prometheus.Client
 			var err error
-			if t.Config.Source.Kind == "mimir" {
-				c, err = prometheus.NewMimir(t.Config.Source.URL, t.Config.Source.MimirOrgID, t.BearerToken)
-			} else {
-				c, err = prometheus.New(t.Config.Source.URL, t.BearerToken)
-			}
-			if err == nil && (t.Config.Source.BasicUsername != "" || t.BasicPassword != "") {
-				err = c.SetBasicAuth(t.Config.Source.BasicUsername, t.BasicPassword)
-			}
+			collector, err = openProvider(t.Config.Source, t.Credentials, t.BearerToken, t.BasicPassword)
 			if err != nil {
 				repository.Close()
 				st.Close()
 				return fail(fmt.Errorf("tenant %s source configuration: %w", t.Config.ID, err))
 			}
-			collector = c
 		}
 		if t.Webhook != "" {
 			u, err := url.Parse(t.Webhook)
@@ -164,7 +158,7 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 		sources := map[string]service.MetricSource{}
 		ruleTargets := map[string]rules.Target{}
 		connections := []tenancy.Connection{{Name: "primary", Source: t.Config.Source}}
-		addTarget := func(name string, source tenancy.Source, bearer, basicPassword, rulesBearer, rulesPassword string) {
+		addTarget := func(name string, source tenancy.Source, bearer, basicPassword, rulesBearer, rulesPassword string, credentials map[string]string) {
 			if cfg := source.Rules; cfg != nil {
 				username := source.BasicUsername
 				if cfg.BearerTokenEnv != "" || cfg.BasicUsername != "" {
@@ -172,7 +166,7 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 					basicPassword = rulesPassword
 					username = cfg.BasicUsername
 				}
-				ruleTargets[name] = rules.Target{Connection: name, Kind: source.Kind, QueryURL: source.URL, RulerURL: cfg.RulerURL, MimirOrgID: source.MimirOrgID, Namespace: cfg.Namespace, Directory: cfg.Directory, Reload: cfg.Reload, AutoDeploy: cfg.AutoDeploy, Publisher: cfg.Publisher, BearerToken: bearer, BasicUsername: username, BasicPassword: basicPassword}
+				ruleTargets[name] = rules.Target{NewRelicAccountID: source.Options["accountID"], NewRelicEntityGUID: cfg.EntityGUID, NewRelicUserKey: credentials["userKey"], DatadogAPIKey: credentials["apiKey"], DatadogApplicationKey: credentials["applicationKey"], Connection: name, Kind: source.Kind, QueryURL: source.URL, RulerURL: cfg.RulerURL, MimirOrgID: source.MimirOrgID, GoogleProjectID: source.Options["projectID"], GoogleServiceID: source.Options["serviceID"], GoogleAuth: source.Options["auth"], Dataset: source.Options["dataset"], Namespace: cfg.Namespace, Directory: cfg.Directory, Reload: cfg.Reload, AutoDeploy: cfg.AutoDeploy, Publisher: cfg.Publisher, BearerToken: bearer, BasicUsername: username, BasicPassword: basicPassword}
 				if cfg.Mode == "operator" {
 					target := ruleTargets[name]
 					target.ProviderKind = source.Kind
@@ -181,31 +175,22 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 				}
 			}
 		}
-		addTarget("primary", t.Config.Source, t.BearerToken, t.BasicPassword, t.RulesBearerToken, t.RulesBasicPassword)
+		addTarget("primary", t.Config.Source, t.BearerToken, t.BasicPassword, t.RulesBearerToken, t.RulesBasicPassword, t.Credentials)
 		for _, connection := range t.Connections {
 			cfg := connection.Config
 			var named service.Collector
 			if cfg.Kind != "manual" {
-				var c *prometheus.Client
 				var err error
-				if cfg.Kind == "mimir" {
-					c, err = prometheus.NewMimir(cfg.URL, cfg.MimirOrgID, connection.BearerToken)
-				} else {
-					c, err = prometheus.New(cfg.URL, connection.BearerToken)
-				}
-				if err == nil && cfg.BasicUsername != "" {
-					err = c.SetBasicAuth(cfg.BasicUsername, connection.BasicPassword)
-				}
+				named, err = openProvider(cfg.Source, connection.Credentials, connection.BearerToken, connection.BasicPassword)
 				if err != nil {
 					repository.Close()
 					st.Close()
 					return fail(fmt.Errorf("connection %s initialization: %w", cfg.Name, err))
 				}
-				named = c
 			}
-			sources[cfg.Name] = service.MetricSource{Kind: cfg.Kind, Collector: named}
+			sources[cfg.Name] = service.MetricSource{Kind: cfg.Kind, Collector: named, CollectionMode: cfg.CollectionMode}
 			connections = append(connections, cfg)
-			addTarget(cfg.Name, cfg.Source, connection.BearerToken, connection.BasicPassword, connection.RulesBearerToken, connection.RulesBasicPassword)
+			addTarget(cfg.Name, cfg.Source, connection.BearerToken, connection.BasicPassword, connection.RulesBearerToken, connection.RulesBasicPassword, connection.Credentials)
 		}
 
 		var reviewer rm.Model
@@ -246,6 +231,7 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 		svc.TenantID = t.Config.ID
 		svc.TenantName = t.Config.Name
 		svc.SourceKind = t.Config.Source.Kind
+		svc.CollectionMode = t.Config.Source.CollectionMode
 		svc.Sources = sources
 		var managed *datasources.Registry
 		var err error
@@ -271,7 +257,29 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 					orgs[connection.MimirOrgID] = true
 				}
 			}
-			managed, err = datasources.New(ctx, connectionRepo, t.Config.ID, reserved, hosts, orgs, os.Getenv("NINES_SOURCE_ENCRYPTION_KEY"), os.Getenv("NINES_MANAGED_RULE_DIRECTORY"), st)
+			routes := datasources.ProviderRoutes{}
+			for kind, values := range t.Config.ManagedProviderRoutes {
+				routes[kind] = append([]string{}, values...)
+			}
+			for _, connection := range connections {
+				if connection.Kind == "newrelic" {
+					routes["newrelic"] = append(routes["newrelic"], connection.Options["accountID"])
+					if connection.Rules != nil && connection.Rules.EntityGUID != "" {
+						routes["newrelic-entity"] = append(routes["newrelic-entity"], connection.Rules.EntityGUID)
+					}
+				}
+				if connection.Kind == "victoriametrics" && connection.Options["accountID"] != "" {
+					route := connection.Options["accountID"]
+					if project := connection.Options["projectID"]; project != "" {
+						route += ":" + project
+					}
+					routes["victoriametrics"] = append(routes["victoriametrics"], route)
+				}
+				if connection.Kind == "dash0" {
+					routes["dash0"] = append(routes["dash0"], connection.Options["dataset"])
+				}
+			}
+			managed, err = datasources.New(ctx, connectionRepo, t.Config.ID, reserved, hosts, orgs, os.Getenv("NINES_SOURCE_ENCRYPTION_KEY"), os.Getenv("NINES_MANAGED_RULE_DIRECTORY"), st, routes)
 			if err != nil {
 				connectionRepo.Close()
 				return fail(err)
@@ -337,7 +345,35 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 			}
 		}
 
-		runtime := tenantRuntime{ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !identityEnabled, Workflows: wf}, Repository: repository, Webhook: t.Webhook}
+		var notification *workflowhook.Dispatcher
+		if t.WorkflowWebhook != nil {
+			journal, ok := intentRepo.(workflowhook.Repository)
+			if !ok {
+				if managed != nil {
+					managed.Close()
+				}
+				intentRepo.Close()
+				replayRepo.Close()
+				invRepo.Close()
+				repository.Close()
+				st.Close()
+				return fail(fmt.Errorf("tenant %s workflow journal does not support webhook delivery", t.Config.ID))
+			}
+			notification, err = workflowhook.New(journal, t.Config.ID, *t.WorkflowWebhook)
+			if err != nil {
+				if managed != nil {
+					managed.Close()
+				}
+				intentRepo.Close()
+				replayRepo.Close()
+				invRepo.Close()
+				repository.Close()
+				st.Close()
+				return fail(fmt.Errorf("tenant %s: %w", t.Config.ID, err))
+			}
+		}
+		runtime := tenantRuntime{WorkflowWebhook: notification, ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !identityEnabled, Workflows: wf}, Repository: repository, Webhook: t.Webhook}
+		runtime.Workspace.Replays.Privacy = t.Config.ReplayPrivacy
 		if t.Config.SLOExtensionLock != "" {
 			extensionPath := t.Config.SLOExtensionLock
 			if !filepath.IsAbs(extensionPath) {
@@ -408,4 +444,21 @@ func runWorkflowRecovery(ctx context.Context, wf *workflow.Service, log *slog.Lo
 		case <-ticker.C:
 		}
 	}
+}
+
+func openProvider(cfg tenancy.Source, credentials map[string]string, bearer, password string) (service.Collector, error) {
+	values := make(map[string]string, len(credentials)+3)
+	for key, value := range credentials {
+		values[key] = value
+	}
+	if bearer != "" {
+		values["bearerToken"] = bearer
+	}
+	if cfg.BasicUsername != "" {
+		values["basicUsername"] = cfg.BasicUsername
+	}
+	if password != "" {
+		values["basicPassword"] = password
+	}
+	return providers.Default.Open(cfg.Kind, telemetryprovider.Configuration{Options: cfg.Options, Endpoint: cfg.URL, Dataset: cfg.MimirOrgID, Credentials: values})
 }

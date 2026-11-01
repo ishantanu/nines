@@ -145,6 +145,8 @@ func TestWorkflowCaseArgumentsDoNotContactConfiguredProvider(t *testing.T) {
 		code int
 	}{
 		{[]string{"--case", "availability-reviewed-apply"}, 2},
+		{[]string{"--case", "does-not-exist", "--live"}, 1},
+		{[]string{"--case", "invented-quantity", "--live"}, 1},
 		{[]string{"--suite", "unknown"}, 2},
 		{[]string{"--suite", "workflow", "--case", "does-not-exist", "--live"}, 1},
 		{[]string{"--suite", "workflow", "--case", "availability-reviewed-apply"}, 0},

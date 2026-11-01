@@ -27,6 +27,9 @@ func (s *Service) RuleAutomationStatus(record model.Record, manager *rules.Manag
 		return nil
 	}
 	rev := model.ConfigRevision(record.SLO)
+	if target.Kind == "datadog" || target.Kind == "newrelic" || target.Kind == "dash0" || target.Kind == "googlecloud" {
+		return &v1.RuleAutomationStatus{Revision: rev, IntegrationStage: v1.IntegrationStage{State: "manual", Code: "native_publication_manual", Message: "Native SLO publication requires an explicit reviewed apply.", NextAction: "Review and apply the native SLO publication plan. Automatic native publication is not supported."}}
+	}
 	if !target.AutoDeploy {
 		return &v1.RuleAutomationStatus{Revision: rev, IntegrationStage: v1.IntegrationStage{State: "manual", Code: "automatic_rules_disabled", Message: "Rules deploy only after an explicit reviewed apply.", NextAction: "A tenant owner can enable automatic deployment on this data source."}}
 	}

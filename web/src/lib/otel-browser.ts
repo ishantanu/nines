@@ -1,7 +1,6 @@
 import { context, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { TracerProvider, BatchSpanProcessor } from "@opentelemetry/sdk-trace";
 import {
   MeterProvider,
   PeriodicExportingMetricReader,
@@ -21,13 +20,13 @@ export function setupBrowserTelemetry(endpoint: string): TelemetryFetch {
     "service.instance.id": crypto.randomUUID(),
     "service.version": "0.1.0",
   });
-  const provider = new WebTracerProvider({
+  const provider = new TracerProvider({
     resource,
     spanProcessors: [
-      new BatchSpanProcessor(
-        new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),
-        { scheduledDelayMillis: 1000 },
-      ),
+      new BatchSpanProcessor({
+        exporter: new OTLPTraceExporter({ url: `${endpoint}/v1/traces` }),
+        scheduledDelayMillis: 1000,
+      }),
     ],
   });
   const meters = new MeterProvider({

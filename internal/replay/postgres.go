@@ -150,3 +150,22 @@ func (p *postgres) Update(ctx context.Context, id string, fn func(*record) error
 	}
 	return r, tx.Commit(ctx)
 }
+
+func (p *postgres) Delete(ctx context.Context, id string, version int64) error {
+	tx, e := p.pool.Begin(ctx)
+	if e != nil {
+		return e
+	}
+	defer func() { _ = tx.Rollback(context.Background()) }()
+	r, e := scan(tx.QueryRow(ctx, `SELECT document FROM browser_session_replays WHERE id=$1 AND expires_at>clock_timestamp() FOR UPDATE`, id))
+	if e != nil {
+		return e
+	}
+	if r.Meta.Version != version {
+		return ErrConflict
+	}
+	if _, e = tx.Exec(ctx, `DELETE FROM browser_session_replays WHERE id=$1`, id); e != nil {
+		return e
+	}
+	return tx.Commit(ctx)
+}

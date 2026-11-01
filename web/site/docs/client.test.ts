@@ -13,7 +13,7 @@ function html(slug = "", title = "Introduction") {
   <input id="docs-search" disabled><div id="docs-search-results" hidden><p role="status"></p><ul></ul></div></header>
   <details class="docs-mobile-nav"><summary>Browse documentation</summary><nav aria-label="Documentation chapters"><a href="${prefix}docs/">Introduction</a><a href="${prefix}docs/deployment/operator/">Operator</a></nav></details>
   <aside class="docs-sidebar"><nav aria-label="Documentation chapters"><a href="${prefix}docs/" aria-current="page">Introduction</a><a href="${prefix}docs/deployment/operator/">Operator</a><a href="${prefix}docs/measurements/">Measurements</a></nav></aside>
-  <main id="main" class="docs-main" tabindex="-1"><article id="doc-content"><h1>${title}</h1><h2 id="example">Example</h2>
+  <main id="main" class="docs-main" tabindex="-1"><div><a data-markdown-link href="index.md">View Markdown</a><button data-copy-page hidden>Copy page</button></div><article id="doc-content"><h1>${title}</h1><h2 id="example">Example</h2>
   <a id="anchor" href="#example">Example</a><a id="external" href="https://example.com/">External</a><a id="download" download href="${prefix}docs/deployment/operator/">Download</a>
   <div class="docs-code-block"><button data-copy-code>Copy</button><pre>nines validate</pre></div></article></main>
   <aside class="docs-outline"><a href="#example">Example</a></aside></div></body></html>`;
@@ -267,4 +267,40 @@ it("closes the compact chapter menu with Escape and returns keyboard focus", () 
     );
   expect(menu.open).toBe(false);
   expect(document.activeElement?.tagName).toBe("SUMMARY");
+});
+
+it("copies the current page as Markdown and exposes a fallback on failure", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+  fetcher.mockResolvedValue(
+    new Response("# Introduction\n\nExample.", { status: 200 }),
+  );
+  expect(
+    document.querySelector<HTMLButtonElement>("button[data-copy-page]")?.hidden,
+  ).toBe(false);
+  click("button[data-copy-page]");
+  await settled();
+  expect(writeText).toHaveBeenCalledWith("# Introduction\n\nExample.");
+  expect(document.querySelector("button[data-copy-page]")?.textContent).toBe(
+    "Copied",
+  );
+  expect(fetcher.mock.calls[0][0]).toBe(origin + "/nines/docs/index.md");
+});
+
+it("offers the Markdown link if copying fails", async () => {
+  const writeText = vi.fn().mockRejectedValue(new Error("denied"));
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+  fetcher.mockResolvedValue(new Response("# Introduction", { status: 200 }));
+  click("button[data-copy-page]");
+  await settled();
+  expect(document.querySelector("button[data-copy-page]")?.textContent).toBe(
+    "Open Markdown to copy",
+  );
+  expect(document.querySelector("a[data-markdown-link]")).not.toBeNull();
 });

@@ -116,3 +116,25 @@ func TestWorkspaceReportsNamedConnectionsWithoutPrimary(t *testing.T) {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }
+
+func TestWorkspaceProviderIdentitiesDoNotExposeConnectionSecrets(t *testing.T) {
+	for _, kind := range []string{"prometheus", "mimir", "datadog", "newrelic", "victoriametrics", "dash0", "googlecloud"} {
+		t.Run(kind, func(t *testing.T) {
+			svc := service.New(store.NewMemory(), nil)
+			svc.Sources = map[string]service.MetricSource{"payments": {Kind: kind, Collector: metadataOnlyCollector{}}}
+			h := New(svc, "", slog.New(slog.NewTextHandler(io.Discard, nil)))
+			w := httptest.NewRecorder()
+			h.ServeHTTP(w, httptest.NewRequest("GET", "/api/workspace", nil))
+			var got struct {
+				Connections []map[string]string   `json:"connections"`
+				Source      struct{ Kind string } `json:"source"`
+			}
+			if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+				t.Fatal(err)
+			}
+			if w.Code != 200 || got.Source.Kind != kind || len(got.Connections) != 1 || len(got.Connections[0]) != 2 || got.Connections[0]["id"] != "payments" || got.Connections[0]["kind"] != kind {
+				t.Fatal(w.Code, w.Body.String())
+			}
+		})
+	}
+}

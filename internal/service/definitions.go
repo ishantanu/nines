@@ -212,11 +212,15 @@ func sourceID(name string) string {
 // MeasurementDigest is shared by the API and optional Kubernetes controller so
 // measurement edits can archive and reset observations without reinterpreting history.
 func MeasurementDigest(s model.SLO) string {
+	language := s.QueryLanguage
+	if language == "promql" {
+		language = ""
+	}
 	return model.DefinitionDigest(struct {
-		Measurement                  *v1.MeasurementSpec
-		Window                       *v1.ProviderWindow
-		Binding                      *v1.BindingReference
-		Service, Source, Good, Total string
-		Step                         int64
-	}{s.Measurement, s.ProviderWindow, s.MeasurementBinding, s.Service, sourceID(s.Source), s.GoodQuery, s.TotalQuery, s.StepSeconds})
+		Measurement                            *v1.MeasurementSpec
+		Window                                 *v1.ProviderWindow
+		Binding                                *v1.BindingReference
+		Service, Source, Good, Total, Language string
+		Step                                   int64
+	}{s.Measurement, s.ProviderWindow, s.MeasurementBinding, s.Service, sourceID(s.Source), s.GoodQuery, s.TotalQuery, language, s.StepSeconds})
 }
