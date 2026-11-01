@@ -64,12 +64,18 @@ export function renderDocumentation(page: DocPage, markdown: string) {
             width={
               typeof src === "string" && src.endsWith("nines-architecture.svg")
                 ? 1200
-                : undefined
+                : typeof src === "string" &&
+                    src.endsWith("nines-performance.jpg")
+                  ? 1280
+                  : undefined
             }
             height={
               typeof src === "string" && src.endsWith("nines-architecture.svg")
                 ? 870
-                : undefined
+                : typeof src === "string" &&
+                    src.endsWith("nines-performance.jpg")
+                  ? 1591
+                  : undefined
             }
           />
         ),

@@ -371,7 +371,10 @@ export function App() {
               <h3>Measure the objective</h3>
               <p>
                 Compare observed SLI with a target, rolling window and error
-                budget using configured Prometheus or Mimir sources.
+                budget using configured Prometheus or Mimir sources.{" "}
+                <a href="./docs/slo-guide/#read-sli-budget-and-burn-rate-charts">
+                  See the performance charts.
+                </a>
               </p>
             </li>
             <li>

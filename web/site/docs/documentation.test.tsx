@@ -171,3 +171,14 @@ it("renders branding without a network request and reserves the early architectu
     /<img[^>]*nines-architecture\.svg[^>]*loading="eager"[^>]*width="1200"[^>]*height="870"/,
   );
 });
+
+it("serves the chart screenshot locally with lazy loading and reserved dimensions", () => {
+  const page = docPages.find((page) => page.slug === "slo-guide")!;
+  const { markup } = renderDocumentation(
+    page,
+    "# SLO charts\n\n![Synthetic performance charts](brand/nines-performance.jpg)",
+  );
+  expect(markup).toMatch(
+    /<img[^>]*src="\.\.\/\.\.\/docs\/assets\/nines-performance\.jpg"[^>]*loading="lazy"[^>]*width="1280"[^>]*height="1591"/,
+  );
+});

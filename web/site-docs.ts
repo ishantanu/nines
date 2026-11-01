@@ -54,7 +54,11 @@ export function siteDocs(): Plugin {
             /^\/docs\/assets\/nines(?:-architecture|-dark|-mark)?\.svg$/.test(
               pathname,
             );
-          if (!example && !artwork) {
+          const screenshot =
+            /^\/docs\/assets\/nines-(overview|performance)\.jpg$/.test(
+              pathname,
+            );
+          if (!example && !artwork && !screenshot) {
             response.statusCode = 404;
             response.end("Not found");
             return;
@@ -77,7 +81,11 @@ export function siteDocs(): Plugin {
               throw new Error("Outside public assets");
             response.setHeader(
               "Content-Type",
-              artwork ? "image/svg+xml" : "text/plain; charset=utf-8",
+              artwork
+                ? "image/svg+xml"
+                : screenshot
+                  ? "image/jpeg"
+                  : "text/plain; charset=utf-8",
             );
             response.setHeader("X-Content-Type-Options", "nosniff");
             response.end(await readFile(actual));
