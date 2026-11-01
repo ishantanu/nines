@@ -194,7 +194,7 @@ jobs:
           set -euo pipefail
           export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
           printf '::add-mask::%s\n' "$POSTGRES_PASSWORD"
-          compose=(docker compose -p nines-ci-playground -f compose.playground.yaml)
+          compose=(docker compose -p nines-playground -f compose.playground.yaml)
           if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
             compose+=(-f compose.playground.mimir.yaml --profile mimir)
           fi
