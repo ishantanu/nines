@@ -104,7 +104,8 @@ FONT_ASSETS = {
 
 # Reviewed synthetic product media; arbitrary screenshots remain excluded.
 PRODUCT_IMAGES = {
-    "docs/public/brand/nines-overview.jpg": "2d71e77e100cb9184d88e70b375c29f683954a0bc60668a91039e6e6c546a239",
+    "docs/public/brand/nines-performance.jpg": "2452e97faff6a0c6c6381ce11f0240b6981eb1e2a0769abd4e25e16ec1c57859",
+    "docs/public/brand/nines-overview.jpg": "42812c7ee105d0ce5493caf338c0903de81ef9cab7f94d70701a38fbc2dee972",
 }
 
 
