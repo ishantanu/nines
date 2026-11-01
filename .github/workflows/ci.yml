@@ -219,4 +219,5 @@ jobs:
           }
           trap cleanup EXIT
           ./playground up "${flags[@]}"
-          ./playground verify
+          echo "=== Starting verification ==="
+          ./playground verify || { echo "=== Verify failed with exit code $? ==="; exit 1; }
