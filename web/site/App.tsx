@@ -14,7 +14,7 @@ import intent from "../../examples/api-success.intent.yaml?raw";
 import { examples } from "./examples";
 import { documentationLink } from "./docs/navigation";
 
-const logo = "./nines.svg";
+import { inlineWordmark as logo } from "./brand";
 const repo = "https://github.com/ishantanu/nines";
 const start =
   "git clone https://github.com/ishantanu/nines.git\ncd nines\ngo run ./cmd/server -demo";
@@ -371,7 +371,10 @@ export function App() {
               <h3>Measure the objective</h3>
               <p>
                 Compare observed SLI with a target, rolling window and error
-                budget using configured Prometheus or Mimir sources.
+                budget using configured Prometheus or Mimir sources.{" "}
+                <a href="./docs/slo-guide/#read-sli-budget-and-burn-rate-charts">
+                  See the performance charts.
+                </a>
               </p>
             </li>
             <li>

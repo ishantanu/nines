@@ -128,6 +128,35 @@ export function Timeline({
     });
     return segments.join(" ");
   }
+  // Shade only contiguous, fully observed segments. A fill must never bridge
+  // missing measurements or imply complete attainment for partial windows.
+  function areas(line: Line) {
+    const segments: string[] = [];
+    let run: number[] = [];
+    function finish() {
+      if (run.length > 1) {
+        const first = run[0],
+          last = run[run.length - 1];
+        segments.push(
+          `M${x(first).toFixed(2)},${bottom} ` +
+            run
+              .map(
+                (i) =>
+                  `L${x(i).toFixed(2)},${y(line.get(history.points[i])!).toFixed(2)}`,
+              )
+              .join(" ") +
+            ` L${x(last).toFixed(2)},${bottom} Z`,
+        );
+      }
+      run = [];
+    }
+    history.points.forEach((point, i) => {
+      if (finite(line.get(point)) && !line.partial?.(point)) run.push(i);
+      else finish();
+    });
+    finish();
+    return segments.join(" ");
+  }
   const selectedIndex = Math.max(0, Math.min(index, history.points.length - 1));
   const selected = history.points[selectedIndex];
   const hasPartial = lines.some((line) =>
@@ -164,6 +193,16 @@ export function Timeline({
           <h3 className="text-base font-semibold">
             <ReplayLabel>{title}</ReplayLabel>
           </h3>
+          {lines.length === 1 && selected ? (
+            <span
+              className="text-xl font-semibold tabular-nums tracking-tight sm:text-2xl"
+              aria-label={`Selected ${lines[0].name}: ${valueText(lines[0], selected)}`}
+            >
+              {finite(lines[0].get(selected))
+                ? inspectValue(lines[0].get(selected)!)
+                : "No data"}
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-foreground">
           {lines.map((line) => (
@@ -266,6 +305,20 @@ export function Timeline({
                 : ""}
             </desc>
             <defs>
+              {lines.length === 1 ? (
+                <linearGradient id={`${id}-area`} x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor={lines[0].color}
+                    stopOpacity={0.16}
+                  />
+                  <stop
+                    offset="100%"
+                    stopColor={lines[0].color}
+                    stopOpacity={0}
+                  />
+                </linearGradient>
+              ) : null}
               <clipPath id={`${id}-clip`}>
                 <rect
                   x={left}
@@ -285,6 +338,7 @@ export function Timeline({
                     y1={y(value)}
                     y2={y(value)}
                     stroke="var(--border)"
+                    strokeDasharray="3 5"
                   />
                   <text
                     x={left - 8}
@@ -299,6 +353,14 @@ export function Timeline({
               );
             })}
             <g clipPath={`url(#${id}-clip)`}>
+              {lines.length === 1 ? (
+                <path
+                  data-chart-area
+                  d={areas(lines[0])}
+                  fill={`url(#${id}-area)`}
+                  aria-hidden="true"
+                />
+              ) : null}
               <line
                 x1={left}
                 x2={right}
@@ -347,7 +409,9 @@ export function Timeline({
                     d={path(line)}
                     fill="none"
                     stroke={line.color}
-                    strokeWidth={2}
+                    strokeWidth={2.5}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
                     strokeDasharray={line.dashed ? "4 3" : undefined}
                     vectorEffect="non-scaling-stroke"
                   />
@@ -409,15 +473,22 @@ export function Timeline({
                   {lines.map((line) => {
                     const value = line.get(selected);
                     return finite(value) ? (
-                      <circle
-                        key={line.name}
-                        cx={x(selectedIndex)}
-                        cy={y(value)}
-                        r={3}
-                        fill={line.color}
-                        stroke="var(--card)"
-                        strokeWidth={1.5}
-                      />
+                      <g key={line.name} data-chart-marker>
+                        <circle
+                          cx={x(selectedIndex)}
+                          cy={y(value)}
+                          r={8}
+                          fill="var(--card)"
+                        />
+                        <circle
+                          cx={x(selectedIndex)}
+                          cy={y(value)}
+                          r={4.5}
+                          fill="var(--card)"
+                          stroke={line.color}
+                          strokeWidth={2.5}
+                        />
+                      </g>
                     ) : null;
                   })}
                 </g>

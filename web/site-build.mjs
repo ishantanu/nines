@@ -42,7 +42,7 @@ try {
       {
         name: "raw-source-examples",
         setup(bundler) {
-          bundler.onResolve({ filter: /\.(?:yaml|go)\?raw$/ }, (args) => ({
+          bundler.onResolve({ filter: /\.(?:yaml|go|svg)\?raw$/ }, (args) => ({
             path: path.resolve(args.resolveDir, args.path.slice(0, -4)),
             namespace: "raw-definition",
           }));
@@ -88,7 +88,7 @@ try {
   }
   await writeFile(path.join(site, "docs/search.json"), JSON.stringify(search));
   await writeFile(path.join(site, "llms-full.txt"), corpus.join("\n\n---\n\n"));
-  // Only public example definitions and canonical SVG artwork are copied.
+  // Only public examples, canonical artwork and reviewed demo screenshots are copied.
   const copyPublicFiles = async (source, destination, extensions) => {
     await mkdir(destination, { recursive: true });
     for (const item of await readdir(source, { withFileTypes: true })) {
@@ -116,7 +116,7 @@ try {
   await copyPublicFiles(
     path.join(root, "docs/public/brand"),
     path.join(site, "docs/assets"),
-    [".svg"],
+    [".svg", ".jpg"],
   );
   await mkdir(path.join(site, "openapi"), { recursive: true });
   await writeFile(

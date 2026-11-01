@@ -1,3 +1,4 @@
+import { inlineWordmark } from "../brand";
 import { ArrowLeft, ArrowRight, ChevronDown, Search } from "lucide-react";
 import { Input } from "../../src/components/ui/input";
 import { Button } from "../../src/components/ui/button";
@@ -87,7 +88,7 @@ export function DocsLayout({
       <header className="site-header docs-header">
         <div className="docs-header-inner">
           <a className="brand" href={root} aria-label="Nines home">
-            <img src={root + "nines.svg"} width="112" height="32" alt="Nines" />
+            <img src={inlineWordmark} width="112" height="32" alt="Nines" />
           </a>
           <a href={root + "docs/"} className="docs-header-label">
             Documentation

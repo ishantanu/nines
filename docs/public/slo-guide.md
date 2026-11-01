@@ -18,6 +18,20 @@ This Nines definition measures the proportion of eligible `http_requests_total` 
 
 Use the [CLI reference](../cli.md) to validate the definition offline and generate recording rules. Connect a supported [telemetry provider](provider-adapters.md) to collect real measurements. Prometheus and Mimir support generated recording rules; native vendor publication has separate limits and review steps. Generation, rule deployment, rule evaluation and observed SLI are separate steps.
 
+## Read SLI, budget and burn-rate charts
+
+![Nines SLO performance with measured SLI, error budget remaining and two-window burn rates](brand/nines-performance.jpg)
+
+This is the synthetic checkout SLO in the local demo, not production telemetry. [Open the full-size screenshot](brand/nines-performance.jpg).
+
+- **SLI and SLO target:** compare measured attainment with the configured objective. The value in the chart header follows the selected observation; it is not a separate measurement.
+- **Error budget remaining:** see how much of the allowed failure budget remains. A negative value means the measured budget is exhausted.
+- **Burn rate:** compare short- and long-window rates with the selected policy threshold. The example has a fast-burn alert firing even though full-window attainment remains above target.
+- **Inspect history:** choose a preset or custom time range, then hover, tap or use the arrow keys on a focused chart. Read the timestamp and values together.
+- **Check coverage:** missing data leaves gaps. Dashed SLI segments identify incomplete history and do not establish full-window attainment. Shading does not bridge gaps or cover incomplete SLI history.
+
+Run `go run ./cmd/server -demo`, open `http://127.0.0.1:8080` and sign in with **admin / admin** to explore the charts with synthetic measurements. See [deployment options](deployment.md) before connecting a [telemetry provider](provider-adapters.md) for your own SLOs.
+
 ## Latency, journeys and AI workloads
 
 - [Latency SLOs](latency-slos.md) explain how histogram bucket counts form the good and total event ratio. A latency threshold SLO is not automatically the same thing as a p95 or p99 chart.

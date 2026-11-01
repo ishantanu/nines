@@ -22,6 +22,16 @@ Service level objectives and critical user journeys as versioned YAML, with a po
 
 *Synthetic demo workspace. [View the full-size screenshot](docs/public/brand/nines-overview.jpg).*
 
+<details>
+  <summary>SLI, error budget and burn-rate charts</summary>
+
+  <a href="docs/public/brand/nines-performance.jpg">
+    <img src="docs/public/brand/nines-performance.jpg" alt="Synthetic checkout SLO showing measured SLI against its target, remaining error budget and short- and long-window burn rates" width="760">
+  </a>
+
+  Synthetic demo measurements. [View the full-size charts](docs/public/brand/nines-performance.jpg).
+</details>
+
 ## Try the demo
 
 1. Clone the repository and enter it:

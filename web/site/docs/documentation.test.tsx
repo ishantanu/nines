@@ -159,3 +159,26 @@ it("takes table-of-contents text from parsed heading nodes without stripping HTM
   expect(markup).toContain("Literal &amp;lt;img&amp;gt;");
   expect(markup).not.toContain("<script>");
 });
+
+it("renders branding without a network request and reserves the early architecture image", () => {
+  const page = docPages.find((page) => page.slug === "architecture")!;
+  const { markup } = renderDocumentation(
+    page,
+    "# Architecture\n\n![Nines architecture](brand/nines-architecture.svg)",
+  );
+  expect(markup).toContain('src="data:image/svg+xml,');
+  expect(markup).toMatch(
+    /<img[^>]*nines-architecture\.svg[^>]*loading="eager"[^>]*width="1200"[^>]*height="870"/,
+  );
+});
+
+it("serves the chart screenshot locally with lazy loading and reserved dimensions", () => {
+  const page = docPages.find((page) => page.slug === "slo-guide")!;
+  const { markup } = renderDocumentation(
+    page,
+    "# SLO charts\n\n![Synthetic performance charts](brand/nines-performance.jpg)",
+  );
+  expect(markup).toMatch(
+    /<img[^>]*src="\.\.\/\.\.\/docs\/assets\/nines-performance\.jpg"[^>]*loading="lazy"[^>]*width="1280"[^>]*height="1591"/,
+  );
+});

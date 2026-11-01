@@ -238,3 +238,40 @@ test("direct chart inspection passes automated WCAG semantic checks", async () =
     })),
   ).toEqual([]);
 });
+
+test("area shading preserves missing-data gaps and excludes partial history", async () => {
+  const observed = (minute: number, coverage = 1) => ({
+    ...point(`2026-10-24T10:0${minute}:00Z`, 0.999),
+    coverage,
+  });
+  await render({
+    ...history,
+    points: [
+      observed(0),
+      observed(1),
+      point("2026-10-24T10:02:00Z", null),
+      observed(3),
+      observed(4),
+      observed(5, 0.5),
+    ],
+  });
+  const area = host.querySelector("[data-chart-area]")!.getAttribute("d")!;
+  expect(area.match(/M/g)).toHaveLength(2);
+  expect(area.match(/Z/g)).toHaveLength(2);
+  expect(area.match(/L/g)).toHaveLength(6);
+  expect(host.innerHTML).not.toMatch(/NaN|Infinity/);
+  await render({ ...history, points: [observed(0, 0.5), observed(1, 0.5)] });
+  expect(host.querySelector("[data-chart-area]")!.getAttribute("d")).toBe("");
+});
+
+test("summary describes the selected measurement and never substitutes a missing value", async () => {
+  await render();
+  expect(
+    host.querySelector('[aria-label^="Selected Measured SLI"]')?.textContent,
+  ).toBe("99.000%");
+  await render({ ...history, points: [history.points[1]] });
+  expect(
+    host.querySelector('[aria-label^="Selected Measured SLI"]')?.textContent,
+  ).toBe("No data");
+  expect(host.querySelector("[data-chart-marker]")).toBeNull();
+});

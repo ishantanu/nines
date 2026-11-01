@@ -1,6 +1,6 @@
 # HTTP API
 
-Nines provides a tenant-scoped HTTP API for SLOs, critical user journeys and reviewed intent workflows. This guide covers common endpoints. The pre-release API can change. The [versioned OpenAPI contract](../../api/openapi/v1alpha1.yaml) describes the core SLO and reviewed intent workflow operations listed in that file; other endpoints and complete resource schemas are not yet covered. It is OpenAPI 3.1.1, contract version 0.1.0-alpha.2. Nines does not yet provide Swagger UI.
+Nines provides a tenant-scoped HTTP API for SLOs, critical user journeys and reviewed intent workflows. This guide covers common endpoints. The pre-release API can change. The [versioned OpenAPI contract](../../api/openapi/v1alpha1.yaml) describes the core SLO, reviewed intent workflow and Datadog/New Relic native-result/catalog/draft operations listed in that file; other endpoints and complete resource schemas are not yet covered. It is OpenAPI 3.1.1, contract version 0.1.0-alpha.2. Nines does not yet provide Swagger UI.
 
 ## Authentication and tenant scope
 
@@ -72,6 +72,8 @@ These read-only operations use the configured Datadog or New Relic **native dest
 - `GET /api/slos/{id}/native-results?from=RFC3339&to=RFC3339`: read the exact published current revision. Past, whole-second ranges are limited to 31 days. New Relic clips inward to complete buckets; returned `from`/`to` show the effective range. The response is independent from Nines measurements, with nullable attainment/budget, history, provenance and limitations.
 - `GET /api/connections/{connection}/native-slos`: bounded vendor catalog. New Relic is restricted to the configured associated entity/account; Datadog to the configured credential scope. Catalogs exceeding their bounds fail rather than claim completeness.
 - `GET /api/connections/{connection}/native-slo-draft?nativeID=...&name=...&project=...&service=...`: prepare YAML for a new experimental Nines SLO. This does not save, adopt, synchronize or modify the vendor SLO. Review through the normal plan/apply workflow. Alerts, corrections, notifications and vendor ownership are not imported.
+
+Datadog, New Relic, VictoriaMetrics, Dash0 and Google Cloud share the Nines resource API; there is no separate public API namespace per vendor. The [provider capability guide](provider-adapters.md) describes query languages, native publication and supported subsets. Connection management and rule plan/apply operations are not yet fully covered by the partial OpenAPI contract.
 
 See [native results and reviewed import](provider-adapters.md#native-results-and-reviewed-import) for CLI examples and supported subsets.
 
