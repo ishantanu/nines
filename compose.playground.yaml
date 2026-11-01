@@ -61,9 +61,10 @@ services:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/healthz"]
-      interval: 2s
-      timeout: 2s
-      retries: 30
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://nines:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or your shell}@database:5432/nines?sslmode=disable
       API_TOKEN: nines-local-playground-owner-token
