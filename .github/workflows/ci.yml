@@ -205,19 +205,19 @@ jobs:
           set -euo pipefail
           export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
           printf '::add-mask::%s\n' "$POSTGRES_PASSWORD"
-          export NINES_PLAYGROUND_PROJECT=nines-playground
-          export NINES_PLAYGROUND_STATE_FILE="$RUNNER_TEMP/nines-playground.conf"
-          flags=(--ai)
+          compose=(docker compose -p nines-playground -f compose.playground.yaml)
           if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
-            flags+=(--mimir)
+            compose+=(-f compose.playground.mimir.yaml --profile mimir)
+          fi
+          compose+=(-f compose.playground.ai.yaml --profile ai)
+          if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
+            export NINES_PLAYGROUND_TENANTS=prometheus,mimir
           fi
           cleanup() {
-            set +e
-            ./playground logs --no-follow
-            docker compose -p nines-playground -f compose.playground.yaml --profile '*' down -v
-            set -e
+            "${compose[@]}" logs --no-color --tail 40 || true
+            "${compose[@]}" down -v || true
           }
           trap cleanup EXIT
-          ./playground up "${flags[@]}"
-          echo "=== Starting verification ==="
-          ./playground verify || { echo "=== Verify failed with exit code $? ==="; exit 1; }
+          "${compose[@]}" up --build -d
+          "${compose[@]}" run --rm verify
+          "${compose[@]}" run --rm ai-verify
