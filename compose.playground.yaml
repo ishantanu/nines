@@ -59,6 +59,11 @@ services:
         condition: service_healthy
       rule-directory:
         condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/healthz"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
     environment:
       DATABASE_URL: postgres://nines:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env or your shell}@database:5432/nines?sslmode=disable
       API_TOKEN: nines-local-playground-owner-token
@@ -157,7 +162,7 @@ services:
     network_mode: service:nines
     depends_on:
       nines:
-        condition: service_started
+        condition: service_healthy
       ai-sample:
         condition: service_healthy
     environment:
@@ -171,7 +176,7 @@ services:
     network_mode: service:nines
     depends_on:
       nines:
-        condition: service_started
+        condition: service_healthy
       ai-sample:
         condition: service_healthy
     environment:
