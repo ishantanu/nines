@@ -1,10 +1,15 @@
 # Architecture
 
-![Nines telemetry, reviewed rule delivery and standalone operator architecture](brand/nines-architecture.svg)
+![Nines multi-provider telemetry, reviewed SLO publication and standalone operator architecture](brand/nines-architecture.svg)
 
 - Nines is a Go server with a React/shadcn/ui frontend embedded in the executable. PostgreSQL stores normal deployment data.
   - The explicit demo uses isolated memory stores and synthetic data.
   - Deploy one collecting server process for the MVP; distributed collector scheduling is not implemented.
+- Telemetry stays in your observability backend. Nines reads provider-specific APIs for **Prometheus, Mimir, Datadog, New Relic, Dash0, Google Cloud Monitoring and VictoriaMetrics**.
+  - Datadog, New Relic, Dash0, Google Cloud Monitoring and VictoriaMetrics adapters are experimental.
+  - Prometheus/Mimir recording and burn-rate rules, reviewed native vendor SLO publication, and Nines attainment/alert evaluation are distinct capabilities.
+  - Datadog, New Relic, Dash0 and Google Cloud support native SLO publication within documented subsets. VictoriaMetrics currently supports collection only; native vendor alert creation is not included.
+  - Query languages, setup and live-test coverage differ by provider. See the [provider capability matrix](provider-adapters.md).
 - The CLI shares validation, deterministic measurement compilation and recording-rule generation with the server.
   - Offline commands do not start a server or load credentials.
   - Connected operations use a fixed server and tenant, with exact revisions or digests for writes.
