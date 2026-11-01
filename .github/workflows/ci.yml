@@ -232,3 +232,24 @@ jobs:
             launcher_flags+=(--prometheus)
           fi
           ./playground up "${launcher_flags[@]}"
+
+  ci:
+    name: CI
+    if: always()
+    needs: [lint, test, mimir, prometheus, victoriametrics, dependencies, topology, operator, identity, container]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI job to succeed
+        env:
+          CI_JOB_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, sys
+          results = json.loads(os.environ["CI_JOB_RESULTS"])
+          blocked = {name: job["result"] for name, job in results.items() if job["result"] != "success"}
+          if not results or blocked:
+              print("CI did not pass:", json.dumps(blocked, sort_keys=True))
+              sys.exit(1)
+          print("All required CI jobs passed.")
+          PYTHON
