@@ -205,7 +205,7 @@ jobs:
           set -euo pipefail
           export POSTGRES_PASSWORD="$(openssl rand -hex 24)"
           printf '::add-mask::%s\n' "$POSTGRES_PASSWORD"
-          export NINES_PLAYGROUND_PROJECT=nines-ci-playground
+          export NINES_PLAYGROUND_PROJECT=nines-playground
           export NINES_PLAYGROUND_STATE_FILE="$RUNNER_TEMP/nines-playground.conf"
           flags=(--ai)
           if [[ "$PLAYGROUND_BACKEND" == "mimir" ]]; then
@@ -214,7 +214,7 @@ jobs:
           cleanup() {
             set +e
             ./playground logs --no-follow
-            docker compose -p nines-ci-playground -f compose.playground.yaml --profile '*' down -v
+            docker compose -p nines-playground -f compose.playground.yaml --profile '*' down -v
             set -e
           }
           trap cleanup EXIT
