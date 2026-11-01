@@ -25,10 +25,10 @@ RUN apk add --no-cache python3
 COPY --from=ui /ui/node_modules ./web/node_modules
 RUN python3 scripts/release/licenses.py --out /out/LICENSES
 
-FROM scratch
+FROM alpine:3.20
+RUN apk add --no-cache wget ca-certificates
 COPY LICENSE NOTICE THIRD_PARTY_NOTICES.md /licenses/
 COPY --from=notices /out/LICENSES /licenses/dependencies/
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=build /out/nines-server /nines-server
 COPY --from=build /out/nines-mcp /nines-mcp
 USER 65532:65532
