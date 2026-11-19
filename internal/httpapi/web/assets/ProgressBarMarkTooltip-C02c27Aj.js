@@ -1,0 +1,1 @@
+import{t as e}from"./Tooltip-CwcsPcsB.js";import{a as t}from"./focusOutline.stylex-B3Dg982V.js";var n=t();function r({content:t,children:r}){return(0,n.jsx)(e,{content:t,placement:`above`,focusTrigger:`always`,children:r})}export{r as default};

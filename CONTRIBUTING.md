@@ -4,7 +4,7 @@ The current priority is a small, reproducible public MVP. Fix correctness, first
 
 ## Setup
 
-Use Go 1.27.4 or later, Node 24, npm, Python 3.9 or later and Docker when running integration tests. Install frontend dependencies with `npm ci --prefix web`, then `make ui build`. Go embeds `internal/httpapi/web`; finish the UI build before compiling Go. Run `go run ./cmd/server -demo` for isolated synthetic data.
+Use Go 1.27.4 or later, Node 24, npm, Python 3.9 or later and Docker when running integration tests. Install frontend dependencies with `npm ci --prefix web`, then `make ui build`. Go embeds `internal/httpapi/web`; finish the UI build before compiling Go. CI fails if the committed build differs from the source. Dependabot cannot run the build, so the **Rebuild portal for Dependabot** workflow rebuilds it on Dependabot's web dependency PRs, commits only `internal/httpapi/web` as `github-actions[bot]`, and starts CI again. Review that commit like the dependency change; Dependabot no longer rebases a PR once the bot has committed to it, so comment `@dependabot recreate` to refresh one. Run `go run ./cmd/server -demo` for isolated synthetic data.
 
 Docker builds use BuildKit cache mounts shared across the server, operator and Go fixtures. See [build cache and disk use](docs/public/deployment/docker-compose.md#build-cache-and-disk-use) for local retention settings; changing the Dockerfiles does not prune an existing builder.
 
