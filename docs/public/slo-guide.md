@@ -52,4 +52,4 @@ Experimental, aspirational, deprecated and archived objectives are not counted. 
 
 ## Using an agent
 
-Nines can help draft an SLO with configurable models or deterministic templates. Confirm the population and success criteria against telemetry, inspect the proposal and evidence, and use the independent human approval and application workflow. A generated draft, successful validation or saved definition does not establish measurement quality, activated rules or a healthy SLI. See [SLO intents](intents.md) and [headless workflows](headless-workflows.md).
+Nines can help draft an SLO with configurable models or deterministic templates. Confirm the population and success criteria against telemetry, inspect the proposal and evidence, and use the independent human approval and application workflow. A generated draft, successful validation or saved definition does not establish measurement quality, activated rules or a healthy SLI. See [Create from a goal](intents.md) and [headless workflows](headless-workflows.md).

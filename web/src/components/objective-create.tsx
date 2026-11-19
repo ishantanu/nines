@@ -466,7 +466,7 @@ export function ObjectiveCreate({
           <DialogDescription>
             {resource
               ? "Edit the objective, measurement and burn-rate policies, then review the new revision. Measurement changes archive existing evidence and require fresh coverage. Rule delivery follows the telemetry connection policy."
-              : "Choose what to measure and a target, then review before saving. Use Settings or YAML for custom queries."}
+              : "Choose what to measure and a target, then review before saving. Use Settings or YAML for custom queries. To prepare the SLO with evidence and a separate approval, use Create from a goal instead."}
           </DialogDescription>
         </DialogHeader>
         <div className="dialog-body space-y-5">

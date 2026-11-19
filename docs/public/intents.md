@@ -1,6 +1,11 @@
-# SLO intents
+# Create an SLO from a goal
 
-An intent expresses the reliability outcome you want to measure.
+A goal, written as an SLO intent (`kind: ServiceLevelObjectiveIntent`), expresses the reliability outcome you want to measure. Nines turns it into an SLO only after its measurement is confirmed and a separate person approves the exact change.
+
+- **Use Define objective** to write an SLO directly: choose a type, fill in the measurement, verify telemetry and save.
+- **Use Create from a goal** when the change needs telemetry evidence, a backtest and a separate approval before it is applied, or when an agent prepares it. In the portal it is **Create from a goal** on **Service level objectives**, or in the sidebar.
+- A goal can be any counter-ratio or threshold type: availability, latency, correctness, durability, freshness or coverage. Sessions, good-minute and throughput are defined with Define objective. See [SLO types](slo-types.md).
+- The goal, evidence, approval and apply steps are deterministic and do not need a model. Only drafting the goal from a description, and agent-driven preparation, use a model; those parts are experimental.
 
 - Nines can help turn natural language into a draft, discover relevant telemetry and prepare a change set.
 - The deterministic compiler and explicit human review determine what can be applied.

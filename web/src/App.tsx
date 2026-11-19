@@ -244,7 +244,7 @@ const copy = {
   ],
   intents: [
     "Create an SLO from a goal",
-    "Describe the user outcome. Nines finds candidate telemetry, shows evidence and a backtest, and prepares a change for review. A model is optional.",
+    "Describe the user outcome. Nines finds candidate telemetry, shows evidence and a backtest, and prepares a change that a second person approves before it is applied. A model is optional. To write an SLO directly, use Define objective on Service level objectives.",
   ],
   maps: [
     "Service dependencies",
@@ -1230,9 +1230,10 @@ function TenantWorkspace({
                     >
                       <Button
                         variant="outline"
+                        title="Prepare an SLO from a goal, with telemetry evidence and a separate approval before it is applied"
                         onClick={() => navigate("intents")}
                       >
-                        <ReplayLabel>Create from intent</ReplayLabel>
+                        <ReplayLabel>Create from a goal</ReplayLabel>
                       </Button>
                       <MigrationImport scope={scope} onApplied={reload} />
                       <ObjectiveCreate scope={scope} onCreated={reload} />

@@ -16,7 +16,7 @@ import { ReplayLabel } from "@/components/replay-label";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { definitionFromSLO } from "@/lib/definitions";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Waypoints } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -678,10 +678,10 @@ export function ObjectiveDetail({
           {journeys.some((j) => j.links.some((l) => l.link.id === id)) ? (
             <section
               className="mt-5 border-t pt-4"
-              aria-label="Linked critical user journeys"
+              aria-label="Journeys that depend on this SLO"
             >
               <h2 className="mb-2 text-sm font-semibold">
-                Linked critical user journeys
+                Journeys that depend on this SLO
               </h2>
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {journeys
@@ -691,11 +691,13 @@ export function ObjectiveDetail({
                       variant="outline"
                       size="sm"
                       key={j.resource.manifest.metadata.name}
+                      title={`Open the critical user journey "${j.resource.manifest.spec.displayName}"`}
                       onClick={() => {
                         onClose();
                         onJourney(j.resource.manifest.metadata.name);
                       }}
                     >
+                      <Waypoints className="size-3.5" aria-hidden />
                       {j.resource.manifest.spec.displayName}
                       <ArrowUpRight className="size-3" />
                     </Button>

@@ -39,7 +39,7 @@ docker compose -p nines-playground -f compose.playground.yaml up --build -d
 - **Deliver SLOs through a pull or merge request**: [Git delivery](git-delivery.md)
 - **Bring SLOs from Sloth or Pyrra**: [Migration](migration.md)
 - **Integrate CI and incident workflows**: [Headless workflows](headless-workflows.md) and [signed notifications](workflow-webhooks.md)
-- **Draft and review a change with an agent**: [SLO intents](intents.md)
+- **Prepare an SLO with evidence and a separate approval, optionally with an agent**: [Create from a goal](intents.md)
 - **Connect Prometheus or Mimir and load generated rules**: [Metrics and rules](deployment/metrics-and-rules.md)
 - **Run a released image**: [Container images](deployment/container-images.md)
 - **Run Nines in Kubernetes**: [Server deployment](deployment/kubernetes.md) or [operator](deployment/operator.md)

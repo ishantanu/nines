@@ -170,7 +170,7 @@ export const docGroups: DocGroup[] = [
       ),
       page(
         "intents",
-        "SLO intents",
+        "Create from a goal",
         "Move from a reliability goal to confirmed measurements and reviewed changes.",
       ),
       page(

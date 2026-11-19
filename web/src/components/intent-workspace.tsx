@@ -522,7 +522,7 @@ export function IntentWorkspace({
         {createOpen ? (
           <Card>
             <CardHeader>
-              <CardTitle>New intent conversation</CardTitle>
+              <CardTitle>New goal conversation</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Fix the service and eligible population before asking the agent
                 to prepare a measurement. Use the definition form to provide a
@@ -721,7 +721,7 @@ export function IntentWorkspace({
                             value="model"
                             disabled={!caps?.modelEnabled}
                           >
-                            Model-directed agent
+                            Model-directed agent (experimental)
                           </SelectItem>
                         </SelectContent>
                       </Select>
@@ -1073,7 +1073,7 @@ export function IntentWorkspace({
                 {value.changeSet ? (
                   <section
                     className="space-y-3 rounded-md border p-3"
-                    aria-label="Reviewed intent changes"
+                    aria-label="Reviewed goal changes"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">Change set</p>
@@ -1219,7 +1219,7 @@ export function IntentWorkspace({
                       </summary>
                       <dl className="mt-2 space-y-2 break-all font-mono">
                         <div>
-                          <dt>Intent digest</dt>
+                          <dt>Goal digest</dt>
                           <dd>
                             {value.backtest.intentDigest ?? "Unavailable"}
                           </dd>
@@ -1311,8 +1311,9 @@ export function IntentWorkspace({
         ) : !createOpen ? (
           <Card>
             <CardContent className="p-8 text-center text-sm text-muted-foreground">
-              Start a conversation to clarify a reliability goal, or use the
-              definition form to prepare a typed intent.
+              Start a conversation to prepare an SLO from a goal step by step,
+              with or without a model, or use the Definition form to write the
+              goal directly.
             </CardContent>
           </Card>
         ) : null}

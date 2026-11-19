@@ -240,7 +240,7 @@ docker compose -p nines-playground -f compose.playground.yaml down -v
 
 - The launcher remembers these choices. `./playground up`, `verify`, `logs`, `status` and `down` reuse them without repeating flags.
 - A Jev key alone enables no calls. The selected tenant file controls advice, and each guided run still requires consent. Existing accounts and volumes are preserved.
-- Sign in with **admin / admin**, select the intended tenant, and open **SLO intents**.
+- Sign in with **admin / admin**, select the intended tenant, and open **Create from a goal**.
   - Save a conversation with a typed goal, expand **Run options**, keep **Guided preparation**, select the separate TypeSafe/Jev consent checkbox, then choose **Prepare proposal**.
   - Expand the latest **Guided run → System One advice → Assessment receipt** to inspect the model, judgments and token usage.
   - A typed goal permits this path without a generative model.

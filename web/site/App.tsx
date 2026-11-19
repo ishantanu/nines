@@ -602,7 +602,7 @@ export function App() {
                   </TabsTrigger>
                   <TabsTrigger value="latency">Latency SLO</TabsTrigger>
                   <TabsTrigger value="intent">
-                    Intent (experimental)
+                    Goal (intent)
                   </TabsTrigger>
                 </TabsList>
                 <span>YAML</span>
@@ -633,11 +633,11 @@ export function App() {
               </TabsContent>
               <TabsContent value="intent">
                 <div className="file-name">
-                  api-success.intent.yaml (experimental)
+                  api-success.intent.yaml
                 </div>
                 <pre
                   tabIndex={0}
-                  aria-label="Experimental SLO intent YAML example"
+                  aria-label="SLO goal (intent) YAML example"
                 >
                   <code>{intent}</code>
                 </pre>

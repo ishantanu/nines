@@ -47,7 +47,7 @@ tenants:
 
 ## Use the workflow
 
-- In **SLO intents → a saved conversation → Run options**, opt in to sending this run’s goal description and observation point to TypeSafe.
+- In **Create from a goal → a saved conversation → Run options**, opt in to sending this run’s goal description and observation point to TypeSafe.
   - This consent is separate from consent for the model-directed agent.
   - You can use Jev with a typed goal and **Guided preparation**, without a generative model.
 - Each opted-in run sends only its goal description (or latest user message when a typed goal is absent) and the inline measurement’s observation point if present.

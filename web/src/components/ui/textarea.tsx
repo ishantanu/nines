@@ -3,6 +3,18 @@ import { TextArea } from "@astryxdesign/core/TextArea";
 import { cn } from "cn";
 import { splitFieldClasses } from "./field-classes";
 
+// Astryx sizes the textarea by rows (default 3), not by height, so a
+// min-h-* class only grew the frame around a 3-line box. Derive rows from the
+// minimum height (Tailwind spacing: 0.25rem = 4px) and the text size's line
+// height, so the editable area fills the space it is given.
+export function rowsForMinHeight(className?: string): number | undefined {
+  const m = /(?:^|\s)min-h-(\d+)(?:\s|$)/.exec(className ?? "");
+  if (!m) return undefined;
+  const line = /(?:^|\s)text-xs(?:\s|$)/.test(className ?? "") ? 16 : 20;
+  const padding = 16;
+  return Math.max(3, Math.floor((Number(m[1]) * 4 - padding) / line));
+}
+
 // Adapter over Astryx TextArea for controlled values; uncontrolled usage keeps
 // a native element styled from Astryx tokens.
 function Textarea({
@@ -40,7 +52,7 @@ function Textarea({
             ? undefined
             : spellCheck === true || spellCheck === "true"
         }
-        rows={rows}
+        rows={rows ?? rowsForMinHeight(className)}
         width="100%"
         {...splitFieldClasses(className)}
         status={

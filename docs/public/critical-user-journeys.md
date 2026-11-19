@@ -70,7 +70,7 @@ nines apply -f examples/checkout.journey.yaml --expected-revision 0 --context pr
 
 ## Propose links through an intent
 
-- An [SLO intent](intents.md) can propose a link to an existing journey and step.
+- A [goal](intents.md) (SLO intent) can propose a link to an existing journey and step.
   - It must carry the journey's expected revision.
   - The reviewed change set applies the SLO and the proposed journey change atomically.
   - The model cannot approve that change, and a concurrent journey edit invalidates the stale proposal.

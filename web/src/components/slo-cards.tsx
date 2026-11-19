@@ -8,6 +8,7 @@ import { SLOTrend } from "./overview-charts";
 import { SLOProvider } from "./provider-identity";
 import { SLOAlertState } from "./sli-value";
 import { Button } from "./ui/button";
+import { ArrowUpRight, Waypoints } from "lucide-react";
 
 export function SLOCards({
   items,
@@ -154,22 +155,32 @@ export function SLOCards({
               <SLOAlertState status={o.status} />
             </div>
             {!compact && linked.length > 0 && (
-              <div
-                className="mt-3 flex flex-wrap gap-1"
-                aria-label="Linked critical user journeys"
+              <section
+                className="mt-3"
+                aria-label="Journeys that depend on this SLO"
               >
-                {linked.map((j) => (
-                  <Button
-                    key={j.resource.manifest.metadata.name}
-                    variant="outline"
-                    size="sm"
-                    className="h-auto min-h-11 max-w-full whitespace-normal text-left"
-                    onClick={() => onJourney(j.resource.manifest.metadata.name)}
-                  >
-                    {j.resource.manifest.spec.displayName}
-                  </Button>
-                ))}
-              </div>
+                <p className="mb-1 text-xs text-muted-foreground">
+                  Journeys that depend on this SLO
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {linked.map((j) => (
+                    <Button
+                      key={j.resource.manifest.metadata.name}
+                      variant="outline"
+                      size="sm"
+                      className="h-auto min-h-11 max-w-full whitespace-normal text-left"
+                      title={`Open the critical user journey "${j.resource.manifest.spec.displayName}"`}
+                      onClick={() =>
+                        onJourney(j.resource.manifest.metadata.name)
+                      }
+                    >
+                      <Waypoints className="size-3.5 shrink-0" aria-hidden />
+                      {j.resource.manifest.spec.displayName}
+                      <ArrowUpRight className="size-3 shrink-0" aria-hidden />
+                    </Button>
+                  ))}
+                </div>
+              </section>
             )}
           </SLOMetricCard>
         );
