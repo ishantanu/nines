@@ -41,6 +41,7 @@ func (s *Service) budgetFromEvidence(c model.SLO, x model.Snapshot, q v1.Measure
 		d.Message = "This objective is not committed. Its budget is a measurement preview; an owner must review operational use."
 		return d
 	}
+	d.Band = model.MatchBudgetBand(p.Bands, *x.BudgetRemainingFraction)
 	if *x.BudgetRemainingFraction <= 0 {
 		d.State = p.OnExhausted
 		if d.State == "" {

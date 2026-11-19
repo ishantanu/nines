@@ -304,3 +304,94 @@ it("offers the Markdown link if copying fails", async () => {
   );
   expect(document.querySelector("a[data-markdown-link]")).not.toBeNull();
 });
+
+function packedChapter(slug: string, title: string) {
+  const doc = new DOMParser().parseFromString(html(slug, title), "text/html");
+  return {
+    slug,
+    title,
+    description: title + " guide",
+    main: doc.querySelector("#main")!.outerHTML,
+    outline: doc.querySelector(".docs-outline")!.outerHTML,
+  };
+}
+function enableChapterCache() {
+  cleanup();
+  document.querySelector<HTMLElement>("#root")!.dataset.docBundle =
+    "/nines/docs/chapter-cache-012345abcdef.json";
+  cleanup = mountDocumentation(document.querySelector("#root")!);
+}
+it("warms chapter fragments after initial paint and direct clicks need no additional request", async () => {
+  vi.useFakeTimers();
+  try {
+    fetcher.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          version: 1,
+          pages: [
+            packedChapter("deployment/operator", "Operator"),
+            packedChapter("measurements", "Measurements"),
+          ],
+        }),
+        { headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    enableChapterCache();
+    expect(fetcher).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(250);
+    await settled();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][1].priority).toBe("low");
+    click('.docs-sidebar a[href$="deployment/operator/"]');
+    await settled();
+    expect(document.querySelector("h1")?.textContent).toBe("Operator");
+    click('.docs-sidebar a[href$="measurements/"]');
+    await settled();
+    expect(document.querySelector("h1")?.textContent).toBe("Measurements");
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it("background warming never blocks an uncached chapter click", async () => {
+  vi.useFakeTimers();
+  try {
+    fetcher
+      .mockReturnValueOnce(new Promise(() => {}))
+      .mockResolvedValueOnce(response("deployment/operator", "Operator"));
+    enableChapterCache();
+    await vi.advanceTimersByTimeAsync(250);
+    click('.docs-sidebar a[href$="deployment/operator/"]');
+    await settled();
+    expect(document.querySelector("h1")?.textContent).toBe("Operator");
+    expect(fetcher.mock.calls[1][1].priority).toBe("high");
+    cleanup();
+    cleanup = () => {};
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it("does not preload the chapter cache on a data-saver connection", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("navigator", { connection: { saveData: true } });
+  try {
+    enableChapterCache();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetcher).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});
+it("ignores cross-origin chapter cache configuration", async () => {
+  vi.useFakeTimers();
+  try {
+    cleanup();
+    document.querySelector<HTMLElement>("#root")!.dataset.docBundle =
+      "https://other.example/docs/chapter-cache-012345abcdef.json";
+    cleanup = mountDocumentation(document.querySelector("#root")!);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(fetcher).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});

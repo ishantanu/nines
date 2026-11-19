@@ -113,7 +113,10 @@ func (s *Service) renderIntentTemplate(r *record, raw json.RawMessage, now time.
 	if err != nil {
 		return nil, err
 	}
-	if template.Manifest.Spec.Measurement.Type != goal.Spec.Outcome {
+	// Templates are matched by how they compile: a correctness or durability
+	// recipe is an availability-style ratio, a freshness recipe a latency-style
+	// threshold.
+	if model.MeasurementFamily(template.Manifest.Spec.Measurement.Type) != model.MeasurementFamily(goal.Spec.Outcome) {
 		return nil, model.Invalid("template measurement type does not match the typed goal")
 	}
 	if template.Extension == nil {
@@ -137,12 +140,22 @@ func (s *Service) renderIntentTemplate(r *record, raw json.RawMessage, now time.
 		return nil, err
 	}
 	goal.Spec.Measurement = clone(draft.Manifest.Spec.Measurement)
+	refined := ""
+	if kind := draft.Manifest.Spec.Measurement.Type; kind != goal.Spec.Outcome {
+		// Same family (checked above): the recipe names what is counted more
+		// precisely, such as correctness for an availability-style goal.
+		refined = fmt.Sprintf("The recipe counts %s, so the goal's outcome is refined from %s to %s.", kind, goal.Spec.Outcome, kind)
+		goal.Spec.Outcome = kind
+	}
 	warnings := []string{"Template selection proposes an unverified measurement. Review the observation point, success labels and retries before human confirmation.", "The typed goal's target, rolling window, quality requirements and alert policies are preserved. Recipe presets were not imported."}
 	if goal.Spec.StepSeconds == 0 {
 		warnings = append(warnings, fmt.Sprintf("No measurement step was supplied; the proposed step is %d seconds.", draft.Manifest.Spec.StepSeconds))
 	}
 	if goal.Spec.Lifecycle == "" {
 		warnings = append(warnings, "No lifecycle was supplied; this draft starts as experimental with paging suppressed.")
+	}
+	if refined != "" {
+		warnings = append(warnings, refined)
 	}
 	warnings = append(warnings, template.Requirements...)
 	if goal.Spec.Lifecycle == "" {

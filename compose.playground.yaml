@@ -96,7 +96,7 @@ services:
     - setup
     depends_on:
       nines:
-        condition: service_started
+        condition: service_healthy
       prometheus:
         condition: service_started
     volumes:
@@ -141,6 +141,7 @@ services:
     ports:
     - 127.0.0.1:${NINES_PLAYGROUND_MIMIR_PORT:-19009}:9009
   ai-sample:
+    image: nines-ai-playground:local
     profiles:
     - ai
     build: &id001
@@ -157,6 +158,7 @@ services:
       timeout: 3s
       retries: 30
   ai-setup:
+    image: nines-ai-playground:local
     profiles:
     - ai
     build: *id001
@@ -171,6 +173,7 @@ services:
     environment:
       NINES_PLAYGROUND_TENANTS: ${NINES_PLAYGROUND_TENANTS:-auto}
   ai-verify:
+    image: nines-ai-playground:local
     profiles:
     - verify
     build: *id001

@@ -110,7 +110,7 @@ test("viewer UI cannot create investigations and states the actual execution cap
       onJourney={() => {}}
     />,
   );
-  expect(html).toMatch(/disabled=""[^>]*><svg[^]*?New review/);
+  expect(html).toMatch(/aria-disabled="true"[^>]*>[^]*?New review/);
   expect(html).toContain("Runs are read-only");
   expect(html).toContain("Shared with authorized members of this tenant");
 });

@@ -1,48 +1,103 @@
 import * as React from "react";
-import { cn } from "cn";
+import { Dialog as AstryxDialog } from "@astryxdesign/core/Dialog";
 import { XIcon } from "lucide-react";
-import { Dialog as DialogPrimitive } from "radix-ui";
-
+import { cn } from "cn";
 import { Button } from "@/components/ui/button";
 
+// Adapter over Astryx Dialog (a native <dialog>, so focus trapping, Escape and
+// backdrop dismissal come from the platform). Keeps the compound API: state
+// and the title/description ids live in context.
+type DialogState = {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  titleId: string;
+  descriptionId: string;
+};
+const DialogContext = React.createContext<DialogState | null>(null);
+function useDialog(): DialogState {
+  const state = React.useContext(DialogContext);
+  if (!state) throw new Error("Dialog parts must be rendered inside Dialog");
+  return state;
+}
+
 function Dialog({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Root>) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+  open: controlled,
+  defaultOpen = false,
+  onOpenChange,
+  children,
+}: {
+  open?: boolean;
+  defaultOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: React.ReactNode;
+}) {
+  const [uncontrolled, setUncontrolled] = React.useState(defaultOpen);
+  const id = React.useId();
+  const open = controlled ?? uncontrolled;
+  const setOpen = React.useCallback(
+    (next: boolean) => {
+      if (controlled === undefined) setUncontrolled(next);
+      onOpenChange?.(next);
+    },
+    [controlled, onOpenChange],
+  );
+  return (
+    <DialogContext.Provider
+      value={{
+        open,
+        setOpen,
+        titleId: `${id}-title`,
+        descriptionId: `${id}-description`,
+      }}
+    >
+      {children}
+    </DialogContext.Provider>
+  );
+}
+
+type Clickable = {
+  onClick?: (event: React.MouseEvent) => void;
+  "aria-haspopup"?: string;
+  "aria-expanded"?: boolean;
+};
+
+// Wires an existing element (the previous `asChild` pattern) to open/close.
+function wire(
+  child: React.ReactNode,
+  action: () => void,
+  extra: Clickable = {},
+) {
+  if (!React.isValidElement<Clickable>(child)) return child;
+  return React.cloneElement(child, {
+    ...extra,
+    onClick: (event: React.MouseEvent) => {
+      child.props.onClick?.(event);
+      if (!event.defaultPrevented) action();
+    },
+  });
 }
 
 function DialogTrigger({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
-}
-
-function DialogPortal({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
+  children,
+}: {
+  asChild?: boolean;
+  children: React.ReactNode;
+}) {
+  const { open, setOpen } = useDialog();
+  return wire(children, () => setOpen(true), {
+    "aria-haspopup": "dialog",
+    "aria-expanded": open,
+  });
 }
 
 function DialogClose({
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Close>) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
-}
-
-function DialogOverlay({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
-  return (
-    <DialogPrimitive.Overlay
-      data-slot="dialog-overlay"
-      className={cn(
-        "fixed inset-0 z-50 bg-black/50 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:animate-in data-[state=open]:fade-in-0",
-        className,
-      )}
-      {...props}
-    />
-  );
+  children,
+}: {
+  asChild?: boolean;
+  children: React.ReactNode;
+}) {
+  const { setOpen } = useDialog();
+  return wire(children, () => setOpen(false));
 }
 
 function DialogContent({
@@ -50,32 +105,42 @@ function DialogContent({
   children,
   showCloseButton = true,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+}: Omit<React.ComponentProps<"div">, "title"> & {
   showCloseButton?: boolean;
 }) {
+  const { open, setOpen, titleId, descriptionId } = useDialog();
+  // Unmount when closed, as before, so closed dialogs never linger in the DOM.
+  if (!open) return null;
   return (
-    <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
-        className={cn(
-          "fixed top-[50%] left-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full min-w-0 overflow-y-auto max-w-[calc(100%_-_2rem)] translate-x-[-50%] translate-y-[-50%] grid-cols-1 gap-5 rounded-md border bg-card p-4 shadow-lg sm:p-6 duration-200 outline-none data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 sm:max-w-lg",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            className="absolute top-4 right-4 rounded-xs opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
-          >
-            <XIcon />
-            <span className="sr-only">Close</span>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </DialogPortal>
+    <AstryxDialog
+      isOpen={open}
+      onOpenChange={setOpen}
+      width="100%"
+      padding={6}
+      role="dialog"
+      aria-labelledby={titleId}
+      aria-describedby={descriptionId}
+      data-slot="dialog-content"
+      // No positioning class here: Astryx keeps the dialog position: fixed so
+      // it stays centered in the viewport even when the page is scrolled. A
+      // fixed element already anchors the absolute close button.
+      className={cn("sm:max-w-lg", className)}
+      {...(props as object)}
+    >
+      {children}
+      {showCloseButton ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Close"
+          type="button"
+          className="absolute top-3 right-3"
+          onClick={() => setOpen(false)}
+        >
+          <XIcon />
+        </Button>
+      ) : null}
+    </AstryxDialog>
   );
 }
 
@@ -94,9 +159,7 @@ function DialogFooter({
   showCloseButton = false,
   children,
   ...props
-}: React.ComponentProps<"div"> & {
-  showCloseButton?: boolean;
-}) {
+}: React.ComponentProps<"div"> & { showCloseButton?: boolean }) {
   return (
     <div
       data-slot="dialog-footer"
@@ -107,21 +170,20 @@ function DialogFooter({
       {...props}
     >
       {children}
-      {showCloseButton && (
-        <DialogPrimitive.Close asChild>
+      {showCloseButton ? (
+        <DialogClose asChild>
           <Button variant="outline">Close</Button>
-        </DialogPrimitive.Close>
-      )}
+        </DialogClose>
+      ) : null}
     </div>
   );
 }
 
-function DialogTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+function DialogTitle({ className, ...props }: React.ComponentProps<"h2">) {
+  const { titleId } = useDialog();
   return (
-    <DialogPrimitive.Title
+    <h2
+      id={titleId}
       data-slot="dialog-title"
       className={cn("text-lg leading-6 font-semibold", className)}
       {...props}
@@ -129,12 +191,11 @@ function DialogTitle({
   );
 }
 
-function DialogDescription({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
+function DialogDescription({ className, ...props }: React.ComponentProps<"p">) {
+  const { descriptionId } = useDialog();
   return (
-    <DialogPrimitive.Description
+    <p
+      id={descriptionId}
       data-slot="dialog-description"
       className={cn("text-sm leading-6 text-muted-foreground", className)}
       {...props}
@@ -149,8 +210,6 @@ export {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogOverlay,
-  DialogPortal,
   DialogTitle,
   DialogTrigger,
 };

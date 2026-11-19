@@ -18,7 +18,7 @@ The Kubernetes operator is a first-class Nines deployment mode for GitOps-manage
 
 ## Render rules without running a controller
 
-Requires Go 1.27.3 to build the CLI. These commands need no running Nines server or Kubernetes cluster:
+Requires Go 1.27.4 to build the CLI. These commands need no running Nines server or Kubernetes cluster:
 
 ```sh
 make cli
@@ -52,21 +52,22 @@ bin/nines rules generate --offline \
 * A reachable Prometheus query endpoint and rule selectors that include `team-commerce` and the configured `release: monitoring` label.
 * An operator image available to the cluster.
 
-Check your target, then build the image:
+Check your target. `deploy/operator/operator.yaml` uses the published `ghcr.io/ishantanu/nines-operator:v0.1.0-alpha.4` image for `linux/amd64` and `linux/arm64`:
 
 ```sh
 kubectl config current-context
-docker build -f deploy/operator/Dockerfile -t nines-operator:dev .
 ```
 
-For kind, load the image into your explicitly selected evaluation cluster:
+- In your reviewed copy of `deploy/operator/operator.yaml`, pin the image digest listed in the release notes. See [container images](container-images.md) to verify the signature and provenance.
+- To build your own image instead:
 
 ```sh
-# Replace YOUR_KIND_CLUSTER with its name.
+docker build -f deploy/operator/Dockerfile -t nines-operator:dev .
+# For kind, load it into your explicitly selected evaluation cluster.
 kind load docker-image nines-operator:dev --name YOUR_KIND_CLUSTER
 ```
 
-- For another cluster, push to a registry it can access and replace the Deployment image in your reviewed copy of `deploy/operator/operator.yaml`.
+- For another cluster, push your own build to a registry it can access and set the Deployment image in your reviewed copy.
 - Before applying, edit that file's ConfigMap for your actual provider.
   - The example binds Kubernetes namespace `team-commerce` to Nines tenant `commerce`, allows project `commerce`, uses `http://prometheus.monitoring.svc:9090`, and labels generated rules `release: monitoring`.
   - These are examples, not automatic discovery or a bundled Prometheus installation.

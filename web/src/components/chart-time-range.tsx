@@ -3,11 +3,7 @@ import { CalendarDays, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover } from "@astryxdesign/core/Popover";
 import { duration } from "@/lib/history";
 import {
   absoluteRange,
@@ -60,6 +56,21 @@ export function ChartTimeRange({
     }
     setOpen(next);
   }
+  const presets = [
+    ...new Set([
+      ...rangePresets(maxSeconds, stepSeconds),
+      300,
+      900,
+      1800,
+      3600,
+      10800,
+      21600,
+      43200,
+      86400,
+      604800,
+      2419200,
+    ]),
+  ].sort((a, b) => a - b);
   const label =
     value.kind === "relative"
       ? `Last ${duration(Math.min(value.seconds, maxSeconds))}`
@@ -69,123 +80,154 @@ export function ChartTimeRange({
       <Label htmlFor={id}>
         <ReplayLabel>Time range</ReplayLabel>
       </Label>
-      <Popover open={open} onOpenChange={openPicker}>
-        <PopoverTrigger asChild>
-          <Button
-            id={id}
-            variant="outline"
-            className="mt-1 w-full justify-between sm:min-w-44"
-            aria-label={`Time range: ${label}`}
-          >
-            <CalendarDays />
-            <span>{label}</span>
-            <ChevronDown />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent aria-label="Select chart time range" className="p-3">
-          <h3 className="font-semibold">Time range</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Dates and chart axes use UTC. Up to {duration(maxSeconds)} of
-            retained history.
-          </p>
-          <div
-            className="my-3 grid grid-cols-3 gap-2"
-            aria-label="Quick ranges"
-          >
-            {rangePresets(maxSeconds).map((seconds) => (
-              <Button
-                key={seconds}
-                size="sm"
-                variant={
-                  value.kind === "relative" &&
-                  Math.min(value.seconds, maxSeconds) === seconds
-                    ? "secondary"
-                    : "outline"
-                }
-                onClick={() => {
-                  onChange({ kind: "relative", seconds });
-                  setOpen(false);
+      <Popover
+        isOpen={open}
+        onOpenChange={openPicker}
+        label="Select chart time range"
+        padding={4}
+        content={
+          <>
+            <h3 className="font-semibold">Time range</h3>
+            <p
+              id={`${id}-limit`}
+              className="mt-1 text-sm text-muted-foreground"
+            >
+              History limit: {duration(maxSeconds)}. All times UTC.
+            </p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
+              <div
+                className="max-h-64 space-y-1 overflow-y-auto pr-1 sm:max-h-80"
+                aria-label="Quick ranges"
+                aria-describedby={`${id}-limit`}
+              >
+                {presets.map((seconds) => (
+                  <Button
+                    key={seconds}
+                    size="sm"
+                    className="w-full justify-start"
+                    disabled={seconds > maxSeconds || seconds < stepSeconds}
+                    aria-pressed={
+                      value.kind === "relative" &&
+                      Math.min(value.seconds, maxSeconds) === seconds
+                    }
+                    title={
+                      seconds > maxSeconds
+                        ? "Outside retained history"
+                        : seconds < stepSeconds
+                          ? "Shorter than one measurement interval"
+                          : undefined
+                    }
+                    variant={
+                      value.kind === "relative" &&
+                      Math.min(value.seconds, maxSeconds) === seconds
+                        ? "secondary"
+                        : "ghost"
+                    }
+                    onClick={() => {
+                      onChange({ kind: "relative", seconds });
+                      setOpen(false);
+                    }}
+                  >
+                    Last {duration(seconds)}
+                  </Button>
+                ))}
+              </div>
+              <form
+                className="min-w-0 space-y-3 border-t pt-4 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  try {
+                    const next = absoluteRange(
+                      from,
+                      to,
+                      stepSeconds,
+                      maxSeconds,
+                    );
+                    onChange(next);
+                    setOpen(false);
+                  } catch (e) {
+                    setError(
+                      e instanceof Error
+                        ? e.message
+                        : "Choose a valid time range.",
+                    );
+                  }
                 }}
               >
-                Last {duration(seconds)}
-              </Button>
-            ))}
-          </div>
-          <form
-            className="space-y-3 border-t pt-3"
-            onSubmit={(event) => {
-              event.preventDefault();
-              try {
-                const next = absoluteRange(from, to, stepSeconds, maxSeconds);
-                onChange(next);
-                setOpen(false);
-              } catch (e) {
-                setError(
-                  e instanceof Error ? e.message : "Choose a valid time range.",
-                );
-              }
-            }}
-          >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor={`${id}-from`}>From (UTC)</Label>
-                <Input
-                  id={`${id}-from`}
-                  type="datetime-local"
-                  step="1"
-                  value={from}
-                  onChange={(e) => {
-                    setFrom(e.target.value);
-                    setError("");
-                  }}
-                  aria-invalid={!!error}
-                  aria-describedby={error ? `${id}-error` : undefined}
-                />
-              </div>
-              <div className="min-w-0 space-y-2">
-                <Label htmlFor={`${id}-to`}>To (UTC)</Label>
-                <Input
-                  id={`${id}-to`}
-                  type="datetime-local"
-                  step="1"
-                  value={to}
-                  onChange={(e) => {
-                    setTo(e.target.value);
-                    setError("");
-                  }}
-                  aria-invalid={!!error}
-                  aria-describedby={error ? `${id}-error` : undefined}
-                />
-              </div>
+                <h4 className="font-medium">Custom range</h4>
+                <div className="grid gap-3">
+                  <div className="min-w-0 space-y-2">
+                    <Label htmlFor={`${id}-from`}>From (UTC)</Label>
+                    <Input
+                      id={`${id}-from`}
+                      type="datetime-local"
+                      step="1"
+                      value={from}
+                      onChange={(e) => {
+                        setFrom(e.target.value);
+                        setError("");
+                      }}
+                      aria-invalid={!!error}
+                      aria-describedby={error ? `${id}-error` : undefined}
+                    />
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    <Label htmlFor={`${id}-to`}>To (UTC)</Label>
+                    <Input
+                      id={`${id}-to`}
+                      type="datetime-local"
+                      step="1"
+                      value={to}
+                      onChange={(e) => {
+                        setTo(e.target.value);
+                        setError("");
+                      }}
+                      aria-invalid={!!error}
+                      aria-describedby={error ? `${id}-error` : undefined}
+                    />
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Dates align to complete {duration(stepSeconds)} intervals.
+                  Changes load only when applied.
+                </p>
+                {error ? (
+                  <p
+                    id={`${id}-error`}
+                    role="alert"
+                    className="text-sm text-[var(--status-degraded)]"
+                  >
+                    {error}
+                  </p>
+                ) : null}
+                <div className="flex justify-end gap-2">
+                  <Button
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                    onClick={() => setOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button size="sm" type="submit">
+                    Apply range
+                  </Button>
+                </div>
+              </form>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Dates align to complete {duration(stepSeconds)} intervals. Changes
-              load only when applied.
-            </p>
-            {error ? (
-              <p
-                id={`${id}-error`}
-                role="alert"
-                className="text-sm text-[var(--status-degraded)]"
-              >
-                {error}
-              </p>
-            ) : null}
-            <div className="flex justify-end gap-2">
-              <Button
-                size="sm"
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button size="sm" type="submit">
-                Apply range
-              </Button>
-            </div>
-          </form>
-        </PopoverContent>
+          </>
+        }
+      >
+        <Button
+          id={id}
+          variant="outline"
+          className="mt-1 w-full justify-between sm:min-w-44"
+          aria-label={`Time range: ${label}`}
+        >
+          <CalendarDays />
+          <span>{label}</span>
+          <ChevronDown />
+        </Button>
       </Popover>
     </div>
   );

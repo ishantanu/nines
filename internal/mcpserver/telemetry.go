@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -58,6 +59,34 @@ func telemetryRead[T any](ctx context.Context, a *apiClient, method, path string
 	return out, nil
 }
 func addTelemetryOperations(s *mcp.Server, a *apiClient) {
+	evidenceOpen := true
+	mcp.AddTool(s, &mcp.Tool{Name: "prepare_intent_evidence", Description: "Explicit bounded read-only evidence for a complete inline measurement with exact intent, measurement, source/catalog digests and saved revision. Compare baseline and at most two user-specified target/window/policy alternatives. Historical reads require an explicit range; no overlap sums, automatic target selection, confirmation or writes. Inspect quality, freshness, unsupported/error states and evidence gaps.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &evidenceOpen}}, func(ctx context.Context, _ *mcp.CallToolRequest, in v1.IntentEvidenceInput) (*mcp.CallToolResult, contextOutput[v1.IntentEvidence], error) {
+		bounded := *a
+		h := *a.http
+		h.Timeout = 80 * time.Second
+		bounded.http = &h
+		data, err := telemetryRead[v1.IntentEvidence](ctx, &bounded, http.MethodPost, "/api/intents/evidence", in)
+		out := contextOutput[v1.IntentEvidence]{Tenant: a.tenant}
+		if err != nil {
+			out.Error = contextProblem(err)
+			body, _ := json.Marshal(out)
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}}, out, nil
+		}
+		out.Data = &data
+		return nil, out, nil
+	})
+	candidateOpen := true
+	mcp.AddTool(s, &mcp.Tool{Name: "discover_intent_candidates", Description: "Explicit read-only provider discovery for an exact service/source/project and equality-filtered population. At most one metric-name lookup and three series inspections. Metric presence and recipe matches do not confirm success semantics or authorize application. Unsupported providers, failures and truncation are explicit. No writes or model calls.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &candidateOpen}}, func(ctx context.Context, _ *mcp.CallToolRequest, in v1.IntentCandidateInput) (*mcp.CallToolResult, contextOutput[v1.IntentCandidateDiscovery], error) {
+		data, err := telemetryRead[v1.IntentCandidateDiscovery](ctx, a, http.MethodPost, "/api/intents/candidates", in)
+		out := contextOutput[v1.IntentCandidateDiscovery]{Tenant: a.tenant}
+		if err != nil {
+			out.Error = contextProblem(err)
+			body, _ := json.Marshal(out)
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: string(body)}}}, out, nil
+		}
+		out.Data = &data
+		return nil, out, nil
+	})
 	contextTool(s, a, "verify_slo_measurement", "Verify the inline spec.measurement of one versioned SLO against its configured source. Returns the same self-contained SLO YAML and bounded telemetry evidence. Read-only: no resource writes, approvals or rule deployment. A human must confirm observation point, success criteria and population.", func(ctx context.Context, in v1.ServiceLevelObjective) (v1.CompiledMeasurement, error) {
 		return telemetryRead[v1.CompiledMeasurement](ctx, a, http.MethodPost, "/api/slos/compile", in)
 	})

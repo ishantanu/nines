@@ -28,6 +28,18 @@ export function BudgetDecisionPanel({
       <CardContent className="space-y-2 p-4 text-sm">
         <p className="font-medium">{label}</p>
         <p>{decision.message}</p>
+        {decision.band ? (
+          <p
+            className="rounded-md border p-3"
+            aria-label="Agreed response level"
+          >
+            <span className="font-medium">
+              Response level: {decision.band.name}
+            </span>{" "}
+            (remaining budget at or below {percent(decision.band.below, 0)}).{" "}
+            {decision.band.response}
+          </p>
+        ) : null}
         <dl className="grid gap-3 sm:grid-cols-3">
           <div>
             <dt className="text-muted-foreground">Remaining budget</dt>

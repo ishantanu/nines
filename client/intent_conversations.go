@@ -230,3 +230,16 @@ func (c *Client) IntentReviewArtifact(ctx context.Context, id string) (v1.Intent
 	}
 	return out, err
 }
+
+// IntentActivation explicitly inspects the configured backend without changing resources.
+func (c *Client) IntentActivation(ctx context.Context, id string) (v1.IntentActivation, error) {
+	var out v1.IntentActivation
+	p, err := conversationPath(id)
+	if err == nil {
+		err = c.scopedRequest(ctx, "GET", p+"/activation", nil, 128<<10, &out)
+	}
+	if err == nil && out.Conversation != id {
+		err = errors.New("unexpected conversation identity")
+	}
+	return out, err
+}

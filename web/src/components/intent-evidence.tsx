@@ -1,4 +1,5 @@
 import { MeasurementLabels } from "./measurement-labels";
+import { isThresholdKind } from "@/lib/measurement";
 import type { IntentPlan } from "@/lib/intent";
 import type {
   FlowRun,
@@ -89,7 +90,7 @@ export function IntentEvidence({
         <div>
           <dt className="text-muted-foreground">Success condition</dt>
           <dd className="mt-1 break-all">
-            {spec.measurement === "latency" ? (
+            {isThresholdKind(spec.measurement) ? (
               `Attempt duration at most ${spec.thresholdSeconds} seconds`
             ) : (
               <MeasurementLabels

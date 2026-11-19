@@ -91,7 +91,7 @@ func TestRetentionPrunesExpiredIntervalsAndRejectsOldImports(t *testing.T) {
 	ctx := context.Background()
 	clock := now
 	s.Now = func() time.Time { return clock }
-	old := model.Point{Time: now.Add(-19 * time.Minute), Good: 1, Total: 1}
+	old := model.Point{Time: now.Add(-24*time.Hour + time.Minute), Good: 1, Total: 1}
 	if err := s.Ingest(ctx, "availability", []model.Point{old}); err != nil {
 		t.Fatal(err)
 	}

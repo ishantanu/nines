@@ -88,14 +88,45 @@ nines auth logout --context production
 - A separate `.credentials.json` file beside config stores only the Nines credential and its server/tenant/expiry binding.
   - The directory requires mode 0700, files mode 0600; writes use a lock, a temporary file and atomic rename.
   - Existing unsafe or symlink file paths are refused.
-  - This is private-file storage, not OS-keychain encryption.
+  - This is the default private-file fallback. Opt-in OS storage is described below.
   - Coordinate concurrent invocations through the supplied lock; a crash can leave a `.lock` file that must be inspected and removed after verifying no writer remains.
 - `auth logout` revokes the saved credential and removes it locally, without signing out the browser or revoking service-account/environment keys.
   - An unavailable server leaves the credential in place so revocation can be retried. `auth logout --local` deliberately removes only the local copy; the server copy expires normally.
   - Environment API keys remain active until unset or revoked through the server's administrative flow.
-- `--no-browser` still requires opening the URL on the computer running the CLI because the return address is loopback.
-  - For remote headless/CI sessions, use an API key.
-  - Device-code login, automatic refresh and OS-keychain storage are not implemented.
+- `--no-browser` still requires opening the URL on the computer running the CLI because the return address is loopback. Use device login below when the terminal and browser are on different computers. CI and deterministic agent skills should continue to use an API key.
+
+## Device login and credential storage
+
+```sh
+# Discover support without starting login or unlocking an OS credential store.
+nines auth diagnose --server https://nines.example.com --tenant production --agent
+
+# Open the printed URL on another trusted computer, sign in, enter the displayed
+# code and explicitly approve the exact tenant. No local callback listener opens.
+nines login --method device --context production \
+  --server https://nines.example.com --tenant production --timeout 5m
+
+# Explicitly opt into the operating system's credential store.
+nines login --method device --context production \
+  --server https://nines.example.com --tenant production \
+  --credential-store keychain --timeout 5m
+
+nines auth status --context production
+nines auth logout --context production
+```
+
+- Device login is mediated by **Nines**, using the server's existing OIDC, LDAP or local identity provider and current tenant role mappings. It does not require the upstream provider to implement OAuth device authorization, nor does it copy provider access/refresh tokens to the CLI. SAML-only identity still needs the existing OIDC-broker configuration.
+- This is the versioned Nines JSON authentication protocol, inspired by device authorization semantics; it is not an RFC 8628 OAuth endpoint. Generic OAuth device clients must not point at these paths.
+- The device request expires after five minutes. The terminal retains a secret device code and random verifier; the printed browser URL contains a separate approval ticket, never that secret. Enter the human code shown in your own terminal. Never approve a device flow initiated by someone else.
+- Polling begins at the advertised interval, normally five seconds. Early polling increases the interval, up to 30 seconds. Concurrent exchanges consume the approved grant once. Cancellation makes a best-effort request to remove the pending grant; an unreachable server still expires it after five minutes.
+- The resulting credential is limited to the selected tenant and approving identity, with at most one hour of validity or the parent session's earlier expiry. Browser sign-out, account/session revocation, current role changes and provider binding checks apply just as they do to loopback login.
+- **Automatic refresh is not supported.** Discovery reports `refresh: false`. Expired sessions fail with exit code 3; explicitly run login again. Long-running CI and skills should use independently scoped, managed service-account keys in `NINES_API_KEY`.
+- Keychain storage is opt-in for human-operated CLI commands: macOS Keychain, Windows Credential Manager, or Linux Secret Service with a working session D-Bus and keyring. Native OS access can require an OS unlock/permission dialog; headless installations may not have an available credential service.
+- `--credential-store keychain` stores the Nines credential in the OS service `nines.cli.v1`. The private metadata file retains its server, tenant, identity, expiry and opaque lookup reference, with **no token**. Lookup is bound to the configuration location, server, tenant and identity. Changing server or tenant never sends a saved credential to the new route.
+- If OS storage is unavailable, login fails explicitly; it does not silently write the token to a file. Choose `--credential-store file` explicitly for the existing 0700-directory/0600-file fallback, or use `NINES_API_KEY`. Keep user configuration outside source repositories and shared directories.
+- `--agent` never initiates device/browser login and never reads, writes or unlocks OS credentials. An environment key takes precedence without touching the OS store. Pre-authenticated file contexts continue to work until expiry. `auth diagnose --agent` discovers capabilities without loading a session or printing a credential.
+- Login compares the selected context and credential snapshot before saving. A competing login or context change fails with conflict exit code 5; newly issued but unsaved credentials are revoked on a best-effort basis. Explicit logout revokes the selected saved session and removes its local entry; `--local` only removes the local copy. If replacing a keychain entry cannot clean up the previous OS entry, login reports a warning; the old server credential still has its original bounded expiry.
+- Servers without identity report device/browser login disabled. Older servers may not expose discovery at all; diagnostics explain the API-key fallback. Existing `NINES_API_KEY`, `API_TOKEN`, loopback SSO, exit codes and structured errors remain supported.
 
 ## Scripts and LLM skills
 
@@ -232,6 +263,31 @@ nines rules resume --id checkout-success --expected-revision 2 --agent
   - Mutations require a tenant owner; offline mode is refused.
   - See [SLO retirement](public/slo-retirement.md) for retained history, reference resolution and recovery.
 
+## Migrate from Sloth or Pyrra
+
+[Conversion](public/migration.md) is offline: it reads a file, prints or writes Nines definitions and a report, and contacts no server.
+
+```sh
+nines import sloth -f slo.yaml --out-dir slos/ --project payments --window 30d
+nines import pyrra -f pyrra-slos.yaml --out-dir slos/ --lifecycle experimental
+nines import sloth -f slo.yaml --agent     # definitions, notes and skipped items as JSON
+```
+
+Imported SLOs start `experimental`, so Nines does not page while your current rules run. Review the notes and skipped items, then `nines plan` and `nines apply` each file. `--force` overwrites existing files in `--out-dir`.
+
+## Git delivery
+
+Optional [Git delivery](public/git-delivery.md) opens a pull or merge request for a reviewed definition and never applies it.
+
+```sh
+nines git info
+nines git propose -f reviewed.yaml --expected-revision 0 --digest PLAN_DIGEST
+nines git proposals SLO_ID            # add --journey for a journey
+nines git drift SLO_ID                # compares the repository file with the live digest
+```
+
+`propose` needs the revision and digest from the plan you reviewed. `proposals` marks a merged request as applied only when its digest equals the live definition.
+
 ## Visual evidence and recording deletion
 
 - `nines visual assess JOURNEY` requires an exact `--revision`, fixed request `--id`, `--route-digest` from reviewed capabilities, `--image`, `--criterion` and explicit `--consent`. See [visual journey evidence](public/visual-evaluations.md) for privacy and idempotency semantics.
@@ -243,6 +299,9 @@ nines rules resume --id checkout-success --expected-revision 2 --agent
 
 ## Resumable headless workflows
 
+- `nines quality ID --customers --context production --agent` reads per-customer reliability for the SLO's `spec.customers` allowlist: SLI, target, burn, events and whether the service-wide average hides the customer. It is an explicit, bounded provider read and never changes a definition.
+- `nines dependencies composition MAP_ID --context production --agent` checks each committed availability SLO in a dependency map against the product of its critical dependencies' committed availability targets. It reads stored definitions only and reports exceeded ceilings, headroom and unmeasured dependencies.
+- `nines intent conversations usage --days 30 --context production --agent` returns aggregate workflow progress for the tenant: conversations started, proposed, approved and applied, how many applied on the first proposal, rejections, applied rollbacks, backtest attachment, guided versus model runs, and median times to proposal and to applied. It reads stored conversations only and contains no goal text or actor.
 - `nines intent conversations status ID --context production --agent` returns the saved phase, next action, exact version/digests, human review gate and recorded observation outcome.
 - `nines intent conversations report ID --context production --agent` emits a verified JSON snapshot. Add `--markdown` for a portable Markdown attachment; share its potentially sensitive definitions and review notes only with authorized recipients.
 - Status is read-only. It does not call a model, query telemetry or authorize mutation. Unknown states require inspection; a committed configuration is not marked healthy.
@@ -260,3 +319,19 @@ nines rules resume --id checkout-success --expected-revision 2 --agent
 - `nines native list CONNECTION`: bounded native catalog on the configured destination.
 - `nines native draft CONNECTION --native-id ID --name NAME --project PROJECT --service SERVICE`: experimental YAML for normal plan/apply review. No vendor mutation or ownership adoption. `--agent` retains the draft envelope and limitations; ordinary YAML output sends limitations to stderr.
 - These are connected, read-only operations. Offline mode prohibits them. [Provider limits](public/provider-adapters.md#native-results-and-reviewed-import) apply.
+
+### History retention
+
+`nines history SLO --range 1h --agent` reads retained Nines observations. The retention horizon is 24 hours or twice the SLO window, whichever is longer, shared by the CLI, HTTP history endpoint and MCP history tool. Older gaps are not filled automatically and increasing retention does not change SLO calculations.
+
+## Intent measurement candidates
+
+- Run `nines --context production --agent intent candidates -f examples/intent-candidates.yaml` for bounded, read-only provider discovery. The YAML contains exact service/source/project, explicit population filters and optional literal prefix, metrics, category, outcome and unit-bearing latency threshold.
+- HTTP/API, Go client and MCP share the same receipt. Inspect `state`, `truncated`, candidate questions and digests; exit zero only means a report was returned. Unsupported discovery is not missing telemetry.
+- The command does not draft, confirm, apply or deploy an SLO and does not call a model. See [candidate discovery](public/intents.md#discover-measurement-candidates) and `make test-intent-candidates`.
+
+## Intent evidence and trade-offs
+
+- `nines --context production --agent intent evidence -f examples/api-success.intent.yaml` reads a complete inline intent without a model, writes or deployment. Add `--expected-revision N` for an existing SLO identity.
+- Use `examples/intent-evidence.yaml` for explicit target/window/policy alternatives and optional provenance pins. Historical sampling requires an explicit `history` range. First reviews capture current digests without confirming semantics.
+- Inspect current quality, freshness, comparison/history states and gaps. Exit zero does not establish sufficient evidence or approval. See [the complete contract](public/intents.md#inspect-evidence-and-compare-explicit-choices) and `make test-intent-evidence`.

@@ -1,0 +1,29 @@
+{
+  "baseCommit": "bb619a3d01eb27f01d080f1b1f1cd32696da7e3b",
+  "sourceTree": "modified working tree; synthetic full corpora and filtered availability probe, not release certification",
+  "model": "granite4.1:3b",
+  "modelDigest": "6fd349357287c7ffc9e38189a93b48ea175d24fc566b38f09cfc564fb7f303eb",
+  "runtime": "Ollama 0.40.11",
+  "hardware": "Apple M1; 16 GiB unified memory; Metal",
+  "contextLength": 8192,
+  "parallel": 1,
+  "provider": "ollama",
+  "protocol": "chat-completions",
+  "credentials": "none",
+  "evaluationFilesSHA256": {
+    "internal/intenteval/tooltrace.go": "0d052a02764b3a54cba6d24379f036a1165596f14c520cd379fa529ef33c16d6",
+    "internal/intenteval/suite.go": "f5b89104cf38304be742688ddf8ea924eb037ea43498b25f34bc720f6aea6d73",
+    "internal/intenteval/selection.go": "64e9cde2b2db04016dccbc6469fa0b148b2746d5ff0e26f7d1a56b57f1de5f07",
+    "internal/intenteval/workflow.go": "777ec95de25ed5a65407468bd721d058873d9a451743c3b3f7317a0ef238f889"
+  },
+  "prewarmed": true,
+  "productionFilesSHA256": {
+    "internal/intentflow/worker.go": "d1c4288cdb82ea68e8ecc3fe39c26e6e913be5ecb43276aa9f6819f173d42462",
+    "internal/intentflow/skill.yaml": "11ecf55146793f004a2e834715added713e8bc94a15476a2ec774c537e2e9851"
+  },
+  "skillVersion": "0.4.2",
+  "maxModelCalls": 6,
+  "maxToolCalls": 6,
+  "perCallDeadlineSeconds": 20,
+  "workflowMaxOutputTokens": 1024
+}

@@ -102,9 +102,11 @@ test("approval and rejection start disabled until a reviewer enters a reason and
   expect(html).toContain("Review decision and reason");
   expect(html).toContain("I reviewed the rationale");
   expect(html).toMatch(
-    /<button[^>]*disabled=""[^>]*>Approve changes<\/button>/,
+    /<button[^>]*aria-disabled="true"[^>]*>(?:<[^>]+>)*Approve changes/,
   );
-  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Reject changes<\/button>/);
+  expect(html).toMatch(
+    /<button[^>]*aria-disabled="true"[^>]*>(?:<[^>]+>)*Reject changes/,
+  );
 });
 test("withdrawn approvals cannot appear as applied and agents do not receive an enabled approval control", () => {
   const value = {
@@ -238,7 +240,44 @@ test("corrective exception apply is disabled for editors", () => {
   expect(html).toContain("A different tenant owner");
   expect(html).toContain("Burn-rate alert: firing");
   const button = html.match(
-    /<button[^>]*>Apply approved changes<\/button>/,
+    /<button[^>]*>(?:<[^>]+>)*Apply approved changes/,
   )?.[0];
-  expect(button).toContain("disabled");
+  expect(button).toContain("aria-disabled");
+});
+
+test("frozen context distinguishes earlier-goal candidates and reviewed observation exclusions", () => {
+  const html = renderToStaticMarkup(
+    <IntentRecommendationReport
+      report={{
+        ...report,
+        reviewPacket: {
+          candidateDiscovery: {
+            state: "prior_goal",
+            runId: "candidate",
+            runInputDigest: "input",
+            stepDigest: "step",
+            at: "2026-11-04T00:00:00Z",
+          },
+          exclusions: {
+            state: "recorded",
+            definition: {
+              observationBoundaries: [
+                "Requests before the observer <script> are not measured.",
+              ],
+            },
+            intentDigest: "intent",
+            confirmation: {
+              actor: { name: "Engineer" },
+              at: "2026-11-04T00:00:00Z",
+            },
+          },
+        },
+      }}
+    />,
+  );
+  expect(html).toContain("Recorded for an earlier goal");
+  expect(html).toContain("Included in measurement confirmation");
+  expect(html).toContain("&lt;script&gt;");
+  expect(html).not.toContain("<script>");
+  expect(html).toContain("do not change query filters");
 });

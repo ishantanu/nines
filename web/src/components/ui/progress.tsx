@@ -1,28 +1,25 @@
 import * as React from "react";
-import { cn } from "cn";
-import { Progress as ProgressPrimitive } from "radix-ui";
+import { ProgressBar } from "@astryxdesign/core/ProgressBar";
 
+// Adapter over Astryx ProgressBar. The label is required for accessibility,
+// so it comes from aria-label and stays visually hidden.
 function Progress({
-  className,
   value,
-  ...props
-}: React.ComponentProps<typeof ProgressPrimitive.Root>) {
+  "aria-label": label,
+  className,
+}: {
+  value?: number | null;
+  "aria-label"?: string;
+  className?: string;
+}) {
   return (
-    <ProgressPrimitive.Root
+    <ProgressBar
       data-slot="progress"
-      value={value}
-      className={cn(
-        "relative h-2 w-full overflow-hidden rounded-full bg-primary/20",
-        className,
-      )}
-      {...props}
-    >
-      <ProgressPrimitive.Indicator
-        data-slot="progress-indicator"
-        className="h-full w-full flex-1 bg-primary transition-all"
-        style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
-      />
-    </ProgressPrimitive.Root>
+      className={className}
+      label={label ?? "Progress"}
+      isLabelHidden
+      value={value ?? 0}
+    />
   );
 }
 

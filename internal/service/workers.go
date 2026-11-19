@@ -16,41 +16,14 @@ import (
 	"github.com/ishantanu/nines/internal/store"
 )
 
+// Run preserves the single-tenant entry point while using the durable scheduler.
 func (s *Service) Run(ctx context.Context, log *slog.Logger) {
-	ticker := time.NewTicker(collectionInterval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			configs, err := s.Store.List(ctx)
-			if err != nil {
-				log.Error("list SLOs", "error", err)
-				continue
-			}
-			for _, c := range configs {
-				if c.Retired() {
-					continue
-				}
-				if s.AutomaticCollection(c) {
-					job, cancel := context.WithTimeout(ctx, 45*time.Second)
-					from, end, boundsErr := s.scheduledCollectionRange(job, c)
-					err = boundsErr
-					if err == nil {
-						_, err = s.Collect(job, c.ID, from, end)
-					}
-					cancel()
-					if err != nil {
-						log.Error("collect", "slo", c.ID, "error", err)
-					}
-				}
-				if err = s.Evaluate(ctx, c.ID); err != nil {
-					log.Error("evaluate", "slo", c.ID, "error", err)
-				}
-			}
-		}
+	scheduler, err := NewCollectionScheduler([]*Service{s}, 1)
+	if err != nil {
+		log.Error("collection scheduler configuration failed")
+		return
 	}
+	scheduler.Run(ctx, log)
 }
 
 // Keep collection contiguous across delayed rounds, without inventing missing
@@ -71,7 +44,7 @@ func (s *Service) scheduledCollectionRange(ctx context.Context, c model.SLO) (ti
 	}
 	// At most 300 intervals per request (also within the provider adapters' bounds).
 	floor := end.Add(-300 * step)
-	retention := now.Truncate(step).Add(-2 * time.Duration(c.WindowSeconds) * time.Second)
+	retention := now.Truncate(step).Add(-time.Duration(c.RetentionSeconds()) * time.Second)
 	if retention.After(floor) {
 		floor = retention
 	}

@@ -51,7 +51,13 @@ export type FlowRun = {
   modelCalls: number;
   skill: { id: string; version: string; digest: string };
   errorCode?: string;
-  steps: { tool: string; at: string; digest: string; result: unknown }[];
+  steps: {
+    tool: string;
+    at: string;
+    digest: string;
+    intentDigest?: string;
+    result: unknown;
+  }[];
 };
 export type ConversationSummary = {
   id: string;
@@ -240,6 +246,29 @@ export type IntentVerification = {
 };
 
 export type IntentRecommendation = {
+  reviewPacket?: {
+    candidateDiscovery?: {
+      state: "recorded" | "prior_goal" | "unverified" | "stale" | "invalid";
+      runId: string;
+      runInputDigest: string;
+      stepDigest: string;
+      intentDigest?: string;
+      at: string;
+      report?: {
+        state: string;
+        observedAt: string;
+        sourceDigest: string;
+        catalogDigest: string;
+      };
+    };
+    exclusions?: {
+      state: "recorded" | "unconfirmed";
+      definition: import("./intent").IntentExclusions;
+      intentDigest: string;
+      confirmation: { actor: { name: string }; at: string };
+    };
+  };
+
   systemOne?: SystemOneAssessment;
   systemOneRoute?: SystemOneRoute;
   template?: IntentTemplateSelection;

@@ -173,7 +173,7 @@ func TestDeterministicTemplateSuite(t *testing.T) {
 		t.Fatal(code, stderr.String())
 	}
 	var report intenteval.Report
-	if json.Unmarshal(out.Bytes(), &report) != nil || report.Passed != 120 || report.Mode != "deterministic" || !report.Complete {
+	if json.Unmarshal(out.Bytes(), &report) != nil || report.Passed != 128 || report.Mode != "deterministic" || !report.Complete {
 		t.Fatal(out.String())
 	}
 	out.Reset()

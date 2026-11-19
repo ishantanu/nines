@@ -1,6 +1,7 @@
 package operator_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -50,14 +51,21 @@ func operatorSeverity(t *testing.T, kind string) {
 		t.Fatal("missing disposable evaluator")
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
-	request := func(method, path string, want int) []byte {
+	request := func(method, path string, want int, payload ...[]byte) []byte {
 		t.Helper()
-		r, e := http.NewRequestWithContext(f.ctx, method, queryURL+path, nil)
+		var bodyReader io.Reader
+		if len(payload) != 0 {
+			bodyReader = bytes.NewReader(payload[0])
+		}
+		r, e := http.NewRequestWithContext(f.ctx, method, queryURL+path, bodyReader)
 		if e != nil {
 			t.Fatal(e)
 		}
 		if org != "" {
 			r.Header.Set("X-Scope-OrgID", org)
+		}
+		if bodyReader != nil {
+			r.Header.Set("Content-Type", "application/yaml")
 		}
 		response, e := client.Do(r)
 		if e != nil {
@@ -70,11 +78,45 @@ func operatorSeverity(t *testing.T, kind string) {
 		}
 		return body
 	}
-	badAt := time.Now().Unix() + 110
-	healthyAt := badAt + 120
-	// One unchanged generation with scheduled synthetic bad/healthy intervals.
-	good := fmt.Sprintf("vector(100 - 10 * (time() >= bool %d) * (time() < bool %d))", badAt, healthyAt)
-	slo := model.SLO{ID: id, Source: "primary", Project: "commerce", Service: "checkout", Name: id, Target: .999, WindowSeconds: 60, StepSeconds: 15, GoodQuery: good, TotalQuery: "vector(100)", Policies: []model.Policy{
+	// Change a separate synthetic input group, never the reviewed SLO group.
+	// Holding each phase avoids losing the independent-recovery assertion when
+	// a valid missing-data interval makes both alerts inactive at once.
+	setGood := func(good float64) {
+		t.Helper()
+		input := rules.Group{Name: "synthetic-" + id, Interval: "1s", Rules: []rules.Rule{
+			{Record: "fixture:nines_operator_good:interval", Expr: fmt.Sprintf("vector(%g)", good), Labels: map[string]string{"run": id}},
+			{Record: "fixture:nines_operator_total:interval", Expr: "vector(100)", Labels: map[string]string{"run": id}},
+		}}
+		if kind == "mimir" {
+			body, err := yaml.Marshal(input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request(http.MethodPost, "/config/v1/rules/severity-input", http.StatusAccepted, body)
+		} else {
+			directory := os.Getenv("NINES_OPERATOR_TEST_RULE_DIRECTORY")
+			if !filepath.IsAbs(directory) {
+				t.Fatal("missing private shared rule directory")
+			}
+			body, err := yaml.Marshal(rules.File{Groups: []rules.Group{input}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(directory, "synthetic-"+id+".yaml")
+			if err = os.WriteFile(path, body, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err = os.Chmod(path, 0644); err != nil {
+				t.Fatal(err)
+			}
+			request(http.MethodPost, "/-/reload", http.StatusOK)
+		}
+		t.Logf("Synthetic input now requests %g/100 good events; SLO generation is unchanged", good)
+	}
+	setGood(100)
+	good := fmt.Sprintf(`sum(fixture:nines_operator_good:interval{run=%q})`, id)
+	total := fmt.Sprintf(`sum(fixture:nines_operator_total:interval{run=%q})`, id)
+	slo := model.SLO{ID: id, Source: "primary", Project: "commerce", Service: "checkout", Name: id, Target: .999, WindowSeconds: 60, StepSeconds: 15, GoodQuery: good, TotalQuery: total, Policies: []model.Policy{
 		{Name: "critical", Severity: "critical", ShortWindowSeconds: 15, LongWindowSeconds: 30, BurnRate: 8, ForSeconds: 15, MinCoverage: 1},
 		{Name: "warning", Severity: "warning", ShortWindowSeconds: 30, LongWindowSeconds: 60, BurnRate: 2, ForSeconds: 30, MinCoverage: 1},
 	}}
@@ -219,10 +261,23 @@ func operatorSeverity(t *testing.T, kind string) {
 		}
 		return out
 	}
-	f.wait("inactive baseline before the scheduled bad interval", func() bool {
+	fullCoverage := func() bool {
+		expression := fmt.Sprintf(`nines:slo_coverage:ratio{nines_slo=%q,window="60s"} == 1`, id)
+		var result struct {
+			Data struct {
+				Result []json.RawMessage `json:"result"`
+			} `json:"data"`
+		}
+		if err := json.Unmarshal(request(http.MethodGet, "/api/v1/query?query="+url.QueryEscape(expression), http.StatusOK), &result); err != nil {
+			t.Fatal(err)
+		}
+		return len(result.Data.Result) == 1
+	}
+	f.wait("inactive baseline with complete long-window coverage", func() bool {
 		r := read()
-		return len(r) == 2 && r["critical"].State == "inactive" && r["warning"].State == "inactive"
+		return len(r) == 2 && r["critical"].State == "inactive" && r["warning"].State == "inactive" && fullCoverage()
 	})
+	setGood(90)
 	criticalFirst := false
 	f.wait("critical and warning fire independently under the same generation", func() bool {
 		r := read()
@@ -234,8 +289,21 @@ func operatorSeverity(t *testing.T, kind string) {
 	if !criticalFirst || !fired["critical"] || !fired["warning"] {
 		t.Fatal("independent severity transition not observed")
 	}
-	f.wait("critical recovers while warning remains firing", func() bool { r := read(); return r["critical"].State == "inactive" && r["warning"].State == "firing" })
-	f.wait("warning also recovers without a generation or rule rewrite", func() bool {
+	setGood(99.5) // Stable 5x burn: below critical 8x, above warning 2x.
+	var independentSince time.Time
+	f.wait("critical recovers while warning remains firing across evaluations", func() bool {
+		r := read()
+		if r["critical"].State != "inactive" || r["warning"].State != "firing" {
+			independentSince = time.Time{}
+			return false
+		}
+		if independentSince.IsZero() {
+			independentSince = r["critical"].LastEvaluation
+		}
+		return r["critical"].LastEvaluation.Sub(independentSince) >= time.Duration(slo.StepSeconds)*time.Second
+	})
+	setGood(100)
+	f.wait("warning also recovers without a generation or SLO rule rewrite", func() bool {
 		r := read()
 		return len(r) == 2 && r["critical"].State == "inactive" && r["warning"].State == "inactive"
 	})
@@ -244,14 +312,7 @@ func operatorSeverity(t *testing.T, kind string) {
 		if len(r) != 2 || r["critical"].State != "inactive" || r["warning"].State != "inactive" {
 			return false
 		}
-		expression := fmt.Sprintf(`nines:slo_coverage:ratio{nines_slo=%q,window="60s"} == 1`, id)
-		var result struct {
-			Data struct {
-				Result []json.RawMessage `json:"result"`
-			} `json:"data"`
-		}
-		_ = json.Unmarshal(request(http.MethodGet, "/api/v1/query?query="+url.QueryEscape(expression), http.StatusOK), &result)
-		return len(result.Data.Result) == 1
+		return fullCoverage()
 	})
 	if current := f.get("slo", id); current.Metadata.UID != parent.Metadata.UID || current.Metadata.Generation != parent.Metadata.Generation {
 		t.Fatal("test changed the SLO identity or generation")

@@ -36,6 +36,7 @@ func (m *Memory) PurgeSLO(ctx context.Context, id string, receipt v1.RetirementR
 	}
 	m.tombstones[id] = copyJSON(receipt)
 	delete(m.records, id)
+	delete(m.collectionJobs, id)
 	delete(m.archives, id)
 	for key, d := range m.deliveries {
 		if d.Event.SLOID == id {

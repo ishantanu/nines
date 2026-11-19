@@ -56,6 +56,13 @@ func generateWindows(s model.SLO, tenant, ownerUID string) (Group, error) {
 		if p.MinEvents > 0 {
 			expr += fmt.Sprintf(" and on() ((%s) >= %g) and on() ((%s) >= %g)", totals[p.ShortWindowSeconds], p.MinEvents, totals[p.LongWindowSeconds], p.MinEvents)
 		}
+		if p.Confidence > 0 {
+			errorRate := strconv.FormatFloat(p.BurnRate*(1-s.Target), 'g', -1, 64)
+			z := strconv.FormatFloat(model.ZScore(p.Confidence), 'g', -1, 64)
+			for _, window := range []int64{p.ShortWindowSeconds, p.LongWindowSeconds} {
+				expr += fmt.Sprintf(" and on() (((%s) * %s) >= on() (%s + %s * sqrt(%s * (1 - %s) / (%s))))", burns[window], strconv.FormatFloat(1-s.Target, 'g', -1, 64), errorRate, z, errorRate, errorRate, totals[window])
+			}
+		}
 		alertLabels := labels(0)
 		if p.Name != "" {
 			alertLabels["nines_policy"] = p.Name

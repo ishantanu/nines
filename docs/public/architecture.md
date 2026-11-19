@@ -4,7 +4,7 @@
 
 - Nines is a Go server with a React/shadcn/ui frontend embedded in the executable. PostgreSQL stores normal deployment data.
   - The explicit demo uses isolated memory stores and synthetic data.
-  - Deploy one collecting server process for the MVP; distributed collector scheduling is not implemented.
+  - Use the combined process by default, or one control-plane process with separate PostgreSQL-backed collection replicas. [Collector scheduling](deployment/collectors.md) documents fencing, tenant fairness and the measured limits.
 - Telemetry stays in your observability backend. Nines reads provider-specific APIs for **Prometheus, Mimir, Datadog, New Relic, Dash0, Google Cloud Monitoring and VictoriaMetrics**.
   - Datadog, New Relic, Dash0, Google Cloud Monitoring and VictoriaMetrics adapters are experimental.
   - Prometheus/Mimir recording and burn-rate rules, reviewed native vendor SLO publication, and Nines attainment/alert evaluation are distinct capabilities.

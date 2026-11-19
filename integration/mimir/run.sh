@@ -19,4 +19,5 @@ trap cleanup EXIT HUP INT TERM
 port=$(docker inspect --format '{{(index (index .NetworkSettings.Ports "9009/tcp") 0).HostPort}}' "$container")
 cd "$platform_dir"
 MIMIR_TEST_URL="http://127.0.0.1:$port" go test -race -count=1 -json ./integration/mimir ./internal/rules > mimir-test-results.json
+MIMIR_TEST_URL="http://127.0.0.1:$port" go test -race -count=1 -json ./internal/intentflow -run '^TestRealMimirIntentActivation$' >> mimir-test-results.json
 python3 scripts/release/check-tests.py mimir-test-results.json --required mimir

@@ -1,4 +1,8 @@
 import { latencySeconds, latencyDuration } from "@/lib/latency-duration";
+import { measureChoices } from "./slo-kind-chooser";
+import { Badge } from "@/components/ui/badge";
+import type { MeasurementKind } from "@/lib/measurement";
+import { isThresholdKind, measurementWords } from "@/lib/measurement";
 import { MeasurementLabels } from "./measurement-labels";
 import { ProviderIdentity } from "./provider-identity";
 import { BudgetPolicyEditor } from "./budget-policy-editor";
@@ -74,6 +78,19 @@ const initial: Draft = {
   coverage: "1",
   minEvents: "0",
 };
+// The goal compiler supports the counter-ratio and histogram-threshold
+// types; it shares their names and wording with Define objective.
+const goalKinds = measureChoices.filter((c) =>
+  [
+    "availability",
+    "latency",
+    "correctness",
+    "durability",
+    "freshness",
+    "coverage",
+  ].includes(c.id),
+);
+
 export function IntentAuthoring({
   scope,
   journeys,
@@ -160,7 +177,7 @@ export function IntentAuthoring({
           population: intentPopulation(draft.population),
           ...intentGoal(draft.target, draft.window),
           noDataPolicy: "unknown",
-          ...(draft.outcome === "latency"
+          ...(isThresholdKind(draft.outcome)
             ? { thresholdSeconds: latencySeconds(draft.threshold) }
             : {}),
           ...(alerts
@@ -300,27 +317,6 @@ export function IntentAuthoring({
         </CardHeader>
         <CardContent>
           <fieldset disabled={busy} className="space-y-5">
-            <BudgetPolicyEditor
-              value={errorBudgetPolicy}
-              disabled={busy}
-              onChange={(value) => {
-                setErrorBudgetPolicy(value);
-                invalidate();
-              }}
-            />
-            <QualityPolicyEditor
-              value={quality}
-              disabled={busy}
-              onChange={(value) => {
-                setQuality(value);
-                invalidate();
-              }}
-            />
-            <SLOLifecycleSelect
-              value={draft.lifecycle}
-              disabled={busy}
-              onChange={(value) => field("lifecycle", value)}
-            />
             <div className="grid gap-4 md:grid-cols-3">
               {input("name", "SLO ID", "checkout-success")}
               {input("project", "Project", "commerce")}
@@ -361,7 +357,7 @@ export function IntentAuthoring({
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="intent-outcome">Outcome</Label>
+                <Label htmlFor="intent-outcome">SLO type</Label>
                 <Select
                   value={draft.outcome}
                   onValueChange={(v) => field("outcome", v)}
@@ -370,20 +366,34 @@ export function IntentAuthoring({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="availability">
-                      Successful attempts
-                    </SelectItem>
-                    <SelectItem value="latency">
-                      Attempts within a duration
-                    </SelectItem>
+                    {goalKinds.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-muted-foreground">
+                  {goalKinds.find((c) => c.id === draft.outcome)?.hint}{" "}
+                  Sessions, good-minute and throughput are defined directly with{" "}
+                  <strong>Define objective</strong>.
+                </p>
               </div>
-              {draft.outcome === "latency" ? (
-                input("threshold", "Maximum duration", "30ms or 0.03s")
+              {isThresholdKind(draft.outcome) ? (
+                input(
+                  "threshold",
+                  measurementWords[draft.outcome as MeasurementKind]
+                    .threshold ?? "Maximum duration",
+                  measurementWords[draft.outcome as MeasurementKind]
+                    .placeholder ?? "30ms or 0.03s",
+                )
               ) : (
                 <p className="self-end text-sm text-muted-foreground">
-                  Define the metric and success labels below.
+                  Define the metric and{" "}
+                  {measurementWords[
+                    draft.outcome as MeasurementKind
+                  ].good?.toLowerCase() ?? "success"}{" "}
+                  labels below.
                 </p>
               )}
             </div>
@@ -415,7 +425,7 @@ export function IntentAuthoring({
               <IntentMeasurementFields
                 draft={{
                   ...measurement,
-                  measurement: draft.outcome as "availability" | "latency",
+                  measurement: draft.outcome as MeasurementKind,
                 }}
                 disabled={busy}
                 onChange={(d) => {
@@ -500,43 +510,82 @@ export function IntentAuthoring({
                 </>
               ) : null}
             </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={alerts}
-                onChange={(e) => {
-                  setAlerts(e.target.checked);
-                  invalidate();
-                }}
-              />
-              Include a burn-rate alert policy
-            </label>
-            {alerts ? (
-              <div className="grid gap-4 md:grid-cols-3">
-                {input("short", "Short window")}
-                {input("long", "Long window")}
-                {input("burn", "Burn-rate threshold", "Enter a threshold")}
-                {input("pending", "Pending duration")}
-                {input("coverage", "Minimum coverage (0 to 1)")}
-                {input("minEvents", "Minimum events per alert window")}
+            <details
+              className="disclosure-panel"
+              open={
+                alerts ||
+                !!errorBudgetPolicy ||
+                !!quality ||
+                draft.lifecycle !== "committed"
+              }
+            >
+              <summary>
+                Optional settings: alerts, budget response, lifecycle, quality
+              </summary>
+              <div className="space-y-5 pt-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={alerts}
+                    onChange={(e) => {
+                      setAlerts(e.target.checked);
+                      invalidate();
+                    }}
+                  />
+                  Include a burn-rate alert policy
+                </label>
+                {alerts ? (
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {input("short", "Short window")}
+                    {input("long", "Long window")}
+                    {input("burn", "Burn-rate threshold", "Enter a threshold")}
+                    {input("pending", "Pending duration")}
+                    {input("coverage", "Minimum coverage (0 to 1)")}
+                    {input("minEvents", "Minimum events per alert window")}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    No alert policy will be added. Recording and alert rules are
+                    deployed according to the telemetry connection policy after
+                    the SLO is saved.
+                  </p>
+                )}
+                <BudgetPolicyEditor
+                  value={errorBudgetPolicy}
+                  disabled={busy}
+                  onChange={(value) => {
+                    setErrorBudgetPolicy(value);
+                    invalidate();
+                  }}
+                />
+                <QualityPolicyEditor
+                  value={quality}
+                  disabled={busy}
+                  onChange={(value) => {
+                    setQuality(value);
+                    invalidate();
+                  }}
+                />
+                <SLOLifecycleSelect
+                  value={draft.lifecycle}
+                  disabled={busy}
+                  onChange={(value) => field("lifecycle", value)}
+                />
               </div>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                No alert policy will be added. Recording and alert rules are
-                deployed according to the telemetry connection policy after the
-                SLO is saved.
-              </p>
-            )}
+            </details>
             <div className="space-y-2 border-t pt-4">
               {modelEnabled ? (
                 <>
-                  <Button
-                    variant="outline"
-                    onClick={draftLanguage}
-                    disabled={busy || scope.role === "viewer"}
-                  >
-                    Draft goal from description
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={draftLanguage}
+                      disabled={busy || scope.role === "viewer"}
+                    >
+                      Draft goal from description
+                    </Button>
+                    <Badge variant="secondary">Experimental</Badge>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Sends only this description to the configured model. Include
                     a percentage and rolling duration; review the resulting
@@ -616,8 +665,10 @@ export function IntentAuthoring({
                   <div>
                     <dt className="text-muted-foreground">Success criteria</dt>
                     <dd className="break-all">
-                      {c.definition.spec.measurement === "latency" ? (
-                        `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
+                      {isThresholdKind(c.definition.spec.measurement) ? (
+                        measurementWords[c.definition.spec.measurement].summary(
+                          c.definition.spec.thresholdSeconds,
+                        )
                       ) : (
                         <MeasurementLabels
                           labels={c.definition.spec.successLabels}

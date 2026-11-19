@@ -9,10 +9,13 @@ Service level objectives and critical user journeys as versioned YAML, with a po
 
 - **Measure reliability:** connect Prometheus or Mimir (or try experimental [Datadog, New Relic, VictoriaMetrics, Dash0 and Google Cloud collection](docs/public/provider-adapters.md)) and inspect SLI attainment, coverage, error budgets and burn alerts.
 - **Publish reviewed objectives:** create native [Datadog](docs/public/provider-adapters.md#publish-a-native-datadog-slo), [New Relic](docs/public/new-relic.md), [Dash0](docs/public/dash0.md) or [Google Cloud](docs/public/google-cloud.md) SLOs within their supported subsets. Native burn-monitor publishing remains separate.
+- **Pick the right SLO type:** [every SLI kind from the SRE book](docs/public/slo-types.md), namely availability, latency, correctness, durability, freshness, coverage and throughput, plus sessions, good-minute and journey run objectives, with per-customer reports, labels and budget response levels as add-ons. Each guide says [which providers support it](docs/public/slo-types.md#which-providers-support-which-types).
 - **Map user outcomes:** link SLOs to critical user journey steps and service dependencies.
 - **Review changes:** plan, approve and apply exact revisions, with audit records and separately reviewed rollback.
+- **Deliver through Git:** optionally open a reviewed pull or merge request on [GitHub or GitLab](docs/public/git-delivery.md) instead of applying, with drift and applied-state reporting. Your pipeline deploys it.
+- **Migrate in:** [convert Sloth and Pyrra definitions](docs/public/migration.md) into reviewed Nines SLOs and run them beside your current rules.
 - **Work with agents:** use provider-configurable models, deterministic CLI skills and tenant-scoped MCP tools over stdio or opt-in [remote OAuth HTTP](docs/public/remote-mcp.md).
-- **Run it yourself:** use native binaries, Docker Compose or Kubernetes.
+- **Run it yourself:** use native binaries for Linux, macOS and Windows, [signed container images](docs/public/deployment/container-images.md), Docker Compose or Kubernetes.
 
 **Pre-release MVP, under active development.** APIs use `nines.dev/v1alpha1` and may change. Model-assisted workflows, visual evaluations and session replay are experimental; production-scale readiness has not been established.
 
@@ -23,13 +26,25 @@ Service level objectives and critical user journeys as versioned YAML, with a po
 *Synthetic demo workspace. [View the full-size screenshot](docs/public/brand/nines-overview.jpg).*
 
 <details>
-  <summary>SLI, error budget and burn-rate charts</summary>
+  <summary>Watch: sign in and create an SLO in the portal (about 25 seconds)</summary>
+
+  <img src="docs/public/brand/nines-create-slo.gif" alt="Screen recording of signing in to the Nines portal, naming the SLO, entering a metric and label filters, verifying telemetry against Prometheus, reviewing the definition, saving it and opening the new SLO" width="760">
+
+  Recorded against the [local playground](#try-the-demo) with its synthetic sample service. The same steps are written out in [create an SLO in the portal](docs/public/measurements.md#create-an-slo-in-the-portal).
+</details>
+
+<details>
+  <summary>Measurement summary and detailed SLI charts</summary>
 
   <a href="docs/public/brand/nines-performance.jpg">
-    <img src="docs/public/brand/nines-performance.jpg" alt="Synthetic checkout SLO showing measured SLI against its target, remaining error budget and short- and long-window burn rates" width="760">
+    <img src="docs/public/brand/nines-performance.jpg" alt="Synthetic checkout SLO showing measured SLI against its target, remaining error budget and multi-window burn rate" width="760">
   </a>
 
-  Synthetic demo measurements. [View the full-size charts](docs/public/brand/nines-performance.jpg).
+  <a href="docs/public/brand/nines-measurements.jpg">
+    <img src="docs/public/brand/nines-measurements.jpg" alt="Per-service budget burn and a donut counting objectives by complete, partial and missing measurement-window coverage" width="760">
+  </a>
+
+  Synthetic demo workspace (`go run ./cmd/server -demo`). [View detailed SLI charts](docs/public/brand/nines-performance.jpg) or the [measurement summary](docs/public/brand/nines-measurements.jpg).
 </details>
 
 ## Try the demo
@@ -41,13 +56,20 @@ Service level objectives and critical user journeys as versioned YAML, with a po
    cd nines
    ```
 
-2. Start the in-memory demo with Go 1.27.3 or later:
+2. Start the in-memory demo with Go 1.27.4 or later:
 
    ```sh
    go run ./cmd/server -demo
    ```
 
 3. Open [localhost:8080](http://127.0.0.1:8080) and sign in with **admin / admin**.
+
+Or run a released image without cloning. A container listens on all interfaces, so it needs a random API token, which the browser asks for before the demo sign-in:
+
+```sh
+export API_TOKEN="$(openssl rand -hex 24)"; echo "$API_TOKEN"
+docker run --rm -p 127.0.0.1:8080:8080 -e API_TOKEN ghcr.io/ishantanu/nines:v0.1.0-alpha.4 -demo
+```
 
 - Includes synthetic SLOs, critical user journeys and critical/warning burn policies.
 - Resets on restart; keep this demonstration on loopback.
@@ -153,10 +175,11 @@ bin/nines apply --context production -f reviewed.yaml --expected-revision 0 --ag
 
 See [supported limits](https://ishantanu.github.io/nines/docs/operations/), [experimental features](https://ishantanu.github.io/nines/docs/experimental/) and [verification evidence](https://ishantanu.github.io/nines/docs/verification/).
 
-## Alpha binaries
+## Alpha binaries and images
 
-- Download Linux/macOS amd64/arm64 archives from [GitHub Releases](https://github.com/ishantanu/nines/releases).
-- Archives contain the CLI, server, MCP adapter, operator, examples and dependency licences.
+- Download Linux, macOS and Windows archives for amd64 and arm64 from [GitHub Releases](https://github.com/ishantanu/nines/releases).
+- Archives contain the CLI, server, MCP adapter, examples and dependency licences; Linux and macOS archives also include the operator.
+- Signed multi-architecture images: `ghcr.io/ishantanu/nines` (server) and `ghcr.io/ishantanu/nines-operator`, tagged with the release version. See [container images](https://ishantanu.github.io/nines/docs/deployment/container-images/).
 - Verify `SHA256SUMS` and the source commit in `build.json`.
 - Read the [release process](https://ishantanu.github.io/nines/docs/release/#tag-based-alpha-binaries) before publishing tags.
 
@@ -173,7 +196,7 @@ Start with the [hosted documentation](https://ishantanu.github.io/nines/docs/).
 
 ## Development
 
-- Requires Go 1.27.3, Node 24, npm and Python 3.9 or later.
+- Requires Go 1.27.4, Node 24, npm and Python 3.9 or later.
 - Build the frontend before Go, which embeds the generated assets.
 
 ```sh

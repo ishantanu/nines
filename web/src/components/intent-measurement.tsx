@@ -1,5 +1,7 @@
 import { latencyDuration } from "@/lib/latency-duration";
-import { useState } from "react";
+import type { MeasurementKind } from "@/lib/measurement";
+import { NativeSelect } from "@/components/ui/select";
+import { useId, useState } from "react";
 import type { IntentDocument } from "@/lib/intent";
 import { duration } from "@/lib/history";
 import { message } from "@/lib/api";
@@ -10,6 +12,8 @@ import {
 } from "@/lib/measurement";
 import { MeasurementFields } from "./measurement-editor";
 import { Button } from "./ui/button";
+import { Label } from "./ui/label";
+import { Textarea } from "./ui/textarea";
 
 export function goalWithMeasurement(
   goal: IntentDocument,
@@ -23,7 +27,7 @@ export function goalWithMeasurement(
       project: goal.metadata.project,
       service: goal.spec.service,
       source: goal.spec.source,
-      measurement: goal.spec.outcome as "availability" | "latency",
+      measurement: goal.spec.outcome as MeasurementKind,
       population: Object.entries(goal.spec.population).map(
         ([label, value]) => ({ label, value }),
       ),
@@ -66,6 +70,34 @@ export function IntentMeasurementFields({
     />
   );
 }
+export type ExclusionMode = "not_recorded" | "none" | "boundaries";
+export function goalWithExclusions(
+  goal: IntentDocument,
+  mode: ExclusionMode,
+  text: string,
+): IntentDocument {
+  const spec = { ...goal.spec };
+  if (mode === "not_recorded") delete spec.exclusions;
+  else if (mode === "none") spec.exclusions = { none: true };
+  else {
+    const boundaries = text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+    if (
+      !boundaries.length ||
+      boundaries.length > 8 ||
+      boundaries.some((line) => new TextEncoder().encode(line).length > 500) ||
+      new Set(boundaries.map((line) => line.toLowerCase())).size !==
+        boundaries.length
+    )
+      throw new Error(
+        "Enter 1–8 distinct observation boundaries, one per line, up to 500 bytes each.",
+      );
+    spec.exclusions = { observationBoundaries: boundaries };
+  }
+  return { ...goal, spec };
+}
 export function IntentMeasurementEditor({
   goal,
   disabled,
@@ -78,7 +110,7 @@ export function IntentMeasurementEditor({
   const [draft, setDraft] = useState<MeasurementDraft>(() => ({
     ...measurementDraft(),
     metric: goal.spec.measurement?.metric ?? "",
-    measurement: goal.spec.outcome as "availability" | "latency",
+    measurement: goal.spec.outcome as MeasurementKind,
     step: String(goal.spec.stepSeconds ?? 60),
     scrape: String(goal.spec.measurement?.scrapeIntervalSeconds ?? 15),
     observationPoint: goal.spec.measurement?.observationPoint ?? "",
@@ -91,6 +123,17 @@ export function IntentMeasurementEditor({
     ),
   }));
   const [error, setError] = useState("");
+  const exclusionId = useId();
+  const [exclusionMode, setExclusionMode] = useState<ExclusionMode>(
+    goal.spec.exclusions?.none
+      ? "none"
+      : goal.spec.exclusions?.observationBoundaries?.length
+        ? "boundaries"
+        : "not_recorded",
+  );
+  const [boundaries, setBoundaries] = useState(
+    (goal.spec.exclusions?.observationBoundaries ?? []).join("\n"),
+  );
   return (
     <details
       className="rounded-md border p-3 text-sm"
@@ -111,6 +154,40 @@ export function IntentMeasurementEditor({
           disabled={disabled}
           onChange={setDraft}
         />
+        <div className="space-y-2">
+          <Label htmlFor={exclusionId}>Observation exclusions</Label>
+          <NativeSelect
+            id={exclusionId}
+            disabled={disabled}
+            value={exclusionMode}
+            onChange={(e) => setExclusionMode(e.target.value as ExclusionMode)}
+            className="h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+          >
+            <option value="not_recorded">Not recorded</option>
+            <option value="none">No additional observation exclusions</option>
+            <option value="boundaries">Record observation boundaries</option>
+          </NativeSelect>
+          <p className="text-xs text-muted-foreground">
+            Describe what this observer cannot measure. These notes do not
+            filter telemetry or discard events; eligible events come from the
+            measurement above. Saving requires a new measurement confirmation.
+          </p>
+          {exclusionMode === "boundaries" && (
+            <>
+              <Label htmlFor={`${exclusionId}-boundaries`}>
+                Boundaries, one per line
+              </Label>
+              <Textarea
+                id={`${exclusionId}-boundaries`}
+                disabled={disabled}
+                rows={3}
+                maxLength={4096}
+                value={boundaries}
+                onChange={(e) => setBoundaries(e.target.value)}
+              />
+            </>
+          )}
+        </div>
         {error ? (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -123,7 +200,13 @@ export function IntentMeasurementEditor({
           onClick={async () => {
             setError("");
             try {
-              await onSave(goalWithMeasurement(goal, draft));
+              await onSave(
+                goalWithExclusions(
+                  goalWithMeasurement(goal, draft),
+                  exclusionMode,
+                  boundaries,
+                ),
+              );
             } catch (e) {
               setError(message(e));
             }

@@ -1,0 +1,173 @@
+{
+  "suite": "draft",
+  "apiVersion": "nines.dev/v1alpha1",
+  "kind": "IntentEvaluationReport",
+  "mode": "live",
+  "suiteSHA256": "9d9c3f106ec1d9a7007f2836730fdd9777ed64529c34f6f5decb15569af0907d",
+  "generatedAt": "2026-11-02T07:55:33.696882Z",
+  "complete": true,
+  "runtimeVersion": "Ollama 0.40.11; Metal; context 8192; parallel 1; prewarmed",
+  "results": [
+    {
+      "case": "availability",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 3880
+    },
+    {
+      "draftDiagnostic": {
+        "modelState": "returned",
+        "outcome": "compound",
+        "modelClarification": false,
+        "targetEvidence": "appears_in_input",
+        "windowEvidence": "appears_in_input",
+        "thresholdEvidence": "appears_in_input",
+        "validationReasons": [
+          "unsupported_or_joint_outcome"
+        ]
+      },
+      "case": "latency",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "needs_clarification",
+      "failure": "unexpected_status",
+      "durationMilliseconds": 1879
+    },
+    {
+      "case": "written-duration",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 1881
+    },
+    {
+      "case": "missing-target",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 1734
+    },
+    {
+      "case": "missing-window",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 1680
+    },
+    {
+      "case": "calendar-month",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 1769
+    },
+    {
+      "case": "conflicting-targets",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 2289
+    },
+    {
+      "case": "compound-outcome",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 1847
+    },
+    {
+      "case": "percentile-request",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 1829
+    },
+    {
+      "case": "hostile-routing-request",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 1829
+    },
+    {
+      "case": "agent-task-success",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 1667
+    },
+    {
+      "draftDiagnostic": {
+        "modelState": "returned",
+        "outcome": "compound",
+        "modelClarification": false,
+        "targetEvidence": "appears_in_input",
+        "windowEvidence": "appears_in_input",
+        "thresholdEvidence": "appears_in_input",
+        "validationReasons": [
+          "unsupported_or_joint_outcome"
+        ]
+      },
+      "case": "agent-task-duration",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "needs_clarification",
+      "failure": "unexpected_status",
+      "durationMilliseconds": 1800
+    },
+    {
+      "case": "llm-evaluation-pass",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 1895
+    },
+    {
+      "case": "inference-conditional-ttft",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 1935
+    },
+    {
+      "case": "llm-undefined-quality",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 2957
+    },
+    {
+      "case": "agent-joint-conditions",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 1696
+    }
+  ],
+  "passed": 14,
+  "failed": 2,
+  "skipped": [
+    "invented-quantity",
+    "duplicate-quantity",
+    "discarded-clarification",
+    "invented-query-field",
+    "null-clarification-item"
+  ]
+}

@@ -178,6 +178,20 @@ func (a *Server) dependencyView(w http.ResponseWriter, r *http.Request) {
 	}
 	write(w, 200, out)
 }
+func (a *Server) dependencyComposition(w http.ResponseWriter, r *http.Request) {
+	if r.URL.RawQuery != "" {
+		telemetryError(w, model.Invalid("query fields are not supported"))
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+	defer cancel()
+	out, err := a.Service.DependencyComposition(ctx, r.PathValue("id"))
+	if err != nil {
+		telemetryError(w, err)
+		return
+	}
+	write(w, 200, out)
+}
 func (a *Server) mountTelemetry(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/dependency-discovery/kubernetes", a.dependencyDiscoveryCapabilities)
 	mux.HandleFunc("POST /api/dependency-discovery/kubernetes", a.dependencyDiscover)
@@ -195,4 +209,5 @@ func (a *Server) mountTelemetry(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/dependency-maps/{id}", a.topologyRead(v1.DependencyMapKind, false))
 	mux.HandleFunc("GET /api/dependency-maps/{id}/manifest", a.topologyRead(v1.DependencyMapKind, true))
 	mux.HandleFunc("GET /api/dependency-maps/{id}/view", a.dependencyView)
+	mux.HandleFunc("GET /api/dependency-maps/{id}/composition", a.dependencyComposition)
 }

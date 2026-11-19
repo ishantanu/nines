@@ -14,6 +14,7 @@ import (
 	"github.com/ishantanu/nines/internal/datasources"
 	"github.com/ishantanu/nines/internal/identity"
 
+	"github.com/ishantanu/nines/internal/gitops"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/intentmodel"
@@ -65,6 +66,9 @@ func initTenants(ctx context.Context, file string, demo, memory bool, token stri
 	return initTenantsWithIdentity(ctx, file, demo, memory, token, false)
 }
 func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool, token string, identityEnabled bool) ([]tenantRuntime, error) {
+	return initTenantsWithOptions(ctx, file, demo, memory, token, identityEnabled, false)
+}
+func initTenantsWithOptions(ctx context.Context, file string, demo, memory bool, token string, identityEnabled, collectorOnly bool) ([]tenantRuntime, error) {
 	var configured []tenancy.Resolved
 	if demo {
 		for _, t := range []struct{ id, name string }{{"default", "Commerce · demo"}, {"sandbox", "Sandbox · demo"}} {
@@ -126,15 +130,30 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 			if err != nil {
 				return fail(fmt.Errorf("tenant %s database namespace: %w", t.Config.ID, err))
 			}
+			if collectorOnly {
+				u, e := url.Parse(scoped)
+				if e != nil {
+					return fail(e)
+				}
+				q := u.Query()
+				if q.Get("pool_max_conns") == "" {
+					q.Set("pool_max_conns", "2")
+				}
+				u.RawQuery = q.Encode()
+				scoped = u.String()
+			}
 			scopedDSN = scoped
 			st, err = store.NewPostgres(ctx, scoped)
 			if err != nil {
 				return fail(fmt.Errorf("tenant %s initialize database: %w", t.Config.ID, err))
 			}
-			repository, err = workflow.NewPostgres(ctx, scoped)
-			if err != nil {
-				st.Close()
-				return fail(fmt.Errorf("tenant %s initialize workflows: %w", t.Config.ID, err))
+			repository = workflow.NewMemory()
+			if !collectorOnly {
+				repository, err = workflow.NewPostgres(ctx, scoped)
+				if err != nil {
+					st.Close()
+					return fail(fmt.Errorf("tenant %s initialize workflows: %w", t.Config.ID, err))
+				}
 			}
 		}
 		var collector service.Collector
@@ -195,7 +214,7 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 
 		var reviewer rm.Model
 		svc := service.New(st, collector)
-		if !demo && t.Config.KubernetesDiscovery != nil {
+		if !demo && !collectorOnly && t.Config.KubernetesDiscovery != nil {
 			reader, err := kubediscovery.InCluster(*t.Config.KubernetesDiscovery)
 			if err != nil {
 				repository.Close()
@@ -204,7 +223,7 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 			}
 			svc.KubernetesDiscovery = reader
 		}
-		if !demo {
+		if !demo && !collectorOnly {
 			drafter, err := intentmodel.FromEnvironment(t.Config.IntentModel, os.Getenv)
 			if err != nil {
 				repository.Close()
@@ -299,6 +318,10 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 				return fail(fmt.Errorf("stored SLO %s: %w", objective.ID, err))
 			}
 		}
+		if collectorOnly {
+			out = append(out, tenantRuntime{ManagedSources: managed, Repository: repository, Workspace: httpapi.Workspace{ID: t.Config.ID, Name: t.Config.Name, Service: svc}})
+			continue
+		}
 		svc.Demo = demo
 		wf := workflow.New(svc, repository)
 		auth := "none"
@@ -372,7 +395,14 @@ func initTenantsWithIdentity(ctx context.Context, file string, demo, memory bool
 				return fail(fmt.Errorf("tenant %s: %w", t.Config.ID, err))
 			}
 		}
-		runtime := tenantRuntime{WorkflowWebhook: notification, ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !identityEnabled, Workflows: wf}, Repository: repository, Webhook: t.Webhook}
+		var gitDelivery httpapi.GitDelivery
+		if t.GitOps != nil {
+			var gitErr error
+			if gitDelivery, gitErr = gitops.New(t.GitOps, nil); gitErr != nil {
+				return fail(gitErr)
+			}
+		}
+		runtime := tenantRuntime{WorkflowWebhook: notification, ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !identityEnabled, Workflows: wf, GitOps: gitDelivery}, Repository: repository, Webhook: t.Webhook}
 		runtime.Workspace.Replays.Privacy = t.Config.ReplayPrivacy
 		if t.Config.SLOExtensionLock != "" {
 			extensionPath := t.Config.SLOExtensionLock

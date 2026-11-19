@@ -244,3 +244,51 @@ func TestWorkflowWebhookConfigurationKeepsSecretsPrivate(t *testing.T) {
 		}
 	}
 }
+
+func TestGitOpsDeliveryIsOptionalValidatedAndKeepsTheTokenPrivate(t *testing.T) {
+	lookup := func(name string) string {
+		if name == "GITHUB_SLO_TOKEN" {
+			return "synthetic-git-credential-value"
+		}
+		return "synthetic-token-at-least-24-characters"
+	}
+	if plain, err := Parse([]byte(validConfig), lookup); err != nil || plain[0].GitOps != nil {
+		t.Fatal("Git delivery must be off unless configured", err)
+	}
+	block := "  gitOps:\n    provider: github\n    repository: acme/slos\n    tokenEnv: GITHUB_SLO_TOKEN\n"
+	config := strings.Replace(validConfig, "  source:", block+"  source:", 1)
+	resolved, err := Parse([]byte(config), lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g := resolved[0].GitOps
+	if g == nil || g.Token != "synthetic-git-credential-value" || g.BaseBranch != "main" || g.Path != "slos" {
+		t.Fatalf("%+v", g)
+	}
+	// GitLab is accepted with a nested project path and its own default API origin.
+	gl := strings.Replace(config, "provider: github\n    repository: acme/slos", "provider: gitlab\n    repository: platform/team/slos", 1)
+	if r, err := Parse([]byte(gl), lookup); err != nil || r[0].GitOps.APIURL != "https://gitlab.com/api/v4" {
+		t.Fatalf("%+v %v", r, err)
+	}
+	b, _ := json.Marshal(resolved[0])
+	if strings.Contains(string(b), "synthetic-git-credential-value") {
+		t.Fatal("the credential leaked into serialized configuration")
+	}
+	for name, bad := range map[string]string{
+		"unknown provider": strings.Replace(config, "provider: github", "provider: bitbucket", 1),
+		"missing token":    strings.Replace(config, "GITHUB_SLO_TOKEN", "UNSET_TOKEN_VARIABLE", 1),
+		"path traversal":   strings.Replace(config, "repository: acme/slos", "repository: acme/slos\n    path: ../etc", 1),
+		"plain http api":   strings.Replace(config, "repository: acme/slos", "repository: acme/slos\n    apiURL: http://ghe.example", 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Parse([]byte(bad), func(n string) string {
+				if n == "UNSET_TOKEN_VARIABLE" {
+					return ""
+				}
+				return lookup(n)
+			}); err == nil {
+				t.Fatal("accepted invalid Git delivery configuration")
+			}
+		})
+	}
+}

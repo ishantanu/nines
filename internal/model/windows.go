@@ -48,12 +48,19 @@ func (s SLO) Windows() []int64 {
 func WindowQueries(s SLO, window int64) (good, total, coverage string) {
 	p := s.ProviderWindow
 	good = fmt.Sprintf("sum(increase(%s[%ds]))", p.GoodSelector, window)
+	// A session measurement derives good as total minus the event counter. If
+	// either counter is absent the result is absent, so it stays unknown.
+	numerator := p.GoodSelector
+	if p.BadSelector != "" {
+		good = fmt.Sprintf("(sum(increase(%s[%ds])) - sum(increase(%s[%ds])))", p.TotalSelector, window, p.BadSelector, window)
+		numerator = p.BadSelector
+	}
 	total = fmt.Sprintf("sum(increase(%s[%ds]))", p.TotalSelector, window)
 	expected := float64(window) / float64(p.ScrapeIntervalSeconds)
 	cov := func(q string) string {
 		return fmt.Sprintf("(clamp_max(min(count_over_time(%s[%ds])) / %g, 1) and (max(time() - timestamp(%s)) <= %d))", q, window, expected, q, 2*p.ScrapeIntervalSeconds)
 	}
-	coverage = "(min(((" + cov(p.GoodSelector) + ") or vector(0)) or label_replace(((" + cov(p.TotalSelector) + ") or vector(0)), \"population\", \"total\", \"\", \"\"))) or vector(0)"
+	coverage = "(min(((" + cov(numerator) + ") or vector(0)) or label_replace(((" + cov(p.TotalSelector) + ") or vector(0)), \"population\", \"total\", \"\", \"\"))) or vector(0)"
 	return
 }
 

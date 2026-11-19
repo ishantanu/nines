@@ -127,11 +127,13 @@ async function pendingSave() {
         resolve = r;
       }),
   );
-  expect(button("Save recording").disabled).toBe(true);
+  expect(button("Save recording").getAttribute("aria-disabled")).toBe("true");
   await act(async () =>
     host.querySelector<HTMLInputElement>("#replay-sharing-consent")!.click(),
   );
-  expect(button("Save recording").disabled).toBe(false);
+  expect(button("Save recording").getAttribute("aria-disabled")).not.toBe(
+    "true",
+  );
   await act(async () => button("Save recording").click());
   return { capture, scope, resolve };
 }
@@ -257,7 +259,7 @@ test("agent role cannot authorize a recording", async () => {
   expect(host.textContent).toContain(
     "Only a tenant owner or editor can record and share a session.",
   );
-  expect(button("Start recording").disabled).toBe(true);
+  expect(button("Start recording").getAttribute("aria-disabled")).toBe("true");
   scope.close();
 });
 
@@ -269,7 +271,9 @@ test("tenant switch clears previous recording consent until the new notice loads
   );
   const consent = label?.querySelector("input") as HTMLInputElement;
   await act(async () => consent.click());
-  expect(button("Start recording").disabled).toBe(false);
+  expect(button("Start recording").getAttribute("aria-disabled")).not.toBe(
+    "true",
+  );
   mocks.privacy.mockImplementation(() => new Promise(() => {}));
   const next = createTenantSession("", "beta", "owner");
   mocks.list.mockResolvedValue({ tenant: "beta", items: [] });
@@ -286,7 +290,7 @@ test("tenant switch clears previous recording consent until the new notice loads
     ),
   );
   expect(consent.checked).toBe(false);
-  expect(button("Start recording").disabled).toBe(true);
+  expect(button("Start recording").getAttribute("aria-disabled")).toBe("true");
   scope.close();
   next.close();
 });

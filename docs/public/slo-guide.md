@@ -20,17 +20,28 @@ Use the [CLI reference](../cli.md) to validate the definition offline and genera
 
 ## Read SLI, budget and burn-rate charts
 
-![Nines SLO performance with measured SLI, error budget remaining and two-window burn rates](brand/nines-performance.jpg)
+![Nines SLO performance with measured SLI, target, error budget and burn rate](brand/nines-performance.jpg)
 
 This is the synthetic checkout SLO in the local demo, not production telemetry. [Open the full-size screenshot](brand/nines-performance.jpg).
 
 - **SLI and SLO target:** compare measured attainment with the configured objective. The value in the chart header follows the selected observation; it is not a separate measurement.
 - **Error budget remaining:** see how much of the allowed failure budget remains. A negative value means the measured budget is exhausted.
-- **Burn rate:** compare short- and long-window rates with the selected policy threshold. The example has a fast-burn alert firing even though full-window attainment remains above target.
+- **Burn rate:** compare short- and long-window rates with the selected policy threshold. A burn alert can fire even when full-window attainment remains above target; firing still requires its configured windows and coverage.
 - **Inspect history:** choose a preset or custom time range, then hover, tap or use the arrow keys on a focused chart. Read the timestamp and values together.
 - **Check coverage:** missing data leaves gaps. Dashed SLI segments identify incomplete history and do not establish full-window attainment. Shading does not bridge gaps or cover incomplete SLI history.
 
 Run `go run ./cmd/server -demo`, open `http://127.0.0.1:8080` and sign in with **admin / admin** to explore the charts with synthetic measurements. See [deployment options](deployment.md) before connecting a [telemetry provider](provider-adapters.md) for your own SLOs.
+
+## Keep objectives few, user-focused and linked
+
+A handful of objectives that describe what users experience gives clearer signals than a long list of backend measurements. The portal's **Adoption review** on Home reads what is already loaded and suggests, without changing anything:
+
+- **Services with many committed objectives.** More than five committed objectives on one service usually dilute attention. Keep the rest experimental or aspirational.
+- **No critical user journeys.** Objectives defined only from backend metrics can miss what users experience. It is reported once, not once per objective.
+- **Objectives not linked to a journey.** An objective no journey depends on is hard to prioritise.
+- **Journeys with no required objective.** A journey's health reflects only its required objectives, so with none it cannot be judged.
+
+Experimental, aspirational, deprecated and archived objectives are not counted. The review is advice for the portal only; it never blocks a change.
 
 ## Latency, journeys and AI workloads
 
@@ -41,4 +52,4 @@ Run `go run ./cmd/server -demo`, open `http://127.0.0.1:8080` and sign in with *
 
 ## Using an agent
 
-Nines can help draft an SLO with configurable models or deterministic templates. Confirm the population and success criteria against telemetry, inspect the proposal and evidence, and use the independent human approval and application workflow. A generated draft, successful validation or saved definition does not establish measurement quality, activated rules or a healthy SLI. See [SLO intents](intents.md) and [headless workflows](headless-workflows.md).
+Nines can help draft an SLO with configurable models or deterministic templates. Confirm the population and success criteria against telemetry, inspect the proposal and evidence, and use the independent human approval and application workflow. A generated draft, successful validation or saved definition does not establish measurement quality, activated rules or a healthy SLI. See [Create from a goal](intents.md) and [headless workflows](headless-workflows.md).

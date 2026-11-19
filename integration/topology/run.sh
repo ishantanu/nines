@@ -7,7 +7,7 @@ name="nines-topology-acceptance-$$"
 network="$name-net"
 cleanup(){
  result=$?
- if [ "$result" != 0 ]; then docker logs --tail 40 "$name-prometheus" >&2 2>/dev/null || true; fi
+ if [ "$result" != 0 ]; then docker logs --tail 40 "$name-prometheus" >&2 || true; fi
  docker rm -f "$name-traffic" "$name-gateway" "$name-checkout" "$name-payments" "$name-prometheus" >/dev/null 2>&1 || true
  docker network rm "$network" >/dev/null 2>&1 || true
  docker image rm "$name-image" >/dev/null 2>&1 || true

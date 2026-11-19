@@ -54,6 +54,11 @@ export const docGroups: DocGroup[] = [
         "Understand SLIs, targets and error budgets with a practical SLO example.",
       ),
       page(
+        "slo-types",
+        "SLO types",
+        "Compare availability, latency, session, good-minute, per-customer and journey SLOs and choose one.",
+      ),
+      page(
         "slo-extensions",
         "SLO extensions",
         "Publish typed measurement recipes, pinned bundles and evaluation contracts.",
@@ -129,6 +134,16 @@ export const docGroups: DocGroup[] = [
         "Review references, archive retained evidence and verify owned-rule cleanup before deletion.",
       ),
       page(
+        "migration",
+        "Migrate from Sloth or Pyrra",
+        "Convert Sloth and Pyrra definitions into reviewed Nines SLOs and run them beside your current rules.",
+      ),
+      page(
+        "git-delivery",
+        "Git delivery",
+        "Open a pull request for a reviewed SLO so your repository and pipeline deploy it.",
+      ),
+      page(
         "slo-editing",
         "Edit and version SLOs",
         "Change an SLO under the same identity and retain its previous evidence.",
@@ -155,8 +170,18 @@ export const docGroups: DocGroup[] = [
       ),
       page(
         "intents",
-        "SLO intents",
+        "Create from a goal",
         "Move from a reliability goal to confirmed measurements and reviewed changes.",
+      ),
+      page(
+        "intent-roadmap",
+        "Intent workflow plan",
+        "Independent milestones from scoped context to reviewed maintenance proposals.",
+      ),
+      page(
+        "slo-practices-roadmap",
+        "SLO practices plan",
+        "Planned SLO capabilities and the status of each, from composed availability to per-customer objectives.",
       ),
       page(
         "headless-workflows",
@@ -225,6 +250,11 @@ export const docGroups: DocGroup[] = [
         "Configure tenants, sources, identity and credentials.",
       ),
       page(
+        "deployment/container-images",
+        "Container images",
+        "Run, verify and pin the published server and operator images.",
+      ),
+      page(
         "deployment/docker-compose",
         "Docker Compose",
         "Run a persistent server with PostgreSQL.",
@@ -238,6 +268,11 @@ export const docGroups: DocGroup[] = [
         "deployment/operator",
         "Kubernetes operator",
         "Reconcile GitOps resources and publish portal-owned SLOs.",
+      ),
+      page(
+        "deployment/collectors",
+        "Collector scheduling",
+        "Separate collection from the control plane and review measured capacity and failover limits.",
       ),
       page(
         "deployment/linux-service",

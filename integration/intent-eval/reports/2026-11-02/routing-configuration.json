@@ -1,0 +1,27 @@
+{
+  "baseCommit": "bb619a3d01eb27f01d080f1b1f1cd32696da7e3b",
+  "sourceTree": "modified working tree; synthetic filtered probes, not release certification",
+  "model": "granite4.1:3b",
+  "modelDigest": "6fd349357287c7ffc9e38189a93b48ea175d24fc566b38f09cfc564fb7f303eb",
+  "runtime": "Ollama 0.40.11",
+  "hardware": "Apple M1; 16 GiB unified memory; Metal",
+  "contextLength": 8192,
+  "parallel": 1,
+  "provider": "ollama",
+  "protocol": "chat-completions",
+  "credentials": "none",
+  "evaluationFilesSHA256": {
+    "internal/intenteval/tooltrace.go": "0d052a02764b3a54cba6d24379f036a1165596f14c520cd379fa529ef33c16d6",
+    "internal/intenteval/suite.go": "f5b89104cf38304be742688ddf8ea924eb037ea43498b25f34bc720f6aea6d73",
+    "internal/intenteval/selection.go": "64e9cde2b2db04016dccbc6469fa0b148b2746d5ff0e26f7d1a56b57f1de5f07",
+    "internal/intenteval/workflow.go": "777ec95de25ed5a65407468bd721d058873d9a451743c3b3f7317a0ef238f889"
+  },
+  "baselineProductionFilesSHA256": {
+    "internal/intentflow/worker.go": "2a302c6d86283de1b225f613dc45b34dff5bf2c1a5293294cf44897cd1774999",
+    "internal/intentflow/skill.yaml": "686a8e29a33d97c29b87c357dad51e158c7fb41bddf94028c520c166dab4ee1d"
+  },
+  "updatedProductionFilesSHA256": {
+    "internal/intentflow/worker.go": "305d5222c1936f52d3a42cff41227707f992b1bc5b72e986a86a2b26f35541d6",
+    "internal/intentflow/skill.yaml": "a4f238a39c20ba6cf8168f62b293bc299a1b50c92989f3a5f577d7d5dbe00bce"
+  }
+}

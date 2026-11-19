@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { typeDateTime } from "@/test-support/fields";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -11,6 +12,7 @@ beforeEach(() => {
     "ResizeObserver",
     class {
       observe() {}
+      unobserve() {}
       disconnect() {}
     },
   );
@@ -24,13 +26,13 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function open() {
+async function open(maxSeconds = 86400, stepSeconds = 60) {
   await act(async () =>
     root.render(
       <ChartTimeRange
         value={{ kind: "relative", seconds: 3600 }}
-        maxSeconds={86400}
-        stepSeconds={60}
+        maxSeconds={maxSeconds}
+        stepSeconds={stepSeconds}
         observedTo="2026-01-15T11:00:00Z"
         onChange={changed}
       />,
@@ -42,13 +44,7 @@ async function input(label: string, value: string) {
   const node = document.querySelector<HTMLInputElement>(
     `input[id$="-${label}"]`,
   )!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(
-      HTMLInputElement.prototype,
-      "value",
-    )!.set!.call(node, value);
-    node.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  await typeDateTime(node.id, value);
 }
 async function apply() {
   await act(async () =>
@@ -57,16 +53,16 @@ async function apply() {
       .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })),
   );
 }
-test("custom edits do not query until Apply and publish one aligned UTC range", async () => {
+test("custom edits do not query until Apply and publish one minute-aligned UTC range", async () => {
   await open();
-  await input("from", "2026-01-15T10:01:01");
-  await input("to", "2026-01-15T10:59:59");
+  await input("from", "2026-01-15T10:01");
+  await input("to", "2026-01-15T10:59");
   expect(changed).not.toHaveBeenCalled();
   await apply();
   expect(changed).toHaveBeenCalledTimes(1);
   expect(changed).toHaveBeenCalledWith({
     kind: "absolute",
-    from: "2026-01-15T10:02:00.000Z",
+    from: "2026-01-15T10:01:00.000Z",
     to: "2026-01-15T10:59:00.000Z",
   });
 });
@@ -75,7 +71,30 @@ test("invalid ranges stay open and do not issue a request", async () => {
   await input("from", "2026-01-15T11:01:00");
   await apply();
   expect(changed).not.toHaveBeenCalled();
-  expect(document.querySelector('[role="alert"]')?.textContent).toContain(
-    "End time must be after",
-  );
+  expect(
+    document.querySelector('[role="alert"]:not(:empty)')?.textContent,
+  ).toContain("End time must be after");
+});
+
+test("short demo history offers useful ranges and explains the retention limit", async () => {
+  await open(120, 10);
+  const quick = document.querySelector('[aria-label="Quick ranges"]')!;
+  const buttons = [...quick.querySelectorAll("button")];
+  expect(
+    buttons
+      .filter((button) => button.getAttribute("aria-disabled") !== "true")
+      .map((button) => button.textContent),
+  ).toEqual(["Last 30s", "Last 1m", "Last 2m"]);
+  expect(document.body.textContent).toContain("History limit: 2m.");
+  const unavailable = buttons.find(
+    (button) => button.textContent === "Last 1h",
+  )!;
+  expect(unavailable.getAttribute("aria-disabled")).toBe("true");
+  await act(async () => unavailable.click());
+  expect(changed).not.toHaveBeenCalled();
+  await act(async () => buttons[1].click());
+  expect(changed).toHaveBeenCalledExactlyOnceWith({
+    kind: "relative",
+    seconds: 60,
+  });
 });

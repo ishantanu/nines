@@ -153,7 +153,7 @@ export function navigateTo(path: string, replace = false) {
   window.dispatchEvent(new Event(changed));
   if (!replace) window.scrollTo?.({ top: 0, behavior: "instant" });
 }
-export function followLink(event: MouseEvent<HTMLAnchorElement>, path: string) {
+export function followLink(event: MouseEvent<Element>, path: string) {
   if (
     event.defaultPrevented ||
     event.button !== 0 ||

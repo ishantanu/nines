@@ -31,6 +31,16 @@ An SLO's name is its stable identity for critical user journey links and clients
   - Editing queries while retaining a binding that declares different semantics is rejected.
   - Previous revisions retain their original binding reference.
 
+## Review a target change against delivered reliability
+
+Users come to rely on the service level they actually receive, not the one written in a definition. When a plan changes an existing SLO's target, **Validate and plan**, `nines plan` and the plan API add notes that compare the new target with the reliability delivered over the SLO window.
+
+- A target raised above what has been delivered is flagged, because the SLO would start out unmet and its budget would burn from the first minute.
+- A target relaxed so far that it allows about ten times more failures than the service delivers is flagged, because users who rely on the current level can experience the drift as a regression. Communicate the change before using the extra room.
+- Any change that moves the allowed failure rate by ten times or more is called large, in either direction.
+- If the window is not fully measured, the note says the change cannot be compared instead of guessing. If the measurement itself changes, delivered reliability describes the old measurement and is not compared.
+- The notes are advice shown with the plan. They never block an apply, and an unchanged target adds nothing.
+
 ## What happens to existing evidence
 
 - Every replaced server-managed SLO revision is frozen with its definition, the observations still retained at edit time, collection/alert state, replacement time and authenticated replacing actor.
@@ -82,3 +92,11 @@ nines history my-objective --context playground \
 - Server-managed rule destinations stay pinned after publication.
   - Withdraw the owned rules before changing their source/destination.
   - Retiring an objective is a separate [reviewed archive/delete operation](slo-retirement.md); archived objectives retain historical reads and cannot be edited.
+
+## SLO cards and table
+
+The objectives page offers Cards and Table views with the same lifecycle filter and budget ordering. Cards show measured SLI, target, objective window, coverage, budget and linked critical user journeys. Missing measurements remain unavailable; partial windows are labelled. The trend range selects 15 minutes, one hour, six hours or 24 hours of stored Nines history, not a new provider read. Cards display up to 12 objectives per page and request bounded, tenant-scoped history for the displayed current revisions. Archived cards retain their summary without requesting a current trend. The table remains available for comparison across larger inventories.
+
+The portal Home page shows at most six compact SLO cards, prioritised by alert state and remaining budget. All / Needs review filters retain objectives with incomplete evidence. Cards use the same measurement and provider labels as the full inventory, with a fixed last-15-minute stored-history trend; View all SLOs opens the complete Cards / Table view. Archived objectives are excluded.
+
+SLO card values use a short reveal on entry or when their formatted SLI, budget or burn value changes. They show exact reported values immediately to assistive technology and never count through intermediate measurements. Unchanged values do not replay during polling; reduced-motion preferences disable the animation.

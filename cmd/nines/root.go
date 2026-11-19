@@ -118,7 +118,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	core := func(parent *cobra.Command, action, kind, use, mode, effect, short string, min, max int) {
 		parent.AddCommand(mark(position(coreCommand(action, kind, o), use, min, max), mode, effect, short))
 	}
-	r.AddCommand(opensloCommand(o), templatesCommand(o), extensionsCommand(o), retirementCommand(o), visualCommand(o))
+	r.AddCommand(opensloCommand(o), templatesCommand(o), extensionsCommand(o), retirementCommand(o), gitCommand(o), importCommand(o), visualCommand(o))
 	g := group(r, "init", "Create local versioned YAML")
 	core(g, "init", "slo", "slo", "offline", "local-write", "Generate an SLO manifest", 0, 0)
 	for _, v := range []struct{ a, mode, effect, short string }{{"validate", "offline", "read", "Validate a local YAML definition"}, {"plan", "server", "read", "Review a definition against the server"}, {"apply", "server", "write", "Apply an exact revision-checked definition"}} {
@@ -170,6 +170,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 		core(g, "rules-"+a, "", a, mode, effect, map[string]string{"generate": "Generate rules from local YAML", "plan": "Review a recording-rule or native SLO publication plan", "apply": "Publish an exact reviewed rule or native SLO digest", "pause": "Pause automatic deployment without removing loaded rules", "resume": "Resume automatic deployment of the saved SLO revision", "withdraw": "Withdraw a reviewed publication using provider-specific safeguards"}[a], 0, 0)
 	}
 	intent := group(r, "intent", "Prepare and review intent-based SLOs")
+	intent.AddCommand(intentContextCommand(o), intentCandidatesCommand(o), intentEvidenceCommand(o))
 	for _, a := range []string{"draft", "plan", "backtest"} {
 		effect := "provider-read"
 		if a == "draft" {
@@ -179,26 +180,26 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	}
 	g = group(intent, "conversations", "Durable preparation, review, apply and verification")
 	g.AddCommand(githubReviewCommand(o, false), githubReviewCommand(o, true))
-	for _, a := range []string{"list", "show", "status", "report", "create", "message", "run", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "observe", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
+	for _, a := range []string{"list", "usage", "show", "status", "report", "create", "message", "run", "evidence", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "activation", "observe", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
 		use, min, max := a+" ID", 1, 1
 		effect := "write"
-		if a == "list" || a == "create" {
+		if a == "list" || a == "create" || a == "usage" {
 			use, min, max = a, 0, 0
 		}
-		if a == "list" || a == "show" || a == "status" || a == "report" || a == "verify" || a == "kubernetes" || a == "audit" || a == "rollback-kubernetes" {
+		if a == "list" || a == "usage" || a == "show" || a == "status" || a == "report" || a == "verify" || a == "activation" || a == "kubernetes" || a == "audit" || a == "rollback-kubernetes" {
 			effect = "read"
 		}
 		if a == "run" {
 			effect = "model-call"
 		}
-		g.AddCommand(mark(position(conversationCommand(a, o), use, min, max), "server", effect, map[string]string{"list": "List saved conversations", "show": "Read one conversation", "status": "Read the resumable workflow phase and next review gate", "report": "Export an audited review artifact", "create": "Create a preparation conversation", "message": "Append a clarification", "run": "Prepare with explicit model consent", "confirm": "Confirm a measurement revision", "cancel": "Cancel preparation", "changes": "Freeze exact SLO and journey changes", "approve": "Approve an exact change-set digest", "reject": "Reject changes or withdraw approval with a reason", "audit": "Read the decision audit log", "rollback-plan": "Prepare a revision-fenced configuration rollback", "rollback-approve": "Approve an exact rollback digest", "rollback-apply": "Apply an approved configuration rollback", "rollback-reject": "Reject or withdraw rollback approval", "rollback-kubernetes": "Export reviewed rollback definitions for GitOps", "apply": "Atomically apply approved definitions", "observe": "Inspect runtime and persist post-change outcome evidence", "verify": "Read applied revisions and recorded outcome evidence", "kubernetes": "Export exact definitions for GitOps review"}[a]))
+		g.AddCommand(mark(position(conversationCommand(a, o), use, min, max), "server", effect, map[string]string{"list": "List saved conversations", "usage": "Read aggregate workflow progress: stages reached and median times", "show": "Read one conversation", "status": "Read the resumable workflow phase and next review gate", "report": "Export an audited review artifact", "create": "Create a preparation conversation", "message": "Append a clarification", "run": "Prepare with explicit model consent", "evidence": "Read provider evidence and save an audited preparation receipt", "confirm": "Confirm a measurement revision", "cancel": "Cancel preparation", "changes": "Freeze exact SLO and journey changes", "approve": "Approve an exact change-set digest", "reject": "Reject changes or withdraw approval with a reason", "audit": "Read the decision audit log", "rollback-plan": "Prepare a revision-fenced configuration rollback", "rollback-approve": "Approve an exact rollback digest", "rollback-apply": "Apply an approved configuration rollback", "rollback-reject": "Reject or withdraw rollback approval", "rollback-kubernetes": "Export reviewed rollback definitions for GitOps", "apply": "Atomically apply approved definitions", "observe": "Inspect runtime and persist post-change outcome evidence", "verify": "Read applied revisions and recorded outcome evidence", "activation": "Inspect current publication, evaluation and SLI evidence without writes", "kubernetes": "Export exact definitions for GitOps review"}[a]))
 	}
 	for _, name := range []string{"telemetry", "bindings", "dependencies"} {
 		g := group(r, name, map[string]string{"telemetry": "Discover configured source measurements", "bindings": "Review and compile measurement bindings", "dependencies": "Discover and read service dependency maps"}[name])
 		if name == "dependencies" {
 			g.AddCommand(dependencyDiscoveryCommand(o, false), dependencyDiscoveryCommand(o, true))
 		}
-		actions := map[string][]string{"telemetry": {"names", "inspect", "verify"}, "bindings": {"list", "compile"}, "dependencies": {"list", "show"}}[name]
+		actions := map[string][]string{"telemetry": {"names", "inspect", "verify"}, "bindings": {"list", "compile"}, "dependencies": {"list", "show", "composition"}}[name]
 		for _, a := range actions {
 			use, min, max := a+" ID", 1, 1
 			if a == "list" || a == "verify" {
@@ -250,8 +251,8 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 	return r
 }
 func exposeCoreFlags(c *cobra.Command, fs *pflag.FlagSet, a string) {
-	def := "file window step target source lifecycle short-window long-window burn-rate for min-coverage min-events good-query total-query no-policy"
-	allowed := map[string]string{"init": "out name project service display-name " + strings.ReplaceAll(def, "file ", ""), "validate": def, "plan": def, "apply": def + " expected-revision", "get": "", "export": "out", "describe": "", "context": "expected-revision at limit cursor", "search": "kind query project limit cursor linked-slo", "status": "", "quality": "cohorts expected-revision", "budget": "check expected-revision", "integration": "", "history": "from to range resolution revision", "collect": "from to recent", "events": "id", "connections-list": "", "connections-test": "", "rules-generate": "out " + def, "rules-plan": "id", "rules-apply": "id expected-digest", "rules-pause": "id expected-revision", "rules-resume": "id expected-revision", "rules-withdraw": "id expected-digest"}[a]
+	def := "file window step target source lifecycle label short-window long-window burn-rate for min-coverage min-events confidence good-query total-query no-policy"
+	allowed := map[string]string{"init": "out name project service display-name " + strings.ReplaceAll(def, "file ", ""), "validate": def, "plan": def, "apply": def + " expected-revision", "get": "", "export": "out", "describe": "", "context": "expected-revision at limit cursor", "search": "kind query project limit cursor linked-slo", "status": "", "quality": "cohorts customers expected-revision", "budget": "check expected-revision", "integration": "", "history": "from to range resolution revision", "collect": "from to recent", "events": "id", "connections-list": "", "connections-test": "", "rules-generate": "out " + def, "rules-plan": "id", "rules-apply": "id expected-digest", "rules-pause": "id expected-revision", "rules-resume": "id expected-revision", "rules-withdraw": "id expected-digest"}[a]
 	for _, name := range strings.Fields(allowed) {
 		c.Flags().AddFlag(fs.Lookup(name))
 	}
@@ -385,11 +386,11 @@ func (o *options) httpClient() *http.Client {
 func refineFlags(root *cobra.Command) {
 	allowed := map[string]string{
 		"nines intent draft": "file out", "nines intent plan": "file binding expected-revision out", "nines intent backtest": "file binding expected-revision from to resolution",
-		"nines telemetry verify": "file out", "nines telemetry names": "prefix", "nines telemetry inspect": "metric labels", "nines bindings list": "limit cursor", "nines bindings compile": "expected-revision name display-name target window out", "nines dependencies list": "limit cursor", "nines dependencies show": "expected-revision",
+		"nines telemetry verify": "file out", "nines telemetry names": "prefix", "nines telemetry inspect": "metric labels", "nines bindings list": "limit cursor", "nines bindings compile": "expected-revision name display-name target window out", "nines dependencies list": "limit cursor", "nines dependencies show": "expected-revision", "nines dependencies composition": "",
 		"nines replays list": "resource-kind resource-id", "nines replays show": "", "nines replays events": "", "nines replays ingest": "file",
 		"nines review-skills list": "", "nines review-skills show": "version",
 	}
-	for _, a := range []string{"list", "show", "status", "report", "create", "message", "run", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "observe", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
+	for _, a := range []string{"list", "usage", "show", "status", "report", "create", "message", "run", "evidence", "confirm", "cancel", "changes", "approve", "reject", "apply", "verify", "activation", "observe", "audit", "rollback-plan", "rollback-approve", "rollback-apply", "rollback-reject", "kubernetes", "rollback-kubernetes"} {
 		f := "file"
 		switch a {
 		case "list":
@@ -398,7 +399,9 @@ func refineFlags(root *cobra.Command) {
 			f = "after through"
 		case "report":
 			f = "markdown"
-		case "show", "status", "verify":
+		case "usage":
+			f = "days"
+		case "show", "status", "verify", "activation":
 			f = ""
 		case "kubernetes", "rollback-kubernetes":
 			f = "namespace digest"

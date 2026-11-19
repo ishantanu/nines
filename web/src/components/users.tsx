@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { NativeSelect } from "@/components/ui/select";
 import { api, message, type RequestScope } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -255,7 +256,7 @@ export function Users({
               {!draft.id ? (
                 <>
                   <Label htmlFor="user-provider">Authentication provider</Label>
-                  <select
+                  <NativeSelect
                     id="user-provider"
                     className="h-9 w-full rounded-md border bg-background px-3"
                     value={draft.provider}
@@ -268,7 +269,7 @@ export function Users({
                         {p.name}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                   <Label htmlFor="user-username">Username</Label>
                   <Input
                     id="user-username"
@@ -316,7 +317,7 @@ export function Users({
               {!draft.id ? (
                 <>
                   <Label htmlFor="user-role">Tenant role</Label>
-                  <select
+                  <NativeSelect
                     id="user-role"
                     className="h-9 w-full rounded-md border bg-background px-3"
                     value={draft.role}
@@ -327,7 +328,7 @@ export function Users({
                     {["viewer", "agent", "editor", "owner"].map((role) => (
                       <option key={role}>{role}</option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </>
               ) : null}
               {error ? (

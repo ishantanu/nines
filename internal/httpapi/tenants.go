@@ -50,6 +50,8 @@ type Workspace struct {
 	Anonymous bool
 	Workflows *workflow.Service
 	Identity  *identity.Service
+	// GitOps is nil unless the tenant configures Git delivery.
+	GitOps GitDelivery
 }
 type tenantDescriptor struct {
 	ID   string `json:"id"`
@@ -448,7 +450,7 @@ func allowed(role string, r *http.Request) bool {
 	if strings.HasPrefix(r.URL.Path, "/api/slo-templates/") && strings.HasSuffix(r.URL.Path, "/render") {
 		return true
 	}
-	if r.URL.Path == "/api/dependency-discovery/kubernetes" || r.URL.Path == "/api/slos/compile" || r.URL.Path == "/api/intents/backtest" || r.URL.Path == "/api/intents/plan" || r.URL.Path == "/api/journeys/plan" || r.URL.Path == "/api/resources/plan" || r.URL.Path == "/api/resources/validate" {
+	if r.URL.Path == "/api/dependency-discovery/kubernetes" || r.URL.Path == "/api/slos/compile" || r.URL.Path == "/api/intents/candidates" || r.URL.Path == "/api/intents/evidence" || r.URL.Path == "/api/intents/backtest" || r.URL.Path == "/api/intents/plan" || r.URL.Path == "/api/journeys/plan" || r.URL.Path == "/api/resources/plan" || r.URL.Path == "/api/resources/validate" || r.URL.Path == "/api/migrations/convert" {
 		return true
 	}
 	if r.URL.Path == "/api/session-replays" {
@@ -474,7 +476,7 @@ func allowed(role string, r *http.Request) bool {
 		return true
 	}
 	if role == "editor" {
-		if r.URL.Path == "/api/resources/apply" || r.URL.Path == "/api/slos" || r.URL.Path == "/api/journeys/apply" {
+		if r.URL.Path == "/api/resources/apply" || r.URL.Path == "/api/slos" || r.URL.Path == "/api/journeys/apply" || r.URL.Path == "/api/gitops/proposals" {
 			return true
 		}
 		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")

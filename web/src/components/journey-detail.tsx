@@ -46,8 +46,10 @@ import {
   type Run,
 } from "@/lib/api";
 import { Status } from "./status";
+import { GitProposals } from "./git-delivery";
 import { ManifestEditor } from "./manifest-editor";
 import { JourneyMap } from "./journey-map";
+import { RunObjectiveCard } from "./run-objective";
 function RunRecorder({
   journey,
   scope,
@@ -241,7 +243,8 @@ export function JourneyDetail({
           />
         </div>
       </div>
-      <CardContent className="p-5">
+      <CardContent className="space-y-4 p-5">
+        <GitProposals scope={scope} id={m.metadata.name} kind="journey" />
         <Tabs
           defaultValue={evidenceOnly ? "evidence" : "overview"}
           key={`${m.metadata.name}-${evidenceOnly}`}
@@ -258,8 +261,8 @@ export function JourneyDetail({
               <div className="section-label mb-3">Journey map</div>
               <JourneyMap journey={journey} onSLO={onSLO} />
             </div>
-            <div>
-              <div className="section-label mb-2">Linked objectives</div>
+            <details className="disclosure-panel">
+              <summary>Linked objectives · {journey.links.length}</summary>
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -305,7 +308,10 @@ export function JourneyDetail({
                 missing traffic remain unknown. An end-to-end success rate
                 requires a separately instrumented SLI.
               </p>
-            </div>
+            </details>
+            {journey.runObjective ? (
+              <RunObjectiveCard objective={journey.runObjective} />
+            ) : null}
             {a ? (
               <div className="rounded-md border bg-slate-50 p-4">
                 <div className="mb-2 flex items-center gap-2 text-sm font-semibold">

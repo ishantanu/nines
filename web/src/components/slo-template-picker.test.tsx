@@ -95,6 +95,95 @@ test("category and SLI selection require an explicit use action and never render
   expect(vi.mocked(fetch).mock.calls).toHaveLength(1);
   expect(vi.mocked(fetch).mock.calls[0][0]).toBe("/api/slo-templates");
 });
+test("offers only templates of the chosen SLO type and hides workloads without one", async () => {
+  const base = catalog.templates[0];
+  const typed = (
+    id: string,
+    category: string,
+    title: string,
+    type: "availability" | "latency",
+  ) => ({
+    ...base,
+    id,
+    category,
+    title,
+    manifest: {
+      ...base.manifest,
+      spec: {
+        ...base.manifest.spec,
+        measurement: { type, metric: "m", labels: {} },
+      },
+    },
+  });
+  const mixed = {
+    ...catalog,
+    categories: [
+      { id: "request-serving", title: "Request serving" },
+      { id: "storage", title: "Storage" },
+    ],
+    templates: [
+      typed(
+        "req-avail",
+        "request-serving",
+        "Request availability",
+        "availability",
+      ),
+      typed("req-latency", "request-serving", "Request latency", "latency"),
+      typed(
+        "storage-ops",
+        "storage",
+        "Storage operation success",
+        "availability",
+      ),
+    ],
+  } as SLOTemplateCatalog;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify(mixed), { status: 200 })),
+  );
+  const scope = createTenantSession("token", "alpha", "editor");
+  const options = async (index: number) => {
+    const combo = host.querySelectorAll('[role="combobox"]')[index];
+    await act(async () => {
+      combo.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+    });
+    const found = [...document.querySelectorAll('[role="option"]')].map(
+      (o) => o.textContent,
+    );
+    await act(async () => {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    return found;
+  };
+  await act(async () =>
+    root.render(
+      <SLOTemplatePicker
+        scope={scope}
+        measure="latency"
+        disabled={false}
+        onSelect={select}
+      />,
+    ),
+  );
+  // Both selects' options are in the DOM: Storage and the availability
+  // template are absent because neither has a latency template.
+  expect(await options(0)).toEqual(["Request serving", "Request latency"]);
+  await act(async () =>
+    root.render(
+      <SLOTemplatePicker
+        scope={scope}
+        measure="sessions"
+        disabled={false}
+        onSelect={select}
+      />,
+    ),
+  );
+  expect(host.textContent).toContain("No templates for this SLO type");
+});
 test("catalog failure leaves manual measurement authoring available", async () => {
   vi.stubGlobal(
     "fetch",

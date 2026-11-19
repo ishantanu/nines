@@ -15,7 +15,7 @@ func (s *Service) applyWindows(r *model.Record, observations []model.WindowObser
 	if r.Windows == nil {
 		r.Windows = map[string]model.WindowObservation{}
 	}
-	cutoff := s.Now().UTC().Truncate(time.Duration(r.SLO.StepSeconds) * time.Second).Add(-2 * time.Duration(r.SLO.WindowSeconds) * time.Second)
+	cutoff := s.Now().UTC().Truncate(time.Duration(r.SLO.StepSeconds) * time.Second).Add(-time.Duration(r.SLO.RetentionSeconds()) * time.Second)
 	allowed := map[int64]bool{}
 	for _, w := range r.SLO.Windows() {
 		allowed[w] = true
@@ -39,7 +39,7 @@ func (s *Service) applyWindows(r *model.Record, observations []model.WindowObser
 	for _, o := range observations {
 		r.Windows[model.WindowKey(o.WindowSeconds, o.Time)] = o
 	}
-	if len(r.Windows) > 800000 {
+	if len(r.Windows) > max(800000, len(r.SLO.Windows())*int(model.MinimumHistorySeconds/r.SLO.StepSeconds+1)) {
 		return model.Invalid("provider-window observation limit exceeded")
 	}
 	// Replay only the bounded live overlap, in order. A 15-second worker can

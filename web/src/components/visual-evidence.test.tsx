@@ -78,7 +78,7 @@ test("image sharing requires fresh consent for the exact input and never runs on
   await criterion("Confirmation is visible");
   await image();
   const submit = button("Share image and assess");
-  expect(submit.disabled).toBe(true);
+  expect(submit.getAttribute("aria-disabled")).toBe("true");
   expect(calls.create).not.toHaveBeenCalled();
   expect(host.querySelector("img")?.getAttribute("src")).toBe(
     "data:image/png;base64,aW1hZ2U=",
@@ -87,10 +87,10 @@ test("image sharing requires fresh consent for the exact input and never runs on
     'input[type="checkbox"]',
   )!;
   await act(async () => consent.click());
-  expect(submit.disabled).toBe(false);
+  expect(submit.getAttribute("aria-disabled")).not.toBe("true");
   await criterion("Confirmation plus no payment error");
   expect(consent.checked).toBe(false);
-  expect(submit.disabled).toBe(true);
+  expect(submit.getAttribute("aria-disabled")).toBe("true");
   await act(async () => consent.click());
   calls.create.mockImplementation(async (_scope, _journey, input) => ({
     id: input.id,

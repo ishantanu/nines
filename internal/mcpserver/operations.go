@@ -18,7 +18,7 @@ type historyInput struct {
 	ID                string `json:"id" jsonschema:"SLO identifier in the configured tenant"`
 	From              string `json:"from,omitempty" jsonschema:"Optional aligned RFC3339 start; cannot combine with rangeSeconds"`
 	To                string `json:"to,omitempty" jsonschema:"Optional aligned RFC3339 end; defaults to the current evaluation"`
-	RangeSeconds      *int64 `json:"rangeSeconds,omitempty" jsonschema:"Optional positive lookback, at most two retained SLO windows; use instead of from"`
+	RangeSeconds      *int64 `json:"rangeSeconds,omitempty" jsonschema:"Optional positive lookback, within retained history (24 hours or two SLO windows, whichever is longer); use instead of from"`
 	ResolutionSeconds *int64 `json:"resolutionSeconds,omitempty" jsonschema:"Optional positive multiple of sampling interval; at most 1500 points"`
 }
 type sloApplyInput struct {

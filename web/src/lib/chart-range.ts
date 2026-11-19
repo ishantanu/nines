@@ -2,11 +2,15 @@ export type ChartRange =
   | { kind: "relative"; seconds: number }
   | { kind: "absolute"; from: string; to: string };
 
-export function rangePresets(maxSeconds: number): number[] {
+export function rangePresets(maxSeconds: number, stepSeconds = 1): number[] {
+  const presets =
+    maxSeconds < 900
+      ? [30, 60, 120, 300, 600]
+      : [900, 3600, 21600, 86400, 604800, 2419200];
   return [
     ...new Set(
-      [900, 3600, 21600, 86400, 604800, 2419200, maxSeconds].filter(
-        (n) => n <= maxSeconds && n > 0,
+      [...presets, maxSeconds].filter(
+        (n) => n <= maxSeconds && n >= stepSeconds && n > 0,
       ),
     ),
   ].sort((a, b) => a - b);
@@ -83,4 +87,18 @@ export function nearestPointIndex(
   )
     return left - 1;
   return left;
+}
+
+// Shared by compact overview and full SLI plots. Include the objective so
+// a flat, healthy series never appears to sit on an arbitrary midline.
+export function sliDomain(values: readonly number[], target: number) {
+  let low = target,
+    high = target;
+  for (const value of values) {
+    if (!Number.isFinite(value)) continue;
+    low = Math.min(low, value);
+    high = Math.max(high, value);
+  }
+  const pad = Math.max((high - low) * 0.12, 0.0001);
+  return { low: Math.max(0, low - pad), high: Math.min(1, high + pad) };
 }

@@ -34,6 +34,7 @@ func (a *Server) access(w http.ResponseWriter, r *http.Request) {
 		{"propose", "Start investigations and proposals", "POST", "/api/workflows"},
 		{"evidence", "Record run evidence", "POST", "/api/journeys/example/runs"},
 		{"apply", "Apply SLO, journey, binding and dependency-map definitions", "POST", "/api/resources/apply"},
+		{"gitPropose", "Open a pull request for a reviewed SLO definition", "POST", "/api/gitops/proposals"},
 		{"review", "Approve or reject proposals", "POST", "/api/workflows/example/approve"},
 		{"testConnection", "Test a configured data source", "POST", "/api/connections/primary/test"},
 		{"planRules", "Preview recording-rule destination", "POST", "/api/slos/example/rules/plan"},

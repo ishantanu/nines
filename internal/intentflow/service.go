@@ -154,10 +154,7 @@ func (s *Service) Append(ctx context.Context, id string, in v1.AppendIntentConve
 		}
 		for _, m := range r.Session.Messages {
 			if m.ID == in.ID {
-				if m.Role != "user" || m.Text != in.Text || m.Actor.Subject != a.Subject || m.Actor.Kind != a.Kind || r.MessageDigests[in.ID] != hash(struct {
-					Text string
-					Goal *v1.SLOIntent
-				}{in.Text, in.Goal}) {
+				if m.Role != "user" || m.Text != in.Text || m.Actor.Subject != a.Subject || m.Actor.Kind != a.Kind || r.MessageDigests[in.ID] != answerDigest(in) {
 					return ErrConflict
 				}
 				return nil
@@ -168,6 +165,9 @@ func (s *Service) Append(ctx context.Context, id string, in v1.AppendIntentConve
 		}
 		if len(r.Session.Messages) >= maxMessages {
 			return &CapacityError{Resource: "messages", Limit: maxMessages}
+		}
+		if in.PreserveGoal && (in.Goal != nil || r.Session.Goal == nil) {
+			return model.Invalid("preserveGoal requires a saved typed goal and no replacement goal")
 		}
 		if in.Goal != nil {
 			if e := model.ValidateIntent(*in.Goal); e != nil {
@@ -181,19 +181,19 @@ func (s *Service) Append(ctx context.Context, id string, in v1.AppendIntentConve
 		if r.MessageDigests == nil {
 			r.MessageDigests = map[string]string{}
 		}
-		r.MessageDigests[in.ID] = hash(struct {
-			Text string
-			Goal *v1.SLOIntent
-		}{in.Text, in.Goal})
+		r.MessageDigests[in.ID] = answerDigest(in)
 		// A clarification or goal edit invalidates previous selection/proposal evidence.
 		if e := invalidateChangeSet(r, a, "Goal or clarification changed; pending approval no longer applies.", now); e != nil {
 			return e
 		}
-		r.Session.Goal = clone(in.Goal)
-		r.Session.Template = nil
+		if !in.PreserveGoal {
+			r.Session.Goal = clone(in.Goal)
+			r.Session.Template = nil
+		}
 		r.Session.Selection = nil
 		r.Session.Plan = nil
 		r.Session.Backtest = nil
+		r.Session.PreparationEvidence = nil
 		r.Session.State = "draft"
 		touch(r, now)
 		return nil
@@ -237,6 +237,7 @@ func (s *Service) Select(ctx context.Context, id string, in v1.ConfirmIntentBind
 		r.Session.Selection = &v1.IntentBindingConfirmation{IntentDigest: in.IntentDigest, MeasurementDigest: in.MeasurementDigest, Binding: in.Binding, Actor: a, At: now}
 		r.Session.State = "draft"
 		r.Session.Backtest = nil
+		r.Session.PreparationEvidence = nil
 		touch(r, now)
 		return nil
 	})
@@ -316,6 +317,7 @@ func (s *Service) Start(ctx context.Context, id string, in v1.CreateIntentFlowRu
 		r.Session.State = "queued"
 		r.Session.Plan = nil
 		r.Session.Backtest = nil
+		r.Session.PreparationEvidence = nil
 		r.Token = ""
 		r.LeaseUntil = time.Time{}
 		r.Pending = nil
@@ -385,4 +387,19 @@ func finish(r *record, status, code, message string, now time.Time) {
 		r.Session.Messages = append(r.Session.Messages, v1.IntentConversationMessage{ID: run.ID + "-reply", Role: "assistant", Text: message, At: now, Actor: v1.InvestigationActor{Subject: "intent-workflow", Name: "Intent workflow", Kind: "assistant"}, RunID: run.ID})
 	}
 	touch(r, now)
+}
+
+// Keep legacy request idempotency hashes unchanged when preservation is absent.
+func answerDigest(in v1.AppendIntentConversation) string {
+	if !in.PreserveGoal {
+		return hash(struct {
+			Text string
+			Goal *v1.SLOIntent
+		}{in.Text, in.Goal})
+	}
+	return hash(struct {
+		Text         string
+		Goal         *v1.SLOIntent
+		PreserveGoal bool
+	}{in.Text, in.Goal, true})
 }

@@ -1,0 +1,25 @@
+{
+  "selectedCase": "availability-reviewed-apply",
+  "suite": "workflow",
+  "apiVersion": "nines.dev/v1alpha1",
+  "kind": "IntentEvaluationReport",
+  "mode": "live",
+  "suiteSHA256": "d8cb713746446779dab747e8f68339fbb7cc8c14a9093e934c535f43434ee229",
+  "generatedAt": "2026-11-02T07:57:01.880798Z",
+  "complete": true,
+  "runtimeVersion": "Ollama 0.40.11; Metal; context 8192; parallel 1; prewarmed",
+  "results": [
+    {
+      "case": "availability-reviewed-apply",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "needs_input",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 5391
+    }
+  ],
+  "passed": 0,
+  "failed": 1,
+  "skipped": []
+}

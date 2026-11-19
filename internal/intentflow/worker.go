@@ -50,7 +50,7 @@ var contract = func() skillContract {
 	if e := yaml.Unmarshal(skillYAML, &c); e != nil {
 		panic(e)
 	}
-	if c.APIVersion != v1.APIVersion || c.Kind != "IntentAuthoringSkill" || c.Metadata.Name != "intent-authoring" || c.Metadata.Version != "0.4.0" || c.Spec.MaxModelCalls != 6 || c.Spec.MaxToolCalls != 6 || len(c.Spec.Tools) != 8 || len(c.Spec.Definitions) != 8 {
+	if c.APIVersion != v1.APIVersion || c.Kind != "IntentAuthoringSkill" || c.Metadata.Name != "intent-authoring" || c.Metadata.Version != "0.6.0" || c.Spec.MaxModelCalls != 6 || c.Spec.MaxToolCalls != 6 || len(c.Spec.Tools) != 9 || len(c.Spec.Definitions) != 9 {
 		panic("invalid intent skill contract")
 	}
 	seen := map[string]bool{}
@@ -66,7 +66,7 @@ var contract = func() skillContract {
 
 func bytesDigest(b []byte) string { d := sha256.Sum256(b); return hex.EncodeToString(d[:]) }
 func skillRef() v1.ReviewSkillRef {
-	return v1.ReviewSkillRef{ID: "intent-authoring", Version: "0.4.0", Digest: bytesDigest(skillYAML)}
+	return v1.ReviewSkillRef{ID: contract.Metadata.Name, Version: contract.Metadata.Version, Digest: bytesDigest(skillYAML)}
 }
 func (s *Service) Capabilities() any {
 	return map[string]any{"apiVersion": v1.APIVersion, "tenant": s.Platform.TenantID, "modelEnabled": s.Model != nil, "draftEnabled": s.Platform.IntentDrafter != nil, "skill": skillRef(), "systemOneEnabled": s.SystemOne != nil, "systemOneRoute": s.systemOneRoute(), "systemOneAdvisoryOnly": true, "templateSelection": true, "templateCatalogDigest": s.templateCatalogDigest(), "maxRuns": maxRuns, "maxMessages": maxMessages, "maxDocumentBytes": maxDocument, "maxPreparationBytes": maxPreparationBytes, "maxModelCalls": 6, "maxToolCalls": 6, "tools": contract.Spec.Tools, "appliesResources": false, "reviewedChangeSets": true, "humanApprovalRequired": true, "auditTrail": true, "approvalReasonRequired": true, "independentApplierRequired": true, "tenantAuditJournal": true, "externalImmutableArchive": s.Archive != nil, "externalArchiveBackend": "s3-object-lock", "actionTimeSafetyChecks": true, "ownerCorrectiveExceptions": true, "postChangeObservation": true, "automaticRollback": false, "reviewedConfigurationRollback": true, "rollbackCreatesNewRevisions": true, "rollbackDeletesResources": false, "rollbackDeploysRules": false, "skillYAML": string(skillYAML)}
@@ -107,17 +107,26 @@ func decodeArgs(raw json.RawMessage, out any) error {
 	return nil
 }
 func toolset(r record) []rm.Tool {
-	names := []string{"ask_user"}
+	names := []string{}
 	if r.Session.Goal == nil {
 		names = append(names, "draft_goal")
 	} else if r.Session.Selection == nil {
 		names = append(names, "find_measurements")
 		if r.Session.Goal.Spec.Measurement == nil {
-			names = append(names, "list_slo_templates", "render_slo_template")
+			names = append([]string{"list_slo_templates"}, names...)
+			// Keep the four-tool provider budget: after catalog discovery,
+			// rendering takes the optional candidate-discovery slot.
+			if !discoveredIntentCandidates(r) && !discoveredTemplates(r) {
+				names = append(names, "discover_measurement_candidates")
+			}
+			if discoveredTemplates(r) {
+				names = append(names, "render_slo_template")
+			}
 		}
 	} else {
 		names = append(names, "compile_intent", "backtest_intent", "finish_proposal")
 	}
+	names = append(names, "ask_user")
 	tools := []rm.Tool{}
 	for _, name := range names {
 		d := contract.Spec.Definitions[name]
@@ -127,6 +136,26 @@ func toolset(r record) []rm.Tool {
 
 	return tools
 }
+
+// A successful discovery receipt belongs to this run and pinned catalog.
+// Earlier conversations/runs never supply authority to skip discovery.
+func discoveredTemplates(r record) bool {
+	if len(r.Session.Runs) == 0 {
+		return false
+	}
+	run := current(&r)
+	for _, step := range run.Steps {
+		if step.Tool != "list_slo_templates" {
+			continue
+		}
+		var discovery templateDiscovery
+		if json.Unmarshal(step.Result, &discovery) == nil && discovery.CatalogDigest == run.TemplateCatalogDigest && len(discovery.Templates) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func guidedTool(r record) string {
 	if r.Session.Goal == nil {
 		return "draft_goal"
@@ -298,7 +327,7 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 	if run.Mode == "model" {
 		call = *r.Pending
 	}
-	if !slices.Contains(contract.Spec.Tools, call.Name) {
+	if !slices.Contains(contract.Spec.Tools, call.Name) || run.Mode == "model" && !slices.ContainsFunc(toolset(r), func(t rm.Tool) bool { return t.Name == call.Name }) {
 		return fail("unsafe_tool_call")
 	}
 	// Reserve a drafting model call before the external operation, including crash recovery.
@@ -389,7 +418,11 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 			current(n).Progress.State = "received"
 			current(n).Progress.At = now
 		}
-		current(n).Steps = append(current(n).Steps, v1.IntentFlowStep{Tool: call.Name, At: now, Digest: bytesDigest(data), Result: json.RawMessage(data)})
+		step := v1.IntentFlowStep{Tool: call.Name, At: now, Digest: bytesDigest(data), Result: json.RawMessage(data)}
+		if call.Name == "discover_measurement_candidates" && r.Session.Goal != nil {
+			step.IntentDigest = hash(*r.Session.Goal)
+		}
+		current(n).Steps = append(current(n).Steps, step)
 		current(n).UpdatedAt = now
 		if !active(next) {
 			status := current(&next).Status
@@ -423,6 +456,16 @@ func (s *Service) WorkOne(ctx context.Context) (bool, error) {
 	return true, e
 }
 func modelResult(r record, name string, result any) any {
+	if name == "discover_measurement_candidates" {
+		if out, ok := result.(v1.IntentCandidateDiscovery); ok {
+			if len(out.Names) > 12 {
+				out.Names = out.Names[:12]
+				out.Truncated = true
+				out.Warnings = append(out.Warnings, "model_metric_name_view_bounded_read_saved_receipt_for_more")
+			}
+			return out
+		}
+	}
 	if (name == "compile_intent" || name == "find_measurements") && r.Session.Plan != nil {
 		p := r.Session.Plan
 		compact := map[string]any{"status": p.Status, "intentDigest": p.IntentDigest, "warnings": p.Warnings, "clarifications": p.Clarifications, "journeyChange": p.Journey != nil}
@@ -433,6 +476,13 @@ func modelResult(r record, name string, result any) any {
 		if name == "find_measurements" {
 			compact["candidates"] = p.Candidates
 			compact["humanConfirmationRequired"] = r.Session.Selection == nil
+			// A missing saved definition is not evidence that telemetry is absent.
+			// Keep the public plan unchanged; this receipt only guides authoring.
+			if r.Session.Goal != nil && r.Session.Goal.Spec.Measurement == nil && p.Compiled == nil && len(p.Candidates) == 0 && !p.Truncated && p.Status == "needs_instrumentation" {
+				compact["status"] = "needs_measurement_definition"
+				compact["nextTool"] = "list_slo_templates"
+				compact["clarifications"] = []string{"No matching saved measurement definition was found. This does not establish whether telemetry exists. Discover a recipe for the supplied instrumentation, or ask for missing measurement fields. Verify telemetry after defining the measurement."}
+			}
 		}
 		return compact
 	}
@@ -445,6 +495,8 @@ func modelResult(r record, name string, result any) any {
 func (s *Service) execute(ctx context.Context, r *record, call rm.Call) (any, error) {
 	now := time.Now().UTC()
 	switch call.Name {
+	case "discover_measurement_candidates":
+		return s.discoverIntentCandidates(ctx, r, call.Arguments)
 	case "list_slo_templates":
 		if r.Session.Goal == nil || r.Session.Goal.Spec.Measurement != nil || r.Session.Selection != nil || current(r).Mode != "model" || !r.RunRequest.ModelConsent {
 			return nil, model.Invalid("template discovery requires an unconfirmed typed goal and consented model mode")
@@ -454,10 +506,18 @@ func (s *Service) execute(ctx context.Context, r *record, call rm.Call) (any, er
 		return s.renderIntentTemplate(r, call.Arguments, now)
 	case "ask_user":
 		var in struct {
-			Question string `json:"question"`
+			Question string   `json:"question"`
+			Fields   []string `json:"fields"`
 		}
-		if e := decodeArgs(call.Arguments, &in); e != nil || !text(in.Question, 2000) {
+		if e := decodeArgs(call.Arguments, &in); e != nil || !text(in.Question, 2000) || len(in.Fields) < 1 || len(in.Fields) > 8 {
 			return nil, rm.Failure("unsafe_tool_call")
+		}
+		supplied, unresolved, valid := clarificationFields(r.Session, in.Fields)
+		if !valid {
+			return nil, rm.Failure("unsafe_tool_call")
+		}
+		if len(supplied) > 0 {
+			return map[string]any{"status": "fields_already_provided", "providedFields": supplied, "unresolvedFields": unresolved, "message": "Do not ask again for provided fields. Use the saved typed goal and pinned scope, and ask only about unresolved fields or confirmation. No goal or confirmation has changed."}, nil
 		}
 		status := "needs_input"
 		if r.Session.Plan != nil && r.Session.Selection == nil && (len(r.Session.Plan.Candidates) > 0 || (r.Session.Plan.Compiled != nil && r.Session.Goal != nil && r.Session.Goal.Spec.Measurement != nil)) {

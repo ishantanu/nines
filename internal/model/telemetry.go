@@ -41,6 +41,13 @@ func topologyHeader(version, kind, expected string, meta v1.Metadata, display st
 	}
 	return nil
 }
+
+// What the success selector or threshold means for each type, for errors.
+var (
+	ratioGood        = map[string]string{"availability": "requests or jobs", "correctness": "results that pass validation", "durability": "objects verified intact", "coverage": "records processed"}
+	thresholdMeaning = map[string]string{"latency": "the slowest acceptable duration", "freshness": "the oldest acceptable data age"}
+)
+
 func (b MeasurementBinding) Validate() error {
 	if err := topologyHeader(b.APIVersion, b.Kind, v1.BindingKind, b.Metadata, b.Spec.DisplayName); err != nil {
 		return err
@@ -58,28 +65,40 @@ func (b MeasurementBinding) Validate() error {
 	if err := ValidateLabels(s.SuccessLabels); err != nil {
 		return err
 	}
+	if s.Measurement != "sessions" && s.EventMetric != "" {
+		return Invalid("eventMetric is only for the sessions measurement")
+	}
 	switch s.Measurement {
-	case "availability":
+	case "sessions":
+		if !MetricName.MatchString(s.EventMetric) || s.EventMetric == s.Metric {
+			return Invalid("sessions requires an eventMetric different from metric")
+		}
+		if s.CountFrom != "" || len(s.SuccessLabels) > 0 || s.ThresholdSeconds != nil {
+			return Invalid("sessions counts sessions with an event: it does not accept countFrom, successLabels or thresholdSeconds")
+		}
+	case "availability", "correctness", "durability", "coverage":
+		t := s.Measurement
 		if !oneOf(s.CountFrom, "", "counter", "histogram") {
-			return Invalid("availability countFrom must be counter or histogram")
+			return Invalid("%s countFrom must be counter or histogram", t)
 		}
 		if len(s.SuccessLabels) == 0 || s.ThresholdSeconds != nil {
-			return Invalid("availability requires successLabels and no thresholdSeconds")
+			return Invalid("%s requires successLabels that select the good %s and no thresholdSeconds", t, ratioGood[t])
 		}
 		for k := range s.SuccessLabels {
 			if _, ok := s.Labels[k]; ok {
 				return Invalid("successLabels must refine, not repeat or override population labels")
 			}
 		}
-	case "latency":
+	case "latency", "freshness":
+		t := s.Measurement
 		if s.CountFrom != "" {
-			return Invalid("latency does not accept countFrom; it uses histogram buckets and count")
+			return Invalid("%s does not accept countFrom; it uses histogram buckets and count", t)
 		}
 		if len(s.SuccessLabels) > 0 || s.ThresholdSeconds == nil || !Finite(*s.ThresholdSeconds) || *s.ThresholdSeconds <= 0 || *s.ThresholdSeconds > 86400 {
-			return Invalid("latency requires a positive thresholdSeconds at most 86400 and no successLabels")
+			return Invalid("%s requires a positive thresholdSeconds at most 86400 (%s) and no successLabels", t, thresholdMeaning[t])
 		}
 	default:
-		return Invalid("measurement must be availability or latency")
+		return Invalid("measurement must be availability, latency, sessions, correctness, durability, coverage or freshness")
 	}
 	return nil
 }

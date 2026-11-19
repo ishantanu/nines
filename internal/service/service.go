@@ -220,7 +220,7 @@ func (s *Service) apply(r *model.Record, points []model.Point, replace *[2]time.
 		return model.Invalid("SLO is archived")
 	}
 	now := s.Now().UTC().Truncate(time.Duration(r.SLO.StepSeconds) * time.Second)
-	cutoff := now.Add(-2 * time.Duration(r.SLO.WindowSeconds) * time.Second)
+	cutoff := now.Add(-time.Duration(r.SLO.RetentionSeconds()) * time.Second)
 	seen := map[int64]bool{}
 	for _, p := range points {
 		if err := p.Validate(r.SLO.StepSeconds); err != nil {
@@ -230,7 +230,7 @@ func (s *Service) apply(r *model.Record, points []model.Point, replace *[2]time.
 			return model.Invalid("cannot ingest future intervals")
 		}
 		if !p.Time.After(cutoff) {
-			return model.Invalid("sample is outside retention (two rolling windows)")
+			return model.Invalid("sample is outside retained history")
 		}
 		if seen[p.Time.Unix()] {
 			return model.Invalid("duplicate timestamps within the same request")
@@ -294,9 +294,11 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 	ctx, finish := observability.Operation(ctx, "slo.collect", s.TenantID)
 	defer func() { finish(collectErr) }()
 
-	// The first release runs one collector at a time, bounding provider load and
-	// preventing overlapping replay/live queries in a single service process.
-	s.collectionMu.Lock()
+	// Admit at most one collection per tenant/process. Interactive callers get
+	// explicit backpressure instead of waiting behind a slow historical query.
+	if !s.collectionMu.TryLock() {
+		return 0, model.ErrUnavailable
+	}
 	defer s.collectionMu.Unlock()
 	if err := ctx.Err(); err != nil {
 		return 0, err
@@ -320,8 +322,8 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 	if !aligned(from, c.StepSeconds) || !aligned(to, c.StepSeconds) || !to.After(from) || to.Sub(from) > 31*24*time.Hour || to.After(s.Now().UTC().Truncate(time.Duration(c.StepSeconds)*time.Second)) {
 		return 0, model.Invalid("collection requires aligned from < to, at most 31 days, ending in the past")
 	}
-	if from.Before(s.Now().UTC().Truncate(time.Duration(c.StepSeconds) * time.Second).Add(-2 * time.Duration(c.WindowSeconds) * time.Second)) {
-		return 0, model.Invalid("collection range exceeds retention (two rolling windows)")
+	if from.Before(s.Now().UTC().Truncate(time.Duration(c.StepSeconds) * time.Second).Add(-time.Duration(c.RetentionSeconds()) * time.Second)) {
+		return 0, model.Invalid("collection range exceeds retained history")
 	}
 	attempted := s.Now().UTC()
 	var points []model.Point

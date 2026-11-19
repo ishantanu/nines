@@ -1,0 +1,31 @@
+{
+  "runtime": "Ollama 0.40.11",
+  "sourceCommit": "bb619a3d01eb27f01d080f1b1f1cd32696da7e3b",
+  "sourceTree": "clean detached worktree",
+  "hardware": "Apple M1; 16 GiB unified memory",
+  "model": "granite4.1:3b",
+  "digest": "6fd349357287c7ffc9e38189a93b48ea175d24fc566b38f09cfc564fb7f303eb",
+  "size": 2099520281,
+  "details": {
+    "format": "gguf",
+    "family": "granite",
+    "families": [
+      "granite"
+    ],
+    "parameter_size": "3.4B",
+    "quantization_level": "Q4_K_M",
+    "context_length": 131072,
+    "embedding_length": 2560,
+    "runner": "ggml"
+  },
+  "capabilities": [
+    "completion",
+    "tools"
+  ],
+  "contextLength": 8192,
+  "parallel": 1,
+  "provider": "ollama",
+  "apiStyle": "chat-completions",
+  "draftOutputMode": "schema",
+  "modelCredentials": "none"
+}

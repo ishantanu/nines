@@ -117,3 +117,29 @@ docker compose -p nines start platform
 - To use another host port, set `NINES_PORT` and the matching `NINES_PUBLIC_URL` together.
   - Changing the bootstrap environment password does not reset an existing account; use the Users tab.
   - A token-only or SSO-only deployment can replace the auth mount and `AUTH_CONFIG_FILE` through the override above.
+
+## Build cache and disk use
+
+- Source builds require BuildKit, included in current Docker Desktop and Docker Engine installations.
+- Go module downloads and compiler outputs use shared cache mounts across the server, operator and Go fixtures. npm downloads have a separate cache mount. These caches are disposable: an empty or garbage-collected cache must still produce a working image.
+- The server copies portal inputs separately from Go sources. Public website chapters, screenshots and local acceptance reports do not invalidate its compilation. License collection mounts installed frontend dependencies without copying a second dependency tree into a build layer.
+- The three synthetic AI services share `nines-ai-playground:local`; changing Compose project names no longer produces separate AI image tags for identical commands.
+- Inspect actual usage with `docker system df`. Cache mounts improve reuse but do not impose a storage limit, and old layers from earlier Dockerfiles remain until garbage-collected.
+
+For a small development machine using Docker Desktop's default builder, merge this fragment into **Settings → Docker Engine**, preserving the other settings:
+
+```json
+{
+  "builder": {
+    "gc": {
+      "enabled": true,
+      "defaultKeepStorage": "8GB"
+    }
+  }
+}
+```
+
+- This configures periodic build-cache retention; it is not a hard ceiling on Docker's disk image, temporary build space, images or database volumes. Applying engine settings can restart Docker, so choose an appropriate time.
+- Custom Buildx builders have their own BuildKit garbage-collection configuration. See [Docker's cache retention documentation](https://docs.docker.com/build/cache/garbage-collection/).
+- For a one-time cleanup that retains some recent cache, run `docker builder prune --keep-storage 8GB`. Removing cache can make later builds slower and require dependency downloads; containers, runtime images and database volumes are outside this command's scope.
+- Use [the playground shutdown instructions](playground.md) for project data. Avoid global volume cleanup when databases must be preserved.

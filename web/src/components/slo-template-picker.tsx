@@ -13,14 +13,21 @@ import {
   SelectValue,
 } from "./ui/select";
 
+/** The measurement type a template fills in, such as availability or latency. */
+export const templateType = (t: SLOTemplate) =>
+  t.manifest.spec.measurement?.type ?? "";
+
 export function SLOTemplatePicker({
   scope,
   disabled,
+  measure,
   onSelect,
   onBusyChange,
 }: {
   scope: RequestScope;
   disabled: boolean;
+  /** Offer only templates of this SLO type; omit to offer all. */
+  measure?: string;
   onSelect: (template: SLOTemplate) => void;
   onBusyChange?: (busy: boolean) => void;
 }) {
@@ -60,8 +67,18 @@ export function SLOTemplatePicker({
       request.current?.abort();
     };
   }, [scope]);
-  const templates =
-    catalog?.templates.filter((t) => t.category === category) ?? [];
+  const matching =
+    catalog?.templates.filter((t) => !measure || templateType(t) === measure) ??
+    [];
+  const categories =
+    catalog?.categories.filter((c) =>
+      matching.some((t) => t.category === c.id),
+    ) ?? [];
+  // Keep the chosen category when it still has a template of this type.
+  const activeCategory = categories.some((c) => c.id === category)
+    ? category
+    : (categories[0]?.id ?? "");
+  const templates = matching.filter((t) => t.category === activeCategory);
   const template = templates.find((t) => t.id === selected);
   async function useTemplate() {
     if (!template || disabled || rendering) return;
@@ -117,24 +134,28 @@ export function SLOTemplatePicker({
       className="space-y-3 rounded-md border p-4"
       aria-label="SLO templates"
     >
-      <div>
-        <p className="text-sm font-medium">Start from a template</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Choose an SLI, then adapt its example instrumentation. Templates start
-          as experimental SLOs with no paging commitment.
-        </p>
-      </div>
+      {/* The "Start from a template" disclosure around this panel names it. */}
+      <p className="text-xs text-muted-foreground">
+        Fills the form below with example metrics for a common workload. Adapt
+        them to your telemetry. Templates start as experimental SLOs with no
+        paging commitment.
+      </p>
       {error ? (
         <p role="alert" className="text-sm text-destructive">
           Templates unavailable: {error}. You can still define a measurement
           below.
         </p>
       ) : null}
-      <div className="form-grid">
+      {catalog && categories.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No templates for this SLO type. Fill in the measurement below.
+        </p>
+      ) : null}
+      <div className="form-grid" hidden={!!catalog && categories.length === 0}>
         <div>
-          <FormField htmlFor={`${id}-category`} label={<> Category </>}>
+          <FormField htmlFor={`${id}-category`} label={<> Workload </>}>
             <Select
-              value={category}
+              value={activeCategory}
               disabled={disabled || rendering || !catalog}
               onValueChange={(value) => {
                 setCategory(value);
@@ -144,10 +165,10 @@ export function SLOTemplatePicker({
               }}
             >
               <SelectTrigger id={`${id}-category`} className="w-full">
-                <SelectValue placeholder="Choose category" />
+                <SelectValue placeholder="Choose workload" />
               </SelectTrigger>
               <SelectContent>
-                {catalog?.categories.map((c) => (
+                {categories.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.title}
                   </SelectItem>
@@ -157,9 +178,9 @@ export function SLOTemplatePicker({
           </FormField>
         </div>
         <div>
-          <FormField htmlFor={`${id}-sli`} label={<> SLI template </>}>
+          <FormField htmlFor={`${id}-sli`} label={<> Template </>}>
             <Select
-              value={selected}
+              value={template ? selected : ""}
               disabled={disabled || rendering || !catalog}
               onValueChange={(value) => {
                 setSelected(value);
@@ -168,7 +189,7 @@ export function SLOTemplatePicker({
               }}
             >
               <SelectTrigger id={`${id}-sli`} className="w-full">
-                <SelectValue placeholder="Choose an SLI" />
+                <SelectValue placeholder="Choose a template" />
               </SelectTrigger>
               <SelectContent>
                 {templates.map((t) => (

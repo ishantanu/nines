@@ -19,8 +19,8 @@ func (c *Client) ReadCohorts(ctx context.Context, s model.SLO, labels []string, 
 		return v1.CohortEvidence{}, err
 	}
 	out := v1.CohortEvidence{At: at, WindowSeconds: s.WindowSeconds, Counts: []v1.CohortCount{}}
-	if s.ProviderWindow == nil || len(labels) == 0 || len(labels) > 3 {
-		return out, fmt.Errorf("cohort inspection requires provider-window counts and one to three labels")
+	if s.ProviderWindow == nil || s.ProviderWindow.BadSelector != "" || len(labels) == 0 || len(labels) > 3 {
+		return out, fmt.Errorf("cohort inspection requires good and total provider-window counts and one to three labels; session measurements are not supported")
 	}
 	keys := append([]string(nil), labels...)
 	sort.Strings(keys)
@@ -29,7 +29,18 @@ func (c *Client) ReadCohorts(ctx context.Context, s model.SLO, labels []string, 
 			return out, fmt.Errorf("invalid cohort labels")
 		}
 	}
+	return c.readGrouped(ctx, s, keys, "", at)
+}
+
+// readGrouped sums good and total counts by the given labels at one cutoff.
+// matcher, when set, is a label matcher added to both selectors so the read is
+// limited to an explicit allowlist.
+func (c *Client) readGrouped(ctx context.Context, s model.SLO, keys []string, matcher string, at time.Time) (v1.CohortEvidence, error) {
+	out := v1.CohortEvidence{At: at, WindowSeconds: s.WindowSeconds, Counts: []v1.CohortCount{}}
 	query := func(selector string) (map[string]v1.CohortCount, error) {
+		if matcher != "" {
+			selector = withMatcher(selector, matcher)
+		}
 		expression := fmt.Sprintf("topk(101, sum by (%s) (increase(%s[%ds])))", strings.Join(keys, ","), selector, s.WindowSeconds)
 		var data struct {
 			ResultType string `json:"resultType"`
@@ -94,4 +105,16 @@ func (c *Client) ReadCohorts(ctx context.Context, s model.SLO, labels []string, 
 		return model.DefinitionDigest(out.Counts[i].Labels) < model.DefinitionDigest(out.Counts[j].Labels)
 	})
 	return out, nil
+}
+
+// withMatcher adds one label matcher to a metric selector.
+func withMatcher(selector, matcher string) string {
+	if strings.HasSuffix(selector, "}") {
+		inner := strings.TrimSuffix(selector, "}")
+		if strings.HasSuffix(inner, "{") {
+			return inner + matcher + "}"
+		}
+		return inner + "," + matcher + "}"
+	}
+	return selector + "{" + matcher + "}"
 }

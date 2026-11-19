@@ -1,4 +1,5 @@
 import { providerLabel } from "@/lib/telemetry-providers";
+import { NativeSelect } from "@/components/ui/select";
 import { FormField } from "@/components/ui/form-layout";
 import { SLORevisionHistory } from "./slo-revision-history";
 import { MeasuredObjective } from "./measured-objective";
@@ -22,6 +23,14 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { GitProposeButton } from "./git-delivery";
+import { IntervalJudgingEditor, LabelsEditor } from "./slo-extras-editors";
+import {
+  badIntervalFromDraft,
+  intervalDraft,
+  validateExtras,
+  type IntervalDraft,
+} from "@/lib/slo-extras";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -50,6 +59,8 @@ type Draft = {
   step: string;
   goodQuery: string;
   totalQuery: string;
+  labels?: SLO["labels"];
+  interval: IntervalDraft;
   enabled: boolean;
   short: string;
   long: string;
@@ -81,6 +92,8 @@ export function objectiveDraft(
     step: duration(d.spec.stepSeconds),
     goodQuery: window?.goodSelector ?? d.spec.goodQuery ?? "",
     totalQuery: window?.totalSelector ?? d.spec.totalQuery ?? "",
+    labels: d.spec.labels,
+    interval: intervalDraft(d.spec.badInterval),
     enabled: !!p || !!d.spec.policies?.length,
     policies:
       d.spec.policies ??
@@ -106,6 +119,9 @@ export function objectiveDefinition(
 ): SLODefinition {
   if (d.enabled && !d.policies.length)
     throw new Error("Add an alert policy or disable burn-rate alerts.");
+  validateExtras({ labels: d.labels });
+  const queryBased =
+    !d.providerWindow && !(base.spec.measurement && !d.customMeasurement);
   const spec: SLODefinition["spec"] = {
     ...base.spec,
     quality: d.quality,
@@ -137,6 +153,8 @@ export function objectiveDefinition(
       d.providerWindow || (base.spec.measurement && !d.customMeasurement)
         ? undefined
         : d.totalQuery || undefined,
+    labels: d.labels,
+    badInterval: queryBased ? badIntervalFromDraft(d.interval) : undefined,
     source: d.source || undefined,
     queryLanguage: d.queryLanguage || undefined,
     policy: undefined,
@@ -313,6 +331,25 @@ export function ObjectiveCreate({
       setMeasurementAck(false);
     }
   }
+  // Good-minute and throughput are judged from interval-count queries, so they
+  // live in Settings with custom queries and interval judging switched on.
+  function chooseInterval(mode: "errorRate" | "throughput") {
+    try {
+      const current = document();
+      const d = objectiveDraft(current, undefined);
+      setDraft({
+        ...d,
+        customMeasurement: !!current.spec.measurement || d.customMeasurement,
+        interval: { ...d.interval, enabled: true, mode },
+      });
+      setDefinition(current);
+      setText(stringify(current));
+      setMode("settings");
+      invalidate();
+    } catch (e) {
+      setError(message(e));
+    }
+  }
   function setField<K extends keyof Draft>(key: K, value: Draft[K]) {
     setDraft((d) => (d ? { ...d, [key]: value } : d));
     setPlan(null);
@@ -429,7 +466,7 @@ export function ObjectiveCreate({
           <DialogDescription>
             {resource
               ? "Edit the objective, measurement and burn-rate policies, then review the new revision. Measurement changes archive existing evidence and require fresh coverage. Rule delivery follows the telemetry connection policy."
-              : "Define what counts as success, choose a target and window, then review before applying. Use advanced queries or YAML for custom measurements."}
+              : "Choose what to measure and a target, then review before saving. Use Settings or YAML for custom queries. To prepare the SLO with evidence and a separate approval, use Create from a goal instead."}
           </DialogDescription>
         </DialogHeader>
         <div className="dialog-body space-y-5">
@@ -465,6 +502,7 @@ export function ObjectiveCreate({
                     invalidate();
                   }}
                   fixedName={!!resource}
+                  onChooseInterval={chooseInterval}
                   connections={connections}
                   scope={scope}
                   onBusyChange={setBusy}
@@ -509,21 +547,45 @@ export function ObjectiveCreate({
                       ) : null}
                     </div>
                   ) : null}
-                  <BudgetPolicyEditor
-                    value={draft.errorBudgetPolicy}
-                    disabled={busy}
-                    onChange={(value) => setField("errorBudgetPolicy", value)}
-                  />
-                  <QualityPolicyEditor
-                    value={draft.quality}
-                    disabled={busy}
-                    onChange={(value) => setField("quality", value)}
-                  />
-                  <SLOLifecycleSelect
-                    value={draft.lifecycle}
-                    disabled={busy}
-                    onChange={(value) => setField("lifecycle", value)}
-                  />
+                  <details
+                    className="disclosure-panel"
+                    open={
+                      !!resource ||
+                      !!draft.errorBudgetPolicy ||
+                      !!draft.quality ||
+                      !!draft.labels ||
+                      draft.lifecycle !== "committed"
+                    }
+                  >
+                    <summary>
+                      Optional settings: lifecycle, labels, budget response,
+                      quality
+                    </summary>
+                    <div className="space-y-5 pt-3">
+                      <BudgetPolicyEditor
+                        value={draft.errorBudgetPolicy}
+                        disabled={busy}
+                        onChange={(value) =>
+                          setField("errorBudgetPolicy", value)
+                        }
+                      />
+                      <QualityPolicyEditor
+                        value={draft.quality}
+                        disabled={busy}
+                        onChange={(value) => setField("quality", value)}
+                      />
+                      <SLOLifecycleSelect
+                        value={draft.lifecycle}
+                        disabled={busy}
+                        onChange={(value) => setField("lifecycle", value)}
+                      />
+                      <LabelsEditor
+                        value={draft.labels}
+                        disabled={busy}
+                        onChange={(labels) => setField("labels", labels)}
+                      />
+                    </div>
+                  </details>
                   <div className="form-grid">
                     {fields.map((f) => (
                       <div key={f.key}>
@@ -549,7 +611,7 @@ export function ObjectiveCreate({
                         htmlFor="slo-source"
                         label="Metrics connection"
                       >
-                        <select
+                        <NativeSelect
                           id="slo-source"
                           className="h-9 w-full rounded-md border bg-white px-3 text-sm"
                           value={draft.source === "primary" ? "" : draft.source}
@@ -568,7 +630,7 @@ export function ObjectiveCreate({
                                 {c.id} · {providerLabel(c.kind)}
                               </option>
                             ))}
-                        </select>
+                        </NativeSelect>
                       </FormField>
                     </div>
                   </div>
@@ -578,7 +640,7 @@ export function ObjectiveCreate({
                         htmlFor="slo-query-language"
                         label="Query language"
                       >
-                        <select
+                        <NativeSelect
                           id="slo-query-language"
                           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                           value={draft.queryLanguage}
@@ -595,7 +657,7 @@ export function ObjectiveCreate({
                           <option value="googlecloud">
                             Google Cloud Monitoring filter
                           </option>
-                        </select>
+                        </NativeSelect>
                       </FormField>
                       <p className="text-xs text-muted-foreground">
                         Use the query language supported by the selected
@@ -652,6 +714,15 @@ export function ObjectiveCreate({
                       </FormField>
                     </div>
                   </div>
+                  {!draft.providerWindow &&
+                  !measurementLocked &&
+                  ["", "promql"].includes(draft.queryLanguage) ? (
+                    <IntervalJudgingEditor
+                      value={draft.interval}
+                      disabled={busy}
+                      onChange={(value) => setField("interval", value)}
+                    />
+                  ) : null}
                   {draft.providerWindow ? (
                     <div>
                       <FormField
@@ -795,6 +866,12 @@ export function ObjectiveCreate({
                 ? "Keep current definition"
                 : "Apply definition"}
             </Button>
+            <GitProposeButton
+              scope={scope}
+              manifest={plan?.manifest}
+              plan={plan}
+              disabled={busy || (!!plan?.measurementChanged && !measurementAck)}
+            />
           </div>
         )}
       </DialogContent>

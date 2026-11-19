@@ -5,6 +5,7 @@ import json
 import tarfile
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 spec = importlib.util.spec_from_file_location(
@@ -14,6 +15,20 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 VERSION = "v0.1.0-alpha.1"
 COMMIT = "a" * 40
+
+
+def write_archive(raw, name, members, body):
+    if name.endswith(".zip"):
+        with zipfile.ZipFile(raw, "w") as archive:
+            for member in members:
+                archive.writestr(member, body)
+        return
+    with tarfile.open(fileobj=raw, mode="w:gz") as tar:
+        for member in members:
+            entry = tarfile.TarInfo(member)
+            entry.mode = 0o755
+            entry.size = len(body)
+            tar.addfile(entry, io.BytesIO(body))
 
 
 class ReleaseVerificationTests(unittest.TestCase):
@@ -27,14 +42,9 @@ class ReleaseVerificationTests(unittest.TestCase):
             "artifacts": [],
         }
         for target in module.TARGETS:
-            name = f"nines_{VERSION}_{target.replace('/', '_')}.tar.gz"
+            name = module.archive_name(VERSION, target)
             raw = io.BytesIO()
-            with tarfile.open(fileobj=raw, mode="w:gz") as tar:
-                for binary in ["nines", "nines-server", "nines-mcp", "nines-operator"]:
-                    entry = tarfile.TarInfo(binary)
-                    entry.mode = 0o755
-                    entry.size = len(target)
-                    tar.addfile(entry, io.BytesIO(target.encode()))
+            write_archive(raw, name, module.binaries(target), target.encode())
             data = raw.getvalue()
             (root / name).write_bytes(data)
             manifest["artifacts"].append(
@@ -83,6 +93,57 @@ class ReleaseVerificationTests(unittest.TestCase):
             self.checksums(root)
             with self.assertRaisesRegex(ValueError, "nines-operator"):
                 module.verify(root, VERSION, COMMIT)
+
+    def replace_archive(self, root, manifest, target, members):
+        artifact = next(
+            a
+            for a in manifest["artifacts"]
+            if a["file"] == module.archive_name(VERSION, target)
+        )
+        path = root / artifact["file"]
+        raw = io.BytesIO()
+        write_archive(raw, path.name, members, b"x")
+        path.write_bytes(raw.getvalue())
+        artifact["bytes"] = path.stat().st_size
+        artifact["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest()
+        (root / "build.json").write_text(json.dumps(manifest))
+        self.checksums(root)
+
+    def test_platform_inventory(self):
+        self.assertEqual(
+            module.archive_name(VERSION, "windows/arm64"),
+            f"nines_{VERSION}_windows_arm64.zip",
+        )
+        self.assertEqual(
+            module.archive_name(VERSION, "linux/amd64"),
+            f"nines_{VERSION}_linux_amd64.tar.gz",
+        )
+        self.assertNotIn("nines-operator.exe", module.binaries("windows/amd64"))
+        self.assertIn("nines-operator", module.binaries("darwin/arm64"))
+
+    def test_windows_archive_missing_cli_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = self.fixture(root)
+            self.replace_archive(
+                root, manifest, "windows/amd64", ["nines-server.exe", "nines-mcp.exe"]
+            )
+            with self.assertRaisesRegex(ValueError, "nines.exe"):
+                module.verify(root, VERSION, COMMIT)
+
+    def test_windows_drive_and_backslash_paths_rejected(self):
+        for bad in ["C:/nines.exe", "..\\nines.exe"]:
+            with self.subTest(path=bad), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                manifest = self.fixture(root)
+                self.replace_archive(
+                    root,
+                    manifest,
+                    "windows/arm64",
+                    module.binaries("windows/arm64") + [bad],
+                )
+                with self.assertRaisesRegex(ValueError, "unsafe"):
+                    module.verify(root, VERSION, COMMIT)
 
     def test_wrong_version_or_commit_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

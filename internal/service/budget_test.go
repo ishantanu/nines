@@ -70,3 +70,40 @@ func TestBudgetDecisionDoesNotPromoteStaleObservedSuccess(t *testing.T) {
 		t.Fatal(d, err)
 	}
 }
+
+func TestBudgetBandsShowTheAgreedResponseWithoutChangingTheDecisionState(t *testing.T) {
+	s := setup(t)
+	bands := []v1.BudgetBand{{Name: "watch", Below: .5, Response: "Prioritize reliability bugs."}, {Name: "protect", Below: .25, Response: "Halt risky launches."}}
+	c := model.SLO{ID: "api", Target: .99, StepSeconds: 60, WindowSeconds: 60, ErrorBudgetPolicy: &v1.ErrorBudgetPolicy{Owner: "payments-oncall", RunbookURL: "https://example.test/runbooks/api", ReviewBelow: .25, Bands: bands}}
+	usable := v1.MeasurementQuality{State: "usable", ObservedAt: now}
+	for _, tc := range []struct {
+		name  string
+		good  float64
+		state string
+		band  string
+	}{
+		{"healthy", 10000, "proceed", ""},
+		{"watch", 9940, "proceed", "watch"},             // 40% of the budget left
+		{"protect", 9920, "review_required", "protect"}, // 20% left: reviewBelow is separate from bands
+		{"exhausted", 9900, "blocked", "protect"},
+	} {
+		x := engine.Evaluate(c, map[int64]model.Point{now.Unix(): {Time: now, Good: tc.good, Total: 10000}}, now, 60)
+		got := s.budgetFromEvidence(c, x, usable, false)
+		band := ""
+		if got.Band != nil {
+			band = got.Band.Name
+		}
+		if got.State != tc.state || band != tc.band {
+			t.Errorf("%s: state %q band %q, want %q %q", tc.name, got.State, band, tc.state, tc.band)
+		}
+	}
+	// Bands never exist where the decision itself is not made.
+	x := engine.Evaluate(c, map[int64]model.Point{now.Unix(): {Time: now, Good: 9900, Total: 10000}}, now, 60)
+	if got := s.budgetFromEvidence(c, x, v1.MeasurementQuality{State: "limited", ObservedAt: now}, false); got.Band != nil || got.State != "insufficient_evidence" {
+		t.Fatalf("insufficient evidence must not show a band: %+v", got)
+	}
+	c.Lifecycle = v1.LifecycleExperimental
+	if got := s.budgetFromEvidence(c, x, usable, false); got.Band != nil {
+		t.Fatalf("an uncommitted objective must not show a band: %+v", got)
+	}
+}

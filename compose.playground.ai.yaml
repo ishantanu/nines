@@ -5,6 +5,7 @@ x-ai-build: &ai-build
   dockerfile: deploy/playground/ai/Dockerfile
 services:
   ai-sample:
+    image: nines-ai-playground:local
     profiles: [ai]
     build: *ai-build
     ports:
@@ -18,6 +19,7 @@ services:
     volumes:
       - ./deploy/playground/ai/targets.json:/etc/prometheus/ai-targets.json:ro
   ai-setup:
+    image: nines-ai-playground:local
     profiles: [ai]
     build: *ai-build
     command: [setup]
@@ -32,6 +34,7 @@ services:
     environment:
       NINES_PLAYGROUND_TENANTS: ${NINES_PLAYGROUND_TENANTS:-auto}
   ai-verify:
+    image: nines-ai-playground:local
     profiles: [verify]
     build: *ai-build
     command: [verify]

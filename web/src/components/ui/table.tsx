@@ -1,97 +1,97 @@
 import * as React from "react";
+import {
+  Table as AstryxTable,
+  TableBody as AstryxTableBody,
+  TableCell as AstryxTableCell,
+  TableFooter as AstryxTableFooter,
+  TableHeader as AstryxTableHeader,
+  TableHeaderCell as AstryxTableHeaderCell,
+  TableRow as AstryxTableRow,
+} from "@astryxdesign/core/Table";
 import { cn } from "cn";
 
-function Table({ className, ...props }: React.ComponentProps<"table">) {
+// Composable table parts backed by Astryx's children-mode Table.
+type P<T extends keyof React.JSX.IntrinsicElements> = React.ComponentProps<T>;
+
+function Table({ className, children, ...props }: P<"table">) {
   return (
     <div
       data-slot="table-container"
       className="relative w-full overflow-x-auto"
     >
-      <table
+      <AstryxTable
         data-slot="table"
-        className={cn("w-full caption-bottom text-sm", className)}
-        {...props}
-      />
+        className={cn("w-full", className)}
+        {...(props as object)}
+      >
+        {children}
+      </AstryxTable>
     </div>
   );
 }
-
-function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
+function TableHeader({ className, children, ...props }: P<"thead">) {
   return (
-    <thead
+    <AstryxTableHeader
       data-slot="table-header"
-      className={cn("bg-muted [&_tr]:border-b", className)}
-      {...props}
-    />
+      className={className}
+      {...(props as object)}
+    >
+      {children}
+    </AstryxTableHeader>
   );
 }
-
-function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
+function TableBody({ className, children, ...props }: P<"tbody">) {
   return (
-    <tbody
+    <AstryxTableBody
       data-slot="table-body"
-      className={cn("[&_tr:last-child]:border-0", className)}
-      {...props}
-    />
+      className={className}
+      {...(props as object)}
+    >
+      {children}
+    </AstryxTableBody>
   );
 }
-
-function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
+function TableFooter({ className, children, ...props }: P<"tfoot">) {
   return (
-    <tfoot
+    <AstryxTableFooter
       data-slot="table-footer"
-      className={cn(
-        "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
-        className,
-      )}
-      {...props}
-    />
+      className={className}
+      {...(props as object)}
+    >
+      {children}
+    </AstryxTableFooter>
   );
 }
-
-function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
+function TableRow({ className, children, ...props }: P<"tr">) {
   return (
-    <tr
+    <AstryxTableRow
       data-slot="table-row"
-      className={cn(
-        "border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted",
-        className,
-      )}
-      {...props}
-    />
+      className={className}
+      {...(props as object)}
+    >
+      {children}
+    </AstryxTableRow>
   );
 }
-
-function TableHead({ className, ...props }: React.ComponentProps<"th">) {
+function TableHead({ className, ...props }: P<"th">) {
   return (
-    <th
+    <AstryxTableHeaderCell
       data-slot="table-head"
-      className={cn(
-        "h-10 px-3 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        className,
-      )}
-      {...props}
+      className={className}
+      {...(props as object)}
     />
   );
 }
-
-function TableCell({ className, ...props }: React.ComponentProps<"td">) {
+function TableCell({ className, ...props }: P<"td">) {
   return (
-    <td
+    <AstryxTableCell
       data-slot="table-cell"
-      className={cn(
-        "px-3 py-3 align-middle text-[13px] whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
-        className,
-      )}
-      {...props}
+      className={className}
+      {...(props as object)}
     />
   );
 }
-
-function TableCaption({
-  className,
-  ...props
-}: React.ComponentProps<"caption">) {
+function TableCaption({ className, ...props }: P<"caption">) {
   return (
     <caption
       data-slot="table-caption"

@@ -28,8 +28,13 @@ func TestTemplateSelectionProtocolContracts(t *testing.T) {
 	if !report.Complete || report.Passed != 45 || report.Failed != 0 || report.Acceptance.Status != "fixture_only" || report.Acceptance.RequiredCases != 45 || report.Acceptance.ExecutedCases != 45 || report.Acceptance.ModelChecksFailed != 0 || report.Acceptance.GuardrailChecksFailed != 0 {
 		t.Fatalf("invalid fixture acceptance: %+v", report.Acceptance)
 	}
-	if len(report.SuiteSHA256) != 64 || len(report.CatalogDigest) != 64 || report.Skill == nil || report.Skill.Version != "0.4.0" || len(report.Skill.Digest) != 64 {
+	if len(report.SuiteSHA256) != 64 || len(report.CatalogDigest) != 64 || report.Skill == nil || report.Skill.Version != "0.6.0" || len(report.Skill.Digest) != 64 {
 		t.Fatal("missing pinned evaluation contracts")
+	}
+	for _, result := range report.Results {
+		if len(result.ToolSequence) == 0 || len(result.ToolSequence) > 16 || len(result.ToolSequence) > result.ToolAttempts {
+			t.Fatalf("missing selection tool diagnostics: %+v", result)
+		}
 	}
 	again := selectionReport("fixture", "")
 	if again.SuiteSHA256 != report.SuiteSHA256 {
@@ -175,7 +180,7 @@ func TestLiveSelectionTransportAndAcceptanceStatus(t *testing.T) {
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls.Add(1)
-		workflowToolStream(w, "chat-completions", "clarify", "ask_user", `{"question":"Which metric instrumentation can you supply?"}`)
+		workflowToolStream(w, "chat-completions", "clarify", "ask_user", `{"question":"Which metric instrumentation can you supply?","fields":["metric"]}`)
 	}))
 	defer server.Close()
 	env := map[string]string{"INTENT_MODEL_PROVIDER": "custom", "INTENT_MODEL_MODEL": "scripted-control", "INTENT_MODEL_ENDPOINT": server.URL + "/v1/chat/completions"}

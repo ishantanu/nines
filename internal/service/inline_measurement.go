@@ -25,7 +25,7 @@ func (s *Service) CompileMeasurement(ctx context.Context, manifest v1.ServiceLev
 		return out, err
 	}
 	source := s.SourceFingerprint(c.Source)
-	evidence, err := s.DiscoverTelemetry(ctx, sourceID(c.Source), c.Measurement.Metric, c.Measurement.Labels)
+	evidence, err := s.discoverMeasurement(ctx, sourceID(c.Source), c.Measurement.Metric, c.Measurement.EventMetric, c.Measurement.Labels)
 	if err != nil {
 		return out, err
 	}

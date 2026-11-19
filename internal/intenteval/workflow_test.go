@@ -32,6 +32,9 @@ func TestWorkflowCaseSelection(t *testing.T) {
 		t.Fatalf("filtered report: %+v", report)
 	}
 	for _, result := range report.Results {
+		if result.ModelCalls == 0 || result.ToolAttempts == 0 || len(result.ToolSequence) == 0 || len(result.ToolSequence) > 16 || result.ToolSequence[len(result.ToolSequence)-1] != "finish_proposal" {
+			t.Fatalf("missing workflow tool diagnostics: %+v", result)
+		}
 		if result.Case != report.SelectedCase {
 			t.Fatalf("unselected case ran: %s", result.Case)
 		}

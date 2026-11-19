@@ -281,3 +281,34 @@ test("an administrator can return from the console to an explicitly authorized w
   );
   expect(window.location.pathname).toBe("/tenants/alpha/home");
 });
+
+test("navigation collapse retains accessible destinations and remembers the preference", async () => {
+  await render();
+  await until(() => !!host.querySelector('[aria-label="Collapse sidebar"]'));
+  const button = host.querySelector<HTMLButtonElement>(
+    '[aria-label="Collapse sidebar"]',
+  )!;
+  await act(async () => button.click());
+  expect(
+    host.querySelector(".portal-shell")?.getAttribute("data-sidebar-collapsed"),
+  ).toBe("true");
+  expect(localStorage.getItem("nines.navigation.collapsed")).toBe("true");
+  const link = host.querySelector<HTMLAnchorElement>(
+    'a[href="/tenants/alpha/critical-user-journeys"]',
+  )!;
+  // The collapsed rail is icon-only, so the destination keeps its accessible name.
+  expect(link.getAttribute("aria-label")).toBe("Critical user journeys");
+  await act(async () => link.click());
+  expect(window.location.pathname).toBe(workspacePath("alpha", "journeys"));
+  expect(host.querySelector('[aria-label="Expand sidebar"]')).not.toBeNull();
+  await act(async () => root.unmount());
+  root = createRoot(host);
+  await render();
+  await until(() => !!host.querySelector('[aria-label="Expand sidebar"]'));
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="Expand sidebar"]')!
+      .click(),
+  );
+  expect(localStorage.getItem("nines.navigation.collapsed")).toBe("false");
+});

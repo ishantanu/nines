@@ -138,6 +138,7 @@ type Result struct {
 	Checks               []EvaluationCheck `json:"checks,omitempty"`
 	ModelCalls           int               `json:"modelCalls,omitempty"`
 	ToolAttempts         int               `json:"toolAttempts,omitempty"`
+	ToolSequence         []string          `json:"toolSequence,omitempty"`
 	WorkflowError        string            `json:"workflowError,omitempty"`
 	Case                 string            `json:"case"`
 	Provider             string            `json:"provider"`

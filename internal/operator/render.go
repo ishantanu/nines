@@ -189,6 +189,13 @@ func schemaFor(t reflect.Type) map[string]any {
 			if t == reflect.TypeOf(domain.BurnRatePolicy{}) && name == "minEvents" {
 				properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 1e18}
 			}
+			if t == reflect.TypeOf(domain.SLOSpec{}) && name == "labels" {
+				properties[name] = map[string]any{"type": "object", "maxProperties": model.MaxSLOLabels, "additionalProperties": map[string]any{"type": "string", "minLength": 1, "maxLength": model.MaxLabelValueLen}}
+			}
+			if t == reflect.TypeOf(domain.BurnRatePolicy{}) && name == "confidence" {
+				// Zero turns it off; the server rejects values between 0 and 0.5.
+				properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 0.9999}
+			}
 			if !strings.Contains(opts, "omitempty") {
 				required = append(required, name)
 			}

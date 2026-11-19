@@ -66,7 +66,9 @@ async function open(role: "owner" | "viewer" = "owner") {
 test("visual edits invalidate a plan and saving uses the freshly reviewed revision", async () => {
   await open();
   await click("Validate and plan");
-  expect(button("Apply reviewed definition").disabled).toBe(false);
+  expect(
+    button("Apply reviewed definition").getAttribute("aria-disabled"),
+  ).not.toBe("true");
   const move = document.querySelector<HTMLButtonElement>(
     '[aria-label="Move service api"]',
   )!;
@@ -79,7 +81,9 @@ test("visual edits invalidate a plan and saving uses the freshly reviewed revisi
       }),
     ),
   );
-  expect(button("Apply reviewed definition").disabled).toBe(true);
+  expect(
+    button("Apply reviewed definition").getAttribute("aria-disabled"),
+  ).toBe("true");
   expect(calls.filter((c) => c.path.endsWith("/apply"))).toHaveLength(0);
   await click("Validate and plan");
   await click("Apply reviewed definition");
@@ -92,6 +96,8 @@ test("visual edits invalidate a plan and saving uses the freshly reviewed revisi
 test("a viewer can plan the same draft but cannot save it", async () => {
   await open("viewer");
   await click("Validate and plan");
-  expect(button("Owner or editor required").disabled).toBe(true);
+  expect(button("Owner or editor required").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
   expect(calls.filter((c) => c.path.endsWith("/apply"))).toHaveLength(0);
 });

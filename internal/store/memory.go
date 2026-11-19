@@ -11,17 +11,18 @@ import (
 )
 
 type Memory struct {
-	visual     map[string]v1.VisualEvaluation
-	tombstones map[string]v1.RetirementReceipt
-	batches    map[string]definitionReceipt
-	archives   map[string]map[int64]SLOArchive
-	mu         sync.Mutex
-	topology   map[string][]model.TopologyRevision
-	journeys   map[string][]model.JourneyRevision
-	receipts   map[string]journeyReceipt
-	runs       map[string]map[string]model.JourneyRun
-	records    map[string]model.Record
-	deliveries map[string]model.Delivery
+	collectionJobs map[string]CollectionJob
+	visual         map[string]v1.VisualEvaluation
+	tombstones     map[string]v1.RetirementReceipt
+	batches        map[string]definitionReceipt
+	archives       map[string]map[int64]SLOArchive
+	mu             sync.Mutex
+	topology       map[string][]model.TopologyRevision
+	journeys       map[string][]model.JourneyRevision
+	receipts       map[string]journeyReceipt
+	runs           map[string]map[string]model.JourneyRun
+	records        map[string]model.Record
+	deliveries     map[string]model.Delivery
 }
 
 func NewMemory() *Memory {
@@ -73,6 +74,9 @@ func (m *Memory) Update(ctx context.Context, id string, fn func(*model.Record) e
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	if err := m.checkCollectionLease(ctx, id); err != nil {
+		return err
+	}
 	r, ok := m.records[id]
 	if !ok {
 		return model.ErrNotFound
@@ -82,6 +86,9 @@ func (m *Memory) Update(ctx context.Context, id string, fn func(*model.Record) e
 		return err
 	}
 	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := m.checkCollectionLease(ctx, id); err != nil {
 		return err
 	}
 	if model.ConfigRevision(next.SLO) != model.ConfigRevision(r.SLO) {

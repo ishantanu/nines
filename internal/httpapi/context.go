@@ -151,3 +151,32 @@ func (a *Server) resourceContext(w http.ResponseWriter, r *http.Request, journey
 	}
 	write(w, 200, result)
 }
+
+func (a *Server) intentContext(w http.ResponseWriter, r *http.Request) {
+	q, err := parseContextQuery(r, "service", "source", "project", "journey", "journeyRevision", "limit", "cursor")
+	if err != nil {
+		contextError(w, err)
+		return
+	}
+	in := v1.IntentContextInput{Service: q["service"], Source: q["source"], Project: q["project"], Journey: q["journey"], Cursor: q["cursor"]}
+	in.Limit, err = pageLimit(q["limit"])
+	if err != nil {
+		contextError(w, err)
+		return
+	}
+	if q["journeyRevision"] != "" {
+		in.JourneyRevision, err = strconv.ParseInt(q["journeyRevision"], 10, 64)
+		if err != nil || in.JourneyRevision < 1 {
+			contextError(w, model.Invalid("journeyRevision must be positive"))
+			return
+		}
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+	defer cancel()
+	result, err := a.Service.IntentContext(ctx, in)
+	if err != nil {
+		contextError(w, err)
+		return
+	}
+	write(w, 200, result)
+}

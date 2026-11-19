@@ -101,11 +101,13 @@ it("prerenders safe readable guides with anchors, tables and accessible code con
   const markdown =
     '# Latency SLOs\n\n## Ratios\n\n| Good | Total |\n| --- | --- |\n| fast | all |\n\n```promql\ngood / total\n```\n\n[Guide](measurements.md)\n\n<script>alert("unsafe")</script>\n';
   const html = documentationHTML(template, page, markdown);
-  expect(html).toContain('<h1 id="latency-slos">Latency SLOs</h1>');
-  expect(html).toContain('<h2 id="ratios">Ratios</h2>');
+  expect(html).toMatch(/<h1 [^>]*id="latency-slos"[^>]*>Latency SLOs<\/h1>/);
+  expect(html).toMatch(
+    /<h2 [^>]*class="astryx-heading[^"]*"[^>]*id="ratios"[^>]*>Ratios<\/h2>|<h2 [^>]*id="ratios"[^>]*class="astryx-heading[^"]*"[^>]*>Ratios<\/h2>/,
+  );
   expect(html).toContain('aria-label="Documentation chapters"');
   expect(html).toContain('aria-label="Copy promql code"');
-  expect(html).toContain("<table>");
+  expect(html).toContain('<table class="astryx-table');
   expect(html).toContain('href="../../docs/measurements/"');
   expect(html).toContain('src="../../assets/site.js"');
   expect(html).toContain('href="../../assets/site.css"');
@@ -179,6 +181,6 @@ it("serves the chart screenshot locally with lazy loading and reserved dimension
     "# SLO charts\n\n![Synthetic performance charts](brand/nines-performance.jpg)",
   );
   expect(markup).toMatch(
-    /<img[^>]*src="\.\.\/\.\.\/docs\/assets\/nines-performance\.jpg"[^>]*loading="lazy"[^>]*width="1280"[^>]*height="1591"/,
+    /<img[^>]*src="\.\.\/\.\.\/docs\/assets\/nines-performance\.jpg"[^>]*loading="lazy"[^>]*width="1280"[^>]*height="720"/,
   );
 });

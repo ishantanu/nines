@@ -51,7 +51,7 @@ function AuditDetail({
           href={href}
           onClick={(e) => followLink(e, href)}
         >
-          Open SLO intent
+          Open goal
         </a>
       </div>
       <dl className="grid gap-3 text-sm sm:grid-cols-2">

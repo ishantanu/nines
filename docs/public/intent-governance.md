@@ -8,7 +8,7 @@ Intent workflows prepare proposals. They do not authorize production changes.
 
 ## Understand a recommendation before approving it
 
-- Use **SLO intents**, open a prepared conversation and select **Review changes**. The review freezes the following into the change-set digest:
+- Use **Create from a goal**, open a prepared conversation and select **Review changes**. The review freezes the following into the change-set digest:
 
 * The goal, target, window, selected measurement revision and source fingerprint.
 * Before-and-after target, window, alert policy and critical user journey changes, with explanations of their implications.

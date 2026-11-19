@@ -225,3 +225,12 @@ Use a code-ink surface, high-contrast text, a subtle toolbar rule, and horizonta
 - **Don't** use rounded-card styling, decorative gradients, or shadow-heavy elevation.
 - **Don't** use accent colors as decoration or rely on color alone to communicate status.
 - **Don't** extend this public-site visual system into the logged-in portal without explicit approval.
+
+## Astryx everywhere
+
+Astryx (`@astryxdesign/core`) is the single component system for the portal, the landing page and the documentation pages, always inside the shared `ninesTheme` with self-hosted Figtree. This supersedes the earlier public-site visual system described above wherever they differ.
+
+- **Portal and landing page.** Use the adapters in `web/src/components/ui` (Button, Tabs, Card, Badge, Table, Dialog, inputs). The landing page (`web/site/App.tsx`) is wrapped in `Theme`.
+- **Documentation pages.** `web/site/docs/ServerDocument.tsx` renders markdown with Astryx `Heading`, `Link`, `Code`, `Blockquote`, `Divider` and the Table adapter, and `DocsLayout` uses the Button adapter, all inside `Theme`. This is prerendered static HTML: it adds no client script, so the 16 KB documentation script budget (`documentation-script-budget` in `vite.site.config.ts`) is unaffected. Astryx markup is larger than plain HTML, so the chapter-cache guard is 3 MB raw (about 350 KB compressed).
+- **New markdown elements.** Map them in `ServerDocument.tsx` to an Astryx component. Add custom CSS only for layout, such as link flow or table wrapping, never to restyle a control.
+- **Charts.** Astryx has no chart components, so the custom SVG charts stay and use Astryx tokens.

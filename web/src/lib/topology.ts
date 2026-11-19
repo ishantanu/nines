@@ -1,4 +1,5 @@
 import { RESOURCE_API_VERSION } from "./definitions";
+import type { MeasurementKind } from "./measurement";
 export const bindingKind = "MeasurementBinding";
 export const mapKind = "ServiceDependencyMap";
 export interface TopologyItem {
@@ -112,9 +113,11 @@ export interface BindingManifest {
     displayName: string;
     service: string;
     source: string;
-    measurement: "availability" | "latency";
+    measurement: MeasurementKind;
     countFrom?: "counter" | "histogram";
     metric: string;
+    /** Sessions only: counter of sessions that experienced the bad event. */
+    eventMetric?: string;
     labels: Record<string, string>;
     successLabels?: Record<string, string>;
     thresholdSeconds?: number;

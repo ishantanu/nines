@@ -1,0 +1,26 @@
+{
+  "selectedCase": "availability-reviewed-apply",
+  "suite": "workflow",
+  "apiVersion": "nines.dev/v1alpha1",
+  "kind": "IntentEvaluationReport",
+  "mode": "live",
+  "suiteSHA256": "d8cb713746446779dab747e8f68339fbb7cc8c14a9093e934c535f43434ee229",
+  "generatedAt": "2026-11-02T07:33:30.01454Z",
+  "complete": true,
+  "runtimeVersion": "Ollama 0.40.11; Metal; context 8192; parallel 1; warm",
+  "results": [
+    {
+      "workflowError": "measurement_unavailable",
+      "case": "availability-reviewed-apply",
+      "provider": "ollama",
+      "model": "qwen3:4b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 60346
+    }
+  ],
+  "passed": 0,
+  "failed": 1,
+  "skipped": []
+}

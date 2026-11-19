@@ -242,14 +242,18 @@ func BindingQueries(b model.MeasurementBinding) (good, total string) {
 		population[k] = v
 	}
 	metric := s.Metric
-	if s.Measurement == "latency" || s.CountFrom == "histogram" {
+	if model.ThresholdMeasurement(s.Measurement) || s.CountFrom == "histogram" {
 		metric += "_count"
 	}
 	count := func(name string, labels map[string]string) string {
 		return fmt.Sprintf("sum(increase(%s[%ds]))", prometheus.Selector(name, labels), s.StepSeconds)
 	}
 	total = count(metric, population)
-	if s.Measurement == "latency" {
+	if s.Measurement == "sessions" {
+		good = "(" + total + " - " + count(s.EventMetric, population) + ")"
+		return
+	}
+	if model.ThresholdMeasurement(s.Measurement) {
 		population["le"] = strconv.FormatFloat(*s.ThresholdSeconds, 'g', -1, 64)
 		good = count(s.Metric+"_bucket", population)
 	} else {
@@ -265,15 +269,60 @@ func BindingQueries(b model.MeasurementBinding) (good, total string) {
 // the duration to the evaluator instead of embedding a short interval.
 func BindingWindow(b model.MeasurementBinding) *v1.ProviderWindow {
 	s := b.Spec
-	return model.MeasurementWindow(v1.MeasurementSpec{Type: s.Measurement, Metric: s.Metric, Labels: s.Labels, SuccessLabels: s.SuccessLabels, CountFrom: s.CountFrom, ThresholdSeconds: s.ThresholdSeconds, ScrapeIntervalSeconds: s.ScrapeIntervalSeconds, ObservationPoint: s.ObservationPoint})
+	return model.MeasurementWindow(v1.MeasurementSpec{Type: s.Measurement, Metric: s.Metric, EventMetric: s.EventMetric, Labels: s.Labels, SuccessLabels: s.SuccessLabels, CountFrom: s.CountFrom, ThresholdSeconds: s.ThresholdSeconds, ScrapeIntervalSeconds: s.ScrapeIntervalSeconds, ObservationPoint: s.ObservationPoint})
 }
+
+// discoverMeasurement discovers the measurement's metric and, for a session
+// measurement, its event counter too, returning both as one body of evidence.
+func (s *Service) discoverMeasurement(ctx context.Context, source, metric, eventMetric string, labels map[string]string) (v1.TelemetryDiscovery, error) {
+	d, err := s.DiscoverTelemetry(ctx, source, metric, labels)
+	if err != nil || eventMetric == "" {
+		return d, err
+	}
+	e, err := s.DiscoverTelemetry(ctx, source, eventMetric, labels)
+	if err != nil {
+		return d, err
+	}
+	d.Truncated = d.Truncated || e.Truncated
+	d.Metadata = append(d.Metadata, e.Metadata...)
+	d.Series = append(d.Series, e.Series...)
+	d.Fingerprint = model.DefinitionDigest(struct{ A, B string }{d.Fingerprint, e.Fingerprint})
+	return d, nil
+}
+
+// metadataExpected is the number of metric metadata entries a measurement needs.
+func metadataExpected(measurement string) int {
+	if measurement == "sessions" {
+		return 2
+	}
+	return 1
+}
+
 func verifyBindingEvidence(b model.MeasurementBinding, d v1.TelemetryDiscovery) error {
+	if b.Spec.Measurement == "sessions" {
+		if d.Truncated || len(d.Series) == 0 || len(d.Metadata) != 2 {
+			return model.Invalid("sessions compilation requires unambiguous metadata and nonempty, untruncated series for both the session counter and the event counter")
+		}
+		for _, m := range d.Metadata {
+			if m.Type != "counter" {
+				return model.Invalid("sessions requires counter metadata for both the session counter and the event counter")
+			}
+		}
+		seen := map[string]bool{}
+		for _, series := range d.Series {
+			seen[series["__name__"]] = true
+		}
+		if !seen[b.Spec.Metric] || !seen[b.Spec.EventMetric] {
+			return model.Invalid("both the session counter and the event counter must have series for the population; export the event counter at zero before its first event so a missing series is never mistaken for no failures")
+		}
+		return nil
+	}
 	if d.Truncated || len(d.Series) == 0 || len(d.Metadata) != 1 {
 		return model.Invalid("compilation requires one unambiguous metadata type and nonempty, untruncated series evidence; refine labels or fix instrumentation")
 	}
 	meta := d.Metadata[0]
 	s := b.Spec
-	if s.Measurement == "availability" {
+	if model.RatioMeasurement(s.Measurement) {
 		expectedType := "counter"
 		countMetric := s.Metric
 		if s.CountFrom == "histogram" {
@@ -281,7 +330,7 @@ func verifyBindingEvidence(b model.MeasurementBinding, d v1.TelemetryDiscovery) 
 			countMetric += "_count"
 		}
 		if meta.Type != expectedType {
-			return model.Invalid("availability countFrom requires %s metadata", expectedType)
+			return model.Invalid("%s countFrom requires %s metadata", s.Measurement, expectedType)
 		}
 		success := false
 		for _, series := range d.Series {
@@ -372,7 +421,7 @@ func (s *Service) CompileBinding(ctx context.Context, id string, in v1.CompileBi
 	if err = def.Validate(); err != nil {
 		return out, err
 	}
-	out.Evidence, err = s.DiscoverTelemetry(ctx, b.Spec.Source, b.Spec.Metric, b.Spec.Labels)
+	out.Evidence, err = s.discoverMeasurement(ctx, b.Spec.Source, b.Spec.Metric, b.Spec.EventMetric, b.Spec.Labels)
 	if err != nil {
 		return out, err
 	}
@@ -425,6 +474,57 @@ func (s *Service) validateBindingReference(ctx context.Context, c model.SLO) err
 	}
 	return nil
 }
+
+// DependencyComposition checks each committed availability SLO in a dependency
+// map against the ceiling its critical dependencies' committed promises allow.
+// It reads only stored definitions: no provider call, model call or write.
+func (s *Service) DependencyComposition(ctx context.Context, id string) (v1.DependencyComposition, error) {
+	out := v1.DependencyComposition{APIVersion: v1.APIVersion, Tenant: s.TenantID, ID: id, ObservedAt: s.Now().UTC().Truncate(time.Second), Checks: []v1.CompositionCheck{}, Limitations: append([]string{}, model.CompositionLimitations...)}
+	r, err := s.ReadTopology(ctx, v1.DependencyMapKind, id, 0)
+	if err != nil {
+		return out, err
+	}
+	out.Revision = r.Revision
+	var g model.ServiceDependencyMap
+	if err = json.Unmarshal(r.Manifest, &g); err != nil {
+		return out, err
+	}
+	if err = g.Validate(); err != nil {
+		return out, err
+	}
+	facts := map[string][]model.AvailabilityFact{}
+	for _, n := range g.Spec.Services {
+		facts[n.Name] = []model.AvailabilityFact{}
+		for _, ref := range n.SLORefs {
+			rec, err := s.Store.Read(ctx, ref)
+			if errors.Is(err, model.ErrNotFound) {
+				out.Limitations = append(out.Limitations, "SLO "+ref+" is referenced by the map but was not found; it is ignored.")
+				continue
+			}
+			if err != nil {
+				return out, err
+			}
+			slo := rec.SLO
+			if slo.Service != n.Name {
+				out.Limitations = append(out.Limitations, "SLO "+ref+" belongs to a different service than the map assigns; it is ignored.")
+				continue
+			}
+			if slo.Retirement != nil || slo.Lifecycle.Effective() != v1.LifecycleCommitted {
+				continue
+			}
+			if !model.IsAvailabilitySLO(slo) {
+				if slo.Measurement == nil && slo.Intent == nil {
+					out.Limitations = append(out.Limitations, "SLO "+slo.ID+" is defined by custom queries, so it cannot be classified as availability and is ignored. Declare spec.measurement.type: availability to include it.")
+				}
+				continue
+			}
+			facts[n.Name] = append(facts[n.Name], model.AvailabilityFact{SLOID: slo.ID, Target: slo.Target})
+		}
+	}
+	out.Checks = model.ComposeAvailability(g.Spec.Dependencies, facts)
+	return out, nil
+}
+
 func (s *Service) DependencyView(ctx context.Context, id string, expected int64) (v1.DependencyView, error) {
 	out := v1.DependencyView{APIVersion: v1.APIVersion, Tenant: s.TenantID, ID: id, ObservedAt: s.Now().UTC().Truncate(time.Second), Nodes: []v1.DependencyNode{}, Edges: []v1.DependencyEdge{}, ObservationState: "not_configured", Warnings: []string{"Arrows run from caller to dependency. Component SLOs and dependency edges do not measure end-to-end journey success or establish causality."}}
 	r, err := s.ReadTopology(ctx, v1.DependencyMapKind, id, 0)

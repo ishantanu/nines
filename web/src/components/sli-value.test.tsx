@@ -77,7 +77,7 @@ test("a continuing alert remains visible even when the measurement window is inc
   expect(html).toContain("99.950% SLI");
   expect(html).toContain("Partial window");
 });
-test("objective rows show attainment and independent alert state", () => {
+test("objective cards show attainment and independent alert state", () => {
   const html = renderToStaticMarkup(
     <Objectives
       items={[objective(snapshot)]}
@@ -86,7 +86,7 @@ test("objective rows show attainment and independent alert state", () => {
       onJourney={() => {}}
     />,
   );
-  expect(html).toContain("SLI / SLO target");
+  expect(html).toContain("99.900% target");
   expect(html).toContain("99.950% SLI");
   expect(html).toContain("Based on observed data");
   expect(html).toContain("No active alerts");

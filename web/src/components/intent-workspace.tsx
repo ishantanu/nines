@@ -1,3 +1,6 @@
+import { IntentUsagePanel } from "./intent-usage";
+import { isThresholdKind } from "@/lib/measurement";
+import { TextShimmer } from "./ui/notchset/text-shimmer";
 import { MeasurementLabels } from "./measurement-labels";
 import { SystemOneAdvice, SystemOneConsent } from "./system-one-assessment";
 import { IntentOutcomePanel } from "./intent-outcome";
@@ -423,7 +426,11 @@ export function IntentWorkspace({
       <TabsList>
         <TabsTrigger value="conversations">Conversations</TabsTrigger>
         <TabsTrigger value="form">Definition form</TabsTrigger>
+        <TabsTrigger value="progress">Workflow progress</TabsTrigger>
       </TabsList>
+      <TabsContent value="progress">
+        <IntentUsagePanel scope={scope} />
+      </TabsContent>
       <TabsContent value="form">
         <IntentAuthoring
           scope={scope}
@@ -515,7 +522,7 @@ export function IntentWorkspace({
         {createOpen ? (
           <Card>
             <CardHeader>
-              <CardTitle>New intent conversation</CardTitle>
+              <CardTitle>New goal conversation</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Fix the service and eligible population before asking the agent
                 to prepare a measurement. Use the definition form to provide a
@@ -609,8 +616,9 @@ export function IntentWorkspace({
                   ))}
                   {running ? (
                     <p role="status" className="text-sm text-muted-foreground">
-                      Preparing evidence · {run?.steps.length ?? 0} completed
-                      tools · {run?.modelCalls ?? 0} model calls
+                      <TextShimmer>Preparing evidence</TextShimmer> ·{" "}
+                      {run?.steps.length ?? 0} completed tools ·{" "}
+                      {run?.modelCalls ?? 0} model calls
                       {run?.progress ? (
                         <IntentProgress progress={run.progress} />
                       ) : null}
@@ -621,9 +629,7 @@ export function IntentWorkspace({
                   className="shrink-0 space-y-2 overflow-y-auto border-t p-3 lg:max-h-[65%]"
                   data-replay-block
                 >
-                  <Label htmlFor="intent-reply">
-                    Clarification or revised goal
-                  </Label>
+                  <Label htmlFor="intent-reply">Clarification</Label>
                   <Textarea
                     id="intent-reply"
                     className="h-12 min-h-12 resize-none"
@@ -633,6 +639,11 @@ export function IntentWorkspace({
                     disabled={!writable || busy || running}
                     onChange={(e) => setReply(e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Replies add context while keeping typed values. Use the
+                    definition editor to change the target, window or
+                    measurement. Previous confirmation must be repeated.
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
@@ -650,6 +661,7 @@ export function IntentWorkspace({
                             id: crypto.randomUUID(),
                             expectedVersion: value.version,
                             text: reply,
+                            preserveGoal: Boolean(value.goal),
                           });
                           setReply("");
                         })
@@ -709,7 +721,7 @@ export function IntentWorkspace({
                             value="model"
                             disabled={!caps?.modelEnabled}
                           >
-                            Model-directed agent
+                            Model-directed agent (experimental)
                           </SelectItem>
                         </SelectContent>
                       </Select>
@@ -939,7 +951,7 @@ export function IntentWorkspace({
                         </p>
                         <p>{c.definition.spec.observationPoint}</p>
                         <div className="break-all text-xs text-muted-foreground">
-                          {c.definition.spec.measurement === "latency" ? (
+                          {isThresholdKind(c.definition.spec.measurement) ? (
                             `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
                           ) : (
                             <MeasurementLabels
@@ -1061,7 +1073,7 @@ export function IntentWorkspace({
                 {value.changeSet ? (
                   <section
                     className="space-y-3 rounded-md border p-3"
-                    aria-label="Reviewed intent changes"
+                    aria-label="Reviewed goal changes"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">Change set</p>
@@ -1207,7 +1219,7 @@ export function IntentWorkspace({
                       </summary>
                       <dl className="mt-2 space-y-2 break-all font-mono">
                         <div>
-                          <dt>Intent digest</dt>
+                          <dt>Goal digest</dt>
                           <dd>
                             {value.backtest.intentDigest ?? "Unavailable"}
                           </dd>
@@ -1299,8 +1311,9 @@ export function IntentWorkspace({
         ) : !createOpen ? (
           <Card>
             <CardContent className="p-8 text-center text-sm text-muted-foreground">
-              Start a conversation to clarify a reliability goal, or use the
-              definition form to prepare a typed intent.
+              Start a conversation to prepare an SLO from a goal step by step,
+              with or without a model, or use the Definition form to write the
+              goal directly.
             </CardContent>
           </Card>
         ) : null}

@@ -56,7 +56,6 @@ nines plan -f examples/request-success.slo.yaml --context production --agent
   - Neither an observed percentage nor a frozen proposal-time decision is current release permission.
 - The read-only `verify_intent_changes` tool also returns the last saved post-change observation, including rule activation/output, quality, measured SLI and review/rollback guidance. It makes no provider call. Approval, corrective-work exceptions and rollback remain human-controlled. See [agent change safety](intent-governance.md#action-time-safety-checks).
 
-
 ## Resume an intent workflow
 
 - Call read-only `get_intent_workflow_status` with the saved conversation `id` for the next operation, exact version/digests, human-review gate and recorded runtime outcome.
@@ -70,3 +69,27 @@ nines plan -f examples/request-success.slo.yaml --context production --agent
 - `draft_native_slo_import`: `source`, `nativeID`, new Nines `name`, `project` and `service`; returns experimental YAML and limitations. Does not save, adopt or modify vendor resources. Review through `plan_slo` before separately authorized application.
 
 All three tools are read-only and available without enabling write tools. See [supported profiles and bounds](provider-adapters.md#native-results-and-reviewed-import).
+
+### Intent context
+
+- `intent_context` gathers bounded saved SLO evidence using exact `service`, `source` and `project` IDs, plus optional `journey` and positive `journeyRevision`.
+- It is read-only and available with writes disabled. It makes no upstream telemetry or model requests, cannot select credentials or endpoints, and grants no confirmation or approval.
+- Follow `nextCursor` using the same scope. Inventory absence, adapter capability and measurement quality are distinct facts. See [intent context](intents.md#gather-service-context-without-a-model).
+
+### Intent measurement candidates
+
+- `discover_intent_candidates` accepts the typed candidate request: exact service/source/project, explicit population filters and optional literal prefix, up to three metrics, category, outcome and unit-bearing threshold.
+- It is available with writes disabled. `readOnlyHint` is true and `openWorldHint` is true because it explicitly reads a configured upstream provider. Tenant, credentials and endpoints remain server-configured.
+- Inspect structured capability, failure and truncation states. Recipe references and metric presence cannot confirm semantics or approve changes. See [bounds and examples](intents.md#discover-measurement-candidates).
+
+### Intent evidence
+
+- Read-only `prepare_intent_evidence` accepts a complete inline intent under `plan`, `expectedRevision`, optional exact digest pins, an optional historical range and up to two explicit alternatives. Missing pins capture current provenance without validating older receipts.
+- `readOnlyHint` and `openWorldHint` are true: this operation explicitly queries configured providers. It is available with writes disabled. Upstream credentials, endpoints and Nines tenant cannot be supplied through arguments.
+- Inspect structured unsupported/partial states and quality/freshness gaps. The tool does not approve measurements, choose targets, apply resources or verify delivered alerts. See [bounds and examples](intents.md#inspect-evidence-and-compare-explicit-choices).
+
+### Attach conversation evidence
+
+- With writes enabled, `record_intent_evidence` accepts `conversationId` and an `input` containing the exact `expectedVersion`, `intentDigest` and `readTelemetry: true`. Optional history and explicit alternatives use the evidence request fields above.
+- It reads the configured telemetry provider and saves an audited receipt. Its annotations are `readOnlyHint: false`, `openWorldHint: true`. Tenant, routes, credentials and report contents cannot be supplied by the agent.
+- A ready inline measurement must already have human confirmation. Frozen recommendations cannot be refreshed; their approval digest includes the saved receipt. This tool never confirms, approves or applies changes. See [the receipt workflow](intents.md#attach-evidence-to-a-reviewed-proposal).

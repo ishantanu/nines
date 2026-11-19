@@ -15,5 +15,29 @@
     "sha256": "a79aae0c0f21990d9d963bb3c5a79cdcea9a46f8523ba55c58d7fe776b6ebc84",
     "reviewNote": "Fixed upstream repository notice; repository package.json is 2.3.7 and the npm 2.3.8 gitHead is not reachable. Maintainer review required.",
     "sourceVersion": "2.3.7"
+  },
+  {
+    "repository": "https://github.com/facebook/stylex",
+    "version": "0.19.2",
+    "file": "licenses/stylex.LICENSE",
+    "sourceURL": "https://raw.githubusercontent.com/facebook/stylex/eeac27796dedf68dcd515093613de1b252f132b6/LICENSE",
+    "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+    "reviewNote": "Upstream repository LICENSE at the pinned commit; the published npm package ships no license file. Maintainer review required."
+  },
+  {
+    "repository": "https://github.com/meta/flow",
+    "version": "0.340.0",
+    "file": "licenses/flow.LICENSE",
+    "sourceURL": "https://raw.githubusercontent.com/meta/flow/408b7e731919074dc5ef57dea3a2453d216bb046/LICENSE",
+    "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+    "reviewNote": "Upstream repository LICENSE at the pinned commit; the published npm package ships no license file. Maintainer review required."
+  },
+  {
+    "repository": "https://github.com/jensyt/imurmurhash-js",
+    "version": "0.1.4",
+    "file": "licenses/imurmurhash.LICENSE",
+    "sourceURL": "https://raw.githubusercontent.com/jensyt/imurmurhash-js/9f40361c7e2835a9b7b8eaa1cbab2a9f94ee22a2/LICENSE",
+    "sha256": "fa0943ddcaa857d901a9eb92254d89876297ecdfbc884d294a927df08ebcbbe8",
+    "reviewNote": "Upstream repository LICENSE at the pinned commit; the published npm package ships no license file. Maintainer review required."
   }
 ]

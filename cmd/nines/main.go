@@ -56,6 +56,7 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 	pathOut := flags.String("out", "", "write generated YAML to a new file")
 	budgetCheck := flags.Bool("check", false, "exit 7 unless the configured error-budget decision is proceed")
 	cohorts := flags.Bool("cohorts", false, "explicitly query bounded cohort counts from the configured provider")
+	customers := flags.Bool("customers", false, "explicitly read per-customer reliability for the SLO's allowlist from the configured provider")
 	recent := flags.Bool("recent", false, "collect a bounded recent range using the server clock")
 	from := flags.String("from", "", "range start RFC3339")
 	to := flags.String("to", "", "range end RFC3339")
@@ -76,6 +77,8 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 	pending := flags.String("for", "2m", "pending duration")
 	coverage := flags.Float64("min-coverage", 1, "minimum coverage fraction")
 	minEvents := flags.Float64("min-events", 0, "minimum eligible events in each burn window (not statistical confidence)")
+	confidence := flags.Float64("confidence", 0, "raise each window's error-rate threshold as traffic falls, with this confidence (0.5-0.9999; 0 is off)")
+	labels := flags.StringArray("label", nil, "classification label key=value for roll-ups (repeatable; replaces existing labels)")
 	lifecycle := flags.String("lifecycle", "", "experimental, aspirational, committed (default) or deprecated")
 	good := flags.String("good-query", "", "good interval-count expression")
 	total := flags.String("total-query", "", "total interval-count expression")
@@ -176,6 +179,20 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			if visited["lifecycle"] {
 				d.Spec.Lifecycle = v1.SLOLifecycle(*lifecycle)
 			}
+			if visited["label"] {
+				parsed := map[string]string{}
+				for _, pair := range *labels {
+					key, value, ok := strings.Cut(pair, "=")
+					if !ok || key == "" {
+						return usage("--label requires key=value")
+					}
+					if _, dup := parsed[key]; dup {
+						return usage("--label " + key + " was given twice")
+					}
+					parsed[key] = value
+				}
+				d.Spec.Labels = parsed
+			}
 			if visited["target"] {
 				d.Spec.Target = *target
 			}
@@ -188,7 +205,7 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			if visited["total-query"] {
 				d.Spec.TotalQuery = *total
 			}
-			for _, key := range []string{"short-window", "long-window", "burn-rate", "for", "min-coverage", "min-events"} {
+			for _, key := range []string{"short-window", "long-window", "burn-rate", "for", "min-coverage", "min-events", "confidence"} {
 				if visited[key] && len(d.Spec.Policies) > 0 {
 					return usage("single-policy override flags cannot edit named policies; edit the YAML policies instead")
 				}
@@ -214,6 +231,9 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 				}
 				if visited["min-events"] {
 					p.MinEvents = *minEvents
+				}
+				if visited["confidence"] {
+					p.Confidence = *confidence
 				}
 				if visited["min-coverage"] {
 					p.MinCoverage = *coverage
@@ -408,6 +428,22 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			}
 		case "quality":
 			q := url.Values{}
+			if *customers && *cohorts {
+				return usage("use either --cohorts or --customers")
+			}
+			if *customers {
+				if visited["expected-revision"] {
+					if *expected < 1 {
+						return usage("expected-revision must be positive")
+					}
+					q.Set("expectedRevision", strconv.FormatInt(*expected, 10))
+				}
+				path = "/api/slos/" + id + "/customers"
+				if len(q) > 0 {
+					path += "?" + q.Encode()
+				}
+				break
+			}
 			if *cohorts {
 				q.Set("cohorts", "true")
 			}

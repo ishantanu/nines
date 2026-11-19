@@ -67,3 +67,13 @@ export function durationSeconds(text: string): number {
     throw new Error("Use whole durations such as 28d, 1h30m or 60s.");
   return total;
 }
+
+// Keep in sync with model.SLO.RetentionSeconds. This limits stored Nines
+// observations; it never requests or fabricates missing provider history.
+export function historyRetentionSeconds(
+  windowSeconds: number,
+  stepSeconds = 1,
+): number {
+  const step = Math.max(1, stepSeconds);
+  return Math.max(Math.ceil(86400 / step) * step, 2 * windowSeconds);
+}

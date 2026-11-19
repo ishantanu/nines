@@ -29,6 +29,7 @@ type Config struct {
 }
 type Client struct {
 	origin, tenant, token string
+	customTimeout         bool
 	http                  *http.Client
 }
 type APIError struct{ StatusCode int }
@@ -83,7 +84,7 @@ func New(c Config) (*Client, error) {
 		}
 	}
 	h.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &Client{strings.TrimRight(c.URL, "/"), c.Tenant, c.Token, &h}, nil
+	return &Client{origin: strings.TrimRight(c.URL, "/"), tenant: c.Tenant, token: c.Token, http: &h, customTimeout: c.HTTPClient != nil && c.HTTPClient.Timeout > 0}, nil
 }
 func (c *Client) Validate(ctx context.Context, r v1.Resource) (Validation, error) {
 	b, err := yaml.Marshal(r)

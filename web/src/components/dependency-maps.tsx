@@ -1,4 +1,5 @@
 import { DependencyEvidence } from "./dependency-evidence";
+import { DependencyCompositionPanel } from "./dependency-composition";
 import { SLIValue } from "@/components/sli-value";
 import { useEffect, useId, useState } from "react";
 import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
@@ -575,6 +576,11 @@ export function DependencyMaps({
               ))}
             </div>
           </Card>
+          <DependencyCompositionPanel
+            scope={scope}
+            id={id}
+            revision={view.revision}
+          />
         </>
       ) : null}
     </div>

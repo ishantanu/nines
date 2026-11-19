@@ -1,9 +1,23 @@
+@layer reset, theme, base, astryx-base, astryx-theme, components, utilities;
+
 @import "tailwindcss" source("./");
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+/* Astryx has no theme API for data-visualization tokens, so point its
+   categorical series at the contrast-tested chart palette below. */
+@layer astryx-theme {
+  :where(:root) {
+    --color-data-categorical-green: var(--chart-sli);
+    --color-data-categorical-orange: var(--chart-short);
+    --color-data-categorical-purple: var(--chart-long);
+  }
+}
 @font-face {
-  font-family: "Atkinson Hyperlegible Next";
-  src: url("../site/fonts/atkinson-hyperlegible-next-latin.woff2")
-    format("woff2");
-  font-weight: 400 700;
+  font-family: "Figtree";
+  src: url("../site/fonts/figtree-latin-wght-normal.woff2")
+    format("woff2-variations");
+  font-weight: 300 900;
   font-style: normal;
   font-display: swap;
 }
@@ -34,68 +48,45 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 :root {
-  --chart-sli: #0f766e;
+  --chart-sli: #166534;
   --chart-short: #b45309;
   --chart-long: #6d28d9;
-  --background: #f7f7f5;
-  --foreground: #292731;
-  --card: #ffffff;
-  --primary: #62508f;
-  --primary-foreground: #fff;
-  --secondary: #efedf4;
-  --secondary-foreground: #464154;
-  --muted: #efedf4;
-  --muted-foreground: #625f6c;
-  --accent: #efebf8;
-  --accent-foreground: #51417d;
-  --destructive: #be123c;
-  --destructive-surface: #be123c;
-  --border: #dfdce4;
-  --input: #827b8d;
-  --ring: #7964b2;
-  --edge-highlight: #a28acb;
-  --status-healthy: #166534;
-  --status-degraded: #9f1239;
-  --status-at-risk: #92400e;
-  --status-unknown: #475569;
-  --radius: 0.5rem;
-  font-family:
-    "Atkinson Hyperlegible Next",
-    ui-sans-serif,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  /* Legacy surface/text variables now come from the Astryx theme (see
+     astryx-theme.ts), so Tailwind-styled and Astryx surfaces share one palette. */
+  --background: var(--color-background-body);
+  --foreground: var(--color-text-primary);
+  --card: var(--color-background-card);
+  --primary: var(--color-accent);
+  --primary-foreground: var(--color-on-accent);
+  --secondary: var(--color-background-muted);
+  --secondary-foreground: var(--color-text-primary);
+  --muted: var(--color-background-muted);
+  --muted-foreground: var(--color-text-secondary);
+  --accent: var(--color-background-muted);
+  --accent-foreground: var(--color-text-primary);
+  --destructive: var(--color-text-error);
+  --destructive-surface: var(--color-error);
+  --border: var(--color-border);
+  --input: var(--color-text-secondary);
+  --ring: var(--focus-outline-color);
+  --edge-highlight: var(--color-border-emphasized);
+  --status-healthy: var(--color-text-success);
+  --status-degraded: var(--color-text-error);
+  --status-at-risk: var(--color-text-warning);
+  --status-unknown: var(--color-text-secondary);
+  --radius: var(--radius-element);
+  font-family: var(--font-family-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
 }
 .dark {
-  --chart-sli: #4bd0b4;
+  --chart-sli: #4ade80;
   --chart-short: #ffbc66;
   --chart-long: #b5a0ff;
   color-scheme: dark;
-  --background: #1c1c1e;
-  --foreground: #f5f5f7;
-  --card: #242426;
-  --primary: #b5a1df;
-  --primary-foreground: #21192e;
-  --secondary: #2c2c2e;
-  --secondary-foreground: #f5f5f7;
-  --muted: #2c2c2e;
-  --muted-foreground: #b0b0b5;
-  --accent: #343437;
-  --accent-foreground: #f5f5f7;
-  --destructive: #ff6961;
+  /* Legacy white-on-red text needs a darker fill than Astryx's dark error. */
   --destructive-surface: #ca3d50;
-  --border: #3a3a3c;
-  --input: #9a9aa3;
-  --ring: #b5a1df;
-  --edge-highlight: #424244;
-  --status-healthy: #4ade80;
-  --status-degraded: #ff6961;
-  --status-at-risk: #ff9f0a;
-  --status-unknown: #d1d5db;
 }
 @layer base {
   html {
@@ -696,62 +687,6 @@ textarea {
   }
 }
 
-/* Shared entry point; forms retain their native semantics and auth boundaries. */
-.login-frame {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: center;
-  width: min(100%, 1040px);
-  min-height: calc(100svh - 5rem);
-  margin-inline: auto;
-}
-.login-form-surface {
-  width: min(100%, 420px);
-  margin-inline: auto;
-}
-.login-story {
-  display: none;
-}
-.login-workflow {
-  list-style: none;
-  margin: 2.5rem 0 0;
-  padding: 0;
-}
-.login-workflow li {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1.5rem minmax(0, 1fr);
-  gap: 1rem;
-  padding-bottom: 1.75rem;
-}
-.login-workflow li:not(:last-child)::after {
-  content: "";
-  position: absolute;
-  top: 1.75rem;
-  bottom: 0.5rem;
-  left: 0.7rem;
-  width: 1px;
-  background: var(--border);
-}
-.login-workflow svg {
-  width: 1.5rem;
-  height: 1.5rem;
-  color: var(--primary);
-}
-.login-workflow h3 {
-  font-size: 0.9375rem;
-  font-weight: 600;
-}
-.login-workflow p {
-  margin-top: 0.375rem;
-  max-width: 38ch;
-  color: var(--muted-foreground);
-  font-size: 0.875rem;
-  line-height: 1.6;
-}
-.login-form-heading > div:first-child {
-  margin-bottom: 1rem;
-}
 [data-slot="input"],
 [data-slot="textarea"],
 [data-slot="select-trigger"] {
@@ -761,29 +696,286 @@ textarea {
   font-weight: 600;
 }
 @media (min-width: 1024px) {
-  .login-frame {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
-    gap: 5rem;
+}
+
+/* Chart surfaces are Astryx Cards; series colors alias Astryx data tokens and
+   are contrast-checked against the card and page backgrounds. */
+.chart-tooltip {
+  background: var(--color-background-card);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+  border-radius: var(--radius-element);
+  box-shadow: var(--shadow-popover, 0 4px 16px rgb(0 0 0 / 0.16));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-notchset] * {
+    animation: none !important;
+    transition: none !important;
   }
-  .login-story {
-    display: block;
-    padding-right: 1rem;
+}
+[data-notchset] [role="button"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.overview-measurement-charts > .chart-panel {
+  display: grid;
+  grid-template-rows: subgrid;
+  grid-row: span 2;
+}
+
+/* SVG descriptions and hidden chart tables stay accessible but must not leak
+   into a neighboring paragraph's drag-selection or copied text. */
+.chart-panel svg,
+[data-notchset] svg,
+[data-notchset] .sr-only {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* With no paired burn chart, keep budget history at the same readable width. */
+.performance-no-policy > .chart-panel {
+  grid-column: 1 / -1;
+}
+
+/* Desktop navigation can give its width back to the working surface. */
+.sidebar-brand {
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding-inline: 1rem;
+}
+@media (min-width: 64rem) {
+  [data-sidebar-collapsed="true"] > .sidebar {
+    width: 4.5rem;
   }
-  .login-story > h2 {
-    max-width: 18ch;
-    margin-top: 2.5rem;
-    font-size: 2.25rem;
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: -0.025em;
+  [data-sidebar-collapsed="true"] > .workspace {
+    margin-left: 4.5rem;
   }
-  .login-story > p {
-    max-width: 45ch;
-    margin-top: 1rem;
-    color: var(--muted-foreground);
-    line-height: 1.7;
-  }
-  .login-form-heading > div:first-child {
+  [data-sidebar-collapsed="true"] .sidebar-wordmark {
     display: none;
   }
+  [data-sidebar-collapsed="true"] .sidebar-brand {
+    justify-content: center;
+    padding-inline: 0.5rem;
+  }
+  [data-sidebar-collapsed="true"] .navigation-group-label,
+  [data-sidebar-collapsed="true"] .navigation-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  [data-sidebar-collapsed="true"] .sidebar .nav-item {
+    justify-content: center;
+    padding-inline: 0.5rem;
+  }
+  [data-sidebar-collapsed="true"] .navigation-group + .navigation-group {
+    border-top: 1px solid var(--border);
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+  }
+}
+.journey-canvas-viewport {
+  height: clamp(24rem, 58dvh, 48rem);
+}
+.journey-canvas-expanded .journey-canvas-viewport {
+  height: calc(100dvh - 15rem);
+  min-height: 16rem;
+}
+.journey-canvas-viewport:active {
+  cursor: grabbing;
+}
+.journey-canvas-viewport:fullscreen {
+  background: var(--background);
+}
+
+/* Scoped adaptations of free Notchset components. */
+.overview-health-counts > .notch-metric {
+  min-width: 0;
+  gap: 0.75rem;
+  padding-block: 0.75rem;
+}
+.overview-health-counts .notch-metric dt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Sign-in: branded backdrop and glass card. Decorative layers are aria-hidden. */
+.auth-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--color-background-body);
+}
+.auth-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  color: var(--color-accent);
+  pointer-events: none;
+}
+.auth-aurora {
+  position: absolute;
+  inset: -20%;
+  background:
+    radial-gradient(
+      40% 45% at 18% 22%,
+      color-mix(in srgb, var(--color-accent) 34%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      38% 42% at 82% 18%,
+      color-mix(in srgb, #8b6fe0 26%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      45% 50% at 70% 88%,
+      color-mix(in srgb, #3f8f9b 22%, transparent),
+      transparent 70%
+    );
+  filter: blur(30px);
+  animation: auth-drift 26s ease-in-out infinite alternate;
+}
+.auth-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--color-text-primary) 16%, transparent) 1px,
+    transparent 1.2px
+  );
+  background-size: 26px 26px;
+  mask-image: radial-gradient(70% 70% at 50% 45%, #000 20%, transparent 80%);
+}
+.auth-wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0.55;
+}
+.auth-wave-line {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: auth-draw 3.2s cubic-bezier(0.16, 1, 0.3, 1) 0.2s forwards;
+}
+.auth-wave-area {
+  animation: auth-fade 2.4s ease-out 0.8s both;
+}
+.auth-wave-target {
+  opacity: 0.5;
+}
+.auth-wave-dot {
+  animation: auth-pulse 2.6s ease-in-out 3.2s infinite;
+  transform-origin: 1142px 519px;
+}
+.auth-card {
+  position: relative;
+  display: grid;
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--color-background-card) 82%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 60%, transparent) inset,
+    0 30px 80px -20px color-mix(in srgb, var(--color-accent) 45%, transparent),
+    0 12px 30px -12px rgb(20 12 40 / 0.25);
+  backdrop-filter: blur(18px) saturate(1.2);
+  animation: auth-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (min-width: 768px) {
+  .auth-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+  }
+}
+.auth-aside {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.75rem;
+  overflow: hidden;
+  padding: 2.25rem;
+  color: #fff;
+  background:
+    radial-gradient(
+      90% 70% at 100% 0%,
+      rgb(139 111 224 / 0.55),
+      transparent 60%
+    ),
+    linear-gradient(160deg, #3b2f66 0%, #2a2150 55%, #1d1738 100%);
+}
+.auth-aside-line {
+  width: 100%;
+  height: 72px;
+  margin-bottom: 0.75rem;
+  color: #cbb8ff;
+}
+.auth-aside-line-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: auth-draw 2.6s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+}
+@keyframes auth-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes auth-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+@keyframes auth-pulse {
+  50% {
+    transform: scale(1.9);
+    opacity: 0.45;
+  }
+}
+@keyframes auth-drift {
+  to {
+    transform: translate3d(3%, 2%, 0) scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-aurora,
+  .auth-card,
+  .auth-wave-dot,
+  .auth-wave-area {
+    animation: none;
+  }
+  .auth-wave-line,
+  .auth-aside-line-path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+.dark .auth-card {
+  border-color: color-mix(in srgb, #fff 14%, transparent);
+  background: color-mix(in srgb, var(--color-background-card) 70%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #fff 10%, transparent) inset,
+    0 30px 80px -20px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+.dark .auth-grid {
+  background-image: radial-gradient(
+    color-mix(in srgb, #fff 14%, transparent) 1px,
+    transparent 1.2px
+  );
+}
+.dark .auth-wave {
+  opacity: 0.7;
 }

@@ -134,6 +134,25 @@ func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
 	validInput := fmt.Sprintf("(count((%s)) == 1) and (count((%s)) == 1) and (%s >= 0) and (%s >= %s) and (%s <= 1e18) and ((%s == 0) or (%s >= 1e-9))", goodQuery, totalQuery, goodValue, totalValue, goodValue, totalValue, totalValue, totalValue)
 	goodExpr := goodValue + " and on() (" + validInput + ")"
 	totalExpr := totalValue + " and on() (" + validInput + ")"
+	if b := s.BadInterval; b != nil {
+		// Record judged intervals instead of events, exactly as model.ClassifyInterval
+		// does: 1 when the interval has enough events, and good when its error
+		// ratio is at most the configured rate. Unjudged intervals record 0 so
+		// coverage still counts every observed step.
+		if b.Throughput() {
+			// Throughput: every valid interval is judged; it is good when it
+			// recorded at least minGoodEvents good events.
+			least := strconv.FormatFloat(b.MinGoodEvents, 'g', -1, 64)
+			goodExpr = fmt.Sprintf("(%s >= bool %s) and on() (%s)", goodValue, least, validInput)
+			totalExpr = fmt.Sprintf("(%s >= bool 0) and on() (%s)", totalValue, validInput)
+		} else {
+			floor := strconv.FormatFloat(model.JudgingFloor(b.MinEvents), 'g', -1, 64)
+			rate := strconv.FormatFloat(b.ErrorRate, 'g', -1, 64)
+			judged := fmt.Sprintf("(%s >= bool %s)", totalValue, floor)
+			goodExpr = fmt.Sprintf("(%s * (((%s - %s) / %s) <= bool %s)) and on() (%s)", judged, totalValue, goodValue, totalValue, rate, validInput)
+			totalExpr = fmt.Sprintf("%s and on() (%s)", judged, validInput)
+		}
+	}
 	add("nines:sli_good:interval", goodExpr, 0)
 	add("nines:sli_total:interval", totalExpr, 0)
 	add("nines:slo_target:ratio", "vector("+strconv.FormatFloat(s.Target, 'g', -1, 64)+")", 0)
@@ -164,6 +183,14 @@ func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
 		if p.MinEvents > 0 {
 			for _, window := range []int64{p.ShortWindowSeconds, p.LongWindowSeconds} {
 				expr += fmt.Sprintf(" and%s(sum_over_time(nines:sli_total:interval{%s}[%ds] offset %ds) >= %g)", join, selector, window, s.StepSeconds, p.MinEvents)
+			}
+		}
+		if p.Confidence > 0 {
+			// Same threshold the engine applies: P + z*sqrt(P*(1-P)/N), per window.
+			errorRate := strconv.FormatFloat(p.BurnRate*(1-s.Target), 'g', -1, 64)
+			z := strconv.FormatFloat(model.ZScore(p.Confidence), 'g', -1, 64)
+			for _, window := range []int64{p.ShortWindowSeconds, p.LongWindowSeconds} {
+				expr += fmt.Sprintf(" and%s((nines:slo_burn_rate:ratio{%s,window=%q} * %s) >%s(%s + %s * sqrt(%s * (1 - %s) / sum_over_time(nines:sli_total:interval{%s}[%ds] offset %ds))))", join, selector, fmt.Sprintf("%ds", window), strconv.FormatFloat(1-s.Target, 'g', -1, 64), join, errorRate, z, errorRate, errorRate, selector, window, s.StepSeconds)
 			}
 		}
 		alertLabels := labels(0)

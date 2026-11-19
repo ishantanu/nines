@@ -76,15 +76,18 @@ async function resolve(id: string, ok = true) {
 test("only the tested card shows pending state and its result", async () => {
   await render();
   await act(async () => button("newrelic-trial").click());
-  expect(button("newrelic-trial").disabled).toBe(true);
+  expect(button("newrelic-trial").getAttribute("aria-disabled")).toBe("true");
   expect(button("newrelic-trial").textContent).toContain("Testing");
-  expect(button("primary").disabled).toBe(false);
+  expect(button("primary").getAttribute("aria-disabled")).not.toBe("true");
   expect(button("primary").textContent).toBe("Test connection");
   await resolve("newrelic-trial");
   expect(
-    card("newrelic-trial").querySelector('[role="status"]')?.textContent,
+    card("newrelic-trial").querySelector('[role="status"]:not(:empty)')
+      ?.textContent,
   ).toContain("newrelic-trial: configured endpoint responded");
-  expect(card("primary").querySelector('[role="status"]')).toBeNull();
+  expect(
+    card("primary").querySelector('[role="status"]:not(:empty)'),
+  ).toBeNull();
 });
 
 test("concurrent tests resolving out of order keep success and error on their own cards", async () => {
@@ -100,7 +103,7 @@ test("concurrent tests resolving out of order keep success and error on their ow
   expect(card("newrelic-trial").textContent).not.toContain(
     "Connection credentials rejected",
   );
-  expect(button("newrelic-trial").disabled).toBe(true);
+  expect(button("newrelic-trial").getAttribute("aria-disabled")).toBe("true");
   await resolve("newrelic-trial");
   expect(card("newrelic-trial").textContent).toContain(
     "No samples were stored",
@@ -117,5 +120,7 @@ test("a tenant change aborts the old test and ignores a late response", async ()
   expect(request.signal.aborted).toBe(true);
   await resolve("newrelic-trial");
   expect(host.textContent).not.toContain("No samples were stored");
-  expect(button("newrelic-trial").disabled).toBe(false);
+  expect(button("newrelic-trial").getAttribute("aria-disabled")).not.toBe(
+    "true",
+  );
 });

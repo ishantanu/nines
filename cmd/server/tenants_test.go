@@ -203,3 +203,21 @@ func TestNamedConnectionRoutesMeasurementsAndRulesToSameDataset(t *testing.T) {
 		}
 	}
 }
+
+func TestCollectorOnlyStartupSkipsUnrelatedWorkersAndModels(t *testing.T) {
+	for _, key := range []string{"PROMETHEUS_URL", "MIMIR_URL", "ALERT_WEBHOOK_URL", "NINES_SOURCE_HOSTS"} {
+		t.Setenv(key, "")
+	}
+	t.Setenv("INTENT_MODEL_PROVIDER", "invalid-provider")
+	runtimes, err := initTenantsWithOptions(context.Background(), "", false, true, "", false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, runtime := range runtimes {
+		defer runtime.Close()
+		w := runtime.Workspace
+		if w.Rules != nil || w.IntentConversations != nil || w.Replays != nil || w.Investigations != nil || w.Service.IntentDrafter != nil {
+			t.Fatal("collector initialized unrelated workers")
+		}
+	}
+}

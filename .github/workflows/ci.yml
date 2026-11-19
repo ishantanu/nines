@@ -18,7 +18,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - name: Install pinned development linters
         run: |
           go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0
@@ -55,7 +55,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
@@ -116,7 +116,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - run: make test-mimir
   prometheus:
     runs-on: ubuntu-24.04
@@ -127,7 +127,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - run: make test-prometheus
   victoriametrics:
     runs-on: ubuntu-24.04
@@ -138,7 +138,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - run: make test-victoriametrics
   dependencies:
     runs-on: ubuntu-24.04
@@ -149,7 +149,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - run: make test-dependencies
   topology:
     runs-on: ubuntu-24.04
@@ -160,7 +160,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - run: make test-topology
   operator:
     runs-on: ubuntu-24.04
@@ -171,7 +171,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - run: make test-operator
   identity:
     runs-on: ubuntu-24.04
@@ -182,8 +182,23 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - run: make test-identity
+  collector:
+    name: Collector scheduling and failover
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.4'
+      - name: Verify failover and print sanitized workload results
+        run: |
+          make test-collector
+          cat collector-acceptance.json
   container:
     strategy:
       fail-fast: false
@@ -251,7 +266,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [lint, charts, test, mimir, prometheus, victoriametrics, dependencies, topology, operator, identity, container]
+    needs: [lint, charts, test, mimir, prometheus, victoriametrics, dependencies, topology, operator, identity, collector, container]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

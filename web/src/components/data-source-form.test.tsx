@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { chooseOption, optionLabels } from "@/test-support/fields";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -52,12 +53,18 @@ async function open(
     host.querySelector<HTMLButtonElement>("button")!.click(),
   );
 }
+const LABELS: Record<string, string> = {
+  prometheus: "Prometheus",
+  mimir: "Mimir",
+  datadog: "Datadog",
+  newrelic: "New Relic",
+  dash0: "Dash0",
+  victoriametrics: "VictoriaMetrics",
+  "": "Single-node (no cluster route)",
+  "42:7": "Cluster 42:7",
+};
 async function select(id: string, value: string) {
-  await act(async () => {
-    const node = document.getElementById(id) as HTMLSelectElement;
-    node.value = value;
-    node.dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  await chooseOption(id, LABELS[value] ?? value);
 }
 async function input(id: string, value: string) {
   await act(async () => {
@@ -97,12 +104,7 @@ test.each([
   "$kind form sends provider-specific credentials and routing without rule flags",
   async ({ kind, credentials, options }) => {
     await open();
-    expect(
-      [
-        ...(document.getElementById("source-kind") as HTMLSelectElement)
-          .options,
-      ].map((o) => o.text),
-    ).toEqual([
+    expect(await optionLabels("source-kind")).toEqual([
       "Prometheus",
       "Mimir",
       "Datadog",
@@ -167,8 +169,10 @@ test("editing a managed account preserves route and does not require re-entering
     options: { accountID: "123456" },
     collectionMode: "manual",
   });
+  const kind = document.getElementById("source-kind")!;
   expect(
-    (document.getElementById("source-kind") as HTMLSelectElement).disabled,
+    kind.hasAttribute("disabled") ||
+      kind.getAttribute("aria-disabled") === "true",
   ).toBe(true);
   expect(
     (document.getElementById("source-credential-userKey") as HTMLInputElement)
@@ -220,14 +224,13 @@ test("New Relic native publication uses an approved entity without automatic wri
   );
   expect(checkbox?.checked).toBe(false);
   await act(async () => checkbox?.click());
-  const entities = document.getElementById(
-    "source-native-entity",
-  ) as HTMLSelectElement;
-  expect([...entities.options].map((o) => o.value)).toEqual([
-    "",
+  expect(await optionLabels("source-native-entity")).toEqual([
+    "Select an approved entity",
     "approved-entity",
   ]);
-  expect(entities.value).toBe("approved-entity");
+  expect(document.getElementById("source-native-entity")!.textContent).toBe(
+    "approved-entity",
+  );
   await save();
   expect(JSON.parse(String(requests[0].init?.body))).toMatchObject({
     kind: "newrelic",
@@ -255,13 +258,10 @@ test.each(["", "42:7"])(
     ).toBe(false);
     await input("source-credential-bearerToken", "synthetic-vm-token");
     await select("source-vm-route", route);
-    expect(
-      [
-        ...document
-          .getElementById("source-vm-route")!
-          .querySelectorAll("option"),
-      ].map((o) => o.value),
-    ).toEqual(["", "42:7"]);
+    expect(await optionLabels("source-vm-route")).toEqual([
+      "Single-node (no cluster route)",
+      "Cluster 42:7",
+    ]);
     expect(document.body.textContent).not.toContain(
       "Enable recording and alert rule deployment",
     );

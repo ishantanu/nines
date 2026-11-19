@@ -60,7 +60,7 @@ func TestStreamingProgressIsDurablePrivateAndDoesNotChangeReviewedVersion(t *tes
 				if after.Version != before.Version || after.Runs[0].Progress.State != "received" || after.Runs[0].Progress.Bytes != 256 || after.Runs[0].Progress.ModelCall != 1 {
 					t.Fatal("progress lost or review invalidated", after)
 				}
-				response := response("ask_user", map[string]string{"question": "Which user outcome should be measured?"})
+				response := response("ask_user", map[string]any{"question": "Which user outcome should be measured?", "fields": []string{"semantics"}})
 				response.Native = json.RawMessage(`{"private":"private-provider-native-state"}`)
 				return response, nil
 			}}

@@ -42,3 +42,7 @@ backups/
 
 # Remembered local playground selections (no secrets).
 /.nines-playground.conf
+
+# Disposable collector acceptance artifacts.
+/collector-test-results.json
+/collector-acceptance.json

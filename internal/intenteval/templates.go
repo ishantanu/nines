@@ -36,7 +36,7 @@ func (s *templateTelemetry) Discover(_ context.Context, metric string, labels ma
 		}
 		return row
 	}
-	if m.Type == "latency" {
+	if model.ThresholdMeasurement(m.Type) {
 		d.Metadata = []v1.TelemetryMetadata{{Type: "histogram", Unit: "seconds"}}
 		d.Series = []map[string]string{series(metric+"_count", nil), series(metric+"_bucket", map[string]string{"le": "+Inf"})}
 		if s.mode != "incomplete-population" {
@@ -113,7 +113,7 @@ func checkTemplate(ctx context.Context, template v1.SLOTemplate, probe string) s
 	}
 	if probe == "intent-plan" {
 		goal := v1.SLOIntent{APIVersion: v1.APIVersion, Kind: v1.IntentKind, Metadata: manifest.Metadata, Spec: v1.IntentSpec{Description: template.EligibleEvents, Service: manifest.Spec.Service, Source: manifest.Spec.Source, Outcome: manifest.Spec.Measurement.Type, Population: manifest.Spec.Measurement.Labels, Target: manifest.Spec.Target, WindowSeconds: manifest.Spec.WindowSeconds, StepSeconds: manifest.Spec.StepSeconds, Measurement: manifest.Spec.Measurement, NoDataPolicy: "unknown", Lifecycle: manifest.Spec.Lifecycle}}
-		if goal.Spec.Outcome == "latency" {
+		if model.ThresholdMeasurement(goal.Spec.Outcome) {
 			goal.Spec.ThresholdSeconds = manifest.Spec.Measurement.ThresholdSeconds
 		}
 		plan, err := svc.PlanIntent(ctx, v1.PlanIntentInput{Intent: goal})

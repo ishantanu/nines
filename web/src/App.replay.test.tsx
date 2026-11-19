@@ -212,10 +212,10 @@ test("switching tenants discards local capture and does not carry consent back",
   expect(host.textContent).not.toContain(
     "A masked recording is ready to save.",
   );
-  expect(button("Start recording").disabled).toBe(true);
+  expect(button("Start recording").getAttribute("aria-disabled")).toBe("true");
   await act(async () => navigateTo(workspacePath("alpha", "replays")));
   await until(() => !!button("Start recording"));
-  expect(button("Start recording").disabled).toBe(true);
+  expect(button("Start recording").getAttribute("aria-disabled")).toBe("true");
 });
 test("a viewer cannot consent to or start capture", async () => {
   allowed[0].role = "viewer";
@@ -232,7 +232,7 @@ test("a viewer cannot consent to or start capture", async () => {
     host.querySelector<HTMLInputElement>('label input[type="checkbox"]')!
       .disabled,
   ).toBe(true);
-  expect(button("Start recording").disabled).toBe(true);
+  expect(button("Start recording").getAttribute("aria-disabled")).toBe("true");
   expect(recorder.record).not.toHaveBeenCalled();
 });
 test("session expiry discards capture after the API rejects access", async () => {
@@ -263,7 +263,9 @@ test("a role downgrade discards capture and refreshes the read-only workspace", 
       .querySelector<HTMLButtonElement>('[aria-label="Refresh recordings"]')!
       .click(),
   );
-  await until(() => !!button("Start recording")?.disabled);
+  await until(
+    () => button("Start recording")?.getAttribute("aria-disabled") === "true",
+  );
   expect(recorder.stop).toHaveBeenCalledOnce();
   expect(host.textContent).not.toContain(
     "A masked recording is ready to save.",

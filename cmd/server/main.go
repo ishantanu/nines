@@ -50,7 +50,19 @@ func run(log *slog.Logger) error {
 	tenantsFile := flag.String("tenants-file", os.Getenv("TENANTS_FILE"), "server-owned YAML/JSON tenant configuration")
 	authFile := flag.String("auth-file", os.Getenv("AUTH_CONFIG_FILE"), "server-owned OIDC/LDAP identity configuration")
 	extensionLock := flag.String("extension-lock", "", "Administrator-owned lockfile shared across tenants; local files only")
+	processRole := flag.String("process-role", "all", "all, control-plane (no scheduled collection), or collector (collection/evaluation only; no HTTP)")
+	collectionWorkers := flag.Int("collection-workers", 4, "maximum concurrent scheduled collection jobs per process (1-32)")
 	flag.Parse()
+	if *processRole != "all" && *processRole != "control-plane" && *processRole != "collector" {
+		return fmt.Errorf("invalid process role")
+	}
+	if *collectionWorkers < 1 || *collectionWorkers > 32 {
+		return fmt.Errorf("collection workers must be between 1 and 32")
+	}
+	if *processRole == "collector" && (*demo || *memory) {
+		return fmt.Errorf("collector role requires persistent tenant stores")
+	}
+
 	host, _, err := net.SplitHostPort(*addr)
 	if err != nil {
 		return fmt.Errorf("invalid listen address: %w", err)
@@ -73,7 +85,7 @@ func run(log *slog.Logger) error {
 		}
 	}
 	startup, cancel := context.WithTimeout(ctx, 60*time.Second)
-	runtimes, err := initTenantsWithIdentity(startup, *tenantsFile, *demo, *memory, token, *authFile != "")
+	runtimes, err := initTenantsWithOptions(startup, *tenantsFile, *demo, *memory, token, *authFile != "", *processRole == "collector")
 	cancel()
 	if err != nil {
 		return err
@@ -103,6 +115,19 @@ func run(log *slog.Logger) error {
 			workspace.Templates = sharedTemplates
 		}
 		workspaces = append(workspaces, workspace)
+	}
+	services := make([]*service.Service, 0, len(runtimes))
+	for _, runtime := range runtimes {
+		services = append(services, runtime.Workspace.Service)
+	}
+	scheduler, err := service.NewCollectionScheduler(services, *collectionWorkers)
+	if err != nil {
+		return err
+	}
+	if *processRole == "collector" {
+		log.Info("collection worker started", "tenants", len(services), "workers", *collectionWorkers)
+		scheduler.Run(ctx, log)
+		return nil
 	}
 	var auth *identity.Service
 	if *authFile != "" {
@@ -155,10 +180,12 @@ func run(log *slog.Logger) error {
 	if auth != nil {
 		workers.Go(func() { auth.Run(ctx) })
 	}
+	if *processRole == "all" {
+		workers.Go(func() { scheduler.Run(ctx, log) })
+	}
 	for _, runtime := range runtimes {
 		svc := runtime.Workspace.Service
 		tenantLog := log.With("tenant", runtime.Workspace.ID)
-		workers.Go(func() { svc.Run(ctx, tenantLog) })
 		workers.Go(func() { svc.RunMeasurementMonitor(ctx, tenantLog) })
 		ruleManager := runtime.Workspace.Rules
 		workers.Go(func() { svc.RunRuleReconciler(ctx, ruleManager, tenantLog) })
@@ -216,9 +243,15 @@ func run(log *slog.Logger) error {
 
 func seed(ctx context.Context, svc *service.Service) error {
 	now := svc.Now().UTC().Truncate(time.Minute)
+	// Classification labels so the demo shows the roll-up by team and product.
+	demoLabels := []map[string]string{
+		{"team": "platform", "product": "storefront"},
+		{"team": "payments", "product": "storefront"},
+		{"team": "platform", "product": "fulfillment"},
+	}
 	for n, name := range []string{"API availability · demo", "Checkout success · demo", "Background jobs · demo"} {
 		id := []string{"api-availability", "checkout-success", "background-jobs"}[n]
-		c := model.SLO{ID: id, Project: "demo", Service: []string{"gateway", "checkout", "workers"}[n], Name: name, Target: .999, WindowSeconds: 86400, StepSeconds: 60, Policies: []model.Policy{{Name: "fast-burn", Severity: "critical", ShortWindowSeconds: 300, LongWindowSeconds: 3600, BurnRate: 14.4, ForSeconds: 0, MinCoverage: 1}, {Name: "sustained-burn", Severity: "warning", ShortWindowSeconds: 1800, LongWindowSeconds: 21600, BurnRate: 6, ForSeconds: 0, MinCoverage: 1}}}
+		c := model.SLO{Labels: demoLabels[n], ID: id, Project: "demo", Service: []string{"gateway", "checkout", "workers"}[n], Name: name, Target: .999, WindowSeconds: 86400, StepSeconds: 60, Policies: []model.Policy{{Name: "fast-burn", Severity: "critical", ShortWindowSeconds: 300, LongWindowSeconds: 3600, BurnRate: 14.4, ForSeconds: 0, MinCoverage: 1}, {Name: "sustained-burn", Severity: "warning", ShortWindowSeconds: 1800, LongWindowSeconds: 21600, BurnRate: 6, ForSeconds: 0, MinCoverage: 1}}}
 		if err := svc.Create(ctx, c); err != nil {
 			return err
 		}
@@ -266,8 +299,9 @@ func refreshDemoSLO(ctx context.Context, svc *service.Service, id string, n int,
 	if err != nil {
 		return err
 	}
-	// A shorter configured window also shortens accepted sample retention.
-	count := min(2880, int(2*record.SLO.WindowSeconds/record.SLO.StepSeconds))
+	// Refresh the retained history horizon, including the minimum chart history
+	// for short-window objectives. Objective evaluation still uses its own window.
+	count := min(2880, int(record.SLO.RetentionSeconds()/record.SLO.StepSeconds))
 	points := make([]model.Point, 0, count)
 	for i := count - 1; i >= 0; i-- {
 		total := float64(10000 + (i%17)*100)

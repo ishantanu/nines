@@ -226,13 +226,16 @@ export function SourceMeasurements({
             <div>
               <dt className="font-medium">
                 <ReplayLabel>
-                  {slo.providerWindow
-                    ? "Good-event selector"
-                    : "Good-event query"}
+                  {slo.providerWindow?.badSelector
+                    ? "Event selector (subtracted from sessions)"
+                    : slo.providerWindow
+                      ? "Good-event selector"
+                      : "Good-event query"}
                 </ReplayLabel>
               </dt>
               <dd className="mt-1 break-all font-mono">
-                {slo.providerWindow?.goodSelector ||
+                {slo.providerWindow?.badSelector ||
+                  slo.providerWindow?.goodSelector ||
                   slo.goodQuery ||
                   "Not configured"}
               </dd>
@@ -240,9 +243,11 @@ export function SourceMeasurements({
             <div>
               <dt className="font-medium">
                 <ReplayLabel>
-                  {slo.providerWindow
-                    ? "Total-event selector"
-                    : "Total-event query"}
+                  {slo.providerWindow?.badSelector
+                    ? "Session selector"
+                    : slo.providerWindow
+                      ? "Total-event selector"
+                      : "Total-event query"}
                 </ReplayLabel>
               </dt>
               <dd className="mt-1 break-all font-mono">

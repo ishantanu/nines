@@ -106,9 +106,15 @@ func (s *workflowTelemetry) CollectWindowRange(_ context.Context, slo model.SLO,
 // EvaluateWorkflow runs the actual bounded model/tool worker, explicit human
 // selection, deterministic backtest and optional reviewed SLO/CUJ transaction.
 // The provider receives synthetic scope only; no real server is contacted.
-func EvaluateWorkflow(ctx context.Context, c workflowCase, draft Case, provider string, client *intentmodel.Client) Result {
+func EvaluateWorkflow(ctx context.Context, c workflowCase, draft Case, provider string, client *intentmodel.Client) (result Result) {
 	start := time.Now()
-	result := Result{Case: c.ID, Provider: provider, Model: client.ModelID()}
+	result = Result{Case: c.ID, Provider: provider, Model: client.ModelID()}
+	observed := &toolTrace{Model: client}
+	defer func() {
+		result.ModelCalls = observed.calls
+		result.ToolAttempts = observed.attempts
+		result.ToolSequence = append([]string(nil), observed.sequence...)
+	}()
 	fail := func(code string) Result {
 		result.Failure = code
 		result.DurationMilliseconds = time.Since(start).Milliseconds()
@@ -136,7 +142,7 @@ func EvaluateWorkflow(ctx context.Context, c workflowCase, draft Case, provider 
 	}
 	flow := intentflow.New(platform, intentflow.NewMemory())
 	defer flow.Repository.Close()
-	flow.Model = client
+	flow.Model = observed
 	flow.Authorize = func(context.Context, v1.InvestigationActor) error { return nil }
 	owner := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "evaluation", Role: "owner", Subject: "fixture-owner", Kind: "user"})
 	input := v1.CreateIntentConversation{ID: "workflow-evaluation", Title: "Synthetic intent evaluation", Text: draft.Text, Scope: v1.IntentAuthoringScope{Metadata: v1.Metadata{Name: "evaluation-slo", Project: "test"}, Service: "api", Source: "primary", Population: map[string]string{"service": "api"}, NoDataPolicy: "unknown", Journey: &v1.IntentJourney{Name: "checkout", Step: "request", ExpectedRevision: 1, Required: true}}}

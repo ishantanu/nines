@@ -1,12 +1,22 @@
+import { SLOCards } from "./slo-cards";
+import { NativeSelect } from "@/components/ui/select";
 import { SLOProvider } from "./provider-identity";
 import type { Workspace } from "@/lib/api";
 import { SLORetirement } from "./slo-retirement";
 import { useChartSize } from "@/lib/use-chart-size";
+import {
+  classifySLO,
+  countSLOTypes,
+  sloType,
+  type SLOTypeId,
+} from "@/lib/slo-types";
+import { GitProposals } from "./git-delivery";
+import { SLOTypeBadges } from "./slo-type-badge";
 import { ReplayLabel } from "@/components/replay-label";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { definitionFromSLO } from "@/lib/definitions";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Waypoints } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -37,6 +47,7 @@ import { SLIValue, SLOAlertState } from "./sli-value";
 import { SLOIntegrationStatus } from "./integration-status";
 import { BudgetDecisionPanel } from "./budget-decision";
 import { MeasurementQualityPanel } from "./measurement-quality";
+import { CustomerReportPanel } from "./customer-report";
 import { SLOHealthNotice } from "./slo-health-notice";
 import { PageHeader } from "./workspace-chrome";
 const SourceMeasurements = lazy(() =>
@@ -55,27 +66,50 @@ const RecordingRules = lazy(() =>
 );
 export function Objectives({
   items,
+  scope,
   connections,
   journeys,
   onSelect,
   onJourney,
 }: {
   items: Objective[];
+  scope?: RequestScope;
   connections?: Workspace["connections"];
   journeys: Journey[];
   onSelect: (id: string) => void;
   onJourney: (id: string) => void;
 }) {
   const [archived, setArchived] = useState(false);
-  const visible = items.filter((o) => Boolean(o.slo.retirement) === archived);
+  const [view, setView] = useState<"cards" | "table">("cards");
+  const [page, setPage] = useState(0);
+  const [rangeSeconds, setRangeSeconds] = useState(900);
+  const [labelFilter, setLabelFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const typeCounts = countSLOTypes(items.map((o) => o.slo));
+  const labelOptions = [
+    ...new Set(
+      items.flatMap((o) =>
+        Object.entries(o.slo.labels ?? {}).map(([k, v]) => `${k}=${v}`),
+      ),
+    ),
+  ].sort();
+  const [filterKey, ...filterRest] = labelFilter.split("=");
+  const visible = items.filter(
+    (o) =>
+      Boolean(o.slo.retirement) === archived &&
+      (!labelFilter || o.slo.labels?.[filterKey] === filterRest.join("=")) &&
+      (!typeFilter || classifySLO(o.slo).primary === typeFilter),
+  );
   const sorted = [...visible].sort(
     (a, b) =>
       (a.status.budgetRemainingFraction ?? Infinity) -
       (b.status.budgetRemainingFraction ?? Infinity),
   );
+  const pages = Math.max(1, Math.ceil(sorted.length / 12));
+  const currentPage = Math.min(page, pages - 1);
   return (
-    <Card className="gap-0 py-0">
-      <CardContent className="p-0">
+    <section aria-label="Service level objectives" className="space-y-4">
+      <div>
         <div
           className="flex flex-wrap gap-2 border-b px-4 py-3"
           role="group"
@@ -84,132 +118,261 @@ export function Objectives({
           <Button
             variant={archived ? "ghost" : "secondary"}
             aria-pressed={!archived}
-            onClick={() => setArchived(false)}
+            onClick={() => {
+              setArchived(false);
+              setPage(0);
+            }}
           >
             Active objectives
           </Button>
           <Button
             variant={archived ? "secondary" : "ghost"}
             aria-pressed={archived}
-            onClick={() => setArchived(true)}
+            onClick={() => {
+              setArchived(true);
+              setPage(0);
+            }}
           >
             Archived objectives
           </Button>
         </div>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="pl-6">
-                <ReplayLabel>Objective / service</ReplayLabel>
-              </TableHead>
-              <TableHead>
-                <ReplayLabel>SLI / SLO target</ReplayLabel>
-              </TableHead>
-              <TableHead>
-                <ReplayLabel>Budget remaining</ReplayLabel>
-              </TableHead>
-              <TableHead>
-                <ReplayLabel>Journeys</ReplayLabel>
-              </TableHead>
-              <TableHead>
-                <ReplayLabel>Alerts</ReplayLabel>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.map((o) => (
-              <TableRow key={o.slo.id}>
-                <TableCell className="py-5 pl-6">
-                  <button
-                    onClick={() => onSelect(o.slo.id)}
-                    className="text-left font-medium hover:text-primary"
-                  >
-                    {o.slo.name}
-                    {o.slo.retirement ? (
-                      <span className="ml-2 text-sm text-muted-foreground">
-                        (Archived)
-                      </span>
-                    ) : null}
-                    <ArrowUpRight className="ml-1 inline size-3" />
-                  </button>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {o.slo.project} / {o.slo.service}
-                  </div>
-                  <div className="mt-2">
-                    <SLOProvider slo={o.slo} connections={connections} />
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <SLIValue
-                    status={o.status}
-                    target={o.slo.target}
-                    showAlerts={false}
-                  />
-                </TableCell>
-                <TableCell className="min-w-40">
-                  <div className="mb-2 flex justify-between gap-4 font-mono text-xs">
-                    <span>
-                      {o.status.budgetRemainingFraction === null
-                        ? "No estimate"
-                        : percent(o.status.budgetRemainingFraction, 1)}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {o.status.burnRate == null
-                        ? "N/A"
-                        : `${o.status.burnRate.toFixed(1)}×`}
-                    </span>
-                  </div>
-                  {o.status.budgetRemainingFraction !== null ? (
-                    <Progress
-                      value={Math.max(
-                        0,
-                        Math.min(
-                          100,
-                          (o.status.budgetRemainingFraction ?? 0) * 100,
-                        ),
-                      )}
-                      aria-label={`Budget remaining for ${o.slo.name}`}
-                    />
-                  ) : null}
-                  {o.status.reliability !== null && o.status.coverage < 1 ? (
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      <ReplayLabel>Based on observed data</ReplayLabel>
-                    </div>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  <div className="flex max-w-48 flex-wrap gap-1">
-                    {journeys
-                      .filter((j) =>
-                        j.links.some((l) => l.link.id === o.slo.id),
-                      )
-                      .map((j) => (
-                        <button
-                          key={j.resource.manifest.metadata.name}
-                          onClick={() =>
-                            onJourney(j.resource.manifest.metadata.name)
-                          }
-                          className="rounded border bg-slate-50 px-2 py-1 text-xs hover:border-primary"
-                        >
-                          {j.resource.manifest.spec.displayName}
-                        </button>
-                      ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <SLOAlertState status={o.status} />
-                </TableCell>
+        <div className="flex flex-wrap items-center gap-3 py-3">
+          <div
+            role="group"
+            aria-label="Objective display"
+            className="flex gap-1"
+          >
+            <Button
+              variant={view === "cards" ? "secondary" : "outline"}
+              aria-pressed={view === "cards"}
+              onClick={() => setView("cards")}
+            >
+              Cards
+            </Button>
+            <Button
+              variant={view === "table" ? "secondary" : "outline"}
+              aria-pressed={view === "table"}
+              onClick={() => setView("table")}
+            >
+              Table
+            </Button>
+          </div>
+          {typeCounts.size > 1 ? (
+            <div className="w-56">
+              <Label htmlFor="objective-type-filter" className="sr-only">
+                Filter by SLO type
+              </Label>
+              <NativeSelect
+                id="objective-type-filter"
+                value={
+                  typeCounts.has(typeFilter as SLOTypeId) ? typeFilter : ""
+                }
+                onChange={(e) => {
+                  setTypeFilter(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <option value="">All SLO types</option>
+                {[...typeCounts].map(([id, n]) => (
+                  <option key={id} value={id}>
+                    {sloType(id).name} ({n})
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          ) : null}
+          {labelOptions.length ? (
+            <div className="w-56">
+              <Label htmlFor="objective-label-filter" className="sr-only">
+                Filter by label
+              </Label>
+              <NativeSelect
+                id="objective-label-filter"
+                value={labelOptions.includes(labelFilter) ? labelFilter : ""}
+                onChange={(e) => {
+                  setLabelFilter(e.target.value);
+                  setPage(0);
+                }}
+              >
+                <option value="">All labels</option>
+                {labelOptions.map((o) => (
+                  <option key={o} value={o}>
+                    {o.replace("=", ": ")}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          ) : null}
+          {view === "cards" && (
+            <label className="flex items-center gap-2 text-sm">
+              Trend range
+              <NativeSelect
+                aria-label="SLO card trend range"
+                className="h-11 rounded border bg-background px-3"
+                value={rangeSeconds}
+                onChange={(e) => setRangeSeconds(Number(e.target.value))}
+              >
+                <option value={900}>Last 15 minutes</option>
+                <option value={3600}>Last hour</option>
+                <option value={21600}>Last 6 hours</option>
+                <option value={86400}>Last 24 hours</option>
+              </NativeSelect>
+            </label>
+          )}
+        </div>
+        {view === "cards" ? (
+          <>
+            <SLOCards
+              items={sorted.slice(currentPage * 12, (currentPage + 1) * 12)}
+              connections={connections}
+              journeys={journeys}
+              scope={scope}
+              rangeSeconds={rangeSeconds}
+              onSelect={onSelect}
+              onJourney={onJourney}
+            />
+            {pages > 1 && (
+              <div
+                className="mt-4 flex items-center justify-end gap-3"
+                aria-label="SLO card pages"
+              >
+                <Button
+                  variant="outline"
+                  disabled={currentPage === 0}
+                  onClick={() => setPage(currentPage - 1)}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm">
+                  Page {currentPage + 1} of {pages}
+                </span>
+                <Button
+                  variant="outline"
+                  disabled={currentPage + 1 === pages}
+                  onClick={() => setPage(currentPage + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-6">
+                  <ReplayLabel>Objective / service</ReplayLabel>
+                </TableHead>
+                <TableHead>
+                  <ReplayLabel>SLI / SLO target</ReplayLabel>
+                </TableHead>
+                <TableHead>
+                  <ReplayLabel>Budget remaining</ReplayLabel>
+                </TableHead>
+                <TableHead>
+                  <ReplayLabel>Journeys</ReplayLabel>
+                </TableHead>
+                <TableHead>
+                  <ReplayLabel>Alerts</ReplayLabel>
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {sorted.map((o) => (
+                <TableRow key={o.slo.id}>
+                  <TableCell className="py-5 pl-6">
+                    <button
+                      onClick={() => onSelect(o.slo.id)}
+                      className="text-left font-medium hover:text-primary"
+                    >
+                      {o.slo.name}
+                      {o.slo.retirement ? (
+                        <span className="ml-2 text-sm text-muted-foreground">
+                          (Archived)
+                        </span>
+                      ) : null}
+                      <ArrowUpRight className="ml-1 inline size-3" />
+                    </button>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {o.slo.project} / {o.slo.service}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <SLOTypeBadges slo={o.slo} />
+                      <SLOProvider slo={o.slo} connections={connections} />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <SLIValue
+                      status={o.status}
+                      target={o.slo.target}
+                      showAlerts={false}
+                    />
+                  </TableCell>
+                  <TableCell className="min-w-40">
+                    <div className="mb-2 flex justify-between gap-4 font-mono text-xs">
+                      <span>
+                        {o.status.budgetRemainingFraction === null
+                          ? "No estimate"
+                          : percent(o.status.budgetRemainingFraction, 1)}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {o.status.burnRate == null
+                          ? "N/A"
+                          : `${o.status.burnRate.toFixed(1)}×`}
+                      </span>
+                    </div>
+                    {o.status.budgetRemainingFraction !== null ? (
+                      <Progress
+                        value={Math.max(
+                          0,
+                          Math.min(
+                            100,
+                            (o.status.budgetRemainingFraction ?? 0) * 100,
+                          ),
+                        )}
+                        aria-label={`Budget remaining for ${o.slo.name}`}
+                      />
+                    ) : null}
+                    {o.status.reliability !== null && o.status.coverage < 1 ? (
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        <ReplayLabel>Based on observed data</ReplayLabel>
+                      </div>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex max-w-48 flex-wrap gap-1">
+                      {journeys
+                        .filter((j) =>
+                          j.links.some((l) => l.link.id === o.slo.id),
+                        )
+                        .map((j) => (
+                          <button
+                            key={j.resource.manifest.metadata.name}
+                            onClick={() =>
+                              onJourney(j.resource.manifest.metadata.name)
+                            }
+                            className="rounded border bg-slate-50 px-2 py-1 text-xs hover:border-primary"
+                          >
+                            {j.resource.manifest.spec.displayName}
+                          </button>
+                        ))}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <SLOAlertState status={o.status} />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
         {!visible.length ? (
           <p className="empty-state">
             <ReplayLabel>No objectives match this view.</ReplayLabel>
           </p>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 function SamplePlot({ points }: { points: Point[] }) {
@@ -383,6 +546,7 @@ export function ObjectiveDetail({
         title={objective?.slo.name ?? "Objective"}
         description={`${objective?.slo.project} / ${objective?.slo.service} · ${objective?.slo.id}`}
       >
+        {objective ? <SLOTypeBadges slo={objective.slo} /> : null}
         {objective ? (
           <SLOProvider slo={objective.slo} connections={connections} />
         ) : null}
@@ -393,6 +557,9 @@ export function ObjectiveDetail({
           </Button>
         ) : null}
       </PageHeader>
+      {objective && !objective.slo.retirement ? (
+        <GitProposals scope={scope} id={objective.slo.id} />
+      ) : null}
       {objective?.budgetDecision &&
       !objective.slo.retirement &&
       objective.slo.errorBudgetPolicy ? (
@@ -504,16 +671,17 @@ export function ObjectiveDetail({
                 at={objective.status.at}
                 scope={scope}
                 refreshKey={refreshKey}
+                onConfigure={() => setTab("config")}
               />
             </Suspense>
           ) : null}
           {journeys.some((j) => j.links.some((l) => l.link.id === id)) ? (
             <section
               className="mt-5 border-t pt-4"
-              aria-label="Linked critical user journeys"
+              aria-label="Journeys that depend on this SLO"
             >
               <h2 className="mb-2 text-sm font-semibold">
-                Linked critical user journeys
+                Journeys that depend on this SLO
               </h2>
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {journeys
@@ -523,11 +691,13 @@ export function ObjectiveDetail({
                       variant="outline"
                       size="sm"
                       key={j.resource.manifest.metadata.name}
+                      title={`Open the critical user journey "${j.resource.manifest.spec.displayName}"`}
                       onClick={() => {
                         onClose();
                         onJourney(j.resource.manifest.metadata.name);
                       }}
                     >
+                      <Waypoints className="size-3.5" aria-hidden />
                       {j.resource.manifest.spec.displayName}
                       <ArrowUpRight className="size-3" />
                     </Button>
@@ -558,6 +728,13 @@ export function ObjectiveDetail({
               report={objective.quality}
               scope={scope}
               cohortLabels={objective.slo.quality?.cohortLabels}
+            />
+          ) : null}
+          {objective?.slo.customers && !objective.slo.retirement ? (
+            <CustomerReportPanel
+              sloId={objective.slo.id}
+              revision={objective.slo.revision ?? 1}
+              scope={scope}
             />
           ) : null}
           {objective?.measurementHealth ? (

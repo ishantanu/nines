@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
@@ -58,3 +58,36 @@ jobs:
           path: dist/releases/
           if-no-files-found: error
           retention-days: 14
+  windows:
+    name: Windows archive smoke test
+    needs: prepare
+    runs-on: windows-2025
+    timeout-minutes: 10
+    env:
+      CANDIDATE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: nines-candidate
+          path: candidate
+      - name: Run the Windows CLI, server and MCP binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Expand-Archive "candidate/nines_${env:CANDIDATE_VERSION}_windows_amd64.zip" -DestinationPath nines
+          Set-Location nines
+          foreach ($exe in 'nines.exe', 'nines-server.exe', 'nines-mcp.exe') {
+            if (-not (Test-Path $exe)) { throw "missing $exe" }
+          }
+          if (Test-Path 'nines-operator.exe') { throw 'the operator is Linux-only' }
+          .\nines.exe version --agent
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          .\nines.exe validate --offline -f examples/api-availability.slo.yaml --agent
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          # Write, rewrite and read the private CLI configuration under %AppData%.
+          .\nines.exe config set-context smoke --server http://127.0.0.1:8080 --tenant default --agent
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          .\nines.exe config use-context smoke --agent
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          .\nines.exe config get-contexts --agent
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

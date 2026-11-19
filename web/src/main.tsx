@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./index.css"; // first: declares the cascade-layer order
 import App from "./App";
-import "./index.css";
 import { startBrowserTelemetry } from "./lib/observability";
 void startBrowserTelemetry().finally(() =>
   ReactDOM.createRoot(document.getElementById("root")!).render(

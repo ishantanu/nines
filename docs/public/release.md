@@ -38,7 +38,7 @@ make public-source
 
 ## Candidate assets
 
-- `make release VERSION=v0.1.0-alpha.3` prepares archives for the selected build targets; it does not publish anything.
+- `make release VERSION=v0.1.0-alpha.4` prepares archives for the selected build targets; it does not publish anything.
   - Override `RELEASE_TARGETS` for a smaller local proof.
   - The builder requires a version, collects dependency notices, includes CLI/server/MCP/operator binaries and emits SHA-256 checksums and build metadata.
   - The operator is included, with executable/archive checks and a container recipe for extracted Linux archives.
@@ -51,21 +51,27 @@ make public-source
 
 ## Tag-based alpha binaries
 
-- After merging the release workflow into `main`, wait for a successful **CI** run on the exact commit you intend to release. Tags such as `v0.1.0-alpha.3` trigger **Alpha release**. The workflow accepts only numbered alpha tags on commits reachable from `main` with successful main-branch CI.
+- After merging the release workflow into `main`, wait for a successful **CI** run on the exact commit you intend to release. Tags such as `v0.1.0-alpha.4` trigger **Alpha release**. The workflow accepts only numbered alpha tags on commits reachable from `main` with successful main-branch CI.
 
 ```sh
 git fetch origin --tags
-git tag -s v0.1.0-alpha.3 <tested-main-commit> -m "Nines v0.1.0-alpha.3"
-git push origin v0.1.0-alpha.3
+git tag -s v0.1.0-alpha.4 <tested-main-commit> -m "Nines v0.1.0-alpha.4"
+git push origin v0.1.0-alpha.4
 ```
 
 - Choose the next unused version; never move a published version tag.
   - Tag signing uses your local Git signing configuration.
   - If CI is still running when the tag is pushed, validation fails with an explanation; rerun the workflow after CI succeeds.
-- The workflow reuses the candidate builder to prepare Linux and macOS archives for amd64 and arm64.
-  - Each archive contains the CLI, server, MCP adapter and Kubernetes operator, examples, docs and dependency licenses. `SHA256SUMS` covers all archives and `build.json`; the manifest identifies the exact version, commit and targets.
-  - The workflow verifies metadata, archive inventory and checksums and smoke-tests the Linux amd64 CLI and server before uploading anything to a release.
-  - Other architectures are cross-built, not run by that smoke test.
+- Before tagging, update `deploy/kubernetes/deployment.yaml` and `deploy/operator/operator.yaml` to the new version's `ghcr.io/ishantanu/...` image tags. Validation refuses a tag whose manifests reference another version.
+- The workflow reuses the candidate builder to prepare Linux, macOS and Windows archives for amd64 and arm64.
+  - Linux and macOS `.tar.gz` archives contain the CLI, server, MCP adapter and Kubernetes operator; Windows `.zip` archives contain the CLI, server and MCP adapter as `.exe` files. All include examples, docs and dependency licenses. `SHA256SUMS` covers all archives and `build.json`; the manifest identifies the exact version, commit and targets.
+  - The workflow verifies metadata, archive inventory and checksums, smoke-tests the Linux amd64 CLI and server, and runs the Windows amd64 CLI on a Windows runner, including a configuration write and read.
+  - Other architectures are cross-built, not run by those smoke tests.
+- The **images** job builds `ghcr.io/ishantanu/nines` and `ghcr.io/ishantanu/nines-operator` for `linux/amd64` and `linux/arm64` from the same commit.
+  - It smoke-tests the amd64 server image before pushing, pushes only the version tag (never `latest`), signs both digests with keyless Cosign and verifies the signatures, and records GitHub build provenance and an SBOM.
+  - It needs `packages: write`, `id-token: write` and `attestations: write`, granted to that job only.
+  - The first push creates each package as **private**. Once, after the first release, open each package's settings on GitHub and set its visibility to **Public**, so `docker pull` works without signing in.
+  - The draft release notes end with both image digests.
 - Only the final draft job receives release-write permission.
   - It creates a **draft prerelease**, not a public announcement.
   - Review the assets, release notes and checksums in GitHub Releases, then publish the draft when satisfied.
@@ -75,7 +81,7 @@ git push origin v0.1.0-alpha.3
 
 ## Before the first push
 
-From a clean checkout with Go 1.27.3, Node 24, Python 3 and Docker Compose:
+From a clean checkout with Go 1.27.4, Node 24, Python 3 and Docker Compose:
 
 ```sh
 npm ci --prefix web --no-audit --no-fund
@@ -93,10 +99,10 @@ python3 scripts/release/source.py --publication
   - Commit with your configured signing key, push to `ishantanu/nines`, and inspect the CI and Pages runs before tagging a release.
   - See the [local verification record](verification.md) for the checks already performed and their limits.
 
-## Alpha.3 preparation
+## Alpha.4 preparation
 
-- The next candidate is `v0.1.0-alpha.3`.
-  - Existing alpha.1/alpha.2 drafts and their assets are historical candidates; do not reuse their build metadata for a newer commit or move an existing tag.
+- The next candidate is `v0.1.0-alpha.4`; `v0.1.0-alpha.3` is already tagged and released, so never move or reuse it.
+  - Existing alpha.1 to alpha.3 drafts and their assets are historical candidates; do not reuse their build metadata for a newer commit or move an existing tag.
   - The versioned [alpha notes](alpha-release-notes.md) describe this candidate and its experimental boundaries.
 - Before tagging, merge the preparation PR, require green CI on that exact main commit, and confirm the Product site build.
   - CI checks default and optional Jev Compose selection without real model credentials or paid calls.
@@ -111,8 +117,8 @@ After the tested commit is merged, create the unused tag:
 
 ```sh
 git fetch origin --tags
-git tag -s v0.1.0-alpha.3 <tested-main-commit> -m "Nines v0.1.0-alpha.3"
-git push origin v0.1.0-alpha.3
+git tag -s v0.1.0-alpha.4 <tested-main-commit> -m "Nines v0.1.0-alpha.4"
+git push origin v0.1.0-alpha.4
 ```
 
 - The Alpha release workflow prepares a draft.

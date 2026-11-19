@@ -86,6 +86,18 @@ export function parseJourney(text: string): Manifest {
     throw Error(
       "Correct the agent contract fields in YAML before opening the form.",
     );
+  const o = m.spec.runObjective;
+  if (
+    o !== undefined &&
+    o !== null &&
+    (typeof o !== "object" ||
+      ![o.target, o.windowSeconds, o.minRuns].every(
+        (v) => typeof v === "number" && Number.isFinite(v),
+      ))
+  )
+    throw Error(
+      "Correct the run objective fields in YAML before opening the form.",
+    );
   return m;
 }
 export function removeJourneyLink(m: Manifest, id: string): Manifest {

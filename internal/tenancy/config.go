@@ -17,6 +17,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/auditarchive"
+	"github.com/ishantanu/nines/internal/gitops"
 	"github.com/ishantanu/nines/internal/intentmodel"
 	"github.com/ishantanu/nines/internal/kubediscovery"
 	"github.com/ishantanu/nines/internal/systemone"
@@ -41,6 +42,7 @@ type IntentModel = intentmodel.Config
 type Tenant struct {
 	ManagedProviderRoutes map[string][]string   `json:"managedProviderRoutes,omitempty" yaml:"managedProviderRoutes,omitempty"`
 	WorkflowWebhook       *workflowhook.Config  `json:"workflowWebhook,omitempty" yaml:"workflowWebhook,omitempty"`
+	GitOps                *gitops.Config        `json:"gitOps,omitempty" yaml:"gitOps,omitempty"`
 	ReplayPrivacy         v1.ReplayPrivacy      `json:"replayPrivacy,omitempty" yaml:"replayPrivacy,omitempty"`
 	KubernetesDiscovery   *kubediscovery.Config `json:"kubernetesDiscovery,omitempty" yaml:"kubernetesDiscovery,omitempty"`
 	SystemOne             *systemone.Config     `json:"systemOne,omitempty" yaml:"systemOne,omitempty"`
@@ -102,6 +104,7 @@ type Source struct {
 type Resolved struct {
 	Credentials        map[string]string      `json:"-" yaml:"-"`
 	WorkflowWebhook    *workflowhook.Settings `json:"-" yaml:"-"`
+	GitOps             *gitops.Settings       `json:"-" yaml:"-"`
 	IntentModelKey     string                 `json:"-" yaml:"-"`
 	Connections        []ResolvedConnection
 	RulesBearerToken   string `json:"-" yaml:"-"`
@@ -408,6 +411,12 @@ func parse(b []byte, lookup func(string) string, identityEnabled bool) ([]Resolv
 				return nil, fmt.Errorf("tenant %s: %w", t.ID, e)
 			}
 			r.WorkflowWebhook = &workflowhook.Settings{Endpoint: endpoint, Key: key, Since: t.WorkflowWebhook.Since}
+		}
+		if t.GitOps != nil {
+			var e error
+			if r.GitOps, e = gitops.Resolve(*t.GitOps, lookup); e != nil {
+				return nil, fmt.Errorf("tenant %s: %w", t.ID, e)
+			}
 		}
 		r.Webhook, err = secret(t.AlertWebhookEnv, false)
 		if err != nil {

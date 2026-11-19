@@ -13,8 +13,9 @@ runtime="$name-runtime"
 cleanup() {
   result=$?
   if [ "$result" != 0 ]; then
-    docker logs --tail 60 "$server" >&2 2>/dev/null || true
-    docker logs --tail 60 "$runtime" >&2 2>/dev/null || true
+    docker inspect --format 'Runtime state: {{.State.Status}}, exit={{.State.ExitCode}}, oom={{.State.OOMKilled}}' "$runtime" >&2 || true
+    docker logs --tail 60 "$server" >&2 || true
+    docker logs --tail 60 "$runtime" >&2 || true
   fi
   docker rm -f "$runtime" "$server" >/dev/null 2>&1 || true
   docker image rm "$name-image" >/dev/null 2>&1 || true
@@ -88,12 +89,15 @@ docker run -d --name "$runtime" --label nines.acceptance=dependencies \
   --mount "type=bind,src=$work/config,dst=/etc/nines,readonly" \
   --mount "type=bind,src=$work/serviceaccount,dst=/var/run/secrets/kubernetes.io/serviceaccount,readonly" \
   "$name-image" -memory -tenants-file /etc/nines/tenants.yaml -addr 0.0.0.0:8080 >/dev/null
-port=$(docker port "$runtime" 8080/tcp | sed 's/.*://')
+mapping=$(docker port "$runtime" 8080/tcp) || { echo 'Nines fixture has no published port'; exit 1; }
+port=${mapping##*:}
 export NINES_DISCOVERY_TEST_URL="http://127.0.0.1:$port"
 export NINES_DISCOVERY_TEST_CONTAINER="$server"
 ready=false
 for _ in $(seq 1 60); do
-  if curl --fail --silent "$NINES_DISCOVERY_TEST_URL/healthz" >/dev/null; then ready=true; break; fi
+  if curl --fail --silent --max-time 2 "$NINES_DISCOVERY_TEST_URL/healthz" >/dev/null; then ready=true; break; fi
+  running=$(docker inspect --format '{{.State.Running}}' "$runtime")
+  [ "$running" = true ] || { echo 'Nines fixture exited before readiness'; exit 1; }
   sleep 1
 done
 [ "$ready" = true ] || { echo 'Nines fixture did not become ready'; exit 1; }

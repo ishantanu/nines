@@ -8,6 +8,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -101,7 +102,7 @@ func authCommand(o *options) *cobra.Command {
 		}
 		return render(c.OutOrStdout(), v, o.format("json"), "auth")
 	}}, "server", "read", "Check effective tenant access without printing credentials"))
-	logout := mark(&cobra.Command{Use: "logout", Args: cobra.NoArgs}, "login", "logout", "Revoke and remove a saved browser session")
+	logout := mark(&cobra.Command{Use: "logout", Args: cobra.NoArgs}, "login", "logout", "Revoke and remove a saved CLI session")
 	local := logout.Flags().Bool("local", false, "Remove the local credential without contacting Nines")
 	logout.RunE = func(c *cobra.Command, args []string) error {
 		if o.Context == "" {
@@ -118,9 +119,13 @@ func authCommand(o *options) *cobra.Command {
 		saved, exists := stored[o.Context]
 		if !*local && exists {
 			if saved.Server != o.Server || saved.Tenant != o.Tenant {
-				return usage("saved browser credential belongs to a different server or tenant; select its original context or use --local")
+				return usage("saved CLI credential belongs to a different server or tenant; select its original context or use --local")
 			}
-			e = authRequest(c.Context(), o.httpClient(), saved.Server, saved.Tenant, saved.Token, "POST", "/auth/cli/logout", map[string]any{}, nil)
+			token, err := storedToken(p, saved, o.Agent)
+			if err != nil {
+				return err
+			}
+			e = authRequest(c.Context(), o.httpClient(), saved.Server, saved.Tenant, token, "POST", "/auth/cli/logout", map[string]any{}, nil)
 			if ae, ok := e.(*client.APIError); ok && (ae.StatusCode == 401 || ae.StatusCode == 403 || ae.StatusCode == 404) {
 				e = nil
 			}
@@ -133,35 +138,56 @@ func authCommand(o *options) *cobra.Command {
 			if e != nil {
 				return e
 			}
+			current, ok := m[o.Context]
+			if ok && current != saved {
+				return &cliError{"conflict", "Credential changed during logout; retry", 5}
+			}
+			if e = deleteStoredCredential(p, current, o.Agent); e != nil {
+				return e
+			}
 			delete(m, o.Context)
 			return credentialsSave(p, m)
 		})
 		if e != nil {
 			return e
 		}
-		note := "Saved browser credential removed"
+		note := "Saved CLI credential removed"
 		if o.credentialSource == "NINES_API_KEY" || o.credentialSource == "API_TOKEN" {
 			note = "Environment API key remains active; unset it in your shell. API keys are not revoked by logout."
 		}
 		return render(c.OutOrStdout(), map[string]any{"context": o.Context, "status": "signed_out", "localOnly": *local, "note": note}, o.format("json"), "auth")
 	}
 	root.AddCommand(logout)
+	root.AddCommand(mark(&cobra.Command{Use: "diagnose", Args: cobra.NoArgs, RunE: func(c *cobra.Command, args []string) error {
+		capabilities, e := authCapabilities(c.Context(), o)
+		if e != nil {
+			return e
+		}
+		return render(c.OutOrStdout(), map[string]any{"server": o.Server, "tenant": o.Tenant, "context": o.Context, "capabilities": capabilities, "credentialSource": o.credentialSource, "keychainAccessed": false, "fallback": "NINES_API_KEY; automatic refresh is not supported"}, o.format("json"), "auth")
+	}}, "login", "read", "Discover login capabilities without reading OS credentials or printing secrets"))
 	return root
 }
 func loginCommand(o *options) *cobra.Command {
-	cmd := mark(&cobra.Command{Use: "login", Args: cobra.NoArgs}, "login", "login", "Authenticate one tenant context via API key or browser SSO")
-	method := cmd.Flags().String("method", "auto", "auto, api-key or sso")
+	cmd := mark(&cobra.Command{Use: "login", Args: cobra.NoArgs}, "login", "login", "Authenticate one tenant context via API key, browser or device code")
+	method := cmd.Flags().String("method", "auto", "auto, api-key, sso or device")
+	storage := cmd.Flags().String("credential-store", "file", "file or opt-in keychain; API keys are never saved")
 	noBrowser := cmd.Flags().Bool("no-browser", false, "Print the sign-in URL instead of opening a browser")
 	cmd.RunE = func(c *cobra.Command, args []string) error {
+		if *storage != "file" && *storage != "keychain" {
+			return usage("credential-store must be file or keychain")
+		}
 		selected := *method
+		if o.Agent && selected != "auto" && selected != "api-key" {
+			return usage("agent mode cannot initiate interactive login; supply NINES_API_KEY")
+		}
 		if selected == "auto" {
 			selected = "sso"
 			if o.credentialSource == "NINES_API_KEY" || o.credentialSource == "API_TOKEN" {
 				selected = "api-key"
 			}
 		}
-		if selected != "api-key" && selected != "sso" {
-			return usage("method must be auto, api-key or sso")
+		if selected != "api-key" && selected != "sso" && selected != "device" {
+			return usage("method must be auto, api-key, sso or device")
 		}
 		if o.Context == "" {
 			o.Context = o.Tenant
@@ -169,7 +195,23 @@ func loginCommand(o *options) *cobra.Command {
 		if !tenancy.ValidID(o.Context) {
 			return usage("invalid context name")
 		}
+		p, e := o.configPath()
+		if e != nil {
+			return e
+		}
+		baseline, e := credentialSnapshot(p, o.Context)
+		if e != nil {
+			return e
+		}
 		var cred *credential
+		savedSuccessfully := false
+		defer func() {
+			if cred != nil && !savedSuccessfully {
+				cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+				defer stop()
+				_ = authRequest(cleanup, o.httpClient(), cred.Server, cred.Tenant, cred.Token, "POST", "/auth/cli/logout", map[string]any{}, nil)
+			}
+		}()
 		if selected == "api-key" {
 			if o.credentialSource != "NINES_API_KEY" && o.credentialSource != "API_TOKEN" {
 				return usage("API-key login requires NINES_API_KEY or API_TOKEN")
@@ -181,7 +223,13 @@ func loginCommand(o *options) *cobra.Command {
 			if v, _ := environmentToken(); v != "" {
 				return usage("unset NINES_API_KEY and API_TOKEN before choosing browser SSO")
 			}
-			v, e := browserLogin(c.Context(), o, *noBrowser, c.ErrOrStderr())
+			var v credential
+			var e error
+			if selected == "device" {
+				v, e = deviceLogin(c.Context(), o, c.ErrOrStderr())
+			} else {
+				v, e = browserLogin(c.Context(), o, *noBrowser, c.ErrOrStderr())
+			}
 			if e != nil {
 				return e
 			}
@@ -193,31 +241,71 @@ func loginCommand(o *options) *cobra.Command {
 		if e != nil {
 			return e
 		}
-		p, e := o.configPath()
-		if e != nil {
-			return e
-		}
+		var previous credential
 		e = withConfigLock(p, func() error {
-			cfg, e := configLoad(p)
-			if e != nil {
-				return e
+			current, err := credentialSnapshot(p, o.Context)
+			if err != nil {
+				return err
+			}
+			if current != baseline {
+				return &cliError{"conflict", "Context or credential changed during login; retry using the current context", 5}
+			}
+			cfg, err := configLoad(p)
+			if err != nil {
+				return err
+			}
+			original, err := configLoad(p)
+			if err != nil {
+				return err
 			}
 			cfg.Contexts[o.Context] = savedContext{o.Server, o.Tenant}
 			cfg.Current = o.Context
-			if cred != nil {
-				m, e := credentialsLoad(p)
-				if e != nil {
-					return e
-				}
-				m[o.Context] = *cred
-				if e = credentialsSave(p, m); e != nil {
-					return e
-				}
+			if cred == nil {
+				return configSave(p, cfg)
 			}
-			return configSave(p, cfg)
+			m, err := credentialsLoad(p)
+			if err != nil {
+				return err
+			}
+			previous = m[o.Context]
+			entry, err := secureCredential(p, *cred, *storage)
+			if err != nil {
+				return err
+			}
+			committed := false
+			defer func() {
+				if !committed {
+					_ = deleteStoredCredential(p, entry, false)
+				}
+			}()
+			if err = configSave(p, cfg); err != nil {
+				return err
+			}
+			m[o.Context] = entry
+			if err = credentialsSave(p, m); err != nil {
+				return errors.Join(err, configSave(p, original))
+			}
+			committed = true
+			return nil
 		})
 		if e != nil {
 			return e
+		}
+		savedSuccessfully = true
+		if cred != nil {
+			// Cleanup concerns must not turn a committed login into a failed one.
+			if previous.Token != "" {
+				cleanup, stop := context.WithTimeout(context.Background(), 5*time.Second)
+				_ = authRequest(cleanup, o.httpClient(), previous.Server, previous.Tenant, previous.Token, "POST", "/auth/cli/logout", map[string]any{}, nil)
+				stop()
+			}
+			if err := deleteStoredCredential(p, previous, false); err != nil {
+				v["warning"] = "Signed in; the previous OS credential could not be removed. Remove the stale nines.cli.v1 entry manually; its server credential expires normally."
+			}
+			v["credentialStore"] = *storage
+			if selected == "device" {
+				v["credentialSource"] = "device-session"
+			}
 		}
 		return render(c.OutOrStdout(), v, o.format("json"), "auth")
 	}
@@ -333,6 +421,9 @@ func browserLogin(ctx context.Context, o *options, noBrowser bool, errOut io.Wri
 		Token   string    `json:"token"`
 		Expires time.Time `json:"expiresAt"`
 		Tenant  string    `json:"tenant"`
+		Actor   struct {
+			ID string `json:"id"`
+		} `json:"actor"`
 	}
 	e = authRequest(loginCtx, o.httpClient(), o.Server, "", "", "POST", "/auth/cli/exchange", map[string]string{"code": callback.code, "codeVerifier": verifier, "redirectURI": redirect}, &exchanged)
 	if e != nil {
@@ -341,5 +432,5 @@ func browserLogin(ctx context.Context, o *options, noBrowser bool, errOut io.Wri
 	if !strings.HasPrefix(exchanged.Token, "wp_cli_") || len(exchanged.Token) != 50 || exchanged.Tenant != o.Tenant || !exchanged.Expires.After(time.Now()) || exchanged.Expires.After(time.Now().Add(61*time.Minute)) {
 		return zero, fmt.Errorf("invalid Nines CLI credential response")
 	}
-	return credential{o.Server, o.Tenant, exchanged.Token, exchanged.Expires}, nil
+	return credential{Server: o.Server, Tenant: o.Tenant, Token: exchanged.Token, Expires: exchanged.Expires, Identity: exchanged.Actor.ID, Method: "browser"}, nil
 }

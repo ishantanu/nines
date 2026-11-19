@@ -21,3 +21,14 @@ __pycache__/
 *.pyc
 
 .nines-playground.conf
+
+# Local tooling, generated acceptance reports and Go tests are not image inputs.
+.agents/
+.codex/
+.impeccable/
+.DS_Store
+**/.DS_Store
+**/*_test.go
+collector-acceptance.json
+intent-evaluation*.json
+integration/intent-eval/reports/

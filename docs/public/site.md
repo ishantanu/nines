@@ -1,6 +1,6 @@
 # Product site and logo
 
-The product site and documentation are static pages generated from React components using the same shadcn/ui controls as the application.
+The product site and documentation are static pages generated from React components using the same Astryx components and `nines` theme as the portal. Documentation markdown is rendered to static HTML with Astryx headings, links, code, quotes, tables and buttons, so it needs no client-side Astryx.
 
 - The build prerenders HTML for readers and crawlers without JavaScript.
 - The landing page hydrates its interactive examples; documentation uses a separate small script for navigation, search and copying commands, without loading React in the browser.
@@ -28,20 +28,27 @@ The product site and documentation are static pages generated from React compone
   - Add new public guides to the registry and the Markdown directory in the same change.
 - Every guide is emitted as its own `index.html`, so direct visits and reloads work on GitHub Pages without a server rewrite or JavaScript router.
   - Initial content, navigation, tables, examples and anchors work without JavaScript.
-  - Markdown parsing and the guide corpus are not shipped in the interactive browser bundle.
+  - Markdown parsing happens at build time. Chapter fragments are a separate static data cache, not part of the interactive browser bundle.
   - The production checker verifies every generated HTML page, internal link, fragment and local asset.
-- With JavaScript enabled, chapter links fetch the next prerendered HTML page and replace only the article and outline.
+- With JavaScript enabled, chapter links replace only the article and outline. After first paint, a low-priority request warms a content-addressed cache of prerendered chapter fragments. Once warm, direct chapter clicks need no new HTML request.
   - The sidebar, styles and script remain loaded.
   - Hovering or focusing a chapter link prefetches that guide, with at most two concurrent speculative requests.
-  - An in-memory cache holds up to eight pages; browser Back/Forward restores the route and saved reading position.
+  - The fragment cache is capped at 2 MB of uncompressed JSON. It is separate from the small navigation script and never executes embedded scripts. Data-saver and slow-2G/2G connections skip background warming.
+  - Until warming completes, a clicked chapter fetches its HTML at high priority without waiting for the background request. A failed cache request leaves ordinary chapter navigation available.
+  - An in-memory cache holds up to eight parsed pages; browser Back/Forward restores the route and saved reading position.
   - Modified clicks, downloads and external links keep their native behavior.
   - Failed navigation falls back to a normal full-page visit.
   - This is progressive enhancement: no server API, SPA rewrite or client-side Markdown renderer is required.
 - The documentation script has a regression-tested 12 KB minified budget and no third-party runtime dependencies.
-  - The production build also limits the bootstrap plus static documentation dependencies to 16 KB.
+  - The production build also limits the bootstrap plus static documentation dependencies to 16 KB, and the chapter cache to 3 MB.
   - The landing-page React bundle is requested only on the landing page.
   - This prevents interactive examples from delaying documentation interactivity; it is not a promise of a particular LCP under every network or device.
   - Use Chrome's Performance panel with cache disabled and a consistent throttling profile to compare first visits and navigation after deployment.
+
+## Portal screenshots
+
+- The homepage gallery, README and SLO guides include reviewed captures of the current portal: SLO trends, per-service burn, coverage counts and timestamped chart inspection.
+- Captures use only the synthetic demo workspace (`go run ./cmd/server -demo`), which contains no production or provider data. They are optimized JPEGs, lazy-loaded with reserved dimensions; screenshot bytes are pinned in the public-source allowlist.
 
 ## Examples
 
@@ -111,3 +118,11 @@ python3 -m http.server 4173 --bind 127.0.0.1 --directory dist/site
 - The site continues to mark model-assisted workflows as experimental.
   - Passing scripted adapter fixtures does not establish real model quality.
   - The new guide and website content are published only after this change is merged to `main` and the Product site workflow completes; a feature-branch push does not update the live site.
+
+### Portal sign-in component
+
+The portal uses Beautiful UI's free Notchset Sign In registry block, with the retained MIT source at `web/src/components/ui/notchset/blocks/sign-in.tsx`. A Nines account-form slot connects the existing local/LDAP forms and configured OIDC links. The adapter hides email-code, passkey and signup controls because those backends are not configured. Demo mode uses the same block and keeps `admin / admin` explicitly limited to the sample workspace. The upstream OTP/segmented-control modules are lazy-loaded and are not requested by the account adapter. Authentication, CSRF and tenant/RBAC decisions remain on the server.
+
+### Homepage feature illustrations
+
+The public homepage uses the free MIT Beautiful UI Feature Bento registry block after the detailed critical user journey example, before the portal screenshots. The Features navigation link opens this section directly. Its tiles illustrate change review, documentation discovery, synthetic budget burn and independent approval/application. The block is labelled as illustrative; it does not execute CLI commands, call telemetry providers or change SLOs. The guide palette keeps its three destinations visible until a reader searches, and opens local documentation and retains ordinary links in the prerendered HTML. Readers can pause the illustrations; reduced-motion, hidden-tab and offscreen states stop the shared animation clock. Component attribution is retained in the website's third-party notices. Documentation enhancement JavaScript remains independent of the landing-page component.

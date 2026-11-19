@@ -56,6 +56,7 @@ See the [deployment guides](deployment.md) for container, Linux, Kubernetes, ide
   - The first-release core does not require OpenAI, Anthropic, Gemini or a local model.
   - Review destinations and data sharing before enabling any of them.
   - The [intent evaluation guide](intent-evaluations.md) documents provider/key variables, local Ollama and vLLM endpoints, repeatable checks and measured model limitations.
+- Optional [Git delivery](git-delivery.md) uses a tenant `gitOps` block and a credential environment variable. It opens a pull or merge request on GitHub or GitLab for a reviewed SLO or journey and never applies, merges or deploys.
 - Optional [System One advice with Jev](system-one.md) uses a separate tenant `systemOne` configuration and per-run `systemOneConsent`.
   - A Jev key alone enables no calls.
   - Guided preparation can use this advisory assessment without a generative model.

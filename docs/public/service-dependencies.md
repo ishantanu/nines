@@ -5,6 +5,14 @@ A service dependency map links callers to the services they depend on and associ
 - Use it to review reliability risks across a critical user journey.
 - A map describes relationships; it does not prove causality or calculate end-to-end journey availability.
 
+## Check the availability a service can promise
+
+- A service that needs several critical dependencies in series cannot be more available than they are. The map page shows an **Availability ceiling** panel; `nines dependencies composition ID` and `GET /api/dependency-maps/{id}/composition` return the same check.
+  - For each committed availability SLO, the ceiling is the product of the lowest committed availability target of each directly declared critical dependency.
+  - A target above its ceiling is reported as above the ceiling, with the headroom. If a critical dependency has no committed availability SLO, the result is "within known ceiling" at best, because the true ceiling can only be lower.
+- The calculation assumes the dependencies fail independently, so shared infrastructure can make reality better or worse. It uses declared critical edges only, ignores retries, caches and hedged calls, and ignores experimental, aspirational and deprecated SLOs.
+- It bounds what can be promised. It does not show that a service meets its SLO, and it reads stored definitions only: no provider call, model call or write.
+
 ## Create and edit a map
 
 - Open **Service dependencies → Define dependency map**.

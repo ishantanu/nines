@@ -1,4 +1,5 @@
 import { Users } from "./users";
+import { NativeSelect } from "@/components/ui/select";
 import { useEffect, useState } from "react";
 import { api, message, type RequestScope } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -717,7 +718,7 @@ export function TeamAccess({ scope }: { scope: RequestScope }) {
                 <>
                   <div>
                     <Label htmlFor="member-provider">Identity provider</Label>
-                    <select
+                    <NativeSelect
                       id="member-provider"
                       className={field}
                       disabled={draft.version > 0}
@@ -731,7 +732,7 @@ export function TeamAccess({ scope }: { scope: RequestScope }) {
                           {p.name} ({p.type})
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                   </div>
                   <div>
                     <Label htmlFor="member-subject">Identity subject</Label>
@@ -786,7 +787,7 @@ export function TeamAccess({ scope }: { scope: RequestScope }) {
               )}
               <div>
                 <Label htmlFor="access-role">Role</Label>
-                <select
+                <NativeSelect
                   id="access-role"
                   className={field}
                   value={draft.role}
@@ -802,7 +803,7 @@ export function TeamAccess({ scope }: { scope: RequestScope }) {
                       {r}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </div>
               {draft.kind === "team" ? (
                 <fieldset>

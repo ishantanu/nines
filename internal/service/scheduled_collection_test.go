@@ -94,7 +94,7 @@ func TestScheduledCatchupIsBoundedAndRespectsRetention(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if to.Sub(from) > 300*time.Second || from.Before(now.Add(-2*time.Duration(window)*time.Second)) || !to.Before(now) {
+		if to.Sub(from) > 300*time.Second || from.Before(now.Add(-time.Duration(c.RetentionSeconds())*time.Second)) || !to.Before(now) {
 			t.Fatal("unbounded or future collection", from, to)
 		}
 	}

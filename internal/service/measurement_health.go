@@ -24,7 +24,7 @@ func (s *Service) inspectBinding(ctx context.Context, ref v1.BindingReference) (
 		return out, err
 	}
 	out.SourceDigest = s.SourceFingerprint(b.Spec.Source)
-	evidence, err := s.DiscoverTelemetry(ctx, b.Spec.Source, b.Spec.Metric, b.Spec.Labels)
+	evidence, err := s.discoverMeasurement(ctx, b.Spec.Source, b.Spec.Metric, b.Spec.EventMetric, b.Spec.Labels)
 	if err != nil {
 		return out, nil
 	}
@@ -32,7 +32,7 @@ func (s *Service) inspectBinding(ctx context.Context, ref v1.BindingReference) (
 		return out, model.ErrRevisionConflict
 	}
 	out.Fingerprint = evidence.Fingerprint
-	if evidence.Truncated || len(evidence.Metadata) != 1 || len(evidence.Series) == 0 {
+	if evidence.Truncated || len(evidence.Metadata) != metadataExpected(b.Spec.Measurement) || len(evidence.Series) == 0 {
 		out.State = "unknown"
 		out.Code = "insufficient_evidence"
 		out.Message = "Discovery evidence is missing, ambiguous or truncated; compatibility cannot be established."
@@ -183,7 +183,7 @@ func (s *Service) RunMeasurementMonitor(ctx context.Context, log *slog.Logger) {
 
 func (s *Service) inspectInlineMeasurement(ctx context.Context, c model.SLO) (v1.BindingHealth, error) {
 	out := v1.BindingHealth{APIVersion: v1.APIVersion, Tenant: s.TenantID, MeasurementDigest: MeasurementDigest(c), SourceDigest: s.SourceFingerprint(c.Source), CheckedAt: s.Now().UTC(), State: "unavailable", Code: "telemetry_unavailable", Message: "Measurement evidence is unavailable."}
-	evidence, err := s.DiscoverTelemetry(ctx, sourceID(c.Source), c.Measurement.Metric, c.Measurement.Labels)
+	evidence, err := s.discoverMeasurement(ctx, sourceID(c.Source), c.Measurement.Metric, c.Measurement.EventMetric, c.Measurement.Labels)
 	if err != nil {
 		return out, nil
 	}
@@ -191,7 +191,7 @@ func (s *Service) inspectInlineMeasurement(ctx context.Context, c model.SLO) (v1
 		return out, model.ErrRevisionConflict
 	}
 	out.Fingerprint = evidence.Fingerprint
-	if evidence.Truncated || len(evidence.Series) == 0 || len(evidence.Metadata) != 1 {
+	if evidence.Truncated || len(evidence.Series) == 0 || len(evidence.Metadata) != metadataExpected(c.Measurement.Type) {
 		out.State = "unknown"
 		out.Code = "insufficient_evidence"
 		out.Message = "Recent telemetry does not establish the measurement contract."

@@ -1,4 +1,5 @@
 import { FormField } from "@/components/ui/form-layout";
+import { NativeSelect } from "@/components/ui/select";
 import { useId } from "react";
 import type { SLOLifecycle } from "@/lib/api";
 
@@ -15,7 +16,7 @@ export function SLOLifecycleSelect({
   return (
     <div className="space-y-2">
       <FormField htmlFor={id} label="Lifecycle">
-        <select
+        <NativeSelect
           id={id}
           className="h-9 w-full rounded-md border bg-background px-3 text-sm"
           value={value}
@@ -26,7 +27,7 @@ export function SLOLifecycleSelect({
           <option value="aspirational">Aspirational</option>
           <option value="committed">Committed</option>
           <option value="deprecated">Deprecated</option>
-        </select>
+        </NativeSelect>
       </FormField>
       <p className="text-xs text-muted-foreground">
         {value === "committed"

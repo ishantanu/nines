@@ -13,6 +13,7 @@ type SLOIntent struct {
 	Spec       IntentSpec `json:"spec" yaml:"spec"`
 }
 type IntentSpec struct {
+	Exclusions        *IntentExclusions         `json:"exclusions,omitempty" yaml:"exclusions,omitempty"`
 	ErrorBudgetPolicy *ErrorBudgetPolicy        `json:"errorBudgetPolicy,omitempty" yaml:"errorBudgetPolicy,omitempty"`
 	Quality           *MeasurementQualityPolicy `json:"quality,omitempty" yaml:"quality,omitempty"`
 	Lifecycle         SLOLifecycle              `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`
@@ -133,4 +134,13 @@ type IntentDraft struct {
 	Intent         *SLOIntent `json:"intent,omitempty"`
 	Clarifications []string   `json:"clarifications"`
 	Warnings       []string   `json:"warnings"`
+}
+
+// IntentExclusions records observation boundaries for human review. It is not
+// an executable filter; eligible events are still defined by the measurement.
+// Omission means not recorded. None is an explicit assertion of no additional
+// observation exclusions; it cannot be combined with boundaries.
+type IntentExclusions struct {
+	None                  bool     `json:"none,omitempty" yaml:"none,omitempty"`
+	ObservationBoundaries []string `json:"observationBoundaries,omitempty" yaml:"observationBoundaries,omitempty"`
 }

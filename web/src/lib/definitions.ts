@@ -5,6 +5,9 @@ export interface SLODefinition {
   kind: "ServiceLevelObjective";
   metadata: { name: string; project: string };
   spec: {
+    customers?: SLO["customers"];
+    badInterval?: SLO["badInterval"];
+    labels?: SLO["labels"];
     lifecycle?: SLO["lifecycle"];
     quality?: SLO["quality"];
     errorBudgetPolicy?: SLO["errorBudgetPolicy"];
@@ -43,6 +46,11 @@ export function definitionFromSLO(slo: SLO): SLODefinition {
       ...(slo.queryLanguage ? { queryLanguage: slo.queryLanguage } : {}),
       ...(slo.source ? { source: slo.source } : {}),
       ...(slo.lifecycle ? { lifecycle: slo.lifecycle } : {}),
+      ...(slo.badInterval ? { badInterval: slo.badInterval } : {}),
+      ...(slo.customers ? { customers: slo.customers } : {}),
+      ...(slo.labels && Object.keys(slo.labels).length
+        ? { labels: slo.labels }
+        : {}),
       ...(slo.quality ? { quality: slo.quality } : {}),
       ...(slo.errorBudgetPolicy
         ? { errorBudgetPolicy: slo.errorBudgetPolicy }

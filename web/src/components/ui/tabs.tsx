@@ -1,90 +1,159 @@
 "use client";
 
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
+import { Tab, TabList } from "@astryxdesign/core/TabList";
+import { Tooltip } from "@astryxdesign/core/Tooltip";
 import { cn } from "cn";
-import { Tabs as TabsPrimitive } from "radix-ui";
+import { replayLabels } from "@/lib/replay-labels";
+
+// Adapter over Astryx TabList/Tab. Astryx owns the tab strip only, so this
+// supplies the selected-value state and the tab panels around it.
+type TabsState = {
+  value: string;
+  select: (value: string) => void;
+  base: string;
+  disabled: React.RefObject<Set<string>>;
+};
+const TabsContext = React.createContext<TabsState | null>(null);
+function useTabs(): TabsState {
+  const state = React.useContext(TabsContext);
+  if (!state) throw new Error("Tabs components must be rendered inside Tabs");
+  return state;
+}
+const panelId = (base: string, value: string) => `${base}-panel-${value}`;
 
 function Tabs({
+  value: controlled,
+  defaultValue = "",
+  onValueChange,
   className,
-  orientation = "horizontal",
+  children,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.Root>) {
+}: Omit<React.ComponentProps<"div">, "dir" | "defaultValue" | "onChange"> & {
+  value?: string;
+  defaultValue?: string;
+  onValueChange?: (value: string) => void;
+  orientation?: "horizontal" | "vertical";
+}) {
+  const [uncontrolled, setUncontrolled] = React.useState(defaultValue);
+  const base = React.useId();
+  const disabled = React.useRef(new Set<string>());
+  const value = controlled ?? uncontrolled;
+  const select = React.useCallback(
+    (next: string) => {
+      if (disabled.current.has(next)) return;
+      if (controlled === undefined) setUncontrolled(next);
+      onValueChange?.(next);
+    },
+    [controlled, onValueChange],
+  );
+  const { orientation: _orientation, ...rest } = props;
   return (
-    <TabsPrimitive.Root
-      data-slot="tabs"
-      data-orientation={orientation}
-      orientation={orientation}
-      className={cn(
-        "group/tabs flex min-w-0 gap-2 data-[orientation=horizontal]:flex-col",
-        className,
-      )}
-      {...props}
-    />
+    <TabsContext.Provider value={{ value, select, base, disabled }}>
+      <div
+        data-slot="tabs"
+        className={cn("flex min-w-0 flex-col gap-2", className)}
+        {...rest}
+      >
+        {children}
+      </div>
+    </TabsContext.Provider>
   );
 }
-
-const tabsListVariants = cva(
-  "group/tabs-list inline-flex h-auto min-h-9 w-fit max-w-full flex-wrap items-center justify-start  rounded-md p-[3px] text-muted-foreground  group-data-[orientation=vertical]/tabs:h-fit group-data-[orientation=vertical]/tabs:flex-col data-[variant=line]:rounded-none",
-  {
-    variants: {
-      variant: {
-        default: "bg-muted",
-        line: "gap-1 bg-transparent",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-    },
-  },
-);
 
 function TabsList({
   className,
-  variant = "default",
-  ...props
-}: React.ComponentProps<typeof TabsPrimitive.List> &
-  VariantProps<typeof tabsListVariants>) {
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+  variant?: "default" | "line";
+}) {
+  const { value, select } = useTabs();
   return (
-    <TabsPrimitive.List
+    <TabList
+      role="tablist"
       data-slot="tabs-list"
-      data-variant={variant}
-      className={cn(tabsListVariants({ variant }), className)}
-      {...props}
-    />
+      className={className}
+      value={value}
+      onChange={select}
+      size="sm"
+    >
+      {children}
+    </TabList>
   );
+}
+
+function textOf(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (React.isValidElement<{ children?: React.ReactNode }>(node))
+    return textOf(node.props.children);
+  return "";
 }
 
 function TabsTrigger({
+  value,
+  disabled = false,
+  title,
   className,
-  ...props
-}: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
-  return (
-    <TabsPrimitive.Trigger
+  children,
+}: {
+  value: string;
+  disabled?: boolean;
+  title?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const { base, disabled: blocked } = useTabs();
+  React.useLayoutEffect(() => {
+    if (disabled) blocked.current.add(value);
+    return () => {
+      blocked.current.delete(value);
+    };
+  }, [blocked, disabled, value]);
+  const label = textOf(children);
+  const tab = (
+    <Tab
       data-slot="tabs-trigger"
-      className={cn(
-        "relative inline-flex min-h-9 flex-none items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors group-data-[orientation=vertical]/tabs:w-full group-data-[orientation=vertical]/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 group-data-[variant=default]/tabs-list:data-[state=active]:shadow-sm group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none dark:text-muted-foreground dark:hover:text-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-        "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:border-transparent dark:group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
-        "data-[state=active]:bg-background data-[state=active]:text-foreground dark:data-[state=active]:border-input dark:data-[state=active]:bg-background dark:data-[state=active]:text-foreground",
-        "after:absolute after:bg-foreground after:opacity-0 after:transition-opacity group-data-[orientation=horizontal]/tabs:after:inset-x-0 group-data-[orientation=horizontal]/tabs:after:bottom-[-5px] group-data-[orientation=horizontal]/tabs:after:h-0.5 group-data-[orientation=vertical]/tabs:after:inset-y-0 group-data-[orientation=vertical]/tabs:after:-right-1 group-data-[orientation=vertical]/tabs:after:w-0.5 group-data-[variant=line]/tabs-list:data-[state=active]:after:opacity-100",
-        className,
-      )}
-      {...props}
+      className={className}
+      value={value}
+      label={label}
+      panelId={panelId(base, value)}
+      aria-disabled={disabled || undefined}
+      data-replay-label={replayLabels.has(label) ? label : undefined}
     />
   );
+  // Explains why a tab is unavailable; Tab itself has no tooltip prop.
+  return title ? <Tooltip content={title}>{tab}</Tooltip> : tab;
 }
 
 function TabsContent({
+  value,
+  forceMount,
   className,
+  children,
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.Content>) {
+}: Omit<React.ComponentProps<"div">, "dir"> & {
+  value: string;
+  forceMount?: true;
+}) {
+  const { value: active, base } = useTabs();
+  const selected = active === value;
+  if (!selected && !forceMount) return null;
   return (
-    <TabsPrimitive.Content
-      data-slot="tabs-content"
-      className={cn("min-w-0 flex-1 outline-none", className)}
+    <div
       {...props}
-    />
+      id={panelId(base, value)}
+      role="tabpanel"
+      data-slot="tabs-content"
+      data-state={selected ? "active" : "inactive"}
+      hidden={!selected}
+      className={cn("min-w-0 flex-1 outline-none", className)}
+    >
+      {children}
+    </div>
   );
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants };
+export { Tabs, TabsList, TabsTrigger, TabsContent };

@@ -1,0 +1,208 @@
+{
+  "suite": "workflow",
+  "apiVersion": "nines.dev/v1alpha1",
+  "kind": "IntentEvaluationReport",
+  "mode": "live",
+  "suiteSHA256": "d8cb713746446779dab747e8f68339fbb7cc8c14a9093e934c535f43434ee229",
+  "generatedAt": "2026-11-02T20:02:30.111705Z",
+  "complete": true,
+  "runtimeVersion": "Ollama 0.40.11; Metal; context 8192; parallel 1; prewarmed",
+  "results": [
+    {
+      "modelCalls": 2,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "workflowError": "model_capability_unavailable",
+      "case": "availability-reviewed-apply",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 36558
+    },
+    {
+      "modelCalls": 1,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "case": "latency-reviewed-apply",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "needs_input",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 3518
+    },
+    {
+      "modelCalls": 1,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "case": "ambiguous-goal",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": true,
+      "status": "needs_input",
+      "durationMilliseconds": 3025
+    },
+    {
+      "modelCalls": 3,
+      "toolAttempts": 2,
+      "toolSequence": [
+        "draft_goal",
+        "find_measurements"
+      ],
+      "workflowError": "model_capability_unavailable",
+      "case": "missing-population",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 41434
+    },
+    {
+      "modelCalls": 2,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "workflowError": "model_capability_unavailable",
+      "case": "missing-metric",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_error",
+      "durationMilliseconds": 27039
+    },
+    {
+      "modelCalls": 2,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "workflowError": "model_capability_unavailable",
+      "case": "sparse-traffic",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 25379
+    },
+    {
+      "modelCalls": 2,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "workflowError": "model_capability_unavailable",
+      "case": "no-traffic",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 31503
+    },
+    {
+      "modelCalls": 1,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "case": "conflicting-cuj",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "needs_input",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 3218
+    },
+    {
+      "modelCalls": 2,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "workflowError": "model_capability_unavailable",
+      "case": "stale-binding-approval",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 25726
+    },
+    {
+      "modelCalls": 2,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "workflowError": "model_capability_unavailable",
+      "case": "changed-mimir-dataset",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 39308
+    },
+    {
+      "modelCalls": 2,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "workflowError": "model_capability_unavailable",
+      "case": "ambiguous-apply-readback",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 23460
+    },
+    {
+      "modelCalls": 2,
+      "toolAttempts": 2,
+      "toolSequence": [
+        "draft_goal",
+        "ask_user"
+      ],
+      "case": "template-availability-reviewed-apply",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "needs_input",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 8494
+    },
+    {
+      "modelCalls": 1,
+      "toolAttempts": 1,
+      "toolSequence": [
+        "draft_goal"
+      ],
+      "case": "template-latency-reviewed-apply",
+      "provider": "ollama",
+      "model": "granite4.1:3b",
+      "passed": false,
+      "status": "needs_input",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 4234
+    }
+  ],
+  "passed": 1,
+  "failed": 12,
+  "skipped": [
+    "reject-provider-routing-tool"
+  ]
+}

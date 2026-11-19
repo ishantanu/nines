@@ -135,6 +135,13 @@ case "$command" in
     printf 'backend=%s\njev=%s\nai=%s\ntopology=%s\nproviders=%s\n' "$backend" "$jev" "$ai" "$topology" "$providers" > "$tmp"
     mv -- "$tmp" "$STATE"
     trap - EXIT HUP INT TERM
+    printf 'Playground: backend=%s; Jev=%s; AI=%s; topology=%s\n' "$backend" "$jev" "$ai" "$topology"
+    if [ -n "$providers" ]; then
+      printf 'Custom tenant configuration: %s\n' "$providers"
+      echo 'This overrides built-in tenant routing. Use --no-providers to restore the local demo configuration.'
+    else
+      printf 'Built-in tenant configuration: %s\n' "$NINES_PLAYGROUND_TENANTS_FILE"
+    fi
     if [ "$build" = 1 ]; then "$@" up --build -d; else "$@" up --no-build -d; fi
     wait_setup setup "$@"
     [ "$ai" = 0 ] || wait_setup ai-setup "$@"
