@@ -38,8 +38,9 @@ spec:
                                         type: number
                                     minEvents:
                                         type: number
-                                required:
-                                    - errorRate
+                                    minGoodEvents:
+                                        type: number
+                                required: []
                                 type: object
                             customers:
                                 nullable: true

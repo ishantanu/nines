@@ -186,7 +186,9 @@ export function SLOPerformance({
                   ? [
                       [
                         "Counting",
-                        `Judged intervals: bad above ${(slo.badInterval.errorRate * 100).toFixed(2)}% errors`,
+                        slo.badInterval.minGoodEvents
+                          ? `Judged intervals: good at ${slo.badInterval.minGoodEvents.toLocaleString()} or more good events`
+                          : `Judged intervals: bad above ${((slo.badInterval.errorRate ?? 0) * 100).toFixed(2)}% errors`,
                       ],
                     ]
                   : []),

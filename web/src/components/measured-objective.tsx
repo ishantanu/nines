@@ -4,7 +4,11 @@ import { createPortal } from "react-dom";
 import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { api, canEdit, message, type RequestScope } from "@/lib/api";
 import { type BindingManifest } from "@/lib/topology";
-import { prepareInlineObjective } from "@/lib/measurement";
+import {
+  isThresholdKind,
+  measurementWords,
+  prepareInlineObjective,
+} from "@/lib/measurement";
 import {
   inlineObjectiveDefinition,
   inlineObjectiveDraft,
@@ -48,8 +52,8 @@ export function MeasurementSummary({
         </dd>
         <dt className="text-muted-foreground">Good events</dt>
         <dd className="break-words">
-          {s.measurement === "latency"
-            ? `Duration at most ${s.thresholdSeconds} seconds`
+          {isThresholdKind(s.measurement)
+            ? measurementWords[s.measurement].summary(s.thresholdSeconds)
             : Object.entries(s.successLabels ?? {})
                 .map(([k, v]) => `${k} = ${JSON.stringify(v)}`)
                 .join(", ")}
@@ -71,7 +75,7 @@ export function MeasuredObjective({
   value,
   onChange,
   fixedName,
-  onChooseGoodMinute,
+  onChooseInterval,
   connections,
   footer,
 }: {
@@ -81,8 +85,8 @@ export function MeasuredObjective({
   value: InlineObjectiveDraft;
   onChange: (value: InlineObjectiveDraft) => void;
   fixedName?: boolean;
-  /** Switches the dialog to Settings with interval judging enabled. */
-  onChooseGoodMinute?: () => void;
+  /** Switches the dialog to Settings with interval judging in this mode. */
+  onChooseInterval?: (mode: "errorRate" | "throughput") => void;
   connections: { id: string; kind: string }[];
   footer?: HTMLElement | null;
 }) {
@@ -194,9 +198,29 @@ export function MeasuredObjective({
         <>
           <SLOKindSelect
             value={draft.measurement}
+            perCustomer={!!value.customers}
             disabled={busy || !canEdit(scope)}
             onChoose={(kind) => {
-              if (kind === "good-minute") return onChooseGoodMinute?.();
+              if (kind === "good-minute")
+                return onChooseInterval?.("errorRate");
+              if (kind === "throughput")
+                return onChooseInterval?.("throughput");
+              if (kind === "customers")
+                // An add-on to the current type. Sessions cannot be grouped
+                // by customer, so they switch to availability.
+                return change(() =>
+                  onChange({
+                    ...value,
+                    customers: value.customers ?? {
+                      label: "",
+                      customers: [{ value: "", name: "" }],
+                    },
+                    measurement:
+                      draft.measurement === "sessions"
+                        ? { ...draft, measurement: "availability" }
+                        : draft,
+                  }),
+                );
               change(() =>
                 onChange({
                   ...value,

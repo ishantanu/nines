@@ -1,4 +1,5 @@
 import { observedFetch } from "./observability";
+import type { MeasurementKind } from "./measurement";
 export type Health = "healthy" | "at_risk" | "unknown" | "degraded";
 export type SLOLifecycle =
   "experimental" | "aspirational" | "committed" | "deprecated";
@@ -45,7 +46,7 @@ export interface BurnRatePolicy {
   minCoverage: number;
 }
 export type MeasurementSpec = {
-  type: "availability" | "latency" | "sessions";
+  type: MeasurementKind;
   metric: string;
   /** Sessions only: counter incremented once per session that had the event. */
   eventMetric?: string;
@@ -187,11 +188,14 @@ export interface CustomerReport {
   items: CustomerResult[];
   limitations: string[];
 }
+/** Judge intervals by exactly one rule: errorRate (good-minute) or minGoodEvents (throughput). */
 export interface BadIntervalPolicy {
-  /** An interval is bad when its error rate exceeds this fraction (0 to 1, exclusive). */
-  errorRate: number;
-  /** Intervals with fewer events are not judged (at least one event is always required). */
+  /** Good-minute: an interval is bad when its error rate exceeds this fraction (0 to 1, exclusive). */
+  errorRate?: number;
+  /** Good-minute: intervals with fewer events are not judged (at least one event is always required). */
   minEvents?: number;
+  /** Throughput: an interval is good when it records at least this many good events. */
+  minGoodEvents?: number;
 }
 export interface SLO {
   /** Opt-in per-customer reporting for an explicit allowlist. */

@@ -315,3 +315,34 @@ test("a session measurement survives editing and round-trips through the guided 
   };
   expect(() => parseObjectiveDefinition(stringify(bad))).toThrow();
 });
+
+test("the book's SLI kinds round-trip between YAML and the guided form", () => {
+  for (const kind of ["correctness", "durability", "coverage"] as const) {
+    const d = definition();
+    d.spec.measurement!.type = kind;
+    d.spec.measurement!.successLabels = { verdict: "pass" };
+    const parsed = parseObjectiveDefinition(stringify(d));
+    expect(parsed.spec.measurement!.type).toBe(kind);
+    const result = inlineObjectiveDefinition(inlineObjectiveDraft(parsed));
+    expect(result.spec.measurement).toMatchObject({
+      type: kind,
+      successLabels: { verdict: "pass" },
+    });
+  }
+  const d = definition();
+  d.spec.measurement = {
+    type: "freshness",
+    metric: "record_age_seconds",
+    labels: { pipeline: "index" },
+    thresholdSeconds: 300,
+    scrapeIntervalSeconds: 15,
+    observationPoint: "Age of each record when served.",
+  };
+  const parsed = parseObjectiveDefinition(stringify(d));
+  const result = inlineObjectiveDefinition(inlineObjectiveDraft(parsed));
+  expect(result.spec.measurement).toMatchObject({
+    type: "freshness",
+    thresholdSeconds: 300,
+  });
+  expect(result.spec.measurement!.successLabels).toBeUndefined();
+});

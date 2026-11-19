@@ -331,16 +331,16 @@ export function ObjectiveCreate({
       setMeasurementAck(false);
     }
   }
-  // Good-minute is judged from interval-count queries, so it lives in
-  // Settings with custom queries and interval judging switched on.
-  function chooseGoodMinute() {
+  // Good-minute and throughput are judged from interval-count queries, so they
+  // live in Settings with custom queries and interval judging switched on.
+  function chooseInterval(mode: "errorRate" | "throughput") {
     try {
       const current = document();
       const d = objectiveDraft(current, undefined);
       setDraft({
         ...d,
         customMeasurement: !!current.spec.measurement || d.customMeasurement,
-        interval: { ...d.interval, enabled: true },
+        interval: { ...d.interval, enabled: true, mode },
       });
       setDefinition(current);
       setText(stringify(current));
@@ -502,7 +502,7 @@ export function ObjectiveCreate({
                     invalidate();
                   }}
                   fixedName={!!resource}
-                  onChooseGoodMinute={chooseGoodMinute}
+                  onChooseInterval={chooseInterval}
                   connections={connections}
                   scope={scope}
                   onBusyChange={setBusy}

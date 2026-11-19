@@ -16,10 +16,11 @@ func catalog() []v1.SLOTemplate {
 	return []v1.SLOTemplate{
 		event("request-availability", "request-serving", "availability", "Request availability", "Completed eligible server requests", "Requests classified as successful", "http_requests_total", "status", "200", "api", "Includes server completions only; instrument edge failures separately. Define success codes and retry treatment."),
 		latency("request-latency", "request-serving", "latency", "Request latency", "http_request_duration_seconds", "api", .3, "Completed eligible server requests, including error completions when instrumented. Pair with availability."),
-		event("pipeline-correctness", "pipeline", "correctness", "Pipeline correctness", "All eligible records receiving a validation verdict", "Records passing the versioned validation contract", "pipeline_records_total", "verdict", "pass", "pipeline", "Count invalid and unevaluable records in the population; do not emit only successful records."),
-		latency("pipeline-freshness", "pipeline", "freshness", "Pipeline freshness", "pipeline_record_age_seconds", "pipeline", 300, "Record age at delivery relative to event time, in seconds. Missing deliveries are absent from this histogram; pair with delivery coverage."),
+		revised(event("pipeline-correctness", "pipeline", "correctness", "Pipeline correctness", "All eligible records receiving a validation verdict", "Records passing the versioned validation contract", "pipeline_records_total", "verdict", "pass", "pipeline", "Count invalid and unevaluable records in the population; do not emit only successful records."), 2),
+		revised(latency("pipeline-freshness", "pipeline", "freshness", "Pipeline freshness", "pipeline_record_age_seconds", "pipeline", 300, "Record age at delivery relative to event time, in seconds. Missing deliveries are absent from this histogram; pair with delivery coverage."), 2),
+		event("pipeline-coverage", "pipeline", "coverage", "Pipeline coverage", "Every record received by the pipeline, counted once on arrival", "Records written to the output", "pipeline_records_received_total", "outcome", "processed", "pipeline", "Count a record once when it arrives and label its terminal outcome; records lost before arrival are invisible to this SLI, so pair it with an upstream delivery count."),
 		event("storage-operation-success", "storage", "availability", "Storage operation success", "All eligible storage operation completions", "Operations acknowledged successfully", "storage_operations_total", "outcome", "success", "storage", "An acknowledgement measures operation success, not long-term durability. Verify durability through separate integrity checks."),
-		event("storage-integrity", "storage", "correctness", "Storage integrity checks", "All scheduled object integrity checks reaching a terminal verdict", "Checks confirming the declared integrity contract", "storage_integrity_checks_total", "verdict", "pass", "storage", "Emit failures and unknown verdicts. Check completion coverage separately; sampled checks do not establish universal durability."),
+		revised(event("storage-integrity", "storage", "durability", "Storage integrity checks", "All scheduled object integrity checks reaching a terminal verdict", "Checks confirming the declared integrity contract", "storage_integrity_checks_total", "verdict", "pass", "storage", "Emit failures and unknown verdicts. Check completion coverage separately; sampled checks do not establish universal durability."), 2),
 		event("agent-task-completion", "agent", "task-success", "Agent task completion", "One terminal outcome per eligible logical task, after internal retries", "Tasks satisfying the declared user outcome", "agent_tasks_total", "outcome", "success", "agent", "Emit failed, cancelled and timed-out task outcomes. Tool success alone does not establish task completion."),
 		event("agent-tool-success", "agent", "tool-success", "Agent tool-call success", "Every eligible tool attempt, including retries", "Attempts satisfying the tool result contract", "agent_tool_calls_total", "outcome", "success", "agent", "A transport 200 is insufficient when the tool result contains a domain error. This measures attempts, not logical tasks."),
 		event("agent-budget-compliance", "agent", "budget-compliance", "Agent task budget compliance", "One terminal budget verdict per eligible logical task", "Tasks within the declared cost, token and step limits", "agent_task_budget_total", "verdict", "pass", "agent", "Define limits and accounting version in instrumentation; emit unknown costs as unknown verdicts, never pass. No universal cost conversion is assumed."),
@@ -39,11 +40,35 @@ func base(id, category, sli, title, eligible, good, service, requirement string,
 	t.Digest = model.DefinitionDigest(t)
 	return t
 }
+
+// event templates count good events over eligible events. The SLI kind is the
+// measurement type when it is one (correctness, durability, coverage), and
+// availability otherwise (task success, tool success and similar ratios).
 func event(id, category, sli, title, eligible, good, metric, label, value, service, requirement string) v1.SLOTemplate {
-	return base(id, category, sli, title, eligible, good, service, requirement, v1.MeasurementSpec{Type: "availability", Metric: metric, CountFrom: "counter", SuccessLabels: map[string]string{label: value}})
+	kind := "availability"
+	if model.RatioMeasurement(sli) {
+		kind = sli
+	}
+	return base(id, category, sli, title, eligible, good, service, requirement, v1.MeasurementSpec{Type: kind, Metric: metric, CountFrom: "counter", SuccessLabels: map[string]string{label: value}})
 }
+
+// latency templates judge a histogram at a threshold. A freshness template
+// measures data age instead of duration and is typed freshness.
 func latency(id, category, sli, title, metric, service string, threshold float64, eligible string) v1.SLOTemplate {
-	return base(id, category, sli, title, eligible, "Observed duration at most the selected threshold", service, "Requires a classic histogram in seconds with an exact matching le bucket and count series; summaries and percentile gauges are unsupported.", v1.MeasurementSpec{Type: "latency", Metric: metric, ThresholdSeconds: &threshold})
+	kind, good := "latency", "Observed duration at most the selected threshold"
+	if sli == "freshness" {
+		kind, good = "freshness", "Data age at most the selected threshold"
+	}
+	return base(id, category, sli, title, eligible, good, service, "Requires a classic histogram in seconds with an exact matching le bucket and count series; summaries and percentile gauges are unsupported.", v1.MeasurementSpec{Type: kind, Metric: metric, ThresholdSeconds: &threshold})
+}
+
+// revised marks a template whose definition changed after release, so a
+// client holding the old digest sees a new revision rather than a silent edit.
+func revised(t v1.SLOTemplate, revision int) v1.SLOTemplate {
+	t.Revision = revision
+	t.Digest = ""
+	t.Digest = model.DefinitionDigest(t)
+	return t
 }
 
 // List returns the built-in catalog. Configured registries use the same contract.

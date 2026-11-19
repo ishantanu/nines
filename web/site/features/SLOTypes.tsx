@@ -31,10 +31,11 @@ export function SLOTypes() {
       <div className="section-heading">
         <h2 id="slo-types-title">One platform, every kind of SLO.</h2>
         <p>
-          Availability and latency cover most services. Sessions, good-minute
-          intervals and agent journey runs cover what a plain event ratio hides.
-          Per-customer reports, labels and budget response levels add to any of
-          them.
+          Every SLI kind from the SRE book: availability and latency for
+          serving, durability for storage, and freshness, coverage, correctness
+          and throughput for pipelines. Sessions, good-minute intervals and
+          agent journey runs cover what a plain event ratio hides. Per-customer
+          reports, labels and budget response levels add to any of them.
         </p>
       </div>
       <Tabs defaultValue="availability" className="definition-panel">

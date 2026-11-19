@@ -1,4 +1,5 @@
 import { latencyDuration } from "@/lib/latency-duration";
+import type { MeasurementKind } from "@/lib/measurement";
 import { NativeSelect } from "@/components/ui/select";
 import { useId, useState } from "react";
 import type { IntentDocument } from "@/lib/intent";
@@ -26,7 +27,7 @@ export function goalWithMeasurement(
       project: goal.metadata.project,
       service: goal.spec.service,
       source: goal.spec.source,
-      measurement: goal.spec.outcome as "availability" | "latency",
+      measurement: goal.spec.outcome as MeasurementKind,
       population: Object.entries(goal.spec.population).map(
         ([label, value]) => ({ label, value }),
       ),
@@ -109,7 +110,7 @@ export function IntentMeasurementEditor({
   const [draft, setDraft] = useState<MeasurementDraft>(() => ({
     ...measurementDraft(),
     metric: goal.spec.measurement?.metric ?? "",
-    measurement: goal.spec.outcome as "availability" | "latency",
+    measurement: goal.spec.outcome as MeasurementKind,
     step: String(goal.spec.stepSeconds ?? 60),
     scrape: String(goal.spec.measurement?.scrapeIntervalSeconds ?? 15),
     observationPoint: goal.spec.measurement?.observationPoint ?? "",

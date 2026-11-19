@@ -325,13 +325,13 @@ func inspectCandidateEvidence(candidate *v1.IntentMeasurementCandidate, e v1.Tel
 	}
 	exact := false
 	for _, template := range templates {
-		if template.Manifest.Spec.Measurement != nil && template.Manifest.Spec.Measurement.Type == measurementType && template.Manifest.Spec.Measurement.Metric == candidate.Metric {
+		if template.Manifest.Spec.Measurement != nil && model.MeasurementFamily(template.Manifest.Spec.Measurement.Type) == measurementType && template.Manifest.Spec.Measurement.Metric == candidate.Metric {
 			exact = true
 		}
 	}
 	for _, template := range templates {
 		m := template.Manifest.Spec.Measurement
-		if m == nil || m.Type != measurementType || (exact && m.Metric != candidate.Metric) {
+		if m == nil || model.MeasurementFamily(m.Type) != measurementType || (exact && m.Metric != candidate.Metric) {
 			continue
 		}
 		basis := "measurement_type_only"

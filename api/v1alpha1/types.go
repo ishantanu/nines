@@ -54,14 +54,23 @@ func (l SLOLifecycle) Valid() bool {
 }
 
 // BadIntervalPolicy changes what the SLI counts: instead of events, the SLO
-// counts judged intervals (one per step, a "minute" when the step is 60s). An
-// interval is bad when its error rate exceeds ErrorRate, so a steady noise
-// floor below that line cannot consume the budget while real incidents do.
-// Intervals with fewer than MinEvents events (and at least one) are not judged.
+// counts judged intervals (one per step, a "minute" when the step is 60s).
+// Set exactly one judging rule:
+//   - ErrorRate (good-minute): an interval is bad when its error rate exceeds
+//     ErrorRate, so a steady noise floor below that line cannot consume the
+//     budget while real incidents do. Intervals with fewer than MinEvents
+//     events (and at least one) are not judged.
+//   - MinGoodEvents (throughput): every observed interval is judged, and it
+//     is good when it records at least MinGoodEvents good events, so a stalled
+//     or slowed pipeline spends budget even though nothing failed.
 type BadIntervalPolicy struct {
-	ErrorRate float64 `json:"errorRate" yaml:"errorRate"`
-	MinEvents float64 `json:"minEvents,omitempty" yaml:"minEvents,omitempty"`
+	ErrorRate     float64 `json:"errorRate,omitempty" yaml:"errorRate,omitempty"`
+	MinEvents     float64 `json:"minEvents,omitempty" yaml:"minEvents,omitempty"`
+	MinGoodEvents float64 `json:"minGoodEvents,omitempty" yaml:"minGoodEvents,omitempty"`
 }
+
+// Throughput reports whether the policy judges intervals by volume.
+func (b BadIntervalPolicy) Throughput() bool { return b.MinGoodEvents > 0 }
 
 type SLOSpec struct {
 	// Customers opts the SLO into per-customer reporting for an explicit allowlist.

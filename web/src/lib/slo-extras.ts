@@ -31,18 +31,31 @@ export function labelsFromRows(
 
 export type IntervalDraft = {
   enabled: boolean;
+  /** "errorRate" judges good-minutes; "throughput" judges minimum volume. */
+  mode: "errorRate" | "throughput";
   errorRate: string;
   minEvents: string;
+  minGoodEvents: string;
 };
 export const intervalDraft = (p?: BadIntervalPolicy): IntervalDraft => ({
   enabled: !!p,
-  errorRate: p ? String(p.errorRate) : "0.05",
+  mode: p?.minGoodEvents ? "throughput" : "errorRate",
+  errorRate: p?.errorRate ? String(p.errorRate) : "0.05",
   minEvents: p?.minEvents ? String(p.minEvents) : "",
+  minGoodEvents: p?.minGoodEvents ? String(p.minGoodEvents) : "",
 });
 export function badIntervalFromDraft(
   d: IntervalDraft,
 ): BadIntervalPolicy | undefined {
   if (!d.enabled) return undefined;
+  if (d.mode === "throughput") {
+    const least = Number(d.minGoodEvents);
+    if (!d.minGoodEvents.trim() || !Number.isFinite(least) || least <= 0)
+      throw new Error(
+        "Enter the fewest good events a healthy interval records, above 0.",
+      );
+    return { minGoodEvents: least };
+  }
   const errorRate = Number(d.errorRate);
   if (!Number.isFinite(errorRate) || errorRate <= 0 || errorRate >= 1)
     throw new Error("The interval error rate must be above 0 and below 1.");

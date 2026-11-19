@@ -11,7 +11,7 @@ func TestTemplateEvaluationContracts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err, report.Results)
 	}
-	if !report.Complete || report.Mode != "deterministic" || report.Suite != "templates" || report.Failed != 0 || report.Passed != 120 || len(report.SuiteSHA256) != 64 {
+	if !report.Complete || report.Mode != "deterministic" || report.Suite != "templates" || report.Failed != 0 || report.Passed != 128 || len(report.SuiteSHA256) != 64 {
 		t.Fatal(report)
 	}
 	again, err := Templates(context.Background())

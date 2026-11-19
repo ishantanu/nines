@@ -10,13 +10,90 @@ import { durationSeconds } from "./history";
 import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 
 export type LabelFilter = { label: string; value: string };
+
+/**
+ * What an SLO counts, as in the SRE book's SLI kinds. Ratio kinds count good
+ * events over eligible events from a counter; threshold kinds judge a classic
+ * histogram at a threshold. Mirrors model.RatioMeasurement and
+ * model.ThresholdMeasurement on the server.
+ */
+export type MeasurementKind =
+  | "availability"
+  | "latency"
+  | "sessions"
+  | "correctness"
+  | "durability"
+  | "coverage"
+  | "freshness";
+const ratioKinds = ["availability", "correctness", "durability", "coverage"];
+const thresholdKinds = ["latency", "freshness"];
+export const isRatioKind = (k: string) => ratioKinds.includes(k);
+export const isThresholdKind = (k: string) => thresholdKinds.includes(k);
+
+/** Field wording for each kind, so every form says what is being counted. */
+export const measurementWords: Record<
+  MeasurementKind,
+  {
+    metric: string;
+    good?: string;
+    goodHint?: string;
+    threshold?: string;
+    placeholder?: string;
+    summary: (threshold?: number) => string;
+  }
+> = {
+  availability: {
+    metric: "Metric name",
+    good: "Success",
+    goodHint:
+      "These additional label matches define good events within the population.",
+    summary: () => "Events matching the success labels",
+  },
+  correctness: {
+    metric: "Metric name",
+    good: "Correct results",
+    goodHint:
+      "These label matches select results that passed validation, such as a verdict label. Count failed and unevaluable results in the population too.",
+    summary: () => "Results matching the correct-result labels",
+  },
+  durability: {
+    metric: "Integrity check counter",
+    good: "Intact objects",
+    goodHint:
+      "These label matches select integrity checks that confirmed the object was intact. Lost, corrupt and unreadable objects stay in the population.",
+    summary: () => "Checks confirming the object intact",
+  },
+  coverage: {
+    metric: "Received records counter",
+    good: "Processed records",
+    goodHint:
+      "These label matches select records that reached the output. Records dropped, skipped or stuck stay in the population.",
+    summary: () => "Records matching the processed labels",
+  },
+  latency: {
+    metric: "Histogram metric family (seconds)",
+    threshold: "Good events complete within",
+    placeholder: "30ms or 0.03s",
+    summary: (t) => `Duration at most ${t} seconds`,
+  },
+  freshness: {
+    metric: "Data age histogram (seconds)",
+    threshold: "Data is fresh when its age is at most",
+    placeholder: "5m or 300s",
+    summary: (t) => `Data age at most ${t} seconds`,
+  },
+  sessions: {
+    metric: "Session counter (one increment per session)",
+    summary: () => "Sessions without the bad event",
+  },
+};
 export type MeasurementDraft = {
   name: string;
   project: string;
   displayName: string;
   service: string;
   source: string;
-  measurement: "availability" | "latency" | "sessions";
+  measurement: MeasurementKind;
   metric: string;
   /** Sessions only: counter of sessions that experienced the bad event. */
   eventMetric: string;
@@ -80,8 +157,7 @@ export function bindingFromDraft(
   const b = bindingStarter();
   b.metadata = { name: d.name, project: d.project };
   const labels = filterLabels(d.population);
-  const success =
-    d.measurement === "availability" ? filterLabels(d.success) : {};
+  const success = isRatioKind(d.measurement) ? filterLabels(d.success) : {};
   const step = Number(d.step),
     scrape = Number(d.scrape);
   if (
@@ -118,10 +194,10 @@ export function bindingFromDraft(
         "The event counter must differ from the session counter.",
       );
     b.spec.eventMetric = d.eventMetric.trim();
-  } else if (d.measurement === "availability") {
+  } else if (isRatioKind(d.measurement)) {
     if (validate && !Object.keys(success).length)
       throw new Error(
-        "Specify at least one label that identifies successful events.",
+        `Specify at least one label that identifies ${measurementWords[d.measurement].good?.toLowerCase() ?? "good events"}.`,
       );
     if (Object.keys(success).some((k) => Object.hasOwn(labels, k)))
       throw new Error(

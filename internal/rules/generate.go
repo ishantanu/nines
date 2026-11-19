@@ -139,11 +139,19 @@ func compile(s model.SLO, tenant, ownerUID string) (Group, error) {
 		// does: 1 when the interval has enough events, and good when its error
 		// ratio is at most the configured rate. Unjudged intervals record 0 so
 		// coverage still counts every observed step.
-		floor := strconv.FormatFloat(model.JudgingFloor(b.MinEvents), 'g', -1, 64)
-		rate := strconv.FormatFloat(b.ErrorRate, 'g', -1, 64)
-		judged := fmt.Sprintf("(%s >= bool %s)", totalValue, floor)
-		goodExpr = fmt.Sprintf("(%s * (((%s - %s) / %s) <= bool %s)) and on() (%s)", judged, totalValue, goodValue, totalValue, rate, validInput)
-		totalExpr = fmt.Sprintf("%s and on() (%s)", judged, validInput)
+		if b.Throughput() {
+			// Throughput: every valid interval is judged; it is good when it
+			// recorded at least minGoodEvents good events.
+			least := strconv.FormatFloat(b.MinGoodEvents, 'g', -1, 64)
+			goodExpr = fmt.Sprintf("(%s >= bool %s) and on() (%s)", goodValue, least, validInput)
+			totalExpr = fmt.Sprintf("(%s >= bool 0) and on() (%s)", totalValue, validInput)
+		} else {
+			floor := strconv.FormatFloat(model.JudgingFloor(b.MinEvents), 'g', -1, 64)
+			rate := strconv.FormatFloat(b.ErrorRate, 'g', -1, 64)
+			judged := fmt.Sprintf("(%s >= bool %s)", totalValue, floor)
+			goodExpr = fmt.Sprintf("(%s * (((%s - %s) / %s) <= bool %s)) and on() (%s)", judged, totalValue, goodValue, totalValue, rate, validInput)
+			totalExpr = fmt.Sprintf("%s and on() (%s)", judged, validInput)
+		}
 	}
 	add("nines:sli_good:interval", goodExpr, 0)
 	add("nines:sli_total:interval", totalExpr, 0)

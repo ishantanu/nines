@@ -4,6 +4,7 @@ import { FormField } from "@/components/ui/form-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect } from "@/components/ui/select";
 import type { CustomerPolicy } from "@/lib/api";
 import {
   MAX_CUSTOMERS,
@@ -239,10 +240,12 @@ export function IntervalJudgingEditor({
   disabled?: boolean;
 }) {
   const id = useId();
+  const throughput = value.mode === "throughput";
   return (
     <fieldset className="space-y-3 rounded-md border p-4" disabled={disabled}>
       <legend className="px-1 text-sm font-medium">
-        Good-minute (optional)
+        {throughput ? sloType("throughput").name : sloType("good-minute").name}
+        {value.enabled ? "" : " (optional)"}
       </legend>
       <Label className="flex items-center gap-2">
         <input
@@ -253,40 +256,85 @@ export function IntervalJudgingEditor({
         Judge intervals instead of events
       </Label>
       <p className="text-xs text-muted-foreground">
-        With the interval-count queries below, each measurement interval is good
-        or bad by its own error ratio, and the target is the share of judged
-        intervals that were good. Place the error rate just above your noise
-        floor. Every judged interval weighs the same however busy it was.
+        With the interval-count queries above, each measurement interval is
+        judged good or bad, and the target is the share of judged intervals that
+        were good. Every judged interval weighs the same however busy it was.
       </p>
       {value.enabled ? (
-        <div className="form-grid">
-          <FormField
-            htmlFor={`${id}-rate`}
-            label="Interval is bad above error rate (0 to 1)"
-          >
-            <Input
-              id={`${id}-rate`}
-              inputMode="decimal"
-              value={value.errorRate}
+        <>
+          <FormField htmlFor={`${id}-mode`} label="Judge each interval by">
+            <NativeSelect
+              id={`${id}-mode`}
+              value={value.mode}
+              disabled={disabled}
               onChange={(e) =>
-                onChange({ ...value, errorRate: e.target.value })
+                onChange({
+                  ...value,
+                  mode: e.target.value as IntervalDraft["mode"],
+                })
               }
-            />
+            >
+              <option value="errorRate">
+                Error rate ({sloType("good-minute").name})
+              </option>
+              <option value="throughput">
+                Minimum volume ({sloType("throughput").name})
+              </option>
+            </NativeSelect>
           </FormField>
-          <FormField
-            htmlFor={`${id}-min`}
-            label="Minimum events to judge an interval (optional)"
-          >
-            <Input
-              id={`${id}-min`}
-              inputMode="numeric"
-              value={value.minEvents}
-              onChange={(e) =>
-                onChange({ ...value, minEvents: e.target.value })
-              }
-            />
-          </FormField>
-        </div>
+          {throughput ? (
+            <>
+              <FormField
+                htmlFor={`${id}-least`}
+                label="Interval is good with at least this many good events"
+              >
+                <Input
+                  id={`${id}-least`}
+                  inputMode="decimal"
+                  value={value.minGoodEvents}
+                  onChange={(e) =>
+                    onChange({ ...value, minGoodEvents: e.target.value })
+                  }
+                />
+              </FormField>
+              <p className="text-xs text-muted-foreground">
+                The good-events query counts the work done in each interval,
+                such as records processed. An observed interval below the
+                minimum is bad, including one with nothing processed; an
+                interval with no data stays unknown.
+              </p>
+            </>
+          ) : (
+            <div className="form-grid">
+              <FormField
+                htmlFor={`${id}-rate`}
+                label="Interval is bad above error rate (0 to 1)"
+              >
+                <Input
+                  id={`${id}-rate`}
+                  inputMode="decimal"
+                  value={value.errorRate}
+                  onChange={(e) =>
+                    onChange({ ...value, errorRate: e.target.value })
+                  }
+                />
+              </FormField>
+              <FormField
+                htmlFor={`${id}-min`}
+                label="Minimum events to judge an interval (optional)"
+              >
+                <Input
+                  id={`${id}-min`}
+                  inputMode="numeric"
+                  value={value.minEvents}
+                  onChange={(e) =>
+                    onChange({ ...value, minEvents: e.target.value })
+                  }
+                />
+              </FormField>
+            </div>
+          )}
+        </>
       ) : null}
     </fieldset>
   );

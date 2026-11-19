@@ -335,3 +335,63 @@ test("the common path asks only for name, service, metric and filters, with the 
     "Judge intervals instead of events",
   );
 });
+
+test("every SLI kind from the book is offered with its own wording", async () => {
+  await render(null);
+  const dialog = () => document.querySelector('[role="dialog"]')!;
+  const choose = async (name: string) => {
+    await act(async () =>
+      (document.querySelector("#slo-measure") as HTMLElement).click(),
+    );
+    await act(async () => {
+      [...document.querySelectorAll('[role="option"]')]
+        .find((o) => o.textContent?.trim() === name)!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+  };
+  await act(async () =>
+    (document.querySelector("#slo-measure") as HTMLElement).click(),
+  );
+  const offered = [...document.querySelectorAll('[role="option"]')].map((o) =>
+    o.textContent?.trim(),
+  );
+  for (const name of [
+    "Availability",
+    "Latency",
+    "Correctness",
+    "Durability",
+    "Freshness",
+    "Coverage",
+    "Sessions",
+    "Good-minute",
+    "Throughput",
+    "Per-customer",
+  ])
+    expect(offered).toContain(name);
+  // Freshness judges a data-age histogram at a threshold. The list is open.
+  await act(async () => {
+    [...document.querySelectorAll('[role="option"]')]
+      .find((o) => o.textContent?.trim() === "Freshness")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  expect(dialog().textContent).toContain("Data age histogram (seconds)");
+  expect(dialog().textContent).toContain(
+    "Data is fresh when its age is at most",
+  );
+  // Correctness counts results that passed validation.
+  await choose("Correctness");
+  expect(dialog().textContent).toContain("Correct results");
+  // Per-customer adds the report to the current type and opens its settings.
+  await choose("Per-customer");
+  const optional = [...dialog().querySelectorAll("details")].find((d) =>
+    d.textContent?.includes("Optional settings"),
+  )!;
+  expect(optional.open).toBe(true);
+  expect(dialog().textContent).toContain("Customer label on the metric");
+  expect(dialog().textContent).toContain("Per-customer reporting is on");
+  // Throughput is judged from interval-count queries in Settings.
+  await choose("Throughput");
+  expect(dialog().textContent).toContain(
+    "Interval is good with at least this many good events",
+  );
+});

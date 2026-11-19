@@ -10,6 +10,38 @@ import (
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 )
 
+// Measurement types name what an SLO counts, as in the SRE book's SLI kinds.
+// Each compiles through one of two proven forms:
+//   - ratio: a counter's good series over its eligible series (availability,
+//     correctness, durability, coverage);
+//   - threshold: a classic histogram's bucket at a threshold over its count
+//     (latency, freshness).
+//
+// Sessions have their own form, and throughput judges intervals instead (see
+// BadIntervalPolicy), so neither is a measurement type here.
+var (
+	ratioMeasurements     = []string{"availability", "correctness", "durability", "coverage"}
+	thresholdMeasurements = []string{"latency", "freshness"}
+)
+
+// RatioMeasurement reports a good-over-eligible counter measurement.
+func RatioMeasurement(t string) bool { return oneOf(t, ratioMeasurements...) }
+
+// ThresholdMeasurement reports a histogram measurement judged at a threshold.
+func ThresholdMeasurement(t string) bool { return oneOf(t, thresholdMeasurements...) }
+
+// MeasurementFamily groups types that compile the same way: "availability"
+// for ratios, "latency" for thresholds, otherwise the type itself.
+func MeasurementFamily(t string) string {
+	switch {
+	case RatioMeasurement(t):
+		return "availability"
+	case ThresholdMeasurement(t):
+		return "latency"
+	}
+	return t
+}
+
 // InlineBinding adapts the shared measurement validation/compiler internally.
 // It never reads or creates a MeasurementBinding resource.
 func InlineBinding(s SLO) MeasurementBinding {
@@ -53,11 +85,11 @@ func MeasurementWindow(m v1.MeasurementSpec) *v1.ProviderWindow {
 		return &v1.ProviderWindow{TotalSelector: measurementSelector(m.Metric, labels), BadSelector: measurementSelector(m.EventMetric, labels), ScrapeIntervalSeconds: m.ScrapeIntervalSeconds}
 	}
 	metric := m.Metric
-	if m.Type == "latency" || m.CountFrom == "histogram" {
+	if ThresholdMeasurement(m.Type) || m.CountFrom == "histogram" {
 		metric += "_count"
 	}
 	total := measurementSelector(metric, labels)
-	if m.Type == "latency" {
+	if ThresholdMeasurement(m.Type) {
 		if m.ThresholdSeconds != nil {
 			labels["le"] = HistogramBoundaryLabels(*m.ThresholdSeconds)[0]
 		}
@@ -68,7 +100,7 @@ func MeasurementWindow(m v1.MeasurementSpec) *v1.ProviderWindow {
 		}
 	}
 	good := measurementSelector(metric, labels)
-	if m.Type == "latency" && m.ThresholdSeconds != nil {
+	if ThresholdMeasurement(m.Type) && m.ThresholdSeconds != nil {
 		buckets := HistogramBoundaryLabels(*m.ThresholdSeconds)
 		if len(buckets) == 2 {
 			literal := "le=" + strconv.Quote(buckets[0])

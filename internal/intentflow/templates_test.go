@@ -290,7 +290,7 @@ func TestTemplateDiscoveryPagesAreBoundedAndComplete(t *testing.T) {
 		}
 		after = result.NextAfter
 	}
-	if len(seen) != 16 {
+	if len(seen) != 17 {
 		t.Fatal("incomplete catalog", len(seen))
 	}
 	if _, err := s.discoverTemplates(json.RawMessage(`{"category":"agent","after":"request-availability"}`)); err == nil {

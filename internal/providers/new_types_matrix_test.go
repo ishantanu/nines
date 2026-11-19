@@ -83,3 +83,53 @@ func TestCohortDependentReportsAreAPrometheusFamilyCapability(t *testing.T) {
 		}
 	}
 }
+
+func throughputSLO(language string) model.SLO {
+	s := goodMinuteSLO(language)
+	s.BadInterval = &v1.BadIntervalPolicy{MinGoodEvents: 500}
+	return s
+}
+
+func TestThroughputSLOsNeedIntervalCountsInPromQL(t *testing.T) {
+	for _, kind := range []string{"prometheus", "dash0"} {
+		s := throughputSLO("")
+		if err := s.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		if err := open(t, kind, configs()[kind]).ValidateSLO(s); err != nil {
+			t.Errorf("%s: throughput refused: %v", kind, err)
+		}
+	}
+	for _, language := range []string{"datadog", "nrql", "googlecloud", "metricsql"} {
+		if err := throughputSLO(language).Validate(); err == nil {
+			t.Errorf("throughput accepted for query language %s", language)
+		}
+	}
+}
+
+// Correctness, durability and coverage compile exactly like availability, and
+// freshness exactly like latency, so every provider must host them exactly as
+// it hosts their counterpart. The documented table relies on this.
+func TestNewMeasurementTypesHaveTheirCounterpartsSupport(t *testing.T) {
+	threshold := 300.0
+	inline := func(kind string) model.SLO {
+		m := v1.MeasurementSpec{Type: kind, Metric: "work_total", CountFrom: "counter", Labels: map[string]string{"job": "etl"}, SuccessLabels: map[string]string{"outcome": "good"}, ScrapeIntervalSeconds: 15, ObservationPoint: "Every unit of work."}
+		if model.ThresholdMeasurement(kind) {
+			m.Metric, m.CountFrom, m.SuccessLabels, m.ThresholdSeconds = "work_age_seconds", "", nil, &threshold
+		}
+		s := model.SLO{ID: "w", Name: "w", Project: "p", Service: "svc", Source: "primary", Target: .99, WindowSeconds: 86400, StepSeconds: 60, Measurement: &m, ProviderWindow: model.MeasurementWindow(m)}
+		if err := s.Validate(); err != nil {
+			t.Fatalf("%s: %v", kind, err)
+		}
+		return s
+	}
+	for kind, counterpart := range map[string]string{"correctness": "availability", "durability": "availability", "coverage": "availability", "freshness": "latency"} {
+		for provider, cfg := range configs() {
+			c := open(t, provider, cfg)
+			got, want := c.ValidateSLO(inline(kind)), c.ValidateSLO(inline(counterpart))
+			if (got == nil) != (want == nil) {
+				t.Errorf("%s on %s: accepted=%v, but %s accepted=%v", kind, provider, got == nil, counterpart, want == nil)
+			}
+		}
+	}
+}

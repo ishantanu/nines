@@ -16,12 +16,13 @@ func TestCatalogProducesIndependentValidNonPagingSLOs(t *testing.T) {
 	}
 	seen := map[string]bool{}
 	categories := map[string]bool{}
-	if len(catalog.Templates) != 15 || len(catalog.Categories) != 6 || len(catalog.Digest) != 64 {
+	if len(catalog.Templates) != 16 || len(catalog.Categories) != 6 || len(catalog.Digest) != 64 {
 		t.Fatal(catalog)
 	}
 	for _, template := range catalog.Templates {
 		t.Run(template.ID, func(t *testing.T) {
-			if seen[template.ID] || len(template.Digest) != 64 || template.Revision != 1 {
+			// Templates whose definition changed after release carry revision 2.
+			if seen[template.ID] || len(template.Digest) != 64 || template.Revision < 1 || template.Revision > 2 {
 				t.Fatal(template)
 			}
 			seen[template.ID] = true

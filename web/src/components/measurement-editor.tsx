@@ -14,7 +14,9 @@ import {
 } from "@/lib/topology";
 import {
   bindingFromDraft,
+  isRatioKind,
   measurementDraft,
+  measurementWords,
   type MeasurementDraft,
   type LabelFilter,
 } from "@/lib/measurement";
@@ -186,12 +188,7 @@ export function MeasurementFields({
     { key: "service", label: "Service" },
     {
       key: "metric",
-      label:
-        draft.measurement === "latency"
-          ? "Histogram metric family (seconds)"
-          : draft.measurement === "sessions"
-            ? "Session counter (one increment per session)"
-            : "Metric name",
+      label: measurementWords[draft.measurement].metric,
     },
     { key: "step", label: "Measurement interval (seconds)", type: "number" },
     {
@@ -320,17 +317,17 @@ export function MeasurementFields({
             is missing the result is unknown, never perfect.
           </p>
         </div>
-      ) : draft.measurement === "availability" ? (
+      ) : isRatioKind(draft.measurement) ? (
         <div className="space-y-3">
           <MeasurementFilters
-            title="Success"
+            title={measurementWords[draft.measurement].good ?? "Success"}
             rows={draft.success}
             disabled={disabled}
             onChange={(v) => field("success", v)}
           />
           <p className="text-xs text-muted-foreground">
-            These additional label matches define good events within the
-            population. Values are literal strings, not regular expressions.
+            {measurementWords[draft.measurement].goodHint} Values are literal
+            strings, not regular expressions.
           </p>
           <div hidden={simple}>
             <FormField htmlFor={`${id}-count`} label="Event count comes from">
@@ -358,12 +355,18 @@ export function MeasurementFields({
         <div>
           <FormField
             htmlFor={`${id}-threshold`}
-            label="Good events complete within"
+            label={
+              measurementWords[draft.measurement].threshold ??
+              "Good events complete within"
+            }
           >
             <Input
               id={`${id}-threshold`}
               type="text"
-              placeholder="30ms or 0.03s"
+              placeholder={
+                measurementWords[draft.measurement].placeholder ??
+                "30ms or 0.03s"
+              }
               value={draft.threshold}
               onChange={(e) => field("threshold", e.target.value)}
             />
@@ -408,7 +411,7 @@ export function MeasurementFields({
                   </FormField>
                 </div>
               ))}
-            {draft.measurement === "availability" ? (
+            {isRatioKind(draft.measurement) ? (
               <div>
                 <FormField
                   htmlFor={`${id}-adv-count`}

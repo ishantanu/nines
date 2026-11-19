@@ -95,9 +95,11 @@ func TestIntentAmbiguityUnsupportedAndEvidence(t *testing.T) {
 		t.Fatal("subset match accepted")
 	}
 	in = goal()
+	// Correctness is a ratio measurement like availability: with no matching
+	// binding it needs an inline measurement, not a different adapter.
 	in.Intent.Spec.Outcome = "correctness"
 	p, err = s.PlanIntent(ctx, in)
-	if err != nil || p.Status != "unsupported_measurement" {
+	if err != nil || p.Status != "needs_instrumentation" {
 		t.Fatal(p, err)
 	}
 	in = goal()

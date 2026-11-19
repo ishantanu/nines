@@ -1,6 +1,9 @@
 package intentflow
 
-import v1 "github.com/ishantanu/nines/api/v1alpha1"
+import (
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/model"
+)
 
 // Supplied facts come only from the saved typed goal/scope and confirmation.
 // Free text is not guessed or parsed here; unresolved semantics stay unresolved.
@@ -10,11 +13,11 @@ func clarificationFields(v v1.IntentConversation, fields []string) (supplied, un
 		known["outcome"] = g.Spec.Outcome != ""
 		known["target"] = g.Spec.Target > 0 && g.Spec.Target < 1
 		known["window"] = g.Spec.WindowSeconds > 0
-		known["threshold"] = g.Spec.Outcome != "latency" || g.Spec.ThresholdSeconds != nil
+		known["threshold"] = !model.ThresholdMeasurement(g.Spec.Outcome) || g.Spec.ThresholdSeconds != nil
 		known["exclusions"] = g.Spec.Exclusions != nil
 		if m := g.Spec.Measurement; m != nil {
 			known["metric"] = m.Metric != ""
-			known["success"] = len(m.SuccessLabels) > 0 || (m.Type == "latency" && m.ThresholdSeconds != nil && *m.ThresholdSeconds > 0)
+			known["success"] = len(m.SuccessLabels) > 0 || (model.ThresholdMeasurement(m.Type) && m.ThresholdSeconds != nil && *m.ThresholdSeconds > 0)
 			known["observationPoint"] = m.ObservationPoint != ""
 		}
 		known["confirmation"] = v.Selection != nil && v.Selection.IntentDigest == hash(*g) && savedCompilationMatches(v, hash(*g)) && selectionMatchesCompilation(v)

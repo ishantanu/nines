@@ -12,7 +12,7 @@ From the repository root:
 ```sh
 make intent-eval                 # 105 drafting checks
 make intent-workflow-eval        # 70 full workflow checks
-make template-eval               # 120 deterministic measurement/intent checks
+make template-eval               # 128 deterministic measurement/intent checks
 make selection-eval              # 45 scripted template-selection checks
 
 # Save private reports in new files:
@@ -40,7 +40,7 @@ go run ./integration/intent-eval --suite workflow \
 
 ## Template measurement evaluations
 
-- `make template-eval` runs 120 deterministic checks across the 15 shipped templates.
+- `make template-eval` runs 128 deterministic checks across the 16 shipped templates.
   - Each passes through the production measurement compiler and typed intent planner with isolated synthetic telemetry.
   - Checks cover compatible evidence, absent series, wrong metric types, missing success series or histogram boundaries, event-ratio arithmetic, absent observations and zero traffic.
   - Planning and compilation must leave the store unchanged.

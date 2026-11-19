@@ -29,9 +29,9 @@ func (s *Service) planIntent(ctx context.Context, in v1.PlanIntentInput, include
 	if _, err := s.telemetrySource(in.Intent.Spec.Source); err != nil {
 		return out, err
 	}
-	if in.Intent.Spec.Outcome != "availability" && in.Intent.Spec.Outcome != "latency" {
+	if !model.RatioMeasurement(in.Intent.Spec.Outcome) && !model.ThresholdMeasurement(in.Intent.Spec.Outcome) {
 		out.Status = "unsupported_measurement"
-		out.Clarifications = append(out.Clarifications, "This outcome needs an implemented measurement adapter and instrumentation contract. Availability and classic-histogram latency are supported.")
+		out.Clarifications = append(out.Clarifications, "This outcome needs an implemented measurement adapter and instrumentation contract. Supported outcomes are availability, correctness, durability and coverage counter ratios, and latency and freshness classic-histogram thresholds.")
 		return out, nil
 	}
 	var journey *v1.IntentJourneyPlan

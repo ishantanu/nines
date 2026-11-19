@@ -242,7 +242,7 @@ func BindingQueries(b model.MeasurementBinding) (good, total string) {
 		population[k] = v
 	}
 	metric := s.Metric
-	if s.Measurement == "latency" || s.CountFrom == "histogram" {
+	if model.ThresholdMeasurement(s.Measurement) || s.CountFrom == "histogram" {
 		metric += "_count"
 	}
 	count := func(name string, labels map[string]string) string {
@@ -253,7 +253,7 @@ func BindingQueries(b model.MeasurementBinding) (good, total string) {
 		good = "(" + total + " - " + count(s.EventMetric, population) + ")"
 		return
 	}
-	if s.Measurement == "latency" {
+	if model.ThresholdMeasurement(s.Measurement) {
 		population["le"] = strconv.FormatFloat(*s.ThresholdSeconds, 'g', -1, 64)
 		good = count(s.Metric+"_bucket", population)
 	} else {
@@ -322,7 +322,7 @@ func verifyBindingEvidence(b model.MeasurementBinding, d v1.TelemetryDiscovery) 
 	}
 	meta := d.Metadata[0]
 	s := b.Spec
-	if s.Measurement == "availability" {
+	if model.RatioMeasurement(s.Measurement) {
 		expectedType := "counter"
 		countMetric := s.Metric
 		if s.CountFrom == "histogram" {
@@ -330,7 +330,7 @@ func verifyBindingEvidence(b model.MeasurementBinding, d v1.TelemetryDiscovery) 
 			countMetric += "_count"
 		}
 		if meta.Type != expectedType {
-			return model.Invalid("availability countFrom requires %s metadata", expectedType)
+			return model.Invalid("%s countFrom requires %s metadata", s.Measurement, expectedType)
 		}
 		success := false
 		for _, series := range d.Series {

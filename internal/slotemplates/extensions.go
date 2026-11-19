@@ -158,7 +158,7 @@ func ParseBundle(data []byte) (v1.SLOExtensionBundle, error) {
 			if !shortName.MatchString(name) || !ok || input.Type != typ || fields[input.Field] || !text(input.Description, 500) || len(input.Enum) > 30 {
 				return b, model.Invalid("invalid, duplicate or unsupported typed input field")
 			}
-			if input.Field == "thresholdSeconds" && r.Manifest.Spec.Measurement.Type != "latency" || input.Field == "successLabels" && r.Manifest.Spec.Measurement.Type != "availability" {
+			if input.Field == "thresholdSeconds" && !model.ThresholdMeasurement(r.Manifest.Spec.Measurement.Type) || input.Field == "successLabels" && !model.RatioMeasurement(r.Manifest.Spec.Measurement.Type) {
 				return b, model.Invalid("input field is incompatible with recipe measurement")
 			}
 			if r.Evaluation != "" && input.Field == "successLabels" {

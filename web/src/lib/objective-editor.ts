@@ -5,6 +5,8 @@ import type { SLO, BurnRatePolicy } from "./api";
 import { bindingStarter } from "./topology";
 import {
   bindingFromDraft,
+  isRatioKind,
+  isThresholdKind,
   measurementDraft,
   sloFromMeasurementDraft,
   type MeasurementDraft,
@@ -217,13 +219,20 @@ const labelsOk = (v: unknown) =>
   record(v) &&
   Object.keys(v).length <= 8 &&
   Object.values(v).every((x) => typeof x === "string");
+// Exactly one judging rule: minGoodEvents alone (throughput), or errorRate
+// with an optional minEvents floor (good-minute). Mirrors the server.
 const badIntervalOk = (v: unknown) =>
   record(v) &&
-  typeof v.errorRate === "number" &&
-  finite(v.errorRate) &&
-  v.errorRate > 0 &&
-  v.errorRate < 1 &&
-  optional(v.minEvents, finite);
+  (v.minGoodEvents !== undefined
+    ? finite(v.minGoodEvents) &&
+      (v.minGoodEvents as number) > 0 &&
+      v.errorRate === undefined &&
+      v.minEvents === undefined
+    : typeof v.errorRate === "number" &&
+      finite(v.errorRate) &&
+      v.errorRate > 0 &&
+      v.errorRate < 1 &&
+      optional(v.minEvents, finite));
 const customersOk = (v: unknown) =>
   record(v) &&
   typeof v.label === "string" &&
@@ -291,7 +300,11 @@ export function parseObjectiveDefinition(text: string): SLODefinition {
   if (
     m !== undefined &&
     (!record(m) ||
-      !["availability", "latency", "sessions"].includes(String(m.type)) ||
+      !(
+        isRatioKind(String(m.type)) ||
+        isThresholdKind(String(m.type)) ||
+        m.type === "sessions"
+      ) ||
       typeof m.metric !== "string" ||
       !optional(m.eventMetric, (x) => typeof x === "string") ||
       !strings(m.labels) ||

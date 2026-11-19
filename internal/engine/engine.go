@@ -27,7 +27,7 @@ func Evaluate(s model.SLO, points map[int64]model.Point, at time.Time, window in
 		p := points[k]
 		if s.BadInterval != nil {
 			// Count judged intervals instead of events; see model.ClassifyInterval.
-			p.Good, p.Total = model.ClassifyInterval(p.Good, p.Total, s.BadInterval.ErrorRate, s.BadInterval.MinEvents)
+			p.Good, p.Total = model.ClassifyInterval(p.Good, p.Total, *s.BadInterval)
 		}
 		yg := p.Good - cg
 		tg := r.Good + yg

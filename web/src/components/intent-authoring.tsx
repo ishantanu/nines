@@ -1,4 +1,6 @@
 import { latencySeconds, latencyDuration } from "@/lib/latency-duration";
+import type { MeasurementKind } from "@/lib/measurement";
+import { isThresholdKind } from "@/lib/measurement";
 import { MeasurementLabels } from "./measurement-labels";
 import { ProviderIdentity } from "./provider-identity";
 import { BudgetPolicyEditor } from "./budget-policy-editor";
@@ -415,7 +417,7 @@ export function IntentAuthoring({
               <IntentMeasurementFields
                 draft={{
                   ...measurement,
-                  measurement: draft.outcome as "availability" | "latency",
+                  measurement: draft.outcome as MeasurementKind,
                 }}
                 disabled={busy}
                 onChange={(d) => {
@@ -616,7 +618,7 @@ export function IntentAuthoring({
                   <div>
                     <dt className="text-muted-foreground">Success criteria</dt>
                     <dd className="break-all">
-                      {c.definition.spec.measurement === "latency" ? (
+                      {isThresholdKind(c.definition.spec.measurement) ? (
                         `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
                       ) : (
                         <MeasurementLabels

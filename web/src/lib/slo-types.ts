@@ -1,7 +1,7 @@
 /** The only fields the classification reads. */
 export interface ClassifiableSLO {
-  measurement?: { type: "availability" | "latency" | "sessions" };
-  badInterval?: unknown;
+  measurement?: { type: string };
+  badInterval?: { errorRate?: number; minGoodEvents?: number } | null;
   customers?: { label?: string; customers?: unknown[] };
 }
 
@@ -11,6 +11,11 @@ export interface ClassifiableSLO {
 export type SLOTypeId =
   | "availability"
   | "latency"
+  | "correctness"
+  | "durability"
+  | "freshness"
+  | "coverage"
+  | "throughput"
   | "sessions"
   | "good-minute"
   | "customers"
@@ -49,6 +54,106 @@ export const SLO_TYPES: SLOType[] = [
     useWhen: "You have a histogram and care how fast, not only whether.",
     definedIn: "Guided form",
     docs: "latency-slos/",
+  },
+  {
+    id: "correctness",
+    name: "Correctness",
+    measures: "The share of results that passed validation.",
+    useWhen:
+      "A response or record can arrive on time and still be wrong, as with pipeline output or computed answers.",
+    definedIn: "Guided form",
+    docs: "slo-types/#correctness-durability-and-coverage",
+    snippet: `spec:
+  measurement:
+    type: correctness
+    metric: pipeline_records_total
+    countFrom: counter
+    labels:
+      pipeline: billing
+    successLabels:
+      verdict: pass
+    scrapeIntervalSeconds: 15
+    observationPoint: Every record receiving a validation verdict; invalid and unevaluable records are counted.
+  target: 0.999`,
+  },
+  {
+    id: "durability",
+    name: "Durability",
+    measures: "The share of stored objects verified intact.",
+    useWhen:
+      "Storage must keep what it acknowledged, checked by scheduled integrity reads.",
+    definedIn: "Guided form",
+    docs: "slo-types/#correctness-durability-and-coverage",
+    snippet: `spec:
+  measurement:
+    type: durability
+    metric: storage_integrity_checks_total
+    countFrom: counter
+    labels:
+      bucket: invoices
+    successLabels:
+      verdict: intact
+    scrapeIntervalSeconds: 15
+    observationPoint: Scheduled integrity reads of stored objects; unreadable and corrupt objects are counted.
+  target: 0.99999`,
+  },
+  {
+    id: "freshness",
+    name: "Freshness",
+    measures: "The share of data younger than an age threshold.",
+    useWhen:
+      "Users see data produced by a pipeline or replica, and stale data is the failure.",
+    definedIn: "Guided form",
+    docs: "slo-types/#freshness",
+    snippet: `spec:
+  measurement:
+    type: freshness
+    metric: pipeline_record_age_seconds
+    labels:
+      pipeline: search-index
+    thresholdSeconds: 300
+    scrapeIntervalSeconds: 15
+    observationPoint: Age of each record when it is served, relative to its event time.
+  target: 0.99`,
+  },
+  {
+    id: "coverage",
+    name: "Coverage",
+    measures: "The share of received records that were processed.",
+    useWhen:
+      "A batch or stream job can succeed while silently skipping part of its input.",
+    definedIn: "Guided form",
+    docs: "slo-types/#correctness-durability-and-coverage",
+    snippet: `spec:
+  measurement:
+    type: coverage
+    metric: pipeline_records_received_total
+    countFrom: counter
+    labels:
+      pipeline: billing
+    successLabels:
+      outcome: processed
+    scrapeIntervalSeconds: 15
+    observationPoint: Each record counted once on arrival and labelled with its terminal outcome.
+  target: 0.999`,
+  },
+  {
+    id: "throughput",
+    name: "Throughput",
+    measures:
+      "The share of minutes that processed at least a minimum number of events.",
+    useWhen:
+      "Too little work getting done is the failure, as with a stalled pipeline or a slowed consumer.",
+    definedIn: "Guided form",
+    docs: "slo-types/#throughput",
+    snippet: `spec:
+  stepSeconds: 60
+  target: 0.99
+  windowSeconds: 2592000
+  goodQuery: sum(increase(pipeline_records_processed_total[1m]))
+  totalQuery: sum(increase(pipeline_records_received_total[1m]))
+  badInterval:
+    minGoodEvents: 500`,
   },
   {
     id: "sessions",
@@ -138,9 +243,17 @@ export interface SLOClassification {
 
 /** Derived from the saved definition: what it counts, plus opt-in reporting. */
 export function classifySLO(slo: ClassifiableSLO): SLOClassification {
-  const primary = slo.badInterval
-    ? "good-minute"
-    : (slo.measurement?.type ?? "custom");
+  const kind = slo.measurement?.type;
+  const primary: SLOClassification["primary"] = slo.badInterval
+    ? slo.badInterval.minGoodEvents
+      ? "throughput"
+      : "good-minute"
+    : kind &&
+        byId.has(kind as SLOTypeId) &&
+        kind !== "customers" &&
+        kind !== "journey"
+      ? (kind as SLOClassification["primary"])
+      : "custom";
   const addOns: SLOTypeId[] = [];
   if (slo.customers?.customers?.length) addOns.push("customers");
   return { primary, addOns };

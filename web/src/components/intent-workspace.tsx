@@ -1,4 +1,5 @@
 import { IntentUsagePanel } from "./intent-usage";
+import { isThresholdKind } from "@/lib/measurement";
 import { TextShimmer } from "./ui/notchset/text-shimmer";
 import { MeasurementLabels } from "./measurement-labels";
 import { SystemOneAdvice, SystemOneConsent } from "./system-one-assessment";
@@ -950,7 +951,7 @@ export function IntentWorkspace({
                         </p>
                         <p>{c.definition.spec.observationPoint}</p>
                         <div className="break-all text-xs text-muted-foreground">
-                          {c.definition.spec.measurement === "latency" ? (
+                          {isThresholdKind(c.definition.spec.measurement) ? (
                             `Duration at most ${c.definition.spec.thresholdSeconds} seconds`
                           ) : (
                             <MeasurementLabels

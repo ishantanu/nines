@@ -49,8 +49,8 @@ func ValidateIntentSpec(s v1.IntentSpec) error {
 	if !validText(s.Description, 2000) || !validText(s.Service, 200) || !identifier.MatchString(s.Source) {
 		return Invalid("description, service and configured source are required")
 	}
-	if !oneOf(s.Outcome, "availability", "latency", "freshness", "correctness") {
-		return Invalid("outcome must be availability, latency, freshness or correctness; combined outcomes need separate definitions")
+	if !RatioMeasurement(s.Outcome) && !ThresholdMeasurement(s.Outcome) {
+		return Invalid("outcome must be availability, latency, correctness, durability, coverage or freshness; combined outcomes need separate definitions")
 	}
 	if len(s.Population) == 0 {
 		return Invalid("an explicit population is required; environment and eligible traffic are never inferred")
@@ -58,12 +58,12 @@ func ValidateIntentSpec(s v1.IntentSpec) error {
 	if err := ValidateLabels(s.Population); err != nil {
 		return err
 	}
-	if s.Outcome == "latency" {
+	if ThresholdMeasurement(s.Outcome) {
 		if s.ThresholdSeconds == nil || !Finite(*s.ThresholdSeconds) || *s.ThresholdSeconds <= 0 || *s.ThresholdSeconds > 86400 {
-			return Invalid("latency requires a positive thresholdSeconds at most 86400")
+			return Invalid("%s requires a positive thresholdSeconds at most 86400", s.Outcome)
 		}
 	} else if s.ThresholdSeconds != nil {
-		return Invalid("thresholdSeconds is supported only for latency")
+		return Invalid("thresholdSeconds is supported only for latency and freshness")
 	}
 	if !Finite(s.Target) || s.Target <= 0 || s.Target >= 1 || s.WindowSeconds < 1 || s.WindowSeconds > 31*86400 {
 		return Invalid("target must be between 0 and 1 exclusively and windowSeconds within 31 days")
@@ -106,10 +106,10 @@ func IntentMatchesBinding(i v1.SLOIntent, b MeasurementBinding) bool {
 			return false
 		}
 	}
-	if s.Outcome == "latency" {
+	if ThresholdMeasurement(s.Outcome) {
 		return s.ThresholdSeconds != nil && t.ThresholdSeconds != nil && *s.ThresholdSeconds == *t.ThresholdSeconds
 	}
-	return s.Outcome == "availability"
+	return RatioMeasurement(s.Outcome)
 }
 func validateSLOIntent(s SLO) error {
 	if s.Intent == nil {
