@@ -178,6 +178,10 @@ func TestHeadlessCLIReviewedChangeAndRollback(t *testing.T) {
 	if e = execute("headless-agent", "status", nil, &status); e != nil || status.Phase != "observing" {
 		t.Fatal(status, e)
 	}
+	var activation v1.IntentActivation
+	if e = execute("headless-agent", "activation", nil, &activation); e != nil || activation.State == "verified" || activation.Conversation != "headless-change" || activation.OperationDigest != digest || activation.Integration == nil {
+		t.Fatal("CLI treated saved configuration as activated", activation, e)
+	}
 	call("headless-owner", "observe", review(digest, "Inspect fresh post-change evidence."))
 	if v.ChangeSet.Outcome == nil || v.ChangeSet.Outcome.State == "verified" {
 		t.Fatal("configuration apply was treated as runtime success")
@@ -194,6 +198,9 @@ func TestHeadlessCLIReviewedChangeAndRollback(t *testing.T) {
 	check(.99, 3)
 	if e = execute("headless-agent", "verify", nil, &verification); e != nil || verification.Operation != "rollback" || verification.Resources[0].State != "matches" {
 		t.Fatal(verification, e)
+	}
+	if e = execute("headless-agent", "activation", nil, &activation); e != nil || activation.Operation != "rollback" || activation.OperationDigest != restore || activation.Resources[0].Revision != 3 || activation.State == "verified" {
+		t.Fatal("rollback activation lost exact restored operation", activation, e)
 	}
 	var audit v1.IntentAuditLog
 	if e = execute("headless-owner", "audit", nil, &audit); e != nil || audit.Integrity != "verified" {

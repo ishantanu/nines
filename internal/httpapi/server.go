@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ishantanu/nines/internal/gitops"
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/investigation"
 	"github.com/ishantanu/nines/internal/model"
@@ -144,12 +145,22 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 	api.HandleFunc("POST /api/slos/{id}/rules/withdraw", a.ruleWithdraw)
 
 	api.HandleFunc("GET /api/resources/search", a.resourceSearch)
+	api.HandleFunc("GET /api/intent-context", a.intentContext)
+	api.HandleFunc("POST /api/intents/candidates", a.intentCandidates)
+	api.HandleFunc("POST /api/intents/evidence", a.intentEvidence)
 	api.HandleFunc("GET /api/slos/{id}/context", func(w http.ResponseWriter, r *http.Request) { a.resourceContext(w, r, false) })
 	api.HandleFunc("GET /api/journeys/{id}/context", func(w http.ResponseWriter, r *http.Request) { a.resourceContext(w, r, true) })
 	api.HandleFunc("POST /api/resources/validate", a.definitionValidate)
 	api.HandleFunc("POST /api/slos/compile", a.compileMeasurement)
 	api.HandleFunc("POST /api/resources/plan", a.definitionPlan)
 	api.HandleFunc("POST /api/resources/apply", a.definitionApply)
+	api.HandleFunc("POST /api/migrations/convert", a.migrationConvert)
+	api.HandleFunc("GET /api/gitops", a.gitopsInfo)
+	api.HandleFunc("POST /api/gitops/proposals", a.gitopsPropose)
+	api.HandleFunc("GET /api/slos/{id}/gitops/proposals", a.gitopsProposals(gitops.KindSLO))
+	api.HandleFunc("GET /api/slos/{id}/gitops/drift", a.gitopsDrift(gitops.KindSLO))
+	api.HandleFunc("GET /api/journeys/{id}/gitops/proposals", a.gitopsProposals(gitops.KindJourney))
+	api.HandleFunc("GET /api/journeys/{id}/gitops/drift", a.gitopsDrift(gitops.KindJourney))
 	api.HandleFunc("GET /api/slos/{id}/manifest", a.sloManifest)
 	api.HandleFunc("GET /api/slos/{id}/revisions", a.sloRevisions)
 	api.HandleFunc("GET /api/slos/{id}/revisions/{revision}", a.sloRevision)
@@ -158,6 +169,7 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 	api.HandleFunc("POST /api/slos", a.create)
 	api.HandleFunc("GET /api/slos/{id}/status", a.status)
 	api.HandleFunc("GET /api/slos/{id}/quality", a.measurementQuality)
+	api.HandleFunc("GET /api/slos/{id}/customers", a.customerReport)
 	api.HandleFunc("GET /api/slos/{id}/budget", a.budgetDecision)
 	api.HandleFunc("GET /api/slos/{id}/samples", a.samples)
 	api.HandleFunc("GET /api/slos/{id}/history", a.history)

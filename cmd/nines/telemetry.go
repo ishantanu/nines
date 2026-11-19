@@ -96,6 +96,8 @@ func telemetryCommand(group, action string, o *options) *cobra.Command {
 			result, err = c.TopologyResources(ctx, kind, *cursor, *limit)
 		case group == "dependencies" && action == "show":
 			result, err = c.DependencyMap(ctx, id, *expected)
+		case group == "dependencies" && action == "composition":
+			result, err = c.DependencyComposition(ctx, id)
 		case group == "bindings" && action == "compile":
 			seconds, e := rules.DurationSeconds(*window)
 			if e != nil {

@@ -4,7 +4,6 @@
 - Playground authentication explicitly enables `allowLoopbackAliases: true`. It accepts only HTTP requests whose Origin matches the request host, using `localhost` or `127.0.0.1` on the configured public port. Other hosts, ports and schemes remain rejected; CSRF tokens are still required.
 - Cookies remain host-only: signing in on one hostname does not sign you in on the other. Refresh the page after rebuilding/restarting to obtain current login state. Production authentication retains exact public-origin checks by default, and SSO callbacks continue to use the configured public URL.
 
-
 ## One local command
 
 ```sh
@@ -21,9 +20,9 @@
 - One file, `compose.playground.yaml`, defines the stack. `mimir`, `ai` and `topology` are optional profiles. Use the launcher to coordinate profiles with source configuration; `--profile mimir` alone cannot switch tenant files or remote-write settings.
 - Selections are saved in the ignored, private `.nines-playground.conf`; no keys are stored there. Flags add to saved choices. Use `--prometheus`, `--no-jev`, `--no-ai`, `--no-topology` and `--no-providers` to turn features off.
 - For existing hosted trial SLOs, select their complete private tenant file once: `./playground up --mimir --jev --providers /private/path/tenants.yaml`. The path is remembered. Restore that file after a reboot if stored under a temporary directory. The file owns tenant/model routing; regenerate it before changing the backend or Jev configuration. Removing a still-referenced connection can prevent startup.
+- If startup fails after selecting a custom tenant file, restore local demo routing with `./playground up --mimir --jev --no-providers`. This preserves database and metrics volumes; the launcher prints the selected configuration before starting containers. Do not use `examples/tenants.yaml` unchanged: it contains production placeholders, not playground connections.
 - Ordinary playground startup never seeds hosted Datadog/New Relic telemetry. The separate `compose.provider-trial.yaml` fixture requires explicit trial commands.
 - The previous overlay files remain for compatibility; new local instructions use the single-file launcher. Do not mix the two workflows. Persistent deployment remains in `compose.yaml`.
-
 
 This synthetic local stack demonstrates the complete measurement and rule flow with Prometheus.
 
@@ -195,6 +194,7 @@ docker compose -p nines-playground -f compose.playground.yaml down -v
 - Use the same project name for every command.
   - Do not use global container or volume cleanup commands.
   - Rebuild after source changes with `up --build -d --remove-orphans`; the database and backend history remain until explicitly removed.
+  - Builds reuse shared Go/npm caches. See [build cache and disk use](docker-compose.md#build-cache-and-disk-use) for an optional retention target and cache-only cleanup.
   - If the optional profile was enabled, use its shutdown command above so Mimir is stopped too.
 
 ## Users and telemetry connections
@@ -211,6 +211,7 @@ docker compose -p nines-playground -f compose.playground.yaml down -v
   - Production needs a private key backed up separately with its database.
   - Referenced connection identities cannot be edited or deleted; create another connection and review the dependent definitions.
 - Use the Alert policy selector on the SLO Performance tab to chart each policy's burn windows.
+- The Time range selector reads retained Nines observations: at least 24 hours, or twice the SLO window for longer objectives. The one-minute AI examples and ten-minute checkout example both support minute/hour ranges up to one day. Previously pruned observations remain missing; collection fills new history without changing objective windows. See [measurement charts](../measurements.md#chart-time-range).
   - The SLO detail lists independent policy states; Rules lists severity labels for notification routing.
   - The sample uses critical `fast-burn` at 6× and warning `sustained-burn` at 2×.
   - The critical policy uses 60s/120s windows and the warning policy uses 120s/300s.

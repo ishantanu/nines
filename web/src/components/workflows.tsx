@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NativeSelect } from "@/components/ui/select";
 import { parse } from "yaml";
 import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { BookOpen, Bot, FileCheck2, Plus, RefreshCw } from "lucide-react";
@@ -102,7 +103,7 @@ function WorkflowCreate({
           onChange={(e) => setID(e.target.value)}
         />
         <Label htmlFor="workflow-kind">Workflow type</Label>
-        <select
+        <NativeSelect
           id="workflow-kind"
           className="h-9 rounded-md border bg-white px-3 text-sm"
           value={kind}
@@ -110,13 +111,13 @@ function WorkflowCreate({
         >
           <option value="investigate">Investigate reliability</option>
           <option value="propose_journey">Propose journey change</option>
-        </select>
+        </NativeSelect>
         <Label htmlFor="workflow-journey">
           {kind === "investigate"
             ? "Investigation scope"
             : "Use an existing journey as a starting point"}
         </Label>
-        <select
+        <NativeSelect
           id="workflow-journey"
           className="h-9 rounded-md border bg-white px-3 text-sm"
           value={journeyId}
@@ -141,7 +142,7 @@ function WorkflowCreate({
               {j.resource.manifest.spec.displayName}
             </option>
           ))}
-        </select>
+        </NativeSelect>
         {kind === "propose_journey" ? (
           <>
             <Label htmlFor="workflow-manifest">

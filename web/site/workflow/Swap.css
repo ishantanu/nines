@@ -1,0 +1,66 @@
+/* Swap */
+
+@layer stageshow {
+  .nines-workflow-demo .ss-swap {
+    position: relative;
+    display: inline-block;
+    vertical-align: top;
+    /* Sideways only: a word can't spill while the box narrows, but a label
+       trimmed to cap height keeps its overshoot above and below */
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  /* While the box resizes, its edge is soft: a word passing it fades out
+     rather than being sliced */
+  .nines-workflow-demo .ss-swap[data-swapping] {
+    mask-image: linear-gradient(to right, #000 calc(100% - 8px), transparent);
+  }
+
+  .nines-workflow-demo .ss-swap__in,
+  .nines-workflow-demo .ss-swap__out {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    /* A label trimmed to its cap height (text-box on the Swap) trims both
+       copies alike: the fading one is its own box and would sit lower */
+    text-box: inherit;
+  }
+
+  .nines-workflow-demo .ss-swap__out {
+    position: absolute;
+    top: 0;
+    left: 0;
+    animation: nines-workflow-swap-out ease forwards;
+  }
+
+  .nines-workflow-demo .ss-swap__in {
+    animation: nines-workflow-swap-in cubic-bezier(0.25, 0.8, 0.25, 1) both;
+  }
+
+  @keyframes nines-workflow-swap-out {
+    to {
+      opacity: 0;
+      filter: blur(2px);
+    }
+  }
+
+  @keyframes nines-workflow-swap-in {
+    0%,
+    30% {
+      opacity: 0;
+      filter: blur(2px);
+    }
+    100% {
+      opacity: 1;
+      filter: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nines-workflow-demo .ss-swap__in,
+    .nines-workflow-demo .ss-swap__out {
+      animation-duration: 1ms !important;
+    }
+  }
+}

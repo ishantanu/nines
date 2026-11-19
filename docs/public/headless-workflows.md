@@ -21,24 +21,24 @@ nines intent conversations status CONVERSATION --context production --agent
 - Status summarizes the current change set. Use `show` and `audit` to inspect retained change-set history; supported rollback requests can also target a historical applied digest.
 - Saved observations describe their recorded period. Read `verify` for current resource/source drift before relying on a previously verified outcome.
 
-| Phase | Next step | Review boundary |
-| --- | --- | --- |
-| `draft` | `run` | Explicit model consent when using a model |
-| `preparing` | Wait, then read status | Do not start duplicate runs |
-| `clarification` | `show`, then `message` | Ask the responsible person for missing semantics |
-| `measurement_review` | `show`, then `confirm` | Human confirms the exact measurement and intent |
-| `proposal_ready` | `changes` | Freeze evidence and changes into a reviewable digest |
-| `approval_required` | `show`, then `approve` | Human reviews changes, rationale, evidence and limitations |
-| `approved` | `apply` | Authorized applier must differ from approver |
-| `observing` | Wait, then read status | Background observer checks runtime; owner/editor can request `observe` |
-| `verified` | `verify` | Saved observation met its policy; inspect current drift |
-| `outcome_review` | `verify` and `show` | Human decides corrective action; no automatic rollback |
-| `rollback_approval_required` | `rollback-approve` | Human reviews exact restore diff |
-| `rollback_approved` | `rollback-apply` | Authorized applier must differ from rollback approver |
-| `rollback_blocked` | `show` | Resolve blockers; do not bypass them |
-| `rollback_rejected` | `show` | Review the rejection and current evidence |
-| `outcome_unavailable` | `verify` | No observation was recorded; inspect runtime evidence separately |
-| `proposal_stopped` / `preparation_stopped` / `review_required` | `show` | Inspect evidence before starting replacement work |
+| Phase                                                          | Next step              | Review boundary                                                        |
+| -------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------- |
+| `draft`                                                        | `run`                  | Explicit model consent when using a model                              |
+| `preparing`                                                    | Wait, then read status | Do not start duplicate runs                                            |
+| `clarification`                                                | `show`, then `message` | Ask the responsible person for missing semantics                       |
+| `measurement_review`                                           | `show`, then `confirm` | Human confirms the exact measurement and intent                        |
+| `proposal_ready`                                               | `changes`              | Freeze evidence and changes into a reviewable digest                   |
+| `approval_required`                                            | `show`, then `approve` | Human reviews changes, rationale, evidence and limitations             |
+| `approved`                                                     | `apply`                | Authorized applier must differ from approver                           |
+| `observing`                                                    | Wait, then read status | Background observer checks runtime; owner/editor can request `observe` |
+| `verified`                                                     | `verify`               | Saved observation met its policy; inspect current drift                |
+| `outcome_review`                                               | `verify` and `show`    | Human decides corrective action; no automatic rollback                 |
+| `rollback_approval_required`                                   | `rollback-approve`     | Human reviews exact restore diff                                       |
+| `rollback_approved`                                            | `rollback-apply`       | Authorized applier must differ from rollback approver                  |
+| `rollback_blocked`                                             | `show`                 | Resolve blockers; do not bypass them                                   |
+| `rollback_rejected`                                            | `show`                 | Review the rejection and current evidence                              |
+| `outcome_unavailable`                                          | `verify`               | No observation was recorded; inspect runtime evidence separately       |
+| `proposal_stopped` / `preparation_stopped` / `review_required` | `show`                 | Inspect evidence before starting replacement work                      |
 
 ## Prepare and review
 
@@ -62,6 +62,7 @@ nines intent conversations report CONVERSATION --context production --markdown >
 
 - These artifacts contain exact changes, recommendation basis, approval and rollback state, a bounded complete audit and any recorded observation. Treat definitions and review notes as sensitive; share them only with authorized recipients.
 - A concurrent change or invalid audit causes export to fail; read the current status and review a fresh artifact. The snapshot itself never approves a change. Use `get_intent_review_artifact` through read-only MCP, `GET /api/intent-conversations/{id}/review-artifact`, or the Go client's `IntentReviewArtifact`. The Markdown format encloses structured JSON in a safe code fence, including user-provided text.
+- New proposals also contain a digest-bound [review packet](intents.md#review-the-frozen-proposal-packet) with the exact goal/measurement, human confirmation, saved evidence gaps, logical destination and SLO/CUJ change references. Destination verification, candidate receipt state and observation exclusions remain explicit. Observation notes do not change telemetry filters. Export does not query providers or models.
 - Record human approval only after reviewing that artifact. The operational request is YAML:
 
 ```yaml
@@ -141,3 +142,15 @@ go test -race ./cmd/nines -run TestHeadlessCLIReviewedChangeAndRollback -count=1
 - This change supplies a resumable status contract and headless lifecycle acceptance.
 - Use [GitHub reviews](github-reviews.md) to plan and explicitly publish an exact proposal snapshot for a selected PR commit. GitHub reviews do not record Nines approval.
 - Configure [signed workflow webhooks](workflow-webhooks.md) to notify an internal CI or incident integration. Automatic PR dispatch, native chat approval adapters and a generic subscription API remain separate work.
+
+## Inspect current activation
+
+```sh
+nines --context production --agent intent conversations activation CONVERSATION
+```
+
+HTTP clients use `GET /api/intent-conversations/{id}/activation`; MCP clients use the read-only `inspect_intent_activation` tool. This explicitly reads administrator-configured provider endpoints, with a ten-second overall deadline. It needs no model and never deploys, reloads, collects or changes resources. Reader permissions are sufficient; it does not grant apply permission.
+
+The receipt includes exact applied resource revisions, source/operation digests and separate publication, evaluation, output and collection stages. Inspect `state`, `code`, `nextAction` and `retryAt`, rather than treating HTTP 200 or CLI exit zero as activation. Concurrent revision/source changes reject the inspection; a saved definition alone cannot verify activation. Native publication does not create Nines recording rules and does not establish native evaluation.
+
+Repeat this inspection for a fresh as-of receipt. `status` and `verify` still read saved state without provider requests; `observe` remains the separately authorized operation for persisting post-change observations. Verified activation does not mean the target is met or that a notification was delivered.

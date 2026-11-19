@@ -1,10 +1,22 @@
 // @vitest-environment jsdom
-import { expect, test, vi } from "vitest";
+import { beforeEach, afterEach, expect, test, vi } from "vitest";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Home } from "./home";
 import type { Data, Objective } from "@/lib/api";
+
+beforeEach(() => {
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+});
+afterEach(() => vi.unstubAllGlobals());
 
 const archived: Objective = {
   slo: {
@@ -149,7 +161,7 @@ test("review filter prioritises firing alerts, preserves missing evidence and op
     );
     const rows = () => [
       ...host.querySelectorAll<HTMLButtonElement>(
-        ".overview-objective-list button",
+        '[data-slot="slo-metric-card"] h3 button',
       ),
     ];
     expect(rows()[0].textContent).toContain("Firing API");
@@ -176,5 +188,54 @@ test("review filter prioritises firing alerts, preserves missing evidence and op
     await act(async () => root.unmount());
     host.remove();
     vi.unstubAllGlobals();
+  }
+});
+
+test("Home bounds compact cards to six and opens the full inventory", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const host = document.createElement("main");
+  document.body.append(host);
+  const root = createRoot(host);
+  const navigate = vi.fn();
+  const items = Array.from({ length: 8 }, (_, i) => ({
+    slo: {
+      ...archived.slo,
+      id: `slo-${i}`,
+      name: `Objective ${i}`,
+      retirement: undefined,
+    },
+    status: {
+      ...archived.status,
+      sloId: `slo-${i}`,
+      reliability: 0.9999,
+      budgetRemainingFraction: (8 - i) / 10,
+      burnRate: 0.1,
+      alert: { phase: "inactive" as const },
+    },
+  }));
+  try {
+    await act(async () =>
+      root.render(
+        <Home
+          data={{ ...data, objectives: [archived, ...items] }}
+          onNavigate={navigate}
+          onSLO={() => {}}
+          onJourney={() => {}}
+        />,
+      ),
+    );
+    const cards = host.querySelectorAll('[data-slot="slo-metric-card"]');
+    expect(cards).toHaveLength(6);
+    expect(cards[0].textContent).toContain("Objective 7");
+    expect(host.textContent).not.toContain("Retired checkout");
+    expect(host.textContent).toContain("Showing 6 of 8 objectives");
+    const all = [...host.querySelectorAll("button")].find(
+      (b) => b.textContent?.trim() === "View all SLOs",
+    )!;
+    await act(async () => all.click());
+    expect(navigate).toHaveBeenCalledWith("objectives");
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
   }
 });

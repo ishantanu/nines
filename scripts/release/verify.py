@@ -6,9 +6,47 @@ import hashlib
 import json
 import re
 import tarfile
+import zipfile
 from pathlib import Path, PurePosixPath
 
-TARGETS = ("linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64")
+TARGETS = (
+    "linux/amd64",
+    "linux/arm64",
+    "darwin/amd64",
+    "darwin/arm64",
+    "windows/amd64",
+    "windows/arm64",
+)
+
+
+def archive_name(version, target):
+    """Windows users expect .zip; everyone else gets a reproducible .tar.gz."""
+    goos, goarch = target.split("/")
+    ext = "zip" if goos == "windows" else "tar.gz"
+    return f"nines_{version}_{goos}_{goarch}.{ext}"
+
+
+def binaries(target):
+    """Programs in each archive. The operator runs only in Linux containers,
+    so Windows archives carry the CLI, server and MCP server."""
+    if target.startswith("windows/"):
+        return ["nines.exe", "nines-server.exe", "nines-mcp.exe"]
+    return ["nines", "nines-server", "nines-mcp", "nines-operator"]
+
+
+def entries(path):
+    """(name, size, is_regular_file, is_executable) for each archive entry."""
+    if path.name.endswith(".zip"):
+        with zipfile.ZipFile(path) as archive:
+            return [
+                (i.filename, i.file_size, not i.is_dir(), i.filename.endswith(".exe"))
+                for i in archive.infolist()
+            ]
+    with tarfile.open(path, "r:gz") as archive:
+        return [
+            (e.name, e.size, e.isfile(), bool(e.mode & 0o111))
+            for e in archive.getmembers()
+        ]
 
 
 def verify(directory, version, commit):
@@ -17,13 +55,12 @@ def verify(directory, version, commit):
         raise ValueError("invalid release version")
     if not re.fullmatch(r"[0-9a-f]{40,64}", commit):
         raise ValueError("invalid expected commit")
-    expected = {
-        f"nines_{version}_{target.replace('/', '_')}.tar.gz" for target in TARGETS
-    }
-    files = expected | {"build.json", "SHA256SUMS"}
+    expected = {archive_name(version, target): target for target in TARGETS}
+    files = set(expected) | {"build.json", "SHA256SUMS"}
     if {p.name for p in directory.iterdir()} != files:
         raise ValueError(
-            "release must contain exactly four archives, build.json and SHA256SUMS"
+            "release must contain exactly one archive per supported platform, "
+            "build.json and SHA256SUMS"
         )
     if any(
         not (directory / name).is_file() or (directory / name).is_symlink()
@@ -42,9 +79,8 @@ def verify(directory, version, commit):
             "build metadata does not match the release version, commit or targets"
         )
     artifacts = manifest.get("artifacts", [])
-    if (
-        len(artifacts) != len(expected)
-        or {a.get("file") for a in artifacts} != expected
+    if len(artifacts) != len(expected) or {a.get("file") for a in artifacts} != set(
+        expected
     ):
         raise ValueError("archive inventory does not match supported targets")
     for artifact in artifacts:
@@ -53,33 +89,32 @@ def verify(directory, version, commit):
             data
         ).hexdigest() != artifact.get("sha256"):
             raise ValueError("archive differs from build metadata: " + artifact["file"])
-        with tarfile.open(directory / artifact["file"], "r:gz") as archive:
-            entries = archive.getmembers()
-            names = [entry.name for entry in entries]
-            if len(names) != len(set(names)):
-                raise ValueError("duplicate archive entry")
-            for entry in entries:
-                path = PurePosixPath(entry.name)
-                if (
-                    not entry.isfile()
-                    or path.is_absolute()
-                    or ".." in path.parts
-                    or entry.size > 128 << 20
-                ):
-                    raise ValueError("unsafe archive entry")
-            by_name = {entry.name: entry for entry in entries}
-            for binary in ["nines", "nines-server", "nines-mcp", "nines-operator"]:
-                if binary not in by_name or not by_name[binary].mode & 0o111:
-                    raise ValueError(
-                        "missing or nonexecutable release binary: " + binary
-                    )
+        listed = entries(directory / artifact["file"])
+        names = [name for name, *_ in listed]
+        if len(names) != len(set(names)):
+            raise ValueError("duplicate archive entry")
+        for name, size, regular, _ in listed:
+            path = PurePosixPath(name)
+            if (
+                not regular
+                or path.is_absolute()
+                or ".." in path.parts
+                or "\\" in name
+                or ":" in name
+                or size > 128 << 20
+            ):
+                raise ValueError("unsafe archive entry")
+        executable = {name: runnable for name, _, _, runnable in listed}
+        for binary in binaries(expected[artifact["file"]]):
+            if not executable.get(binary):
+                raise ValueError("missing or nonexecutable release binary: " + binary)
     checksums = {}
     for line in (directory / "SHA256SUMS").read_text().splitlines():
         match = re.fullmatch(r"([0-9a-f]{64})  ([A-Za-z0-9_.-]+)", line)
         if not match or match[2] in checksums:
             raise ValueError("invalid or duplicate checksum entry")
         checksums[match[2]] = match[1]
-    if set(checksums) != expected | {"build.json"}:
+    if set(checksums) != set(expected) | {"build.json"}:
         raise ValueError("checksum inventory does not match release assets")
     for name, digest in checksums.items():
         if hashlib.sha256((directory / name).read_bytes()).hexdigest() != digest:

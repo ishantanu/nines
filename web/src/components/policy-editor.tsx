@@ -1,4 +1,5 @@
 import { FormField } from "@/components/ui/form-layout";
+import { NativeSelect } from "@/components/ui/select";
 import type { BurnRatePolicy } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +53,7 @@ export function PolicyEditor({
             </div>
             <div>
               <FormField htmlFor={`policy-severity-${index}`} label="Severity">
-                <select
+                <NativeSelect
                   id={`policy-severity-${index}`}
                   className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                   value={policy.severity ?? "critical"}
@@ -61,7 +62,7 @@ export function PolicyEditor({
                   {["critical", "warning", "info"].map((s) => (
                     <option key={s}>{s}</option>
                   ))}
-                </select>
+                </NativeSelect>
               </FormField>
             </div>
             {(
@@ -72,6 +73,7 @@ export function PolicyEditor({
                 ["forSeconds", "Pending duration (seconds)"],
                 ["minCoverage", "Minimum coverage (0 to 1)"],
                 ["minEvents", "Minimum events per alert window"],
+                ["confidence", "Alert confidence (0 off, or 0.5 to 0.9999)"],
               ] as const
             ).map(([key, label]) => (
               <div key={key}>

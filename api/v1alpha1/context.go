@@ -11,6 +11,8 @@ type ResourceSummary struct {
 	DisplayName string `json:"displayName"`
 	Service     string `json:"service,omitempty"`
 	Revision    int64  `json:"revision"`
+	// Labels are the SLO's classification labels, when it has any.
+	Labels map[string]string `json:"labels,omitempty"`
 }
 type SearchOptions struct {
 	LinkedSLO string `json:"linkedSLO,omitempty"`

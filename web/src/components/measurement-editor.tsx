@@ -39,6 +39,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+// Identifiers are lowercase letters, digits and hyphens, up to 63 characters.
+export function slugOf(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 63)
+    .replace(/-+$/g, "");
+}
+
 export function MeasurementFilters({
   title,
   rows,
@@ -122,6 +132,7 @@ export function MeasurementFields({
   hideIdentity,
   hidePopulation,
   hideType,
+  simple,
   onChange,
 }: {
   draft: MeasurementDraft;
@@ -131,13 +142,32 @@ export function MeasurementFields({
   hideIdentity?: boolean;
   hidePopulation?: boolean;
   hideType?: boolean;
+  /**
+   * Show only what most SLOs need (name, service, metric, filters) and keep
+   * identifiers, intervals and counting details under "Advanced". The kind of
+   * SLO is chosen elsewhere, and the identifier follows the display name until
+   * it is edited.
+   */
+  simple?: boolean;
   onChange: (draft: MeasurementDraft) => void;
 }) {
   const id = useId();
   const field = <K extends keyof MeasurementDraft>(
     key: K,
     value: MeasurementDraft[K],
-  ) => onChange({ ...draft, [key]: value });
+  ) => {
+    if (simple && key === "displayName" && !fixedName) {
+      const follows =
+        draft.name === "" || draft.name === slugOf(draft.displayName);
+      onChange({
+        ...draft,
+        displayName: value as string,
+        ...(follows ? { name: slugOf(value as string) } : {}),
+      });
+      return;
+    }
+    onChange({ ...draft, [key]: value });
+  };
   const fields: {
     key:
       | "name"
@@ -159,7 +189,9 @@ export function MeasurementFields({
       label:
         draft.measurement === "latency"
           ? "Histogram metric family (seconds)"
-          : "Metric name",
+          : draft.measurement === "sessions"
+            ? "Session counter (one increment per session)"
+            : "Metric name",
     },
     { key: "step", label: "Measurement interval (seconds)", type: "number" },
     {
@@ -172,9 +204,10 @@ export function MeasurementFields({
     <fieldset className="space-y-5" disabled={disabled}>
       <div className="form-grid">
         {fields
-          .filter(
-            (f) =>
-              !hideIdentity || ["metric", "step", "scrape"].includes(f.key),
+          .filter((f) =>
+            simple
+              ? ["displayName", "service", "metric"].includes(f.key)
+              : !hideIdentity || ["metric", "step", "scrape"].includes(f.key),
           )
           .map((f) => (
             <div key={f.key}>
@@ -189,7 +222,10 @@ export function MeasurementFields({
               </FormField>
             </div>
           ))}
-        {!hideIdentity ? (
+        {!hideIdentity &&
+        (!simple ||
+          connections.filter((c) => supportsGuidedMeasurement(c.kind)).length >
+            1) ? (
           <div>
             <FormField htmlFor={`${id}-source`} label="Metrics connection">
               <Select
@@ -219,7 +255,7 @@ export function MeasurementFields({
             </p>
           </div>
         ) : null}
-        {!hideType ? (
+        {!hideType && !simple ? (
           <div>
             <FormField
               htmlFor={`${id}-measurement`}
@@ -242,6 +278,9 @@ export function MeasurementFields({
                   <SelectItem value="latency">
                     Events below a latency threshold
                   </SelectItem>
+                  <SelectItem value="sessions">
+                    Sessions without a bad event
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </FormField>
@@ -262,7 +301,26 @@ export function MeasurementFields({
           </p>
         </div>
       ) : null}
-      {draft.measurement === "availability" ? (
+      {draft.measurement === "sessions" ? (
+        <div>
+          <FormField
+            htmlFor={`${id}-eventMetric`}
+            label="Bad-event counter (one increment per affected session)"
+          >
+            <Input
+              id={`${id}-eventMetric`}
+              value={draft.eventMetric}
+              onChange={(e) => field("eventMetric", e.target.value)}
+            />
+          </FormField>
+          <p className="mt-2 text-xs text-muted-foreground">
+            The SLI is the share of sessions that did not experience the event.
+            Both counters must exist for the same population, and a session
+            should increment the event counter at most once. If either counter
+            is missing the result is unknown, never perfect.
+          </p>
+        </div>
+      ) : draft.measurement === "availability" ? (
         <div className="space-y-3">
           <MeasurementFilters
             title="Success"
@@ -274,7 +332,7 @@ export function MeasurementFields({
             These additional label matches define good events within the
             population. Values are literal strings, not regular expressions.
           </p>
-          <div>
+          <div hidden={simple}>
             <FormField htmlFor={`${id}-count`} label="Event count comes from">
               <Select
                 disabled={disabled}
@@ -329,10 +387,66 @@ export function MeasurementFields({
           />
         </FormField>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Match the source scrape interval to your telemetry configuration. Each
-        measurement interval must contain at least two scrapes.
-      </p>
+      {simple ? (
+        <details className="disclosure-panel">
+          <summary>Advanced: identifier, project and intervals</summary>
+          <div className="form-grid pt-3">
+            {fields
+              .filter((f) =>
+                ["name", "project", "step", "scrape"].includes(f.key),
+              )
+              .map((f) => (
+                <div key={f.key}>
+                  <FormField htmlFor={`${id}-adv-${f.key}`} label={f.label}>
+                    <Input
+                      id={`${id}-adv-${f.key}`}
+                      type={f.type ?? "text"}
+                      value={draft[f.key]}
+                      disabled={disabled || (f.key === "name" && fixedName)}
+                      onChange={(e) => field(f.key, e.target.value)}
+                    />
+                  </FormField>
+                </div>
+              ))}
+            {draft.measurement === "availability" ? (
+              <div>
+                <FormField
+                  htmlFor={`${id}-adv-count`}
+                  label="Event count comes from"
+                >
+                  <Select
+                    disabled={disabled}
+                    value={draft.countFrom}
+                    onValueChange={(v) =>
+                      field("countFrom", v as MeasurementDraft["countFrom"])
+                    }
+                  >
+                    <SelectTrigger id={`${id}-adv-count`} className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="counter">Counter</SelectItem>
+                      <SelectItem value="histogram">
+                        Classic histogram count
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
+              </div>
+            ) : null}
+          </div>
+          <p className="pt-2 text-xs text-muted-foreground">
+            The identifier follows the display name until you edit it. Match the
+            scrape interval to your telemetry; each measurement interval needs
+            at least two scrapes.
+          </p>
+        </details>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          Match the source scrape interval to your telemetry configuration. Each
+          measurement interval must contain at least two scrapes.
+        </p>
+      )}
     </fieldset>
   );
 }

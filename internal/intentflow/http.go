@@ -6,6 +6,8 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"strconv"
+	"strings"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
@@ -69,6 +71,7 @@ func decode(w http.ResponseWriter, r *http.Request, out any) error {
 }
 func Mount(m *http.ServeMux, s *Service) {
 	mountKubernetesExport(m, s)
+	mountPreparationEvidence(m, s)
 	mountGovernance(m, s)
 	m.HandleFunc("POST /api/intent-conversations/{id}/change-set", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
@@ -102,6 +105,14 @@ func Mount(m *http.ServeMux, s *Service) {
 		out, e := s.ApplyChangeSet(r.Context(), r.PathValue("id"), in)
 		reply(w, out, e, 200)
 	})
+	m.HandleFunc("GET /api/intent-conversations/{id}/activation", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			fail(w, model.Invalid("query fields are not supported"))
+			return
+		}
+		out, err := s.InspectActivation(r.Context(), r.PathValue("id"))
+		reply(w, out, err, 200)
+	})
 	m.HandleFunc("GET /api/intent-conversations/{id}/change-set/verification", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.RawQuery != "" {
 			fail(w, model.Invalid("query fields are not supported"))
@@ -109,6 +120,19 @@ func Mount(m *http.ServeMux, s *Service) {
 		}
 		out, e := s.VerifyChangeSet(r.Context(), r.PathValue("id"))
 		reply(w, out, e, 200)
+	})
+	m.HandleFunc("GET /api/intent-conversations/usage", func(w http.ResponseWriter, r *http.Request) {
+		days := 0
+		for k, v := range r.URL.Query() {
+			n, err := strconv.Atoi(strings.Join(v, ""))
+			if k != "days" || len(v) != 1 || err != nil {
+				fail(w, model.Invalid("only a numeric days query field is supported"))
+				return
+			}
+			days = n
+		}
+		out, err := s.Usage(r.Context(), days)
+		reply(w, out, err, 200)
 	})
 	m.HandleFunc("GET /api/intent-conversations", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()

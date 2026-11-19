@@ -58,6 +58,7 @@ func conversationCommand(action string, o *options) *cobra.Command {
 	cursor := f.String("cursor", "", "metadata page cursor")
 	after := f.Int64("after", 0, "Continue conversation audit after this sequence")
 	through := f.Int64("through", 0, "Freeze audit export at this sequence (zero: current)")
+	days := f.Int("days", 0, "usage window in days (1-365; zero: server default)")
 	format := new(string)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
@@ -74,10 +75,14 @@ func conversationCommand(action string, o *options) *cobra.Command {
 		if e != nil {
 			return e
 		}
-		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
+		timeout := 20 * time.Second
+		if action == "evidence" {
+			timeout = 90 * time.Second
+		}
+		ctx, cancel := context.WithTimeout(cmd.Context(), timeout)
 		defer cancel()
 		var result any
-		if action != "list" && action != "show" && action != "status" && action != "report" && action != "verify" && action != "kubernetes" && action != "rollback-kubernetes" && action != "audit" && *file == "" {
+		if action != "usage" && action != "list" && action != "show" && action != "status" && action != "report" && action != "verify" && action != "activation" && action != "kubernetes" && action != "rollback-kubernetes" && action != "audit" && *file == "" {
 			return fmt.Errorf("provide -f with an explicit operational YAML request")
 		}
 		switch action {
@@ -154,9 +159,13 @@ func conversationCommand(action string, o *options) *cobra.Command {
 			result = artifact
 		case "status":
 			result, e = c.IntentWorkflowStatus(ctx, id)
+		case "activation":
+			result, e = c.IntentActivation(ctx, id)
 		case "verify":
 			result, e = c.VerifyIntentChangeSet(ctx, id)
 
+		case "usage":
+			result, e = c.IntentUsage(ctx, *days)
 		case "list":
 			result, e = c.IntentConversations(ctx, *cursor)
 		case "show":
@@ -170,6 +179,11 @@ func conversationCommand(action string, o *options) *cobra.Command {
 			var in v1.AppendIntentConversation
 			if e = conversationFile(*file, &in); e == nil {
 				result, e = c.AppendIntentConversation(ctx, id, in)
+			}
+		case "evidence":
+			var in v1.RecordIntentEvidence
+			if e = conversationFile(*file, &in); e == nil {
+				result, e = c.RecordIntentEvidence(ctx, id, in)
 			}
 		case "run":
 			var in v1.CreateIntentFlowRun
@@ -189,7 +203,7 @@ func conversationCommand(action string, o *options) *cobra.Command {
 				result, e = c.CancelIntentFlowRun(ctx, id, in.ExpectedVersion)
 			}
 		default:
-			return fmt.Errorf("use intent conversations list|show|create|message|run|confirm|cancel|changes|approve|reject|apply|audit|verify|observe|rollback-plan|rollback-approve|rollback-apply|rollback-reject|kubernetes|rollback-kubernetes")
+			return fmt.Errorf("use intent conversations list|show|create|message|run|evidence|confirm|cancel|changes|approve|reject|apply|audit|verify|activation|observe|rollback-plan|rollback-approve|rollback-apply|rollback-reject|kubernetes|rollback-kubernetes")
 		}
 		if e != nil {
 			return e

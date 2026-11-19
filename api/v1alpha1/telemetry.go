@@ -11,8 +11,12 @@ const DependencyMapKind = "ServiceDependencyMap"
 // MeasurementSpec is owned and versioned by its SLO. It has no independent
 // resource name, revision or lifecycle.
 type MeasurementSpec struct {
-	Type                  string            `json:"type" yaml:"type"`
-	Metric                string            `json:"metric" yaml:"metric"`
+	Type   string `json:"type" yaml:"type"`
+	Metric string `json:"metric" yaml:"metric"`
+	// EventMetric is only for type sessions: a counter incremented once per
+	// session that experienced the event (a crash, an error prompt). Metric is
+	// then the counter incremented once per session.
+	EventMetric           string            `json:"eventMetric,omitempty" yaml:"eventMetric,omitempty"`
 	Labels                map[string]string `json:"labels" yaml:"labels"`
 	SuccessLabels         map[string]string `json:"successLabels,omitempty" yaml:"successLabels,omitempty"`
 	CountFrom             string            `json:"countFrom,omitempty" yaml:"countFrom,omitempty"`
@@ -44,8 +48,9 @@ type BindingSpec struct {
 	DisplayName           string            `json:"displayName" yaml:"displayName"`
 	Service               string            `json:"service" yaml:"service"`
 	Source                string            `json:"source" yaml:"source"`
-	Measurement           string            `json:"measurement" yaml:"measurement"` // availability or latency
+	Measurement           string            `json:"measurement" yaml:"measurement"` // availability, latency or sessions
 	Metric                string            `json:"metric" yaml:"metric"`
+	EventMetric           string            `json:"eventMetric,omitempty" yaml:"eventMetric,omitempty"`
 	Labels                map[string]string `json:"labels" yaml:"labels"`
 	SuccessLabels         map[string]string `json:"successLabels,omitempty" yaml:"successLabels,omitempty"`
 	ThresholdSeconds      *float64          `json:"thresholdSeconds,omitempty" yaml:"thresholdSeconds,omitempty"`

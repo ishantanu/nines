@@ -93,6 +93,9 @@ func Export(def v1.ServiceLevelObjective) (Result, error) {
 		}
 		return Metric{MetricSource: MetricSource{Type: "Prometheus", Spec: Query{Query: q}}}, nil
 	}
+	if s.ProviderWindow.BadSelector != "" {
+		return Result{}, model.Invalid("OpenSLO export does not support session measurements, whose good count is derived from two counters")
+	}
 	good, err := metric(s.ProviderWindow.GoodSelector)
 	if err != nil {
 		return Result{}, err

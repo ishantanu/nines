@@ -1,6 +1,10 @@
 package model
 
-import v1 "github.com/ishantanu/nines/api/v1alpha1"
+import (
+	"strings"
+
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
+)
 
 func ParseIntent(body []byte) (v1.SLOIntent, error) {
 	var in v1.SLOIntent
@@ -19,6 +23,20 @@ func ValidateIntent(in v1.SLOIntent) error {
 	return ValidateIntentSpec(in.Spec)
 }
 func ValidateIntentSpec(s v1.IntentSpec) error {
+	if e := s.Exclusions; e != nil {
+		if e.None == (len(e.ObservationBoundaries) > 0) || (e.None && e.ObservationBoundaries != nil) || len(e.ObservationBoundaries) > 8 {
+			return Invalid("exclusions require either none: true or 1–8 observationBoundaries, never both")
+		}
+		seen := map[string]bool{}
+		for _, boundary := range e.ObservationBoundaries {
+			key := strings.ToLower(strings.TrimSpace(boundary))
+			if !validText(boundary, 500) || key == "" || seen[key] {
+				return Invalid("observation exclusions must be distinct nonempty descriptions of at most 500 bytes")
+			}
+			seen[key] = true
+		}
+	}
+
 	if err := validateBudgetPolicy(s.ErrorBudgetPolicy); err != nil {
 		return err
 	}

@@ -2,7 +2,7 @@
 
 This guide runs one native server as an unprivileged systemd service.
 
-- Build with Go 1.27.3 and use an external PostgreSQL database.
+- Build with Go 1.27.4 and use an external PostgreSQL database.
 - The embedded UI is committed; Node is needed only when rebuilding it.
 
 ## Build and install

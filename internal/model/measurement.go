@@ -21,7 +21,7 @@ func InlineBinding(s SLO) MeasurementBinding {
 	if source == "" {
 		source = "primary"
 	}
-	return MeasurementBinding{APIVersion: APIVersion, Kind: v1.BindingKind, Metadata: v1.Metadata{Name: s.ID, Project: s.Project}, Spec: v1.BindingSpec{DisplayName: s.Name, Service: s.Service, Source: source, Measurement: m.Type, Metric: m.Metric, Labels: m.Labels, SuccessLabels: m.SuccessLabels, CountFrom: m.CountFrom, ThresholdSeconds: m.ThresholdSeconds, ScrapeIntervalSeconds: m.ScrapeIntervalSeconds, StepSeconds: s.StepSeconds, ObservationPoint: m.ObservationPoint}}
+	return MeasurementBinding{APIVersion: APIVersion, Kind: v1.BindingKind, Metadata: v1.Metadata{Name: s.ID, Project: s.Project}, Spec: v1.BindingSpec{DisplayName: s.Name, Service: s.Service, Source: source, Measurement: m.Type, Metric: m.Metric, EventMetric: m.EventMetric, Labels: m.Labels, SuccessLabels: m.SuccessLabels, CountFrom: m.CountFrom, ThresholdSeconds: m.ThresholdSeconds, ScrapeIntervalSeconds: m.ScrapeIntervalSeconds, StepSeconds: s.StepSeconds, ObservationPoint: m.ObservationPoint}}
 }
 func ValidateInlineSLO(s SLO) error {
 	if s.Measurement == nil {
@@ -47,6 +47,10 @@ func MeasurementWindow(m v1.MeasurementSpec) *v1.ProviderWindow {
 	labels := map[string]string{}
 	for k, v := range m.Labels {
 		labels[k] = v
+	}
+	if m.Type == "sessions" {
+		// Good is derived (total minus the event counter), so no good selector.
+		return &v1.ProviderWindow{TotalSelector: measurementSelector(m.Metric, labels), BadSelector: measurementSelector(m.EventMetric, labels), ScrapeIntervalSeconds: m.ScrapeIntervalSeconds}
 	}
 	metric := m.Metric
 	if m.Type == "latency" || m.CountFrom == "histogram" {

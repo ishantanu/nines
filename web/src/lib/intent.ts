@@ -3,7 +3,12 @@ import { RESOURCE_API_VERSION } from "./definitions";
 import { durationSeconds } from "./history";
 import type { SLO, Manifest, MeasurementSpec } from "./api";
 import type { BindingManifest } from "./topology";
+export interface IntentExclusions {
+  none?: boolean;
+  observationBoundaries?: string[];
+}
 export interface IntentSpec {
+  exclusions?: IntentExclusions;
   lifecycle?: SLO["lifecycle"];
   quality?: SLO["quality"];
   errorBudgetPolicy?: SLO["errorBudgetPolicy"];

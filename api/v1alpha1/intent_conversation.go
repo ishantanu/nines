@@ -22,10 +22,11 @@ type IntentConversationMessage struct {
 	RunID string             `json:"runId,omitempty"`
 }
 type IntentFlowStep struct {
-	Tool   string          `json:"tool"`
-	At     time.Time       `json:"at"`
-	Digest string          `json:"digest"`
-	Result json.RawMessage `json:"result"`
+	IntentDigest string          `json:"intentDigest,omitempty"`
+	Tool         string          `json:"tool"`
+	At           time.Time       `json:"at"`
+	Digest       string          `json:"digest"`
+	Result       json.RawMessage `json:"result"`
 }
 
 // IntentModelProgress contains aggregate transport progress only. It never
@@ -92,12 +93,13 @@ type IntentTemplateSelection struct {
 	At               time.Time           `json:"at"`
 }
 type IntentConversation struct {
-	Template         *IntentTemplateSelection `json:"template,omitempty"`
-	Audit            []IntentAuditEvent       `json:"audit,omitempty"`
-	ChangeSetHistory []IntentChangeSet        `json:"changeSetHistory,omitempty"`
-	ChangeSet        *IntentChangeSet         `json:"changeSet,omitempty"`
-	APIVersion       string                   `json:"apiVersion"`
-	Tenant           string                   `json:"tenant"`
+	PreparationEvidence *IntentPreparationEvidence `json:"preparationEvidence,omitempty"`
+	Template            *IntentTemplateSelection   `json:"template,omitempty"`
+	Audit               []IntentAuditEvent         `json:"audit,omitempty"`
+	ChangeSetHistory    []IntentChangeSet          `json:"changeSetHistory,omitempty"`
+	ChangeSet           *IntentChangeSet           `json:"changeSet,omitempty"`
+	APIVersion          string                     `json:"apiVersion"`
+	Tenant              string                     `json:"tenant"`
 	IntentConversationSummary
 	CreatedBy InvestigationActor          `json:"createdBy"`
 	Messages  []IntentConversationMessage `json:"messages"`
@@ -115,6 +117,7 @@ type CreateIntentConversation struct {
 	Goal  *SLOIntent           `json:"goal,omitempty"`
 }
 type AppendIntentConversation struct {
+	PreserveGoal    bool       `json:"preserveGoal,omitempty"`
 	ID              string     `json:"id"`
 	ExpectedVersion int64      `json:"expectedVersion"`
 	Text            string     `json:"text"`

@@ -2,8 +2,40 @@ import { observedFetch } from "./observability";
 export type Health = "healthy" | "at_risk" | "unknown" | "degraded";
 export type SLOLifecycle =
   "experimental" | "aspirational" | "committed" | "deprecated";
+export interface CohortOutliers {
+  state: "available" | "incomplete" | "insufficient";
+  threshold: number;
+  items: {
+    labels: Record<string, string>;
+    total: number;
+    reliability: number;
+    peerReliability: number;
+    zScore: number;
+  }[];
+  limitations: string[];
+}
+export interface CohortConcentration {
+  state: "available" | "no_failures" | "insufficient_failures" | "incomplete";
+  verdict?: "concentrated" | "spread";
+  failures: number;
+  events: number;
+  topShare: number;
+  effectiveCohorts: number;
+  entropy: number;
+  contributors: {
+    labels: Record<string, string>;
+    failures: number;
+    events: number;
+    failureShare: number;
+    eventShare: number;
+    representation?: number;
+  }[];
+  limitations: string[];
+}
 export interface BurnRatePolicy {
   minEvents?: number;
+  /** 0 (off) or 0.5 to 0.9999: raises each window's error-rate threshold as traffic falls. */
+  confidence?: number;
   name?: string;
   severity?: "critical" | "warning" | "info";
   shortWindowSeconds: number;
@@ -13,8 +45,10 @@ export interface BurnRatePolicy {
   minCoverage: number;
 }
 export type MeasurementSpec = {
-  type: "availability" | "latency";
+  type: "availability" | "latency" | "sessions";
   metric: string;
+  /** Sessions only: counter incremented once per session that had the event. */
+  eventMetric?: string;
   labels: Record<string, string>;
   successLabels?: Record<string, string>;
   countFrom?: "counter" | "histogram";
@@ -54,6 +88,8 @@ export interface MeasurementQuality {
   checks: { code: string; state: string; message: string }[];
   limitations: string[];
   cohorts?: {
+    concentration?: CohortConcentration;
+    outliers?: CohortOutliers;
     state: string;
     message: string;
     at: string;
@@ -70,13 +106,23 @@ export interface MeasurementQuality {
     }[];
   };
 }
+export interface BudgetBand {
+  name: string;
+  /** Active when the remaining budget fraction is at or below this. */
+  below: number;
+  response: string;
+}
 export interface ErrorBudgetPolicy {
   owner: string;
   runbookURL: string;
   reviewBelow: number;
   onExhausted?: "blocked" | "review_required";
+  /** Agreed responses as the budget falls. They never change the decision. */
+  bands?: BudgetBand[];
 }
 export interface ErrorBudgetDecision {
+  /** The agreed response level for the remaining budget, when bands apply. */
+  band?: { name: string; below: number; response: string };
   evidence?: {
     coverage: number;
     total: number;
@@ -107,7 +153,53 @@ export interface ErrorBudgetDecision {
   qualityState: string;
   advisory: boolean;
 }
+export interface CustomerPolicy {
+  label: string;
+  customers: { value: string; name?: string; target?: number }[];
+}
+export interface CustomerResult {
+  name: string;
+  alias: string;
+  state:
+    | "observed"
+    | "low_traffic"
+    | "no_traffic"
+    | "missing_numerator"
+    | "no_series";
+  good: number | null;
+  total: number;
+  target: number;
+  reliability: number | null;
+  burnRate: number | null;
+  budgetRemainingFraction: number | null;
+  maskedByAggregate: boolean;
+}
+export interface CustomerReport {
+  sloId: string;
+  revision: number;
+  tenant: string;
+  state: "available" | "unavailable" | "unsupported" | "not_configured";
+  message: string;
+  at: string;
+  windowSeconds: number;
+  label?: string;
+  serviceBurnRate: number | null;
+  items: CustomerResult[];
+  limitations: string[];
+}
+export interface BadIntervalPolicy {
+  /** An interval is bad when its error rate exceeds this fraction (0 to 1, exclusive). */
+  errorRate: number;
+  /** Intervals with fewer events are not judged (at least one event is always required). */
+  minEvents?: number;
+}
 export interface SLO {
+  /** Opt-in per-customer reporting for an explicit allowlist. */
+  customers?: CustomerPolicy;
+  /** When set, the SLO counts judged intervals instead of events. */
+  badInterval?: BadIntervalPolicy;
+  /** Classification labels (team, product, ...); they never change measurement. */
+  labels?: Record<string, string>;
   retirement?: import("./retirement").RetirementState;
   errorBudgetPolicy?: ErrorBudgetPolicy;
   quality?: MeasurementQualityPolicy;
@@ -116,6 +208,8 @@ export interface SLO {
   measurement?: MeasurementSpec;
   providerWindow?: {
     goodSelector: string;
+    /** Sessions only: good is the total minus this event counter. */
+    badSelector?: string;
     totalSelector: string;
     scrapeIntervalSeconds: number;
   };
@@ -204,7 +298,27 @@ export interface Manifest {
       maxSteps?: number;
       approvalRequired: boolean;
     };
+    runObjective?: { target: number; windowSeconds: number; minRuns: number };
   };
+}
+export interface JourneyRunObjective {
+  state: "available" | "no_runs" | "insufficient_runs";
+  target: number;
+  windowSeconds: number;
+  minRuns: number;
+  from: string;
+  to: string;
+  passed: number;
+  failed: number;
+  violated: number;
+  unjudged: number;
+  otherRevision: number;
+  judged: number;
+  reliability: number | null;
+  burnRate: number | null;
+  budgetRemainingFraction: number | null;
+  truncated: boolean;
+  limitations: string[];
 }
 export interface Revision {
   manifest: Manifest;
@@ -217,6 +331,7 @@ export interface Journey {
   health: Health;
   links: { link: Link; slo: SLO; status: Snapshot; health: Health }[];
   reasons: string[];
+  runObjective?: JourneyRunObjective;
 }
 export interface Run {
   evidence: {

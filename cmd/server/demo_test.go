@@ -40,8 +40,11 @@ func TestDemoRefreshAfterWindowEdit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rec.Points) != 120 {
+	if len(rec.Points) != int(model.MinimumHistorySeconds/rec.SLO.StepSeconds) {
 		t.Fatalf("wrong retained sample count: %d", len(rec.Points))
+	}
+	if !rec.Points[0].Time.Before(now.Add(-2 * time.Hour)) {
+		t.Fatal("shortening the objective discarded useful chart history")
 	}
 	status, err := svc.Status(ctx, rec.SLO.ID, time.Time{})
 	if err != nil || status.Coverage != 1 {

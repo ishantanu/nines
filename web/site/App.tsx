@@ -1,5 +1,9 @@
+import { NinesFeatures } from "./features/NinesFeatures";
+import { SLOTypes } from "./features/SLOTypes";
 import { useState } from "react";
 import { ArrowRight, Check, Copy, Terminal, Waypoints } from "lucide-react";
+import { Theme } from "@astryxdesign/core/theme";
+import { ninesTheme } from "../src/astryx-theme";
 import { Button } from "../src/components/ui/button";
 import {
   Tabs,
@@ -13,6 +17,7 @@ import latency from "../../examples/request-latency.slo.yaml?raw";
 import intent from "../../examples/api-success.intent.yaml?raw";
 import { examples } from "./examples";
 import { documentationLink } from "./docs/navigation";
+import { WorkflowIllustration } from "./workflow/WorkflowIllustration";
 
 import { inlineWordmark as logo } from "./brand";
 const repo = "https://github.com/ishantanu/nines";
@@ -46,6 +51,52 @@ function CopyCommand({
         )}{" "}
         Copy
       </Button>
+    </div>
+  );
+}
+
+// Decorative: an aurora, a dot grid and a reliability trace with dips and a
+// spike. Nothing here is data, so it is hidden from assistive technology.
+function HeroBackdrop() {
+  const trace =
+    "M0 430 L110 426 L190 434 L270 421 L330 427 L372 500 L410 412 L500 420 L590 416 L650 426 L694 360 L730 432 L820 422 L910 430 L956 540 L996 446 L1060 416 L1160 410 L1230 426 L1280 320 L1316 424 L1390 418 L1440 412";
+  return (
+    <div aria-hidden="true" className="hero-backdrop">
+      <div className="hero-aurora" />
+      <div className="hero-grid" />
+      <svg viewBox="0 0 1440 640" preserveAspectRatio="xMidYMid slice">
+        <defs>
+          <linearGradient id="hero-wave-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stopColor="currentColor" stopOpacity="0.2" />
+            <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={`${trace} V640 H0 Z`} fill="url(#hero-wave-fill)" />
+        <path
+          className="hero-trace"
+          d={trace}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinejoin="round"
+          pathLength="1"
+        />
+        <path
+          d="M0 500 H1440"
+          stroke="currentColor"
+          strokeOpacity="0.5"
+          strokeWidth="1.5"
+          strokeDasharray="3 9"
+          fill="none"
+        />
+        <circle
+          className="hero-dot"
+          cx="1230"
+          cy="426"
+          r="6"
+          fill="currentColor"
+        />
+      </svg>
     </div>
   );
 }
@@ -255,8 +306,9 @@ function JourneyExample() {
 }
 
 export function App() {
+  const [exampleId, setExampleId] = useState("playground");
   return (
-    <>
+    <Theme theme={ninesTheme} mode="light">
       <a href="#main" className="skip-link">
         Skip to content
       </a>
@@ -267,49 +319,52 @@ export function App() {
           </a>
           <nav aria-label="Main navigation">
             <a href="#product">Product</a>
+            <a href="#slo-types">SLO types</a>
+            <a href="#features">Features</a>
             <a href="#architecture">Architecture</a>
             <a href="#as-code">As code</a>
             <a href="#examples">Examples</a>
             <a href="#agents">For agents</a>
             <a href={"./docs/"}>Docs</a>
           </nav>
-          <Button asChild variant="outline" size="sm">
-            <a href={repo}>GitHub</a>
+          <Button variant="outline" size="sm" href={repo}>
+            GitHub
           </Button>
         </div>
       </header>
       <main id="main">
-        <section
-          className="hero container"
-          id="product"
-          aria-labelledby="hero-title"
-        >
-          <div className="hero-copy">
-            <h1 id="hero-title">
-              Reliability, tied to the <em>user journey.</em>
-            </h1>
-            <p className="hero-description">
-              Define what good looks like. Connect service level objectives to
-              critical user journeys, then track the signals and error budgets
-              that matter.
-            </p>
-            <div className="hero-actions">
-              <Button asChild size="lg">
-                <a href="#quickstart">
+        <div className="hero-stage">
+          <HeroBackdrop />
+          <section
+            className="hero container"
+            id="product"
+            aria-labelledby="hero-title"
+          >
+            <div className="hero-copy">
+              <h1 id="hero-title">
+                Reliability, tied to the <em>user journey.</em>
+              </h1>
+              <p className="hero-description">
+                Define what good looks like. Connect service level objectives to
+                critical user journeys, then track the signals and error budgets
+                that matter.
+              </p>
+              <div className="hero-actions">
+                <Button size="lg" href="#quickstart">
                   Try Nines locally <ArrowRight aria-hidden="true" />
+                </Button>
+                <a className="text-link" href={repo}>
+                  Explore the source <ArrowRight size={15} aria-hidden="true" />
                 </a>
-              </Button>
-              <a className="text-link" href={repo}>
-                Explore the source <ArrowRight size={15} aria-hidden="true" />
-              </a>
+              </div>
+              <p className="release-note">
+                Pre-release MVP <span>·</span> Apache-2.0 <span>·</span>{" "}
+                Self-hosted
+              </p>
             </div>
-            <p className="release-note">
-              Pre-release MVP <span>·</span> Apache-2.0 <span>·</span>{" "}
-              Self-hosted
-            </p>
-          </div>
-          <WorkspacePreview />
-        </section>
+            <WorkspacePreview />
+          </section>
+        </div>
         <div className="stack-bar" id="providers">
           <div className="container">
             <span>
@@ -366,37 +421,59 @@ export function App() {
             </p>
           </div>
           <JourneyExample />
-          <ol className="reliability-path">
-            <li>
-              <span>01</span>
-              <h3>Map the journey</h3>
-              <p>
-                Define the steps a user depends on, their owners and the SLOs
-                that protect them.
-              </p>
-            </li>
-            <li>
-              <span>02</span>
-              <h3>Measure the objective</h3>
-              <p>
-                Compare observed SLI with a target, rolling window and error
-                budget using your configured telemetry provider.{" "}
-                <a href="./docs/slo-guide/#read-sli-budget-and-burn-rate-charts">
-                  See the performance charts.
-                </a>
-              </p>
-            </li>
-            <li>
-              <span>03</span>
-              <h3>Act on budget burn</h3>
-              <p>
-                Generate recording and two-window burn-rate rules. Review the
-                destination, then activate through native Prometheus reload, the
-                Mimir ruler or the Kubernetes operator. Verify runtime
-                evaluation and recorded output separately.
-              </p>
-            </li>
-          </ol>
+        </section>
+        <SLOTypes />
+        <NinesFeatures />
+        <section
+          className="container product-section portal-gallery"
+          id="portal"
+          aria-labelledby="portal-title"
+        >
+          <div className="section-heading">
+            <h2 id="portal-title">Inside the portal.</h2>
+            <p>
+              SLI trends, budget burn and measurement coverage. Captured from
+              the synthetic demo workspace.
+            </p>
+          </div>
+          <div className="portal-gallery-grid">
+            <figure>
+              <a
+                href="./docs/assets/nines-overview.jpg"
+                aria-label="Open the full-size portal overview screenshot"
+              >
+                <img
+                  src="./docs/assets/nines-overview.jpg"
+                  width="1280"
+                  height="720"
+                  loading="lazy"
+                  decoding="async"
+                  alt="Nines overview with SLO trends and linked critical user journeys"
+                />
+              </a>
+              <figcaption>
+                Objectives and critical user journeys, with measured SLI trends.
+              </figcaption>
+            </figure>
+            <figure>
+              <a
+                href="./docs/assets/nines-measurements.jpg"
+                aria-label="Open the full-size measurement summary screenshot"
+              >
+                <img
+                  src="./docs/assets/nines-measurements.jpg"
+                  width="1280"
+                  height="720"
+                  loading="lazy"
+                  decoding="async"
+                  alt="Per-service budget burn and a donut showing complete and partial measurement windows"
+                />
+              </a>
+              <figcaption>
+                Budget burn by service and measurement-window coverage.
+              </figcaption>
+            </figure>
+          </div>
         </section>
         <section
           className="container architecture-section"
@@ -581,22 +658,46 @@ export function App() {
               explicit.
             </p>
           </div>
-          <Tabs defaultValue="playground" className="examples-panel">
-            <TabsList
-              aria-label="Practical workflow examples"
-              className="example-tabs"
-            >
-              {examples.map((example) => (
-                <TabsTrigger key={example.id} value={example.id}>
-                  {example.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          <div className="examples-panel">
+            <label className="example-picker" htmlFor="workflow-example">
+              Choose a workflow
+              <select
+                id="workflow-example"
+                value={exampleId}
+                onChange={(e) => setExampleId(e.target.value)}
+              >
+                {[
+                  {
+                    name: "Try locally",
+                    ids: ["playground", "ai-playground", "offline"],
+                  },
+                  {
+                    name: "Connect and operate",
+                    ids: ["connected", "metrics", "operator"],
+                  },
+                  {
+                    name: "Build and automate",
+                    ids: ["slo-templates", "sdk", "mcp", "intent-checks"],
+                  },
+                ].map((group) => (
+                  <optgroup key={group.name} label={group.name}>
+                    {group.ids
+                      .map((id) => examples.find((item) => item.id === id))
+                      .filter((item) => item !== undefined)
+                      .map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.label}
+                        </option>
+                      ))}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
             {examples.map((example) => (
-              <TabsContent
+              <section
                 key={example.id}
-                value={example.id}
-                forceMount
+                hidden={exampleId !== example.id}
+                aria-label={example.label}
                 className="example-content"
               >
                 <div className="example-description">
@@ -622,9 +723,9 @@ export function App() {
                     <code>{example.code}</code>
                   </pre>
                 </div>
-              </TabsContent>
+              </section>
             ))}
-          </Tabs>
+          </div>
         </section>
         <section
           className="container agent-section"
@@ -661,8 +762,8 @@ export function App() {
                 <div>
                   <h3>Tenant-scoped MCP tools</h3>
                   <p>
-                    Expose the HTTP resource contracts through a stdio MCP
-                    adapter, using explicit server and tenant contexts.
+                    Expose tenant-scoped tools over stdio or opt-in HTTP with
+                    OAuth. Keep server contexts and write permissions explicit.
                   </p>
                 </div>
               </article>
@@ -694,33 +795,7 @@ export function App() {
                 <ArrowRight size={15} aria-hidden="true" />
               </a>
             </div>
-            <aside
-              className="agent-terminal"
-              aria-label="Example deterministic CLI workflow"
-            >
-              <div className="terminal-heading">
-                <Terminal size={15} aria-hidden="true" />
-                <span>Inspect → validate → plan → apply</span>
-              </div>
-              <pre tabIndex={0}>
-                <code>
-                  <span># Discover contracts without a server</span>
-                  {"\n"}nines capabilities --offline --agent{"\n\n"}
-                  <span># Validate a reviewed definition</span>
-                  {"\n"}nines validate --offline -f slo.yaml --agent{"\n\n"}
-                  <span># Review a tenant-scoped change</span>
-                  {"\n"}nines plan --context production -f slo.yaml --agent
-                </code>
-              </pre>
-              <p>
-                Model-assisted intent and review workflows are experimental.
-                Providers are configurable, including local models. Evaluate
-                your model before enabling the workflow. Review recommendation
-                evidence and decision history before approval. Configuration
-                rollback requires a separate review and cannot restore consumed
-                error budget.
-              </p>
-            </aside>
+            <WorkflowIllustration />
           </div>
         </section>
         <section
@@ -811,6 +886,6 @@ export function App() {
           </nav>
         </div>
       </footer>
-    </>
+    </Theme>
   );
 }

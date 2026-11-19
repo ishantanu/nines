@@ -99,3 +99,13 @@ CREATE TABLE IF NOT EXISTS visual_evaluations (
 );
 CREATE INDEX IF NOT EXISTS visual_evaluations_journey ON visual_evaluations(journey_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS visual_evaluations_expiry ON visual_evaluations(expires_at);
+
+-- One coalesced scheduled collection per SLO; token fences writes after failover.
+CREATE TABLE IF NOT EXISTS collection_jobs (
+ slo_id text PRIMARY KEY REFERENCES slos(id) ON DELETE CASCADE,
+ due_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+ lease_until timestamptz NOT NULL DEFAULT 'epoch',
+ token text NOT NULL DEFAULT '',
+ failures integer NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS collection_jobs_due ON collection_jobs(due_at,slo_id);

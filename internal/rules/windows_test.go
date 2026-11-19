@@ -55,3 +55,27 @@ func TestProviderWindowRulesUseIndependentWindowsAndPinnedCutoffs(t *testing.T) 
 		t.Fatal("mixed modes accepted")
 	}
 }
+
+func TestSessionSLOGeneratesDerivedGoodWindowsThatStillParse(t *testing.T) {
+	s := fixture()
+	s.ID = "ios-crash-free"
+	s.StepSeconds = 10
+	s.WindowSeconds = 120
+	s.Policy.ShortWindowSeconds = 20
+	s.Policy.LongWindowSeconds = 40
+	s.GoodQuery, s.TotalQuery = "", ""
+	s.ProviderWindow = &v1.ProviderWindow{TotalSelector: `app_sessions_total{app="ios"}`, BadSelector: `app_sessions_crashed_total{app="ios"}`, ScrapeIntervalSeconds: 2}
+	g, err := Generate(s, "tenant")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var good string
+	for _, r := range g.Rules {
+		if r.Record == "nines:sli_good:window" && r.Labels["window"] == "120s" {
+			good = r.Expr
+		}
+	}
+	if !strings.Contains(good, "sum(increase(app_sessions_total{app=\"ios\"}[120s])) - sum(increase(app_sessions_crashed_total{app=\"ios\"}[120s]))") {
+		t.Fatalf("the good window must subtract the event counter: %s", good)
+	}
+}

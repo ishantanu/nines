@@ -1,0 +1,141 @@
+{
+  "suite": "workflow",
+  "apiVersion": "nines.dev/v1alpha1",
+  "kind": "IntentEvaluationReport",
+  "mode": "live",
+  "suiteSHA256": "d8cb713746446779dab747e8f68339fbb7cc8c14a9093e934c535f43434ee229",
+  "generatedAt": "2026-11-02T07:38:36.065268Z",
+  "complete": true,
+  "runtimeVersion": "Ollama 0.40.11; Metal; context 8192; parallel 1; prewarmed",
+  "results": [
+    {
+      "workflowError": "model_capability_unavailable",
+      "case": "availability-reviewed-apply",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 32464
+    },
+    {
+      "case": "latency-reviewed-apply",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "needs_input",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 19110
+    },
+    {
+      "case": "ambiguous-goal",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_input",
+      "durationMilliseconds": 3066
+    },
+    {
+      "workflowError": "model_capability_unavailable",
+      "case": "missing-population",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 16320
+    },
+    {
+      "workflowError": "model_capability_unavailable",
+      "case": "missing-metric",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_error",
+      "durationMilliseconds": 20340
+    },
+    {
+      "workflowError": "model_capability_unavailable",
+      "case": "sparse-traffic",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 21407
+    },
+    {
+      "workflowError": "model_capability_unavailable",
+      "case": "no-traffic",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 22182
+    },
+    {
+      "workflowError": "invalid_measurement",
+      "case": "conflicting-cuj",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "failed",
+      "durationMilliseconds": 7168
+    },
+    {
+      "workflowError": "model_capability_unavailable",
+      "case": "stale-binding-approval",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 22823
+    },
+    {
+      "workflowError": "model_capability_unavailable",
+      "case": "changed-mimir-dataset",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 23627
+    },
+    {
+      "workflowError": "model_capability_unavailable",
+      "case": "ambiguous-apply-readback",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "failed",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 18534
+    },
+    {
+      "case": "template-availability-reviewed-apply",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "needs_input",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 9352
+    },
+    {
+      "case": "template-latency-reviewed-apply",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "needs_input",
+      "failure": "unexpected_workflow_state",
+      "durationMilliseconds": 10367
+    }
+  ],
+  "passed": 2,
+  "failed": 11,
+  "skipped": [
+    "reject-provider-routing-tool"
+  ]
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { Plus, Settings2, FileCheck2 } from "lucide-react";
+import { GitProposeButton } from "./git-delivery";
 import {
   Dialog,
   DialogContent,
@@ -320,6 +321,12 @@ export function ManifestEditor({
                 ? "Keep current revision"
                 : "Save reviewed journey"}
           </Button>
+          <GitProposeButton
+            scope={scope}
+            manifest={plan?.manifest}
+            plan={plan}
+            disabled={busy || !editable}
+          />
         </div>
       </DialogContent>
     </Dialog>

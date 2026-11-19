@@ -25,9 +25,10 @@ func selectionFixtureClient(c selectionCase, profile fixtureProfile) (*intentmod
 		}
 		names, last := selectionRequestState(body)
 		name := "ask_user"
-		args := map[string]any{"question": "Which metric, instrumentation or reviewed evaluation rubric can you supply in the pinned scope before we confirm a measurement?"}
+		args := map[string]any{"question": "Review the selected measurement and confirm that its event semantics match the intended outcome.", "fields": []string{"confirmation"}}
 		switch {
 		case c.Clarify:
+			args = map[string]any{"question": "Which instrumentation or reviewed evaluation rubric establishes the intended event semantics in this scope?", "fields": []string{"semantics"}}
 		case last == "" && names["list_slo_templates"]:
 			name = "list_slo_templates"
 			args = map[string]any{"category": c.Category}

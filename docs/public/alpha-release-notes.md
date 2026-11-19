@@ -1,27 +1,18 @@
-# Nines v0.1.0-alpha.3
+# Nines v0.1.0-alpha.4
 
 An early-access release of the self-hosted SLO and critical user journey platform.
 
 - Nines is under active development; APIs may change before a stable release.
 - Please report bugs and feature requests through GitHub Issues.
 
-## Changes since alpha.2
+## Changes since alpha.3
 
-- Reviewed SLO retirement resolves current references, freezes retained history and retries owned rule cleanup before separately confirmed permanent deletion. Audit receipts survive deletion and identifiers remain reserved.
-- Observed dependency evidence qualifies actual counter sample age and series continuity, matches declared links and links journey steps. An optional instrumented HTTP example runs locally with Prometheus or Mimir.
-- SLOs own their measurements and support same-name revisioned edits with retained historical definitions. The portal adds guided critical user journey forms, synchronized SLO editor tabs, canonical tenant URLs and live source-measurement reads.
-- Saved SLO rules reconcile automatically when the owner enables a trusted Prometheus, Mimir or Kubernetes destination. Configuration, activation, runtime evaluation and measured attainment remain separate evidence.
-- [Service dependency maps](service-dependencies.md) add visual editing, saved layouts and directed links. Kubernetes resource imports and optional namespace-scoped cluster reads produce reviewable candidates without inferring observed calls or criticality.
-- SLI charts show measured attainment and target with a single series; incomplete history stays qualified. Keyboard and pointer inspection use compact synchronized readouts, with accessible theme contrast and responsive chart alignment.
-- Measurement-quality requirements, bounded cohort inspection, minimum alert traffic and error-budget response policies support reviewed operational decisions. Intent changes enforce current evidence at apply time and preserve independent approval, audit, post-change observation and reviewed rollback.
-- Categorized SLI templates and pinned declarative extensions cover services, pipelines, storage, agents, LLM applications and inference. Optional synthetic AI workloads exercise evaluation quality/coverage, budget and latency SLOs through Prometheus or Mimir.
-- Optional native Jev advice provides consented category and definition-clarity judgments with audit receipts and daily tenant limits. The Compose override works with Prometheus or Mimir; ordinary playgrounds remain usable without any model account.
-- A separate platform admin console manages local accounts, tenant grants, session revocation and Jev policies. Identity acceptance includes real OpenLDAP TLS, controlled signed OIDC fixtures and the native CLI authorization flow.
-- Session replay adds selective masking, visible playback failures and a portable HTML export. Optional immutable audit archival supports AWS S3 and explicitly configured S3-compatible storage, with disposable Ceph RGW acceptance.
-- Website-hosted documentation adds chapter navigation, local search and downloadable examples. Docs load about 9.5 KB of JavaScript, reuse the page shell between chapters and retain usable navigation in narrow windows.
-- Experimental telemetry adapters add VictoriaMetrics, Datadog, New Relic, Dash0 and Google Cloud Monitoring, with provider-specific query validation and pinned account/tenant routes. Native SLO publication and attainment reads are separate capabilities; consult the [provider capability guide](provider-adapters.md) before configuring a destination.
-- The [remote MCP transport](remote-mcp.md) adds opt-in OAuth-protected Streamable HTTP, fixed tenant routing and distinct client/user credential bindings. Stdio remains the default; both transports preserve RBAC, read-only defaults and reviewed mutation controls.
-- Explicit latency inputs preserve subsecond units, burn-policy YAML accepts duration strings, and full intent conversations can continue in a new conversation without copying old evidence or approvals. Delayed scheduled collection catches up bounded intervals without inventing measurements.
+- The portal, public site and documentation pages use Astryx with the shared `nines` theme and self-hosted Figtree. Documentation renders Astryx headings, links, code, quotes and tables as static HTML without adding client script. The login page, Home overview and SLI charts are redesigned.
+- New SLO practices, each opt-in and deterministic, with missing data kept unknown: [low-traffic confidence for burn alerts](measurements.md), [labels and roll-ups](measurements.md#classify-objectives-with-labels), [graduated budget response levels](error-budget-policy.md#agree-responses-for-each-budget-level), [journey run objectives](critical-user-journeys.md#measure-an-agentic-journey-from-its-runs), [session SLIs](measurements.md#measure-sessions-instead-of-requests), [good-minute SLOs](measurements.md#judge-intervals-instead-of-events), [per-customer reports](measurement-quality.md#report-an-slo-for-key-customers), failure concentration, [peer comparison](measurement-quality.md#compare-cohorts-with-their-peers), [composed availability ceilings](service-dependencies.md), a [target-change check](slo-editing.md#review-a-target-change-against-delivered-reliability) and an [adoption review](slo-guide.md#keep-objectives-few-user-focused-and-linked). See the [SLO practices plan](slo-practices-roadmap.md) for each item's status and limits.
+- Every [SLO type](slo-types.md) has a guided form, and the portal shows the type on each objective and filters by type. The Define dialog asks one "what should this SLO measure?" question (defaulting to requests succeed), then a name, service, metric and filters, and keeps identifiers, intervals, templates and optional settings collapsed.
+- Optional [Git delivery](git-delivery.md) on GitHub and GitLab opens a pull or merge request with the exact reviewed SLO or journey definition instead of applying it. It reports applied state and drift, and it never merges or deploys.
+- [Migrate from Sloth or Pyrra](migration.md): offline conversion with per-SLO notes, explicit skips and an experimental-by-default lifecycle, through a portal dialog, `nines import` and the API.
+- Native CLI device login with optional operating-system credential storage, plus read-only intent measurement candidates, service context, evidence comparison, preparation-gap evidence and review packets across API, Go client, CLI and MCP.
 
 ## Upgrade notes
 
@@ -33,9 +24,15 @@ An early-access release of the self-hosted SLO and critical user journey platfor
   - Do not use `down -v` for an upgrade.
   - The source checkout supplies the optional Jev override; select it explicitly and inject the provider key privately.
   - A key alone enables no outbound request.
+- The SLO CRD schema gained optional fields (labels, burn-policy confidence, good-minute intervals, per-customer lists, session measurements and budget response levels). Apply the shipped `deploy/operator/crds.yaml` before upgrading the controller; existing resources remain valid.
+- Git delivery is off unless a tenant configures `gitOps` with a credential environment variable. Nothing changes for existing tenants.
 - Review current CRDs and the operator deployment guide before replacing a Kubernetes controller. Recorded rule output is revision-scoped; retained older series do not establish current-definition evaluation.
 
 ## Experimental boundaries
+
+- Git delivery and Sloth/Pyrra migration are new in this alpha. The GitHub and GitLab adapters are tested against in-memory fakes of their APIs, not live services, and the importers are checked against the projects' published examples, not every real-world file. Review each proposal and each converted definition before relying on it. Converted alert thresholds are standard burn-rate policies, not a copy of your current alerts.
+- The newer SLO types depend on the provider: sessions, good-minute SLOs and per-customer reports work with Prometheus and Mimir, sessions and good-minute SLOs are accepted for Dash0 in YAML but not run against a live account, and Datadog, New Relic and Google Cloud accept none of them. See the [provider table](slo-types.md#which-providers-support-which-types).
+- Session, good-minute and per-customer SLOs refuse unsupported combinations with a reason (for example per-customer reports on sessions, or good-minute on provider-evaluated windows) instead of partly working.
 
 - Model-assisted preparation, template selection, session replay, remote MCP HTTP/OAuth and the additional provider adapters remain experimental.
   - The Jev smoke test does not certify a generative model, task correctness or production calibration.
@@ -46,24 +43,34 @@ An early-access release of the self-hosted SLO and critical user journey platfor
 
 ## Downloads
 
-- Choose the archive matching your operating system and CPU. Each archive contains `nines`, `nines-server`, `nines-mcp` and `nines-operator`, plus configuration examples, reference documentation and dependency licenses.
+- Choose the archive matching your operating system and CPU. Linux and macOS archives contain `nines`, `nines-server`, `nines-mcp` and `nines-operator`; Windows archives contain `nines.exe`, `nines-server.exe` and `nines-mcp.exe`, because the operator runs only in Linux containers. Every archive includes configuration examples, reference documentation and dependency licenses.
 
-| Platform                | Archive suffix        |
-| ----------------------- | --------------------- |
-| Linux, Intel/AMD 64-bit | `linux_amd64.tar.gz`  |
-| Linux, ARM 64-bit       | `linux_arm64.tar.gz`  |
-| macOS, Intel            | `darwin_amd64.tar.gz` |
-| macOS, Apple silicon    | `darwin_arm64.tar.gz` |
+| Platform                  | Archive suffix         |
+| ------------------------- | ---------------------- |
+| Linux, Intel/AMD 64-bit   | `linux_amd64.tar.gz`   |
+| Linux, ARM 64-bit         | `linux_arm64.tar.gz`   |
+| macOS, Intel              | `darwin_amd64.tar.gz`  |
+| macOS, Apple silicon      | `darwin_arm64.tar.gz`  |
+| Windows, Intel/AMD 64-bit | `windows_amd64.zip`    |
+| Windows, ARM 64-bit       | `windows_arm64.zip`    |
 
 - Verify the downloaded archives against `SHA256SUMS` before extracting. `build.json` identifies the exact source commit, version, target architectures and archive hashes. The checksums provide integrity checking; these binaries are not code-signed or notarized.
+- Container images for `linux/amd64` and `linux/arm64` are published as `ghcr.io/ishantanu/nines` and `ghcr.io/ishantanu/nines-operator`, tagged with this version, signed with keyless Cosign and with build provenance. Their digests are listed at the end of these notes. See [container images](https://github.com/ishantanu/nines/blob/v0.1.0-alpha.4/docs/public/deployment/container-images.md).
 
 ## Quick start
 
-After extracting the archive:
+After extracting the archive (on Windows, run `.\nines.exe` and `.\nines-server.exe`):
 
 ```sh
 ./nines version --agent
 ./nines-server -demo
+```
+
+Or run the demo in a container. A container listens on all interfaces, so it needs a random `API_TOKEN`; enter it when the browser asks:
+
+```sh
+export API_TOKEN="$(openssl rand -hex 24)"; echo "$API_TOKEN"
+docker run --rm -p 127.0.0.1:8080:8080 -e API_TOKEN ghcr.io/ishantanu/nines:v0.1.0-alpha.4 -demo
 ```
 
 - Open <http://127.0.0.1:8080> and sign in with **admin / admin**.
@@ -72,7 +79,7 @@ After extracting the archive:
 - The CLI can validate YAML and generate recording rules without a server.
   - Connected operation requires the correct tenant, credentials and a running Nines server.
   - Persistent server operation requires PostgreSQL and explicit provider/authentication configuration.
-  - The Compose playground requires a source checkout; the binary archive is not a container deployment bundle.
+  - The Compose playground requires a source checkout; for containers, use the published images.
 
 ## Scope
 

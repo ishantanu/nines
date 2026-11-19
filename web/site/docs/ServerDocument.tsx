@@ -6,6 +6,21 @@ import { renderToString } from "react-dom/server";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
+import { Theme } from "@astryxdesign/core/theme";
+import { Heading as AstryxHeading } from "@astryxdesign/core/Heading";
+import { Link as AstryxLink } from "@astryxdesign/core/Link";
+import { Code as AstryxCode } from "@astryxdesign/core/Code";
+import { Blockquote } from "@astryxdesign/core/Blockquote";
+import { Divider } from "@astryxdesign/core/Divider";
+import { ninesTheme } from "../../src/astryx-theme";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../src/components/ui/table";
 import { Button } from "../../src/components/ui/button";
 import { DocsLayout, type DocumentationData, type Heading } from "./DocsLayout";
 import { resolveDocumentLink } from "./links";
@@ -22,103 +37,139 @@ export function renderDocumentation(page: DocPage, markdown: string) {
   const headings: Heading[] = [];
   function heading(level: 2 | 3, id: string | undefined, children: ReactNode) {
     if (id) headings.push({ level, id, text: headingText(children) });
-    return level === 2 ? (
-      <h2 id={id}>{children}</h2>
-    ) : (
-      <h3 id={id}>{children}</h3>
+    return (
+      <AstryxHeading level={level} id={id}>
+        {children}
+      </AstryxHeading>
     );
   }
   const content = renderToString(
-    <Markdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[rehypeSlug]}
-      skipHtml
-      components={{
-        h2: ({ id, children }) => heading(2, id, children),
-        h3: ({ id, children }) => heading(3, id, children),
-        a: ({ href, children }) => {
-          const target = resolveDocumentLink(href ?? "", page.source, root);
-          return (
-            <a
-              href={target}
-              download={target.startsWith(root + "examples/") ? "" : undefined}
-            >
+    <Theme theme={ninesTheme} mode="light">
+      <Markdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeSlug]}
+        skipHtml
+        components={{
+          h2: ({ id, children }) => heading(2, id, children),
+          h3: ({ id, children }) => heading(3, id, children),
+          a: ({ href, children }) => {
+            const target = resolveDocumentLink(href ?? "", page.source, root);
+            return (
+              <AstryxLink
+                href={target}
+                download={
+                  target.startsWith(root + "examples/") ? "" : undefined
+                }
+              >
+                {children}
+              </AstryxLink>
+            );
+          },
+          img: ({ src, alt }) => (
+            <img
+              src={resolveDocumentLink(
+                typeof src === "string" ? src : "",
+                page.source,
+                root,
+              )}
+              alt={alt ?? ""}
+              loading={
+                typeof src === "string" &&
+                src.endsWith("nines-architecture.svg")
+                  ? "eager"
+                  : "lazy"
+              }
+              decoding="async"
+              width={
+                typeof src === "string" &&
+                src.endsWith("nines-architecture.svg")
+                  ? 1200
+                  : typeof src === "string" &&
+                      /nines-(?:overview|performance|measurements)\.jpg$/.test(
+                        src,
+                      )
+                    ? 1280
+                    : undefined
+              }
+              height={
+                typeof src === "string" &&
+                src.endsWith("nines-architecture.svg")
+                  ? 870
+                  : typeof src === "string" &&
+                      /nines-(?:overview|performance|measurements)\.jpg$/.test(
+                        src,
+                      )
+                    ? 720
+                    : undefined
+              }
+            />
+          ),
+          h1: ({ id, children }) => (
+            <AstryxHeading level={1} id={id}>
               {children}
-            </a>
-          );
-        },
-        img: ({ src, alt }) => (
-          <img
-            src={resolveDocumentLink(
-              typeof src === "string" ? src : "",
-              page.source,
-              root,
-            )}
-            alt={alt ?? ""}
-            loading={
-              typeof src === "string" && src.endsWith("nines-architecture.svg")
-                ? "eager"
-                : "lazy"
-            }
-            decoding="async"
-            width={
-              typeof src === "string" && src.endsWith("nines-architecture.svg")
-                ? 1200
-                : typeof src === "string" &&
-                    src.endsWith("nines-performance.jpg")
-                  ? 1280
-                  : undefined
-            }
-            height={
-              typeof src === "string" && src.endsWith("nines-architecture.svg")
-                ? 870
-                : typeof src === "string" &&
-                    src.endsWith("nines-performance.jpg")
-                  ? 1591
-                  : undefined
-            }
-          />
-        ),
-        table: ({ children }) => (
-          <div className="docs-table">
-            <table>{children}</table>
-          </div>
-        ),
-        pre: ({ children }) => {
-          const code = isValidElement<{
-            className?: string;
-            children?: ReactNode;
-          }>(children)
-            ? children
-            : null;
-          const language =
-            code?.props.className?.replace(/^language-/, "") ?? "text";
-          return (
-            <div className="docs-code-block">
-              <div className="docs-code-toolbar">
-                <span>{language}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  type="button"
-                  data-copy-code
-                  aria-label={`Copy ${language} code`}
-                >
-                  Copy
-                </Button>
-              </div>
-              <pre tabIndex={0}>{children}</pre>
+            </AstryxHeading>
+          ),
+          table: ({ children }) => (
+            <div className="docs-table">
+              <Table {...({ textOverflow: "wrap" } as object)}>
+                {children}
+              </Table>
             </div>
-          );
-        },
-      }}
-    >
-      {markdown}
-    </Markdown>,
+          ),
+          thead: ({ children }) => <TableHeader>{children}</TableHeader>,
+          tbody: ({ children }) => <TableBody>{children}</TableBody>,
+          tr: ({ children }) => <TableRow>{children}</TableRow>,
+          th: ({ children }) => <TableHead>{children}</TableHead>,
+          td: ({ children }) => <TableCell>{children}</TableCell>,
+          blockquote: ({ children }) => <Blockquote>{children}</Blockquote>,
+          hr: () => <Divider />,
+          code: ({ className, children }) =>
+            className?.startsWith("language-") ||
+            String(children).includes("\n") ? (
+              <code className={className}>{children}</code>
+            ) : (
+              <AstryxCode>{children}</AstryxCode>
+            ),
+          pre: ({ children }) => {
+            const code = isValidElement<{
+              className?: string;
+              children?: ReactNode;
+            }>(children)
+              ? children
+              : null;
+            const language =
+              code?.props.className?.replace(/^language-/, "") ?? "text";
+            return (
+              <div className="docs-code-block">
+                <div className="docs-code-toolbar">
+                  <span>{language}</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    data-copy-code
+                    aria-label={`Copy ${language} code`}
+                  >
+                    Copy
+                  </Button>
+                </div>
+                <pre tabIndex={0}>{children}</pre>
+              </div>
+            );
+          },
+        }}
+      >
+        {markdown}
+      </Markdown>
+    </Theme>,
   );
   const data: DocumentationData = { page, root, headings };
   return {
-    markup: renderToString(<DocsLayout {...data} content={content} />),
+    markup: renderToString(
+      <Theme theme={ninesTheme} mode="light">
+        <DocsLayout {...data} content={content} />
+      </Theme>,
+    ),
     data,
   };
 }

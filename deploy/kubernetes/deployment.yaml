@@ -27,7 +27,7 @@ spec:
       containers:
         - name: nines
           # Replace locally with your reviewed image; no public image is assumed.
-          image: nines:local
+          image: ghcr.io/ishantanu/nines:v0.1.0-alpha.4
           imagePullPolicy: IfNotPresent
           args: ['-addr', '0.0.0.0:8080']
           env:

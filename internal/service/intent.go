@@ -20,6 +20,9 @@ func (s *Service) PlanIntent(ctx context.Context, in v1.PlanIntentInput) (v1.Int
 
 func (s *Service) planIntent(ctx context.Context, in v1.PlanIntentInput, includeJourney bool) (v1.IntentPlan, error) {
 	out := v1.IntentPlan{SourceDigest: s.SourceFingerprint(in.Intent.Spec.Source), APIVersion: v1.APIVersion, Tenant: s.TenantID, Intent: in.Intent, IntentDigest: model.DefinitionDigest(in.Intent), Candidates: []v1.IntentCandidate{}, Clarifications: []string{}, Warnings: []string{"Description is explanatory text, not an executable condition. Review the measurement's success labels, observation point, retries and denominator.", "Telemetry validation checks recent metadata and series. It is not a traffic backtest or proof of end-to-end journey success.", "Planning writes no resources or recording/alert rules. An approved intent change set can apply the SLO and CUJ link together; saved definitions follow the data source deployment policy: automatic reconciliation when enabled, otherwise a separate reviewed rule apply."}}
+	if in.Intent.Spec.Exclusions != nil {
+		out.Warnings = append(out.Warnings, "Observation exclusions are review notes, not executable query filters. Review the exact eligible population and observation point; no events are discarded by these notes.")
+	}
 	if err := model.ValidateIntent(in.Intent); err != nil {
 		return out, err
 	}

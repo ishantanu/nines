@@ -4,15 +4,16 @@ Nines loads compiled Go telemetry adapters through a versioned registry. Prometh
 
 ## Capabilities
 
-| Provider | Measurement API / query language | Native publication | Connection setup |
-| --- | --- | --- | --- |
-| Prometheus / Mimir | Prometheus HTTP API / PromQL; intervals, whole-window counts, discovery, dependencies and cohorts | Recording and burn-rate rules through files/reload, Mimir ruler or operator | Portal or tenant file |
-| Datadog (experimental) | Metrics API / bounded count queries; interval counts | Metric SLO API; 7 or 30 days | Portal or tenant file; native publishing opt-in |
-| New Relic (experimental) | NerdGraph / bounded NRQL event counts; interval counts | NerdGraph service-level API; existing entity required | Portal or tenant file; approved account/entity |
-| VictoriaMetrics (experimental) | Prometheus-compatible API / bounded PromQL or MetricsQL; interval counter estimates | None | Portal or tenant file |
-| Dash0 (experimental) | Dash0 Prometheus API / PromQL; interval and whole-window counts | Dash0 SLO API / OpenSLO; 28 days | Portal for collection; tenant file for publication |
-| Google Cloud Monitoring (experimental) | Monitoring v3 / bounded DELTA-count filters; interval counts | Monitoring v3 SLO API; existing service required | Tenant file; ADC or short-lived access token |
+| Provider                               | Measurement API / query language                                                                  | Native publication                                                          | Connection setup                                   |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------- |
+| Prometheus / Mimir                     | Prometheus HTTP API / PromQL; intervals, whole-window counts, discovery, dependencies and cohorts | Recording and burn-rate rules through files/reload, Mimir ruler or operator | Portal or tenant file                              |
+| Datadog (experimental)                 | Metrics API / bounded count queries; interval counts                                              | Metric SLO API; 7 or 30 days                                                | Portal or tenant file; native publishing opt-in    |
+| New Relic (experimental)               | NerdGraph / bounded NRQL event counts; interval counts                                            | NerdGraph service-level API; existing entity required                       | Portal or tenant file; approved account/entity     |
+| VictoriaMetrics (experimental)         | Prometheus-compatible API / bounded PromQL or MetricsQL; interval counter estimates               | None                                                                        | Portal or tenant file                              |
+| Dash0 (experimental)                   | Dash0 Prometheus API / PromQL; interval and whole-window counts                                   | Dash0 SLO API / OpenSLO; 28 days                                            | Portal for collection; tenant file for publication |
+| Google Cloud Monitoring (experimental) | Monitoring v3 / bounded DELTA-count filters; interval counts                                      | Monitoring v3 SLO API; existing service required                            | Tenant file; ADC or short-lived access token       |
 
+- The newer [SLO types](slo-types.md#which-providers-support-which-types) depend on provider capabilities: sessions need whole-window counts, good-minute SLOs need PromQL interval counts, and per-customer reports, failure concentration and peer comparison need Prometheus or Mimir.
 - All configured providers appear by name in SLO connection selectors. Guided inline measurement supports Prometheus and Mimir; metric browsing/discovery is limited to Prometheus and Mimir. Use provider-specific YAML or custom count queries for other adapters. Selecting a connection does not translate a query between languages.
 - The SVG and connection name beside an SLO identify **where its telemetry is read**. They do not prove a native vendor SLO exists. Open the SLO's rule/publication panel to review the destination, apply the plan and inspect publication evidence.
 - Native publishing does not create Datadog monitors, New Relic alert conditions, Dash0 check rules or Google Cloud alert policies. Nines burn policies and notification delivery are separate.
@@ -39,13 +40,13 @@ Nines loads compiled Go telemetry adapters through a versioned registry. Prometh
 
 All SLO creation and editing paths use the same installed query validators: offline CLI validation, server plan/apply and connected agent workflows. Connection compatibility is checked separately by the server before using a provider.
 
-| Query language | Offline validation | Runtime checks |
-| --- | --- | --- |
-| `promql` or omitted | Pinned Prometheus parser and instant-vector type checker | One aggregate series, aligned intervals and valid good/total counts |
-| `datadog` | Bounded count grammar, exact tag filters and rollup equal to the SLO step | COUNT/RATE metadata, normalization interval, returned rollup and matched buckets |
-| `nrql` | Bounded event-count grammar; no user time windows, grouping or extra statements | Pinned account, confirmed window, complete paired bucket results and no GraphQL errors |
-| `googlecloud` | Exact metric/resource predicates and AND-connected label equalities | Project pinning, raw aligned DELTA count intervals, complete series/pairs and bounded pagination |
-| `metricsql` | Official VictoriaMetrics parser plus a restricted counter-count AST | Complete query responses, one aggregate series and matched interval counts |
+| Query language      | Offline validation                                                              | Runtime checks                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `promql` or omitted | Pinned Prometheus parser and instant-vector type checker                        | One aggregate series, aligned intervals and valid good/total counts                              |
+| `datadog`           | Bounded count grammar, exact tag filters and rollup equal to the SLO step       | COUNT/RATE metadata, normalization interval, returned rollup and matched buckets                 |
+| `nrql`              | Bounded event-count grammar; no user time windows, grouping or extra statements | Pinned account, confirmed window, complete paired bucket results and no GraphQL errors           |
+| `googlecloud`       | Exact metric/resource predicates and AND-connected label equalities             | Project pinning, raw aligned DELTA count intervals, complete series/pairs and bounded pagination |
+| `metricsql`         | Official VictoriaMetrics parser plus a restricted counter-count AST             | Complete query responses, one aggregate series and matched interval counts                       |
 
 - Datadog and NRQL validation cover the supported SLO query subsets, not the vendors' complete query languages.
 - MetricsQL validation requires `sum(increase(metric[STEP]))`, `sum(increase_pure(metric[STEP]))` or `sum(increase_prometheus(metric[STEP]))`. Lookbehind must be explicit, fixed and equal to `stepSeconds`. Implicit windows, interval-relative durations, `WITH`, grouping, limits, offsets, timestamp overrides, subqueries, arithmetic and other functions are refused in this initial subset.
@@ -236,7 +237,6 @@ bin/nines collect newrelic-api-availability --recent --context production --agen
 
 VictoriaMetrics is available in **Telemetry connections → Add connection**. Enter its HTTP(S) origin and an optional bearer token. Select single-node routing or a cluster route approved by the administrator in `managedProviderRoutes.victoriametrics`; existing server-configured cluster routes are also authorized. Cluster values use `accountID` or `accountID:projectID`. Host allowlisting, encrypted credentials, owner permissions and immutable referenced routes apply as for other managed connections. Basic authentication remains available through server configuration. Collection does not deploy recording rules or configure `vmalert`.
 
-
 1. Use [single-node configuration](../../examples/victoriametrics/tenants.yaml) with an HTTP(S) origin such as `http://victoriametrics:8428`. The adapter adds the query API path. The unencrypted example is for a trusted local/private test network; use HTTPS for remote credentials.
 2. For clusters, use [cluster configuration](../../examples/victoriametrics/tenants-cluster.yaml) with a fixed account and optional project:
 
@@ -288,6 +288,7 @@ bin/nines collect vm-api-availability --recent --context production --agent
 - Every query requests `deny_partial_response=1`. Responses marked `isPartial: true`, warnings, multiple series, non-finite values, duplicate/out-of-range timestamps or unmatched good/total buckets fail collection. Missing data is not converted to zero. Returned points are sorted by timestamp.
 - The connection probe runs only constant-vector queries against the configured route; it does not establish real metric coverage. Endpoint/tenant/authentication changes alter the source fingerprint. Counter and coverage limitations appear in measurement-quality reports.
 - Connection creation is currently server-configured. Inline measurement compilation, discovery, whole-window collection and Kubernetes operator/vmalert publishing are not implemented for this adapter. Use explicit queries through the server/CLI/YAML editor; do not configure a rule destination on this provider.
+
 ### Run the disposable backend acceptance test
 
 ```sh
@@ -311,12 +312,12 @@ The isolated provider fixture on port 18180 has its own memory store. Creating a
 
    ```sh
    export NINES_TRIAL_BASE_TENANTS=deploy/playground/tenants-mimir-jev.yaml
-   export NINES_PROVIDER_TENANTS_FILE="${TMPDIR:-/tmp}/nines-playground-providers/tenants.yaml"
+   export NINES_PROVIDER_TENANTS_FILE="$HOME/.config/nines/playground/tenants.yaml"
    export NINES_TRIAL_TENANT=mimir
    go run ./integration/providertrial playground-config
    ```
 
-2. Select the private configuration once. The launcher remembers its path and backend; later `./playground up` calls reuse it:
+2. Select the private configuration once. Keep this file outside temporary directories so cleanup or reboot does not remove the connections. The launcher remembers its path and backend; later `./playground up` calls reuse it. `--no-providers` returns to built-in connections and hides these configured trial connections:
 
    ```sh
    ./playground up --mimir --jev --providers "$NINES_PROVIDER_TENANTS_FILE"
@@ -488,3 +489,9 @@ API references: [Datadog SLO history](https://docs.datadoghq.com/api/latest/serv
 ### Credential identity changes
 
 Connection fingerprints use a stable Argon2id-derived credential identity, separate from fast definition/content digests. The derivation is cached when a provider connection is constructed. Credential rotation changes source identity; a fingerprint is not a password verifier. Updating from an older fingerprint format requires fresh source evidence and review of any pending route-bound plan. Local account passwords retain their separate salted password-verification storage.
+
+## Intent candidate discovery capabilities
+
+- Candidate discovery reuses the optional metric-name and series-discovery interfaces, independently of collection and native SLO publication. Prometheus-compatible adapters expose these interfaces; other provider capabilities do not automatically imply support.
+- `POST /api/intents/candidates` reports both capabilities. Without series inspection it returns `unsupported`; with series inspection but no name listing, callers must supply exact metrics. Unsupported discovery is not an empty telemetry result.
+- The orchestrator accepts literal metric names and equality filters, with no new per-vendor query generation. See [candidate discovery](intents.md#discover-measurement-candidates) for request limits and semantic review requirements.

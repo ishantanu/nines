@@ -11,21 +11,27 @@ import re
 import subprocess
 import tarfile
 import tempfile
+import zipfile
 from pathlib import Path
 
 from licenses import collect
 from source import inspect
+from verify import TARGETS, archive_name, binaries
 
 ROOT = Path(__file__).resolve().parents[2]
-SUPPORTED = {"linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"}
+SUPPORTED = set(TARGETS)
+PACKAGES = {
+    "nines": "./cmd/nines",
+    "nines-server": "./cmd/server",
+    "nines-mcp": "./cmd/mcp",
+    "nines-operator": "./cmd/operator",
+}
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--version", required=True)
-    p.add_argument(
-        "--targets", default="linux/amd64,linux/arm64,darwin/amd64,darwin/arm64"
-    )
+    p.add_argument("--targets", default=",".join(TARGETS))
     p.add_argument("--out", type=Path, default=ROOT / "dist/releases")
     p.add_argument("--require-clean", action="store_true")
     a = p.parse_args()
@@ -105,12 +111,9 @@ def main():
                 "-X " + module + "/internal/buildinfo." + k + "=" + v
                 for k, v in [("Version", a.version), ("Commit", commit), ("Date", date)]
             )
-            for binary, package in [
-                ("nines", "./cmd/nines"),
-                ("nines-server", "./cmd/server"),
-                ("nines-mcp", "./cmd/mcp"),
-                ("nines-operator", "./cmd/operator"),
-            ]:
+            programs = binaries(target)
+            for binary in programs:
+                package = PACKAGES[binary.removesuffix(".exe")]
                 subprocess.run(
                     [
                         "go",
@@ -126,10 +129,19 @@ def main():
                     env=env,
                     check=True,
                 )
-            name = f"nines_{a.version}_{goos}_{goarch}.tar.gz"
+            name = archive_name(a.version, target)
             archive = output / name
             sources = [(f.name, f) for f in sorted(tree.iterdir())]
             readme = work / "BINARY_README.md"
+            run = ".\\" if goos == "windows" else "./"
+            exe = ".exe" if goos == "windows" else ""
+            operator = (
+                "The operator runs only in Linux containers and is not included "
+                "in Windows archives. Use the `ghcr.io/ishantanu/nines-operator` "
+                "image."
+                if goos == "windows"
+                else "```sh\n./nines-operator -version\n```"
+            )
             readme.write_text(f"""# Nines {a.version}
 
 This is a pre-release binary candidate. No production support or stable API compatibility is declared.
@@ -137,8 +149,8 @@ This is a pre-release binary candidate. No production support or stable API comp
 ## Try the isolated demo
 
 ```sh
-./nines version --agent
-./nines-server -demo
+{run}nines{exe} version --agent
+{run}nines-server{exe} -demo
 ```
 
 Open http://127.0.0.1:8080 and use `admin` / `admin`. This sign-in is a local demonstration, not an access-control boundary. The demo resets on restart and contacts no external provider.
@@ -146,16 +158,25 @@ Open http://127.0.0.1:8080 and use `admin` / `admin`. This sign-in is a local de
 ## Use the offline CLI
 
 ```sh
-./nines init slo --name checkout --window 28d --out checkout.yaml
-./nines validate --offline -f checkout.yaml --agent
-./nines rules generate --offline -f examples/api-availability.slo.yaml --tenant commerce
+{run}nines{exe} init slo --name checkout --window 28d --out checkout.yaml
+{run}nines{exe} validate --offline -f checkout.yaml --agent
+{run}nines{exe} rules generate --offline -f examples/api-availability.slo.yaml --tenant commerce
 ```
+
+## Run in a container
+
+```sh
+export API_TOKEN="$(openssl rand -hex 24)"; echo "$API_TOKEN"
+docker run --rm -p 127.0.0.1:8080:8080 -e API_TOKEN ghcr.io/ishantanu/nines:{a.version} -demo
+```
+
+A container listens on all interfaces, so the server requires a random `API_TOKEN` of at least 24 characters even for the demo. Enter it when the browser asks, then sign in with `admin` / `admin`.
+
+Multi-architecture images for `linux/amd64` and `linux/arm64` are published as `ghcr.io/ishantanu/nines` and `ghcr.io/ishantanu/nines-operator` with the same version tag, signed and with build provenance. See [container images](docs/public/deployment/container-images.md).
 
 ## Kubernetes operator
 
-```sh
-./nines-operator -version
-```
+{operator}
 
 The operator uses in-cluster service-account authentication; it needs no Nines server or PostgreSQL. Install the included CRDs and reviewed namespaced deployment from `deploy/operator/`. For a container built from this extracted archive, choose the Linux archive matching the cluster nodes and use `docker build -f deploy/operator/Dockerfile.binary -t YOUR_REGISTRY/nines-operator:VERSION .`. See [operator deployment](docs/public/deployment/operator.md) for installation, credentials, selectors, upgrades and recovery.
 
@@ -203,26 +224,10 @@ The source module is `github.com/ishantanu/nines`. Local previews are unpublishe
                 for f in sorted((ROOT / "docs/public").rglob("*"))
                 if f.is_file() and f.suffix in {".md", ".svg"}
             ]
-            # Stable ordering, timestamps, owner and gzip headers for identical inputs.
-            with (
-                archive.open("wb") as raw,
-                gzip.GzipFile(
-                    filename="", fileobj=raw, mode="wb", mtime=epoch
-                ) as zipped,
-                tarfile.open(fileobj=zipped, mode="w") as tar,
-            ):
-                for relative, path in sorted(sources):
-                    body = path.read_bytes()
-                    entry = tarfile.TarInfo(relative)
-                    entry.size = len(body)
-                    entry.mtime = epoch
-                    entry.mode = (
-                        0o755
-                        if relative
-                        in {"nines", "nines-server", "nines-mcp", "nines-operator"}
-                        else 0o644
-                    )
-                    tar.addfile(entry, io.BytesIO(body))
+            if goos == "windows":
+                write_zip(archive, sources, epoch)
+            else:
+                write_tar(archive, sources, epoch, set(programs))
             manifest["artifacts"].append(
                 {
                     "file": name,
@@ -250,6 +255,37 @@ The source module is `github.com/ishantanu/nines`. Local previews are unpublishe
                 }
             )
         )
+
+
+def write_tar(archive, sources, epoch, programs):
+    # Stable ordering, timestamps, owner and gzip headers for identical inputs.
+    with (
+        archive.open("wb") as raw,
+        gzip.GzipFile(filename="", fileobj=raw, mode="wb", mtime=epoch) as zipped,
+        tarfile.open(fileobj=zipped, mode="w") as tar,
+    ):
+        for relative, path in sorted(sources):
+            body = path.read_bytes()
+            entry = tarfile.TarInfo(relative)
+            entry.size = len(body)
+            entry.mtime = epoch
+            entry.mode = 0o755 if relative in programs else 0o644
+            tar.addfile(entry, io.BytesIO(body))
+
+
+def write_zip(archive, sources, epoch):
+    # Zip timestamps start in 1980 and have no time zone; use the commit time
+    # in UTC so identical inputs produce identical archives.
+    from datetime import datetime, timezone
+
+    stamp = datetime.fromtimestamp(max(epoch, 315532800), timezone.utc).timetuple()[:6]
+    with zipfile.ZipFile(archive, "w") as out:
+        for relative, path in sorted(sources):
+            entry = zipfile.ZipInfo(relative, date_time=stamp)
+            entry.compress_type = zipfile.ZIP_DEFLATED
+            entry.external_attr = 0o644 << 16
+            entry.create_system = 0
+            out.writestr(entry, path.read_bytes())
 
 
 if __name__ == "__main__":

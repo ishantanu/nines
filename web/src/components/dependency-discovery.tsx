@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { NativeSelect } from "@/components/ui/select";
 import { api, message, type RequestScope } from "@/lib/api";
 import { projectKubernetes } from "@/lib/kubernetes-inventory";
 import {
@@ -117,7 +118,7 @@ export function DependencyDiscovery({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor={`${id}-mode`}>Inventory source</Label>
-          <select
+          <NativeSelect
             id={`${id}-mode`}
             disabled={busy || disabled}
             className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm focus-visible:outline-2 focus-visible:outline-ring"
@@ -133,7 +134,7 @@ export function DependencyDiscovery({
             <option value="cluster" disabled={!capabilities?.clusterEnabled}>
               Connected Kubernetes cluster
             </option>
-          </select>
+          </NativeSelect>
         </div>
         <div className="space-y-2">
           <Label htmlFor={`${id}-namespace`}>
@@ -142,7 +143,7 @@ export function DependencyDiscovery({
               : "Default resource namespace"}
           </Label>
           {mode === "cluster" ? (
-            <select
+            <NativeSelect
               id={`${id}-namespace`}
               value={namespace}
               disabled={busy || disabled}
@@ -155,7 +156,7 @@ export function DependencyDiscovery({
               {capabilities?.namespaces.map((ns) => (
                 <option key={ns}>{ns}</option>
               ))}
-            </select>
+            </NativeSelect>
           ) : (
             <Input
               id={`${id}-namespace`}

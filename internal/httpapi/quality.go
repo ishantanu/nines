@@ -33,6 +33,28 @@ func (a *Server) measurementQuality(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, out)
 }
 
+func (a *Server) customerReport(w http.ResponseWriter, r *http.Request) {
+	expected := int64(0)
+	for key, values := range r.URL.Query() {
+		if key != "expectedRevision" || len(values) != 1 {
+			a.fail(w, r, model.Invalid("only expectedRevision is supported"))
+			return
+		}
+		n, err := strconv.ParseInt(values[0], 10, 64)
+		if err != nil || n < 1 {
+			a.fail(w, r, model.Invalid("expectedRevision must be positive"))
+			return
+		}
+		expected = n
+	}
+	out, err := a.Service.CustomerReport(r.Context(), r.PathValue("id"), expected)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	write(w, 200, out)
+}
+
 func (a *Server) budgetDecision(w http.ResponseWriter, r *http.Request) {
 	expected := int64(0)
 	if text := r.URL.Query().Get("expectedRevision"); text != "" {

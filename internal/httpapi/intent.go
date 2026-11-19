@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"mime"
 	"net/http"
 	"strconv"
 	"time"
@@ -114,6 +115,46 @@ func (a *Server) bindingHealth(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 	out, err := a.Service.CheckBinding(ctx, r.PathValue("id"), rev)
+	if err != nil {
+		telemetryError(w, err)
+		return
+	}
+	write(w, 200, out)
+}
+
+func (a *Server) intentCandidates(w http.ResponseWriter, r *http.Request) {
+	typ, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || typ != "application/json" {
+		telemetryError(w, model.Invalid("Content-Type must be application/json"))
+		return
+	}
+	var in v1.IntentCandidateInput
+	if !candidateInput(w, r, &in) {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 16*time.Second)
+	defer cancel()
+	out, err := a.Service.DiscoverIntentCandidates(ctx, in, a.Workspace.Templates)
+	if err != nil {
+		telemetryError(w, err)
+		return
+	}
+	write(w, 200, out)
+}
+
+func (a *Server) intentEvidence(w http.ResponseWriter, r *http.Request) {
+	typ, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if err != nil || typ != "application/json" {
+		telemetryError(w, model.Invalid("Content-Type must be application/json"))
+		return
+	}
+	var in v1.IntentEvidenceInput
+	if !boundedIntentInput(w, r, &in, map[string]bool{"plan": true, "intentDigest": true, "measurementDigest": true, "sourceDigest": true, "catalogDigest": true, "expectedRevision": true, "history": true, "alternatives": true}, "plan", "expectedRevision") {
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 76*time.Second)
+	defer cancel()
+	out, err := a.Service.PrepareIntentEvidence(ctx, in, a.Workspace.Templates)
 	if err != nil {
 		telemetryError(w, err)
 		return

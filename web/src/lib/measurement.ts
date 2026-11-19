@@ -16,8 +16,10 @@ export type MeasurementDraft = {
   displayName: string;
   service: string;
   source: string;
-  measurement: "availability" | "latency";
+  measurement: "availability" | "latency" | "sessions";
   metric: string;
+  /** Sessions only: counter of sessions that experienced the bad event. */
+  eventMetric: string;
   population: LabelFilter[];
   success: LabelFilter[];
   countFrom: "counter" | "histogram";
@@ -38,6 +40,7 @@ export function measurementDraft(
     source: s.source,
     measurement: s.measurement,
     metric: s.metric,
+    eventMetric: s.eventMetric ?? "",
     population: Object.entries(s.labels).map(([label, value]) => ({
       label,
       value,
@@ -105,7 +108,17 @@ export function bindingFromDraft(
     scrapeIntervalSeconds: scrape,
     observationPoint: d.observationPoint,
   };
-  if (d.measurement === "availability") {
+  if (d.measurement === "sessions") {
+    if (validate && !d.eventMetric.trim())
+      throw new Error(
+        "Name the counter of sessions that experienced the bad event.",
+      );
+    if (validate && d.eventMetric.trim() === d.metric.trim())
+      throw new Error(
+        "The event counter must differ from the session counter.",
+      );
+    b.spec.eventMetric = d.eventMetric.trim();
+  } else if (d.measurement === "availability") {
     if (validate && !Object.keys(success).length)
       throw new Error(
         "Specify at least one label that identifies successful events.",
@@ -234,6 +247,9 @@ export function sloFromMeasurementDraft(
         successLabels: contract.spec.successLabels,
         countFrom: contract.spec.countFrom,
         thresholdSeconds: contract.spec.thresholdSeconds,
+        ...(d.measurement === "sessions"
+          ? { eventMetric: contract.spec.eventMetric }
+          : {}),
         scrapeIntervalSeconds: Number(d.scrape),
         observationPoint: d.observationPoint,
       },

@@ -51,6 +51,17 @@ func (c *Client) DependencyMap(ctx context.Context, id string, expected int64) (
 	err := c.scopedRequest(ctx, http.MethodGet, "/api/dependency-maps/"+id+"/view?"+q.Encode(), nil, 1<<20, &out)
 	return out, err
 }
+
+// DependencyComposition reads the serial availability-ceiling check for a
+// dependency map. It never changes a definition.
+func (c *Client) DependencyComposition(ctx context.Context, id string) (v1.DependencyComposition, error) {
+	var out v1.DependencyComposition
+	if !identifier.MatchString(id) {
+		return out, errors.New("invalid dependency-map request")
+	}
+	err := c.scopedRequest(ctx, http.MethodGet, "/api/dependency-maps/"+id+"/composition", nil, 1<<20, &out)
+	return out, err
+}
 func (c *Client) TopologyResources(ctx context.Context, kind, cursor string, limit int) (v1.TopologyCatalog, error) {
 	var out v1.TopologyCatalog
 	if limit < 0 || limit > 100 || len(cursor) > 1024 {

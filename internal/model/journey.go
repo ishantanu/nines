@@ -134,6 +134,9 @@ func (j Journey) Validate() error {
 			return Invalid("maxCostUSD must be finite and between 0 and 1000000")
 		}
 	}
+	if err := validateRunObjective(j); err != nil {
+		return err
+	}
 	return nil
 }
 

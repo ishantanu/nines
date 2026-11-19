@@ -5,6 +5,13 @@ interface SearchEntry {
   title: string;
   text: string;
 }
+interface PackedChapter {
+  slug: string;
+  title: string;
+  description: string;
+  main: string;
+  outline: string;
+}
 interface PageSnapshot {
   main: HTMLElement;
   outline: HTMLElement;
@@ -48,6 +55,7 @@ export function mountDocumentation(root: HTMLElement) {
   absoluteLinks(document.documentElement, new URL(location.href));
   const pages = new Map<string, PageSnapshot>();
   const pending = new Map<string, Promise<PageSnapshot>>();
+  const packed = new Map<string, PackedChapter>();
   const controllers = new Set<AbortController>();
   const timers = new Set<ReturnType<typeof setTimeout>>();
   let disposed = false;
@@ -86,12 +94,42 @@ export function mountDocumentation(root: HTMLElement) {
     const path = canonicalPath(url);
     const cached = pages.get(path);
     if (cached) return Promise.resolve(cached);
+    const chapter = packed.get(path);
+    if (chapter) {
+      try {
+        const parsed = new DOMParser().parseFromString(
+          chapter.main + chapter.outline,
+          "text/html",
+        );
+        const marker = parsed.createElement("div");
+        marker.id = "root";
+        marker.dataset.doc = chapter.slug;
+        parsed.body.append(marker);
+        parsed.title = chapter.title;
+        const meta = parsed.createElement("meta");
+        meta.name = "description";
+        meta.content = chapter.description;
+        parsed.head.append(meta);
+        const page = readPage(parsed);
+        for (const element of [page.main, page.outline]) {
+          for (const script of element.querySelectorAll("script"))
+            script.remove();
+          absoluteLinks(element, new URL(path, base));
+        }
+        return Promise.resolve(remember(path, page));
+      } catch {
+        packed.delete(path);
+      }
+    }
     const existing = pending.get(path);
     if (existing) return existing;
     const controller = new AbortController();
     controllers.add(controller);
     const timeout = setTimeout(() => controller.abort(), 8000);
-    const request = fetch(new URL(path, base), { signal: controller.signal })
+    const request = fetch(new URL(path, base), {
+      signal: controller.signal,
+      priority: "high",
+    })
       .then(async (response) => {
         if (
           !response.ok ||
@@ -129,6 +167,84 @@ export function mountDocumentation(root: HTMLElement) {
     pending.set(path, request);
     return request;
   };
+  // Download compact, content-addressed fragments after first paint. No React,
+  // Markdown runtime or scripts are loaded; the initial HTML stays readable.
+  const connection = (
+    navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string };
+    }
+  ).connection;
+  if (
+    root.dataset.docBundle &&
+    !connection?.saveData &&
+    !["slow-2g", "2g"].includes(connection?.effectiveType ?? "")
+  ) {
+    const bundleURL = new URL(root.dataset.docBundle, location.href);
+    if (
+      bundleURL.origin === base.origin &&
+      new RegExp(
+        "^" +
+          base.pathname.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+          "docs/chapter-cache-[a-f0-9]{12}\\.json$",
+      ).test(bundleURL.pathname)
+    ) {
+      const timer = setTimeout(() => {
+        timers.delete(timer);
+        if (disposed) return;
+        const controller = new AbortController();
+        controllers.add(controller);
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        void fetch(bundleURL, { signal: controller.signal, priority: "low" })
+          .then(async (response) => {
+            if (
+              !response.ok ||
+              !response.headers
+                .get("content-type")
+                ?.includes("application/json") ||
+              (response.url && response.url !== bundleURL.href)
+            )
+              return;
+            const text = await response.text();
+            if (disposed || text.length > 3_000_000) return;
+            const data = JSON.parse(text) as {
+              version?: number;
+              pages?: PackedChapter[];
+            };
+            if (
+              data.version !== 1 ||
+              !Array.isArray(data.pages) ||
+              data.pages.length > 128
+            )
+              return;
+            for (const entry of data.pages) {
+              if (
+                !entry ||
+                ![
+                  entry.slug,
+                  entry.title,
+                  entry.description,
+                  entry.main,
+                  entry.outline,
+                ].every((value) => typeof value === "string") ||
+                !/^(?:[a-z0-9-]+(?:\/[a-z0-9-]+)*)?$/.test(entry.slug)
+              )
+                continue;
+              const path = new URL(
+                `docs/${entry.slug ? entry.slug + "/" : ""}`,
+                base,
+              ).pathname;
+              if (routes.has(path)) packed.set(path, entry);
+            }
+          })
+          .catch(() => {})
+          .finally(() => {
+            clearTimeout(timeout);
+            controllers.delete(controller);
+          });
+      }, 250);
+      timers.add(timer);
+    }
+  }
   const enablePageCopy = () => {
     const button = root.querySelector<HTMLButtonElement>(
       "button[data-copy-page]",

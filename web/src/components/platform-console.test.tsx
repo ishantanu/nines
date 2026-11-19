@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { typeInto } from "@/test-support/fields";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
@@ -131,14 +132,7 @@ function button(text: string) {
 async function field(id: string, value: string) {
   const input = document.getElementById(id) as
     HTMLInputElement | HTMLTextAreaElement;
-  await act(async () => {
-    const proto =
-      input instanceof HTMLTextAreaElement
-        ? HTMLTextAreaElement.prototype
-        : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(proto, "value")!.set!.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  await typeInto(input, value);
 }
 test("tenant inventory has independent administration navigation and does not send tenant credentials", async () => {
   await render("tenants");
@@ -158,7 +152,7 @@ test("tenant inventory has independent administration navigation and does not se
 test("account creation requires a reason, transmits CSRF and clears the password", async () => {
   await render("users");
   await act(async () => button("Create user").click());
-  expect(button("Save change").disabled).toBe(true);
+  expect(button("Save change").getAttribute("aria-disabled")).toBe("true");
   await field("platform-username", "new-user");
   await field("platform-name", "New user");
   await field("platform-password", "test-private-password");

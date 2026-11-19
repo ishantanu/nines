@@ -58,7 +58,17 @@ func (b MeasurementBinding) Validate() error {
 	if err := ValidateLabels(s.SuccessLabels); err != nil {
 		return err
 	}
+	if s.Measurement != "sessions" && s.EventMetric != "" {
+		return Invalid("eventMetric is only for the sessions measurement")
+	}
 	switch s.Measurement {
+	case "sessions":
+		if !MetricName.MatchString(s.EventMetric) || s.EventMetric == s.Metric {
+			return Invalid("sessions requires an eventMetric different from metric")
+		}
+		if s.CountFrom != "" || len(s.SuccessLabels) > 0 || s.ThresholdSeconds != nil {
+			return Invalid("sessions counts sessions with an event: it does not accept countFrom, successLabels or thresholdSeconds")
+		}
 	case "availability":
 		if !oneOf(s.CountFrom, "", "counter", "histogram") {
 			return Invalid("availability countFrom must be counter or histogram")
@@ -79,7 +89,7 @@ func (b MeasurementBinding) Validate() error {
 			return Invalid("latency requires a positive thresholdSeconds at most 86400 and no successLabels")
 		}
 	default:
-		return Invalid("measurement must be availability or latency")
+		return Invalid("measurement must be availability, latency or sessions")
 	}
 	return nil
 }

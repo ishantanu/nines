@@ -1,15 +1,16 @@
 import * as React from "react";
+import { Card as AstryxCard } from "@astryxdesign/core/Card";
 import { cn } from "cn";
 
+// Card is the Astryx surface (border, radius, background, elevation come from
+// the theme). The parts below only arrange content inside it.
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div
+    <AstryxCard
+      padding={0}
       data-slot="card"
-      className={cn(
-        "flex min-w-0 flex-col gap-6 rounded-md border bg-card py-6 text-card-foreground",
-        className,
-      )}
-      {...props}
+      className={cn("flex min-w-0 flex-col gap-6 py-6", className)}
+      {...(props as object)}
     />
   );
 }

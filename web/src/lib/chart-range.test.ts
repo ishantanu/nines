@@ -40,7 +40,10 @@ test("rejects missing, invalid, inverted, future, oversized and sub-interval dat
     ).toThrow();
 });
 test("relative ranges stay server-resolved and presets respect small retention windows", () => {
-  expect(rangePresets(120)).toEqual([120]);
+  expect(rangePresets(120, 10)).toEqual([30, 60, 120]);
+  expect(rangePresets(120, 60)).toEqual([60, 120]);
+  expect(rangePresets(20, 10)).toEqual([20]);
+  expect(rangePresets(600, 120)).toEqual([120, 300, 600]);
   expect(rangePresets(3600)).toEqual([900, 3600]);
   expect(
     rangeQuery({ kind: "relative", seconds: 86400 }, 3600).toString(),

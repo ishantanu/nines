@@ -187,6 +187,16 @@ func TestRealMimirIndependentAlertLifecycle(t *testing.T) {
 			}
 			select {
 			case <-phaseCtx.Done():
+				// Keep failure evidence from the actual evaluator. Synthetic series
+				// are safe to log; no source credentials or user telemetry are used.
+				for _, metric := range []string{"nines:slo_burn_rate:ratio", "nines:slo_coverage:ratio", "nines:sli_good:interval", "nines:sli_total:interval"} {
+					expression := fmt.Sprintf(`%s{nines_slo=%q}`, metric, slo.ID)
+					if strings.HasSuffix(metric, ":interval") {
+						expression += "[60s]"
+					}
+					_, body, err := rulerRequest(ctx, target, http.MethodGet, "/api/v1/query?query="+url.QueryEscape(expression), nil)
+					t.Logf("timeout diagnostics %s: %s (%v)", metric, body, err)
+				}
 				t.Fatal("alert lifecycle timed out in phase", phase)
 			case <-time.After(400 * time.Millisecond):
 			}

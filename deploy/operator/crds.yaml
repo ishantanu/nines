@@ -31,11 +31,61 @@ spec:
                         type: object
                     spec:
                         properties:
+                            badInterval:
+                                nullable: true
+                                properties:
+                                    errorRate:
+                                        type: number
+                                    minEvents:
+                                        type: number
+                                required:
+                                    - errorRate
+                                type: object
+                            customers:
+                                nullable: true
+                                properties:
+                                    customers:
+                                        items:
+                                            properties:
+                                                name:
+                                                    type: string
+                                                target:
+                                                    nullable: true
+                                                    type: number
+                                                value:
+                                                    type: string
+                                            required:
+                                                - value
+                                            type: object
+                                        maxItems: 1000
+                                        type: array
+                                    label:
+                                        type: string
+                                required:
+                                    - label
+                                    - customers
+                                type: object
                             displayName:
                                 type: string
                             errorBudgetPolicy:
                                 nullable: true
                                 properties:
+                                    bands:
+                                        items:
+                                            properties:
+                                                below:
+                                                    type: number
+                                                name:
+                                                    type: string
+                                                response:
+                                                    type: string
+                                            required:
+                                                - name
+                                                - below
+                                                - response
+                                            type: object
+                                        maxItems: 1000
+                                        type: array
                                     onExhausted:
                                         enum:
                                             - blocked
@@ -64,6 +114,22 @@ spec:
                                     errorBudgetPolicy:
                                         nullable: true
                                         properties:
+                                            bands:
+                                                items:
+                                                    properties:
+                                                        below:
+                                                            type: number
+                                                        name:
+                                                            type: string
+                                                        response:
+                                                            type: string
+                                                    required:
+                                                        - name
+                                                        - below
+                                                        - response
+                                                    type: object
+                                                maxItems: 1000
+                                                type: array
                                             onExhausted:
                                                 enum:
                                                     - blocked
@@ -81,6 +147,18 @@ spec:
                                             - owner
                                             - runbookURL
                                             - reviewBelow
+                                        type: object
+                                    exclusions:
+                                        nullable: true
+                                        properties:
+                                            none:
+                                                type: boolean
+                                            observationBoundaries:
+                                                items:
+                                                    type: string
+                                                maxItems: 1000
+                                                type: array
+                                        required: []
                                         type: object
                                     journey:
                                         nullable: true
@@ -111,6 +189,8 @@ spec:
                                         nullable: true
                                         properties:
                                             countFrom:
+                                                type: string
+                                            eventMetric:
                                                 type: string
                                             labels:
                                                 additionalProperties:
@@ -149,6 +229,10 @@ spec:
                                         items:
                                             properties:
                                                 burnRate:
+                                                    type: number
+                                                confidence:
+                                                    maximum: 0.9999
+                                                    minimum: 0
                                                     type: number
                                                 forSeconds:
                                                     format: int64
@@ -193,6 +277,10 @@ spec:
                                         nullable: true
                                         properties:
                                             burnRate:
+                                                type: number
+                                            confidence:
+                                                maximum: 0.9999
+                                                minimum: 0
                                                 type: number
                                             forSeconds:
                                                 format: int64
@@ -282,6 +370,13 @@ spec:
                                     - windowSeconds
                                     - noDataPolicy
                                 type: object
+                            labels:
+                                additionalProperties:
+                                    maxLength: 63
+                                    minLength: 1
+                                    type: string
+                                maxProperties: 8
+                                type: object
                             lifecycle:
                                 enum:
                                     - experimental
@@ -293,6 +388,8 @@ spec:
                                 nullable: true
                                 properties:
                                     countFrom:
+                                        type: string
+                                    eventMetric:
                                         type: string
                                     labels:
                                         additionalProperties:
@@ -343,6 +440,10 @@ spec:
                                     properties:
                                         burnRate:
                                             type: number
+                                        confidence:
+                                            maximum: 0.9999
+                                            minimum: 0
+                                            type: number
                                         forSeconds:
                                             format: int64
                                             type: integer
@@ -387,6 +488,10 @@ spec:
                                 properties:
                                     burnRate:
                                         type: number
+                                    confidence:
+                                        maximum: 0.9999
+                                        minimum: 0
+                                        type: number
                                     forSeconds:
                                         format: int64
                                         type: integer
@@ -427,6 +532,8 @@ spec:
                             providerWindow:
                                 nullable: true
                                 properties:
+                                    badSelector:
+                                        type: string
                                     goodSelector:
                                         type: string
                                     scrapeIntervalSeconds:
@@ -558,6 +665,22 @@ spec:
                                 type: string
                             owner:
                                 type: string
+                            runObjective:
+                                nullable: true
+                                properties:
+                                    minRuns:
+                                        format: int64
+                                        type: integer
+                                    target:
+                                        type: number
+                                    windowSeconds:
+                                        format: int64
+                                        type: integer
+                                required:
+                                    - target
+                                    - windowSeconds
+                                    - minRuns
+                                type: object
                             slos:
                                 items:
                                     properties:
@@ -657,6 +780,8 @@ spec:
                                 type: string
                             displayName:
                                 type: string
+                            eventMetric:
+                                type: string
                             labels:
                                 additionalProperties:
                                     type: string
@@ -745,6 +870,22 @@ spec:
                             errorBudgetPolicy:
                                 nullable: true
                                 properties:
+                                    bands:
+                                        items:
+                                            properties:
+                                                below:
+                                                    type: number
+                                                name:
+                                                    type: string
+                                                response:
+                                                    type: string
+                                            required:
+                                                - name
+                                                - below
+                                                - response
+                                            type: object
+                                        maxItems: 1000
+                                        type: array
                                     onExhausted:
                                         enum:
                                             - blocked
@@ -762,6 +903,18 @@ spec:
                                     - owner
                                     - runbookURL
                                     - reviewBelow
+                                type: object
+                            exclusions:
+                                nullable: true
+                                properties:
+                                    none:
+                                        type: boolean
+                                    observationBoundaries:
+                                        items:
+                                            type: string
+                                        maxItems: 1000
+                                        type: array
+                                required: []
                                 type: object
                             journey:
                                 nullable: true
@@ -792,6 +945,8 @@ spec:
                                 nullable: true
                                 properties:
                                     countFrom:
+                                        type: string
+                                    eventMetric:
                                         type: string
                                     labels:
                                         additionalProperties:
@@ -842,6 +997,10 @@ spec:
                                     properties:
                                         burnRate:
                                             type: number
+                                        confidence:
+                                            maximum: 0.9999
+                                            minimum: 0
+                                            type: number
                                         forSeconds:
                                             format: int64
                                             type: integer
@@ -885,6 +1044,10 @@ spec:
                                 nullable: true
                                 properties:
                                     burnRate:
+                                        type: number
+                                    confidence:
+                                        maximum: 0.9999
+                                        minimum: 0
                                         type: number
                                     forSeconds:
                                         format: int64

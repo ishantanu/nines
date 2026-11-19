@@ -173,7 +173,7 @@ func workflowFixtureClient(c workflowCase, draft Case, profile fixtureProfile) (
 		walk(body["messages"], false)
 		walk(body["contents"], false)
 		name := "ask_user"
-		args := map[string]any{"question": "Review the observation point and explicitly confirm the matching measurement."}
+		args := map[string]any{"question": "Review the observation point and explicitly confirm the matching measurement.", "fields": []string{"confirmation"}}
 		switch {
 		case names["draft_goal"]:
 			name = "draft_goal"

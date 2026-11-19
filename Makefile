@@ -1,6 +1,6 @@
-.PHONY: demo run build server cli mcp operator ui test test-providers test-integration test-mimir test-victoriametrics test-prometheus test-ceph test-operator test-identity test-dependencies test-topology intent-eval intent-workflow-eval template-eval selection-eval check release-check public-source release site site-check lint lint-go lint-python check-api
+.PHONY: test-collector demo run build server cli mcp operator ui test test-providers test-integration test-mimir test-victoriametrics test-prometheus test-ceph test-operator test-identity test-dependencies test-topology intent-eval intent-workflow-eval template-eval selection-eval check release-check public-source release site site-check lint lint-go lint-python check-api
 VERSION ?= dev
-RELEASE_TARGETS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64
+RELEASE_TARGETS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64
 ui:
 	cd web && npm ci --no-audit --no-fund && npm run build
 build: server cli mcp operator
@@ -25,7 +25,7 @@ test-providers:
 
 test-integration:
 	@test -n "$$TEST_DATABASE_URL" || (echo 'Set TEST_DATABASE_URL to a dedicated test database'; exit 1)
-	go test -race -count=1 -json ./... > database-test-results.json
+	go test -race -count=1 -json ./... > database-test-results.json || { python3 scripts/release/check-tests.py database-test-results.json --required database; exit 1; }
 	python3 scripts/release/check-tests.py database-test-results.json --required database
 intent-eval:
 	@go run ./integration/intent-eval
@@ -81,3 +81,34 @@ check-api:
 	python3 -m openapi_spec_validator api/openapi/v1alpha1.yaml
 	python3 -c 'import json,jsonschema; jsonschema.Draft202012Validator.check_schema(json.load(open("api/mcp/v1alpha1.schema.json")))'
 	go test ./api/openapi ./api/mcp
+
+test-collector:
+	./integration/collector/run.sh
+
+.PHONY: test-intent-context
+test-intent-context:
+	go test -race ./internal/service ./internal/httpapi ./client ./cmd/nines ./internal/mcpserver ./api/openapi -run 'IntentContext|ContractStructure|CriticalSchemaFields' -count=1
+
+.PHONY: test-intent-candidates
+test-intent-candidates:
+	go test -race ./internal/service ./internal/httpapi ./client ./cmd/nines ./internal/mcpserver ./internal/intentflow ./api/openapi -run 'IntentCandidates|IntentCandidate|ContractStructure|CriticalSchemaFields' -count=1
+
+.PHONY: test-intent-evidence
+test-intent-evidence:
+	go test -race ./internal/service ./client ./cmd/nines ./internal/mcpserver ./api/openapi -run 'IntentEvidence|Backtest|ContractStructure|CriticalSchemaFields' -count=1
+
+.PHONY: test-intent-attachments
+test-intent-attachments:
+	go test -race ./internal/intentflow ./client ./cmd/nines ./internal/mcpserver ./api/openapi -run 'PreparationEvidence|IntentEvidenceAttachment|ContractStructure|CriticalSchemaFields' -count=1
+
+.PHONY: test-intent-review-packet
+test-intent-review-packet:
+	go test -race ./internal/intentflow ./client ./cmd/nines ./internal/mcpserver ./api/openapi -run 'IntentReviewPacket|ReviewArtifact|IntentReviewMarkdown|IntentEvidenceAttachmentClient|ContractStructure|CriticalSchemaFields' -count=1
+
+.PHONY: test-intent-proposals
+test-intent-proposals:
+	go test -race ./internal/model ./internal/service ./internal/intentflow ./client ./cmd/nines ./internal/mcpserver ./api/openapi -count=1
+
+.PHONY: test-intent-activation
+test-intent-activation:
+	go test -race ./internal/intentflow ./internal/httpapi ./client ./cmd/nines ./internal/mcpserver ./api/openapi -run 'IntentActivation|IntentConversationAPI|HeadlessCLI|ContractStructure|CriticalSchema' -count=1

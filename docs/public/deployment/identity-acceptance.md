@@ -12,7 +12,7 @@ This guide separates controlled-provider evidence from verification of your own 
 make test-identity
 ```
 
-- Requires Go 1.27.3, Docker, OpenSSL and Python 3.
+- Requires Go 1.27.4, Docker, OpenSSL and Python 3.
   - The command builds a disposable OpenLDAP image from a pinned official Debian image and Debian-maintained packages, starts it alongside PostgreSQL 17, and generates new credentials and a short-lived local CA.
   - Ports bind only to random loopback addresses.
   - No existing playground, directory, Nines context or API key is used.

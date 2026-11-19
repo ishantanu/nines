@@ -22,6 +22,9 @@ func workflowStatus(v v1.IntentConversation) v1.IntentWorkflowStatus {
 	set := func(phase, action, message string, human bool) {
 		out.Phase, out.NextAction, out.Message, out.HumanRequired = phase, action, message, human
 	}
+	if v.ChangeSet == nil {
+		out.PreparationChecks = preparationChecks(v)
+	}
 	if v.Plan != nil {
 		out.IntentDigest = v.Plan.IntentDigest
 	}

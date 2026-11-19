@@ -72,6 +72,26 @@ class PublicSourceTests(unittest.TestCase):
             image.write_bytes(image.read_bytes() + b"unreviewed payload")
             self.assertTrue(source.inspect(root)[1])
 
+    def test_reviewed_animated_walkthrough_is_pinned_by_content_and_type(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.fixture(root)
+            name = "docs/public/brand/nines-create-slo.gif"
+            self.assertIn(name, source.PRODUCT_IMAGES)
+            image = root / name
+            image.parent.mkdir(parents=True)
+            image.write_bytes((ROOT / name).read_bytes())
+            selected, errors = source.inspect(root)
+            self.assertFalse(errors)
+            self.assertIn(Path(name), selected)
+            # A different GIF, or a non-GIF with the pinned name, is refused.
+            image.write_bytes(b"GIF89a" + b"unreviewed")
+            self.assertTrue(source.inspect(root)[1])
+            image.write_bytes(
+                (ROOT / name).read_bytes().replace(b"GIF8", b"\xff\xd8\xff", 1)
+            )
+            self.assertTrue(source.inspect(root)[1])
+
     def test_only_exact_licensed_font_assets_are_exported(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -156,6 +176,7 @@ class RequiredIntegrationTests(unittest.TestCase):
             {"Action": "pass", "Test": n, "Package": "app/integration/mimir"}
             for n in [
                 "TestRealMimirRetirement",
+                "TestRealMimirIntentActivation",
                 "TestRealMimirTenantCollection",
                 "TestRealMimirRuleDestinations",
                 "TestRealMimirLifecycleAndMinEvents",

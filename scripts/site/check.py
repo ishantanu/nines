@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify the static product site's local asset and deployment boundaries."""
 
+import hashlib
 import json
 import re
 import xml.etree.ElementTree as ET
@@ -18,6 +19,7 @@ class Assets(HTMLParser):
         self.urls = []
         self.ids = set()
         self.documentation = False
+        self.chapter_cache = None
         self.repository_guide_links = []
 
     def handle_starttag(self, tag, attrs):
@@ -32,7 +34,9 @@ class Assets(HTMLParser):
             and "data-doc-source" not in attrs
         ):
             self.repository_guide_links.append(attrs["href"])
-        for attr in ["src", "href"]:
+        if tag == "div" and attrs.get("id") == "root":
+            self.chapter_cache = attrs.get("data-doc-bundle")
+        for attr in ["src", "href", "data-doc-bundle"]:
             if attr in attrs:
                 self.urls.append(attrs[attr])
 
@@ -87,6 +91,29 @@ for row in search:
     assert target.is_file(), "Missing directly addressable guide: " + row["slug"]
     assert (target.parent / "index.md").is_file(), (
         "Missing Markdown guide: " + row["slug"]
+    )
+cache_files = list((SITE / "docs").glob("chapter-cache-*.json"))
+assert len(cache_files) == 1, "Expected one content-addressed chapter cache"
+cache_file = cache_files[0]
+cache_bytes = cache_file.read_bytes()
+assert len(cache_bytes) <= 3_000_000, "Chapter cache exceeded its size budget"
+assert (
+    cache_file.name
+    == "chapter-cache-" + hashlib.sha256(cache_bytes).hexdigest()[:12] + ".json"
+), "Chapter cache digest mismatch"
+chapter_cache = json.loads(cache_bytes)
+assert chapter_cache["version"] == 1
+assert {row["slug"] for row in chapter_cache["pages"]} == {
+    row["slug"] for row in search
+}, "Chapter cache and published routes differ"
+for row in chapter_cache["pages"]:
+    target = (SITE / "docs" / row["slug"] / "index.html").resolve()
+    assert parsers[target].chapter_cache, "Guide has no navigation-cache reference"
+    assert (
+        target.parent / parsers[target].chapter_cache
+    ).resolve() == cache_file.resolve(), "Guide references the wrong chapter cache"
+    assert row["main"] in target.read_text() and row["outline"] in target.read_text(), (
+        "Cached fragments differ from published HTML"
     )
 assert "thresholdSeconds" in (SITE / "llms-full.txt").read_text()
 assert (SITE / "openapi/v1alpha1.yaml").read_bytes() == (

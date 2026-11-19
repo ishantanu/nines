@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { build } from "esbuild";
 import {
   mkdir,
@@ -74,17 +75,53 @@ try {
   const root = path.resolve(web, "..");
   const search = [];
   const corpus = [];
+  const chapterCache = [];
+  const chapterOutputs = [];
   for (const page of docPages) {
     const markdown = await loadDocumentationSource(root, page);
     const destination = path.join(site, "docs", page.slug);
     await mkdir(destination, { recursive: true });
-    await writeFile(
-      path.join(destination, "index.html"),
-      documentationHTML(html, page, markdown),
-    );
+    const chapterHTML = documentationHTML(html, page, markdown);
+    const main = chapterHTML.match(
+      /<main\b[^>]*id="main"[^>]*>[\s\S]*?<\/main>/,
+    )?.[0];
+    const outline = chapterHTML.match(
+      /<aside class="docs-outline">[\s\S]*?<\/aside>/,
+    )?.[0];
+    if (!main || !outline)
+      throw new Error("Missing static documentation fragments");
+    chapterCache.push({
+      slug: page.slug,
+      title: page.title + " | Nines documentation",
+      description: page.description,
+      main,
+      outline,
+    });
+    chapterOutputs.push({
+      path: path.join(destination, "index.html"),
+      html: chapterHTML,
+      root: "../".repeat(1 + page.slug.split("/").filter(Boolean).length),
+    });
     await writeFile(path.join(destination, "index.md"), markdown);
     search.push({ slug: page.slug, title: page.title, text: markdown });
     corpus.push(`# ${page.title}\nSource: ${page.source}\n\n${markdown}`);
+  }
+  const cacheJSON = JSON.stringify({ version: 1, pages: chapterCache });
+  if (Buffer.byteLength(cacheJSON) > 3_000_000)
+    throw new Error("Documentation chapter cache exceeds 3 MB");
+  const cacheName =
+    "chapter-cache-" +
+    createHash("sha256").update(cacheJSON).digest("hex").slice(0, 12) +
+    ".json";
+  await writeFile(path.join(site, "docs", cacheName), cacheJSON);
+  for (const output of chapterOutputs) {
+    await writeFile(
+      output.path,
+      output.html.replace(
+        /(<div id="root" data-doc="[^"]*")>/,
+        `$1 data-doc-bundle="${output.root}docs/${cacheName}">`,
+      ),
+    );
   }
   await writeFile(path.join(site, "docs/search.json"), JSON.stringify(search));
   await writeFile(path.join(site, "llms-full.txt"), corpus.join("\n\n---\n\n"));
@@ -116,7 +153,7 @@ try {
   await copyPublicFiles(
     path.join(root, "docs/public/brand"),
     path.join(site, "docs/assets"),
-    [".svg", ".jpg"],
+    [".svg", ".jpg", ".gif"],
   );
   await mkdir(path.join(site, "openapi"), { recursive: true });
   await writeFile(

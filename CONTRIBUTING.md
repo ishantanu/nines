@@ -4,7 +4,9 @@ The current priority is a small, reproducible public MVP. Fix correctness, first
 
 ## Setup
 
-Use Go 1.27.3 or later, Node 24, npm, Python 3.9 or later and Docker when running integration tests. Install frontend dependencies with `npm ci --prefix web`, then `make ui build`. Go embeds `internal/httpapi/web`; finish the UI build before compiling Go. Run `go run ./cmd/server -demo` for isolated synthetic data.
+Use Go 1.27.4 or later, Node 24, npm, Python 3.9 or later and Docker when running integration tests. Install frontend dependencies with `npm ci --prefix web`, then `make ui build`. Go embeds `internal/httpapi/web`; finish the UI build before compiling Go. Run `go run ./cmd/server -demo` for isolated synthetic data.
+
+Docker builds use BuildKit cache mounts shared across the server, operator and Go fixtures. See [build cache and disk use](docs/public/deployment/docker-compose.md#build-cache-and-disk-use) for local retention settings; changing the Dockerfiles does not prune an existing builder.
 
 ## Lint tooling
 
@@ -30,16 +32,22 @@ make ui
 make lint
 make check-api       # validates OpenAPI and documented route contracts
 make test
+make test-intent-context # isolated scope/context contracts; no keys or Docker
+make test-intent-candidates # bounded discovery fixtures; no paid keys or model
+make test-intent-evidence # current/history comparison fixtures; no paid keys or model
+make test-intent-review-packet # frozen goal/evidence/diff summary and transport fixtures
+make test-intent-activation # explicit runtime inspection fixtures; no paid keys
 make test-providers   # synthetic provider/API/CLI/MCP contracts; no paid keys
 make check
 make test-integration  # requires TEST_DATABASE_URL for a disposable database
+make test-collector    # owns disposable PostgreSQL; race contracts and synthetic load
 make test-mimir       # starts/removes only its own loopback Mimir fixture
 make test-victoriametrics # disposable backend, synthetic interval-count acceptance
 make test-operator    # private Docker API/controller; never uses your kubecontext
 make release-check
 ```
 
-The CI Go job supplies a disposable PostgreSQL service and fails if PostgreSQL checks are skipped. The Mimir job uses a digest-pinned disposable image and exercises collection, rule destinations, query-output identity and independent alert lifecycle timing. The operator job uses an agentless disposable API, real upstream controller, shipped RBAC, actual Nines reconciliation/failover/cleanup and a packaged container smoke check. It does not schedule workload pods. Its runner requires kubectl, curl, base64 and shasum in addition to Docker/Go. Unit tests use local HTTP/identity fixtures; they do not need real provider credentials. Do not point integration tests at production data.
+The CI Go job supplies a disposable PostgreSQL service and fails if PostgreSQL checks are skipped. The Mimir job uses a digest-pinned disposable image and exercises collection, rule destinations, query-output identity and independent alert lifecycle timing. Prometheus and Mimir also require real-backend intent-activation receipts: stored definitions/files alone cannot pass; current evaluation/output and collected SLI must be verified separately. The operator job uses an agentless disposable API, real upstream controller, shipped RBAC, actual Nines reconciliation/failover/cleanup and a packaged container smoke check. It does not schedule workload pods. Its runner requires kubectl, curl, base64 and shasum in addition to Docker/Go. Unit tests use local HTTP/identity fixtures; they do not need real provider credentials. Do not point integration tests at production data.
 
 Format Go with `golangci-lint fmt`. Run frontend tests and `npm run build --prefix web` when changing the UI. Add regression tests for calculation, tenant/role boundaries, revision/digest checks and recovery behavior. Keep `nines.dev/v1alpha1` definitions shared between clients and the server. Treat missing data as unknown. Model output must not directly redefine a measurement, lower a target or choose a credential-bearing destination.
 

@@ -1,9 +1,8 @@
-import { LoginFrame } from "./login-frame";
-import { Brand } from "@/components/brand";
+import { NotchBadge } from "./ui/notchset/badge";
+import { SignInPanel, SignInPassword } from "./ui/notchset/sign-in";
 import { useState, type FormEvent } from "react";
 import { LogIn, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -34,7 +33,7 @@ export function DemoLogin({
     <main
       data-replay-block
       data-private
-      className="demo-login min-h-svh bg-background px-5 py-10 text-foreground"
+      className="demo-login flex items-center justify-center min-h-svh auth-stage px-5 pb-10 pt-16 sm:py-10 text-foreground"
     >
       <Button
         variant="ghost"
@@ -51,70 +50,59 @@ export function DemoLogin({
           <Moon className="size-4" aria-hidden="true" />
         )}
       </Button>
-      <LoginFrame>
-        <Card className="demo-login-card w-full gap-0 overflow-hidden py-0">
-          <div className="demo-login-heading login-form-heading space-y-3 border-b p-6">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Brand />
-            </div>
-            <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
-            <p className="text-sm text-muted-foreground">
-              Sample SLOs and critical user journeys.
+      <SignInPanel
+        description="Sample SLOs and critical user journeys."
+        badge={<NotchBadge>Demo workspace</NotchBadge>}
+      >
+        <div className="demo-credentials border-b pb-4 text-sm">
+          <p className="font-medium">Demo credentials</p>
+          <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 text-muted-foreground">
+            <dt>Username</dt>
+            <dd className="font-mono text-foreground">admin</dd>
+            <dt>Password</dt>
+            <dd className="font-mono text-foreground">admin</dd>
+          </dl>
+        </div>
+        <form onSubmit={login} className="space-y-4">
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
             </p>
+          ) : null}
+          <div>
+            <Label htmlFor="demo-username">Username</Label>
+            <Input
+              id="demo-username"
+              autoComplete="username"
+              required
+              maxLength={256}
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              className="mt-2"
+            />
           </div>
-          <CardContent className="space-y-5 p-6">
-            <div className="demo-credentials border-b pb-4 text-sm">
-              <p className="font-medium">Demo credentials</p>
-              <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-6 gap-y-2 text-muted-foreground">
-                <dt>Username</dt>
-                <dd className="font-mono text-foreground">admin</dd>
-                <dt>Password</dt>
-                <dd className="font-mono text-foreground">admin</dd>
-              </dl>
-            </div>
-            <form onSubmit={login} className="space-y-4">
-              {error ? (
-                <p role="alert" className="text-sm text-destructive">
-                  {error}
-                </p>
-              ) : null}
-              <div>
-                <Label htmlFor="demo-username">Username</Label>
-                <Input
-                  id="demo-username"
-                  autoComplete="username"
-                  required
-                  maxLength={256}
-                  value={username}
-                  onChange={(event) => setUsername(event.target.value)}
-                  className="mt-2"
-                />
-              </div>
-              <div>
-                <Label htmlFor="demo-password">Password</Label>
-                <Input
-                  id="demo-password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  maxLength={256}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className="mt-2"
-                />
-              </div>
-              <Button type="submit" className="w-full">
-                <LogIn className="size-4" aria-hidden="true" />
-                Sign in
-              </Button>
-            </form>
-            <p className="border-t pt-4 text-xs leading-5 text-muted-foreground">
-              Demo sign-in is for the sample workspace only and is not an
-              access-control mechanism.
-            </p>
-          </CardContent>
-        </Card>
-      </LoginFrame>
+          <div>
+            <Label htmlFor="demo-password">Password</Label>
+            <SignInPassword
+              id="demo-password"
+              autoComplete="current-password"
+              required
+              maxLength={256}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="mt-2"
+            />
+          </div>
+          <Button type="submit" className="w-full">
+            <LogIn className="size-4" aria-hidden="true" />
+            Sign in
+          </Button>
+        </form>
+        <p className="border-t pt-4 text-xs leading-5 text-muted-foreground">
+          Demo sign-in is for the sample workspace only and is not an
+          access-control mechanism.
+        </p>
+      </SignInPanel>
     </main>
   );
 }

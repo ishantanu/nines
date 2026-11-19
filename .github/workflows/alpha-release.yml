@@ -38,14 +38,151 @@ jobs:
           if not any(r["head_sha"] == os.environ["GITHUB_SHA"] and r["conclusion"] == "success" for r in runs):
               raise SystemExit("The tagged commit must have a successful main-branch CI run before release. Wait for CI, then rerun this workflow.")
           PY
+          # The shipped manifests must reference the images this tag publishes.
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          grep -qF "image: ghcr.io/${owner}/nines:${GITHUB_REF_NAME}" deploy/kubernetes/deployment.yaml ||
+            { echo "deploy/kubernetes/deployment.yaml must use ghcr.io/${owner}/nines:${GITHUB_REF_NAME}"; exit 1; }
+          grep -qF "image: ghcr.io/${owner}/nines-operator:${GITHUB_REF_NAME}" deploy/operator/operator.yaml ||
+            { echo "deploy/operator/operator.yaml must use ghcr.io/${owner}/nines-operator:${GITHUB_REF_NAME}"; exit 1; }
           printf 'version=%s\n' "$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
   prepare:
     needs: validate
     uses: ./.github/workflows/candidate.yml
     with:
       version: ${{ needs.validate.outputs.version }}
-  draft:
+  images:
+    # Multi-architecture images from the same tested commit, published under
+    # the version tag only. There is no `latest` while Nines is pre-release.
     needs: [validate, prepare]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      server: ${{ steps.server.outputs.digest }}
+      operator: ${{ steps.operator.outputs.digest }}
+    env:
+      ALPHA_VERSION: ${{ needs.validate.outputs.version }}
+      REGISTRY: ghcr.io/${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Image metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'date=%s\n' "$(git show -s --format=%cI HEAD)" >> "$GITHUB_OUTPUT"
+          printf 'registry=%s\n' "${REGISTRY,,}" >> "$GITHUB_OUTPUT"
+      # The final server stage installs CA certificates with apk, which runs on
+      # the target architecture; build stages cross-compile on the runner.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Smoke-test the server image before publishing
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker buildx build --load --platform linux/amd64 \
+            --build-arg VERSION="$ALPHA_VERSION" --build-arg COMMIT="$GITHUB_SHA" \
+            --tag nines-release-smoke .
+          token="$(openssl rand -hex 24)"
+          printf '::add-mask::%s\n' "$token"
+          container=$(docker run -d --publish 127.0.0.1::8080 --env API_TOKEN="$token" nines-release-smoke -demo)
+          trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+          port=$(docker inspect --format '{{(index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort}}' "$container")
+          for i in $(seq 1 60); do
+            if curl --fail --silent "http://127.0.0.1:${port}/healthz" >/dev/null; then break; fi
+            sleep 1
+          done
+          NINES_SMOKE_API_TOKEN="$token" python3 scripts/release/smoke.py \
+            --url "http://127.0.0.1:${port}" --token-env NINES_SMOKE_API_TOKEN
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and push the server image
+        id: server
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.meta.outputs.registry }}/nines:${{ env.ALPHA_VERSION }}
+          build-args: |
+            VERSION=${{ env.ALPHA_VERSION }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.meta.outputs.date }}
+          labels: |
+            org.opencontainers.image.title=nines
+            org.opencontainers.image.description=Nines server and MCP server
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ env.ALPHA_VERSION }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.date }}
+            org.opencontainers.image.licenses=Apache-2.0
+      - name: Build and push the operator image
+        id: operator
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/operator/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: mode=max
+          sbom: true
+          tags: ${{ steps.meta.outputs.registry }}/nines-operator:${{ env.ALPHA_VERSION }}
+          build-args: |
+            VERSION=${{ env.ALPHA_VERSION }}
+            COMMIT=${{ github.sha }}
+            BUILD_DATE=${{ steps.meta.outputs.date }}
+          labels: |
+            org.opencontainers.image.title=nines-operator
+            org.opencontainers.image.description=Nines Kubernetes operator
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ env.ALPHA_VERSION }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.date }}
+            org.opencontainers.image.licenses=Apache-2.0
+      - name: Record build provenance for the server image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.meta.outputs.registry }}/nines
+          subject-digest: ${{ steps.server.outputs.digest }}
+          push-to-registry: true
+      - name: Record build provenance for the operator image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.meta.outputs.registry }}/nines-operator
+          subject-digest: ${{ steps.operator.outputs.digest }}
+          push-to-registry: true
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+      - name: Sign both images by digest with keyless Cosign
+        shell: bash
+        env:
+          SERVER: ${{ steps.meta.outputs.registry }}/nines@${{ steps.server.outputs.digest }}
+          OPERATOR: ${{ steps.meta.outputs.registry }}/nines-operator@${{ steps.operator.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "$SERVER"
+          cosign sign --yes "$OPERATOR"
+          identity="https://github.com/${GITHUB_REPOSITORY}/.github/workflows/alpha-release.yml@${GITHUB_REF}"
+          for image in "$SERVER" "$OPERATOR"; do
+            cosign verify --certificate-identity "$identity" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com "$image" >/dev/null
+          done
+          {
+            printf 'Published and signed:\n\n'
+            printf -- '- `%s`\n' "$SERVER" "$OPERATOR"
+          } >> "$GITHUB_STEP_SUMMARY"
+  draft:
+    needs: [validate, prepare, images]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -64,8 +201,23 @@ jobs:
           python3 scripts/release/verify.py --directory dist/releases --version "$ALPHA_VERSION" --commit "$GITHUB_SHA"
       - name: Prepare a draft prerelease for maintainer review
         shell: bash
+        env:
+          SERVER_DIGEST: ${{ needs.images.outputs.server }}
+          OPERATOR_DIGEST: ${{ needs.images.outputs.operator }}
         run: |
           set -euo pipefail
+          registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}"
+          notes="$RUNNER_TEMP/notes.md"
+          cp docs/public/alpha-release-notes.md "$notes"
+          cat >> "$notes" <<EOF
+
+          ## Container images for this release
+
+          | Image | Pull by digest |
+          | ----- | -------------- |
+          | Server and MCP server | \`${registry}/nines:${ALPHA_VERSION}@${SERVER_DIGEST}\` |
+          | Kubernetes operator | \`${registry}/nines-operator:${ALPHA_VERSION}@${OPERATOR_DIGEST}\` |
+          EOF
           if gh release view "$ALPHA_VERSION" --repo "$GITHUB_REPOSITORY" --json isDraft,targetCommitish > "$RUNNER_TEMP/release.json" 2>/dev/null; then
             python3 - "$RUNNER_TEMP/release.json" <<'PY'
           import json, os, sys
@@ -74,9 +226,10 @@ jobs:
               raise SystemExit("Refusing to overwrite a published release or a draft for another commit.")
           PY
             gh release upload "$ALPHA_VERSION" dist/releases/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$ALPHA_VERSION" --repo "$GITHUB_REPOSITORY" --notes-file "$notes"
           else
             gh release create "$ALPHA_VERSION" dist/releases/* --repo "$GITHUB_REPOSITORY" \
               --verify-tag --target "$GITHUB_SHA" --draft --prerelease \
-              --title "Nines $ALPHA_VERSION" --notes-file docs/public/alpha-release-notes.md
+              --title "Nines $ALPHA_VERSION" --notes-file "$notes"
           fi
-          printf 'Draft alpha release prepared: %s\nReview its notes, checksums and binaries before publishing.\n' "$ALPHA_VERSION" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Draft alpha release prepared: %s\nReview its notes, checksums, binaries and image digests before publishing.\n' "$ALPHA_VERSION" >> "$GITHUB_STEP_SUMMARY"

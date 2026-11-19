@@ -59,6 +59,15 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	if !d.SLO.SLO().AlertsEnabled() {
 		p.Warnings = append(p.Warnings, "Lifecycle "+string(d.SLO.Spec.Lifecycle)+": measurements and recording rules remain enabled; Nines and generated provider burn alerts are disabled.")
 	}
+	if d.SLO.SLO().BadInterval != nil {
+		p.Warnings = append(p.Warnings, "badInterval counts judged intervals, not events. Every judged interval weighs the same however busy it was, intervals with too few events are not judged, and burn policy minEvents and confidence then count intervals.")
+	}
+	for _, policy := range d.SLO.SLO().AlertPolicies() {
+		if policy.Confidence > 0 {
+			p.Warnings = append(p.Warnings, "confidence raises each burn window's required error rate when traffic is low. It makes alerts less likely to fire on a handful of failures, and can delay or suppress an alert for a very low-traffic service.")
+			break
+		}
+	}
 	for _, policy := range d.SLO.SLO().AlertPolicies() {
 		if policy.MinEvents > 0 {
 			p.Warnings = append(p.Warnings, "minEvents gates both alert windows by observed traffic count; it does not establish statistical confidence.")
@@ -93,6 +102,13 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 		p.MeasurementChanged = MeasurementDigest(old.SLO) != MeasurementDigest(d.SLO.SLO())
 		if p.MeasurementChanged {
 			p.Warnings = append(p.Warnings, "This edit changes the measurement. The previous definition and retained evidence will be archived; active samples, coverage and measurement health start fresh. Review the rule destination and its automatic or manual delivery policy. Operator destination changes still require withdrawal from the original route.")
+		}
+		if old.SLO.Target != d.SLO.SLO().Target {
+			if p.MeasurementChanged {
+				p.Warnings = append(p.Warnings, "The target and the measurement both change, so reliability delivered under the previous measurement cannot be compared with the new target.")
+			} else if x, statusErr := s.statusFromRecord(old, time.Time{}); statusErr == nil {
+				p.Warnings = append(p.Warnings, model.ImplicitTargetNotes(old.SLO.Target, d.SLO.SLO().Target, x.Reliability, x.Coverage)...)
+			}
 		}
 		p.Action = "update"
 		return p, nil

@@ -133,3 +133,37 @@ func TestIntentWorkflowStatusMCPIsReadOnly(t *testing.T) {
 		t.Fatal("invalid path reached server")
 	}
 }
+
+func TestIntentActivationMCPReadOnlyExternalInspection(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		if r.Method != "GET" || r.URL.Path != "/api/intent-conversations/chat/activation" || r.Header.Get("X-Nines-Tenant") != "alpha" {
+			t.Error("unsafe activation request")
+		}
+		_, _ = fmt.Fprint(w, `{"apiVersion":"nines.dev/v1alpha1","tenant":"alpha","conversation":"chat","state":"pending","code":"evaluation_unverified"}`)
+	}))
+	defer server.Close()
+	session, ctx := connect(t, Config{Server: server.URL, Tenant: "alpha"})
+	call(t, ctx, session, "inspect_intent_activation", map[string]any{"id": "chat"})
+	tools, err := session.ListTools(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, tool := range tools.Tools {
+		if tool.Name == "inspect_intent_activation" {
+			found = true
+			if tool.Annotations == nil || !tool.Annotations.ReadOnlyHint || tool.Annotations.OpenWorldHint == nil || !*tool.Annotations.OpenWorldHint {
+				t.Fatal("provider reads were not declared")
+			}
+		}
+	}
+	result, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "inspect_intent_activation", Arguments: map[string]any{"id": "../other"}})
+	if err == nil && !result.IsError {
+		t.Fatal("unsafe activation id accepted")
+	}
+	if !found || calls != 1 {
+		t.Fatal(found, calls)
+	}
+}

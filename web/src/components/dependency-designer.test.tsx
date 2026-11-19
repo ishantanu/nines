@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { chooseOption } from "@/test-support/fields";
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, test, vi } from "vitest";
@@ -45,13 +46,11 @@ test("keyboard movement and non-drag connection form edit a draft without networ
   expect(latest.spec.services.find((n) => n.name === "api")?.position?.x).toBe(
     64,
   );
-  const controls = host.querySelectorAll("select");
-  await act(async () => {
-    controls[0].value = "api";
-    controls[0].dispatchEvent(new Event("change", { bubbles: true }));
-    controls[1].value = "database";
-    controls[1].dispatchEvent(new Event("change", { bubbles: true }));
-  });
+  const [caller, callee] = [
+    ...host.querySelectorAll<HTMLElement>('button[role="combobox"]'),
+  ];
+  await chooseOption(caller, "API (api)");
+  await chooseOption(callee, "Database (database)");
   await act(async () =>
     host
       .querySelector("form")!
@@ -60,9 +59,9 @@ test("keyboard movement and non-drag connection form edit a draft without networ
   expect(latest.spec.dependencies).toEqual([
     { caller: "api", callee: "database", critical: false },
   ]);
-  expect(host.querySelector('[role="status"]')?.textContent).toContain(
-    "Added dependency",
-  );
+  expect(
+    host.querySelector('[role="status"]:not(:empty)')?.textContent,
+  ).toContain("Added dependency");
 });
 test("visual editor passes automated WCAG semantic checks with keyboard alternatives", async () => {
   await act(async () => root.render(<Editor />));

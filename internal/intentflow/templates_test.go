@@ -69,14 +69,22 @@ func TestTemplateWorkflowHumanReviewAndDurableProvenance(t *testing.T) {
 					if strings.Contains(string(last.Result), `"yaml":`) {
 						t.Fatal("executable YAML sent to model")
 					}
-					return response("ask_user", map[string]string{"question": "Confirm the population, completion observation point, retries and status=200 success criterion."}), nil
+					return response("ask_user", map[string]any{"question": "Confirm the population, completion observation point, retries and status=200 success criterion.", "fields": []string{"semantics"}}), nil
 				}
 			}}
 			v, err = s.Start(ctx, v.ID, v1.CreateIntentFlowRun{ID: "template-draft", ExpectedVersion: v.Version, Mode: "model", ModelConsent: true})
 			if err != nil {
 				t.Fatal(err)
 			}
-			work(t, s, ctx, 8)
+			work(t, s, ctx, 2) // Persist the catalog receipt before rendering.
+			if pg {
+				s.Repository.Close()
+				s.Repository, err = NewPostgres(ctx, dsn)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			work(t, s, ctx, 6)
 			v, err = s.Read(ctx, v.ID)
 			if err != nil || v.State != "needs_selection" || v.Template == nil || v.Selection != nil || v.Plan == nil || v.Plan.Compiled == nil {
 				t.Fatal(v, err)
@@ -346,5 +354,75 @@ func TestTemplateDraftPreservesExplicitCommittedLifecycleInItsWarnings(t *testin
 	raw, _ := json.Marshal(result)
 	if r.Session.Goal.Spec.Lifecycle != v1.LifecycleCommitted || strings.Contains(string(raw), "experimental") {
 		t.Fatal("misleading lifecycle warning", string(raw))
+	}
+}
+
+func TestTemplateModelCannotRenderBeforeCatalogDiscovery(t *testing.T) {
+	s, ctx, _ := fixture(t, false)
+	s.Model = &scriptedModel{route: "premature-template", turn: func(_ context.Context, req rm.Request) (rm.Response, error) {
+		for _, tool := range req.Tools {
+			if tool.Name == "render_slo_template" {
+				t.Fatal("render exposed without current-run discovery")
+			}
+		}
+		return templateCall(t, s, "request-availability", map[string]any{"measurement": templateMeasurement()}), nil
+	}}
+	value, err := s.Create(ctx, input())
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, err = s.Start(ctx, value.ID, v1.CreateIntentFlowRun{ID: "premature", ExpectedVersion: value.Version, Mode: "model", ModelConsent: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	work(t, s, ctx, 1)
+	value, err = s.Read(ctx, value.ID)
+	if err != nil || value.State != "failed" || value.Runs[0].ErrorCode != "unsafe_tool_call" || value.Goal.Spec.Measurement != nil || value.Template != nil {
+		t.Fatal("premature model template selection was accepted", value, err)
+	}
+	if _, err = s.Platform.Store.Read(ctx, value.Scope.Metadata.Name); !errors.Is(err, model.ErrNotFound) {
+		t.Fatal("premature render wrote SLO", err)
+	}
+}
+
+func TestMeasurementDiscoveryReceiptDistinguishesMissingDefinition(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		tool     string
+		change   func(*record)
+		wantHint bool
+	}{
+		{name: "missing definition", tool: "find_measurements", wantHint: true},
+		{name: "inline measurement", tool: "find_measurements", change: func(r *record) { r.Session.Goal.Spec.Measurement = templateMeasurement() }},
+		{name: "saved candidates", tool: "find_measurements", change: func(r *record) { r.Session.Plan.Candidates = []v1.IntentCandidate{{}} }},
+		{name: "incomplete catalog", tool: "find_measurements", change: func(r *record) { r.Session.Plan.Truncated = true }},
+		{name: "compiled measurement", tool: "find_measurements", change: func(r *record) { r.Session.Plan.Compiled = &v1.CompiledBinding{} }},
+		{name: "no goal", tool: "find_measurements", change: func(r *record) { r.Session.Goal = nil }},
+		{name: "different status", tool: "find_measurements", change: func(r *record) { r.Session.Plan.Status = "catalog_incomplete" }},
+		{name: "compile receipt", tool: "compile_intent"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var r record
+			r.Session.Goal = input().Goal
+			r.Session.Goal.Spec.Measurement = nil
+			r.Session.Plan = &v1.IntentPlan{Status: "needs_instrumentation", Clarifications: []string{"Original clarification"}}
+			if tc.change != nil {
+				tc.change(&r)
+			}
+			before := hash(r.Session)
+			receipt := modelResult(r, tc.tool, nil).(map[string]any)
+			if got := receipt["status"] == "needs_measurement_definition"; got != tc.wantHint {
+				t.Fatalf("definition hint = %v, want %v", got, tc.wantHint)
+			}
+			if tc.wantHint && (receipt["nextTool"] != "list_slo_templates" || receipt["humanConfirmationRequired"] != true) {
+				t.Fatal("missing discovery or human confirmation requirement")
+			}
+			if !tc.wantHint && receipt["nextTool"] != nil {
+				t.Fatal("unexpected definition hint")
+			}
+			if before != hash(r.Session) {
+				t.Fatal("model receipt changed the public plan or goal")
+			}
+		})
 	}
 }

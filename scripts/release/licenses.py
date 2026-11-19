@@ -190,20 +190,28 @@ def collect(root, dest, targets=None, go_only=False, packages=None):
             override,
             not package.get("dev", False),
         )
-    shadcn = root / "web/public/shadcn-license.txt"
-    shadcn_out = dest / "incorporated/shadcn-ui/LICENSE"
-    shadcn_out.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(shadcn, shadcn_out)
-    inventory.append(
-        {
-            "ecosystem": "incorporated",
-            "name": "shadcn/ui",
-            "version": "vendored-components",
-            "declaredLicense": "MIT",
-            "sourceFile": "web/public/shadcn-license.txt",
-            "notices": ["incorporated/shadcn-ui/LICENSE"],
-        }
-    )
+    for name, filename, directory in (
+        ("shadcn/ui", "shadcn-license.txt", "shadcn-ui"),
+        (
+            "Beautiful UI Notchset theme",
+            "beautiful-ui-license.txt",
+            "beautiful-ui-notchset",
+        ),
+    ):
+        notice = root / "web/public" / filename
+        notice_out = dest / "incorporated" / directory / "LICENSE"
+        notice_out.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(notice, notice_out)
+        inventory.append(
+            {
+                "ecosystem": "incorporated",
+                "name": name,
+                "version": "vendored-components",
+                "declaredLicense": "MIT",
+                "sourceFile": "web/public/" + filename,
+                "notices": ["incorporated/" + directory + "/LICENSE"],
+            }
+        )
     if missing:
         raise ValueError(
             "Review missing upstream notices before release: " + ", ".join(missing)

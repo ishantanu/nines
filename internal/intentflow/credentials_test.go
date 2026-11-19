@@ -80,7 +80,7 @@ func TestModelCredentialEchoCannotEnterRecommendationOrAudit(t *testing.T) {
 	s, ctx, _ := fixture(t, false)
 	const key = "private-provider-key-fixture-0123456789"
 	s.Model = credentialEchoModel{key: key, scriptedModel: &scriptedModel{route: "credential-echo", turn: func(context.Context, rm.Request) (rm.Response, error) {
-		return response("ask_user", map[string]string{"question": "Use " + key}), nil
+		return response("ask_user", map[string]any{"question": "Use " + key, "fields": []string{"semantics"}}), nil
 	}}}
 	session, e := s.Create(ctx, input())
 	if e != nil {

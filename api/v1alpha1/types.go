@@ -19,8 +19,11 @@ type ServiceLevelObjective struct {
 // ProviderWindow evaluates counter increases over each complete requested window.
 // Selectors identify cumulative counters; aggregation happens after reset handling.
 type ProviderWindow struct {
+	// GoodSelector is empty for a session measurement, where good is the
+	// total minus the BadSelector counter.
 	GoodSelector          string `json:"goodSelector" yaml:"goodSelector"`
 	TotalSelector         string `json:"totalSelector" yaml:"totalSelector"`
+	BadSelector           string `json:"badSelector,omitempty" yaml:"badSelector,omitempty"`
 	ScrapeIntervalSeconds int64  `json:"scrapeIntervalSeconds" yaml:"scrapeIntervalSeconds"`
 }
 
@@ -50,7 +53,23 @@ func (l SLOLifecycle) Valid() bool {
 	}
 }
 
+// BadIntervalPolicy changes what the SLI counts: instead of events, the SLO
+// counts judged intervals (one per step, a "minute" when the step is 60s). An
+// interval is bad when its error rate exceeds ErrorRate, so a steady noise
+// floor below that line cannot consume the budget while real incidents do.
+// Intervals with fewer than MinEvents events (and at least one) are not judged.
+type BadIntervalPolicy struct {
+	ErrorRate float64 `json:"errorRate" yaml:"errorRate"`
+	MinEvents float64 `json:"minEvents,omitempty" yaml:"minEvents,omitempty"`
+}
+
 type SLOSpec struct {
+	// Customers opts the SLO into per-customer reporting for an explicit allowlist.
+	Customers   *CustomerPolicy    `json:"customers,omitempty" yaml:"customers,omitempty"`
+	BadInterval *BadIntervalPolicy `json:"badInterval,omitempty" yaml:"badInterval,omitempty"`
+	// Labels classify an SLO for roll-ups and filtering (for example team,
+	// feature_area, product). They never change measurement, alerting or rules.
+	Labels             map[string]string         `json:"labels,omitempty" yaml:"labels,omitempty"`
 	QueryLanguage      string                    `json:"queryLanguage,omitempty" yaml:"queryLanguage,omitempty"`
 	ErrorBudgetPolicy  *ErrorBudgetPolicy        `json:"errorBudgetPolicy,omitempty" yaml:"errorBudgetPolicy,omitempty"`
 	Quality            *MeasurementQualityPolicy `json:"quality,omitempty" yaml:"quality,omitempty"`
@@ -81,6 +100,10 @@ type BurnRatePolicy struct {
 	MinCoverage        float64 `json:"minCoverage" yaml:"minCoverage"`
 	// MinEvents gates both windows by observed count, not statistical confidence.
 	MinEvents float64 `json:"minEvents,omitempty" yaml:"minEvents,omitempty"`
+	// Confidence, when set (0.5 to 0.9999), raises the error rate each window
+	// must reach as traffic falls, so a handful of failures cannot page by
+	// chance. Zero keeps the plain burn-rate threshold.
+	Confidence float64 `json:"confidence,omitempty" yaml:"confidence,omitempty"`
 }
 
 type CriticalUserJourney struct {
@@ -98,6 +121,8 @@ type JourneySpec struct {
 	SLOs        []JourneySLO     `json:"slos" yaml:"slos"`
 	Steps       []JourneyStep    `json:"steps" yaml:"steps"`
 	Agentic     *AgenticContract `json:"agentic,omitempty" yaml:"agentic,omitempty"`
+	// RunObjective measures the journey from its recorded runs (agentic journeys only).
+	RunObjective *RunObjective `json:"runObjective,omitempty" yaml:"runObjective,omitempty"`
 }
 type JourneySLO struct {
 	ID        string `json:"id" yaml:"id"`

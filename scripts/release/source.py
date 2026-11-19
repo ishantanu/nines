@@ -51,6 +51,7 @@ FILES = {
     "compose.playground.providers.yaml",
     ".env.example",
     ".gitignore",
+    ".gitattributes",
     ".dockerignore",
     "go.mod",
     "go.sum",
@@ -83,6 +84,10 @@ LINK = re.compile(r'!?\[[^\]]*\]\(([^\s)]+)(?:\s+"[^"]*")?\)')
 # Only these vendored, licensed font bytes may bypass text-source inspection.
 # The embedded build is allowed to rename them with Vite's content hash.
 FONT_ASSETS = {
+    "figtree-latin-wght-normal.woff2": (
+        "4ba7d3d096695818fe0686be4f1e82c6b05134e18a22260336130335027462dd",
+        "OFL-Figtree.txt",
+    ),
     "atkinson-hyperlegible-next-latin.woff2": (
         "1e4cea71d75ec427581d6259fc07148a2e60d60d16cabf4b4f5360487b3f9dc3",
         "OFL-Atkinson-Hyperlegible-Next.txt",
@@ -104,8 +109,10 @@ FONT_ASSETS = {
 
 # Reviewed synthetic product media; arbitrary screenshots remain excluded.
 PRODUCT_IMAGES = {
-    "docs/public/brand/nines-performance.jpg": "2452e97faff6a0c6c6381ce11f0240b6981eb1e2a0769abd4e25e16ec1c57859",
-    "docs/public/brand/nines-overview.jpg": "42812c7ee105d0ce5493caf338c0903de81ef9cab7f94d70701a38fbc2dee972",
+    "docs/public/brand/nines-measurements.jpg": "5fa25e65679d33d9c8f28a0e724769bcab7f1c26cde34cff70ea161e66298606",
+    "docs/public/brand/nines-performance.jpg": "b9e2e082fdf6820de55304405139be6a9cf047553b34e7b57808a6734b34edf4",
+    "docs/public/brand/nines-create-slo.gif": "5ba28ca3f0469754538e70cb9107ff70a20ac877cb3b418baef9bcaf20b320fe",
+    "docs/public/brand/nines-overview.jpg": "a5073ff2800d416f6df66ca6aedc1ebf60fe36524470f9ff28847bd6381ddf62",
 }
 
 
@@ -130,7 +137,7 @@ def included(rel):
         for p in rel.parts
     ):
         return False
-    if rel.suffix in {".test", ".log", ".jpg", ".png", ".mp4", ".webm"}:
+    if rel.suffix in {".test", ".log", ".jpg", ".png", ".gif", ".mp4", ".webm"}:
         return rel.as_posix() in PRODUCT_IMAGES
     if rel.parts[0] == "docs":
         return rel.as_posix() == "docs/cli.md" or rel.parts[:2] == ("docs", "public")
@@ -177,8 +184,9 @@ def inspect(root):
     for rel, p in selected.items():
         data = p.read_bytes()
         if rel.as_posix() in PRODUCT_IMAGES:
+            magic = b"GIF8" if rel.suffix == ".gif" else b"\xff\xd8\xff"
             if (
-                data.startswith(b"\xff\xd8\xff")
+                data.startswith(magic)
                 and hashlib.sha256(data).hexdigest() == PRODUCT_IMAGES[rel.as_posix()]
             ):
                 continue

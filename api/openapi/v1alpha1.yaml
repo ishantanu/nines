@@ -1,7 +1,7 @@
 openapi: 3.1.1
 info:
   title: 'Nines HTTP API: reviewed SLO workflows'
-  version: 0.1.0-alpha.2
+  version: 0.1.0-alpha.4
   description: Versioned initial contract for the listed operations only. Other server endpoints and complete
     resource schemas are not yet covered. Resource manifests use nines.dev/v1alpha1; existing HTTP paths
     are not URL-versioned.
@@ -11,6 +11,363 @@ servers:
 security:
 - bearerAuth: []
 paths:
+  /api/intents/evidence:
+    post:
+      operationId: prepareIntentEvidence
+      summary: Read measurement evidence and compare explicit SLO choices
+      description: Read-only preview for an exact inline intent, measurement, tenant/source/catalog
+        provenance and expected saved revision. Baseline plus at most two explicit alternatives.
+        One metadata adapter call and up to three recent-window calls; explicit history
+        adds up to three historical calls. Ten seconds per adapter call, seventy-five
+        seconds overall. Each recent read samples five completed cutoffs. Historical
+        range at most 72h and 240 cutoffs per comparison; rolling lookback extends before
+        that range by up to 31 days. No overlapping count sums, sample writes, target
+        selection, confirmation, approvals or deployment. Input at most 32 KiB, output
+        at most 128 KiB. Rejects query parameters, duplicate JSON keys and noncanonical
+        root fields.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntentEvidenceInput'
+      responses:
+        '200':
+          description: As-of preview with explicit quality/freshness gaps, unsupported
+            adapters and per-comparison failures. Inspect state; presence is not approval.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentEvidence'
+        '400':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '401':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '403':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '404':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '409':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '429':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '500':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '503':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '504':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+  /api/intents/candidates:
+    post:
+      operationId: discoverIntentCandidates
+      summary: Discover bounded measurement candidates without confirming semantics
+      description: Explicit read-only provider inspection. At most one metric-name and
+        three series adapter calls, four seconds each within fifteen seconds overall.
+        Adapter calls may use several HTTP requests. Maximum request 32 KiB and response
+        128 KiB. Unsupported adapters, failures and truncation remain explicit. No model
+        calls, samples, resource writes or approvals. Rejects duplicate JSON keys, noncanonical
+        fields and query parameters.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IntentCandidateInput'
+      responses:
+        '200':
+          description: Unverified candidates or explicit capability/failure report;
+            inspect state and candidate questions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentCandidateDiscovery'
+        '400':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '401':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '403':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '404':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '409':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '429':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '500':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '503':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '504':
+          description: Invalid scope, authorization failure, revision conflict or unavailable
+            bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+  /api/intent-context:
+    get:
+      operationId: getIntentContext
+      summary: Read saved service context for intent preparation
+      description: Read-only, bounded tenant context. No upstream telemetry queries, model calls, measurement
+        confirmation or approval. Follow nextCursor even when the current page is empty. Source capabilities
+        describe adapter interfaces, not tested permissions or live connectivity. Maximum response is 240
+        KiB.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: service
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description: Exact tenant-local ID.
+      - name: source
+        in: query
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+        description: Exact tenant-local ID.
+      - name: project
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description: Exact tenant-local ID. Project is a metadata filter, not an authorization boundary.
+      - name: journey
+        in: query
+        required: false
+        schema:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+        description: Exact tenant-local ID.
+      - name: journeyRevision
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+        description: Required with journey; latest revision must match.
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+        description: Matching SLO contexts per page; scans at most 100 catalog rows.
+      - name: cursor
+        in: query
+        schema:
+          type: string
+          maxLength: 2048
+        description: Opaque cursor from the same tenant and service/source/project/journey scope.
+      responses:
+        '200':
+          description: Saved context snapshot, not verified telemetry or authorization to apply.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentContext'
+        '400':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '401':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '403':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '404':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '409':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '429':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '500':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '503':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
+        '504':
+          description: Invalid scope, authorization failure, revision conflict or unavailable bounded read.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Error'
+                - $ref: '#/components/schemas/IntentContextFailure'
   /api/slos:
     get:
       operationId: listSLOs
@@ -179,6 +536,263 @@ paths:
           application/yaml:
             schema:
               $ref: '#/components/schemas/Manifest'
+  /api/gitops:
+    get:
+      operationId: getGitDelivery
+      summary: Read whether Git delivery is configured
+      description: Returns the tenant's repository, base branch and path when optional Git delivery is configured. Never returns a credential.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitInfo'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '502': *id001
+        '503': *id001
+  /api/gitops/proposals:
+    post:
+      operationId: proposeGitDefinition
+      summary: Open a pull request for a reviewed SLO definition
+      description: Opens a branch, commits the reviewed SLO or journey definition and opens a pull request (GitHub) or merge request (GitLab) in the tenant's configured repository. It never applies, merges or deploys. The server re-plans the definition and refuses with 409 unless the quoted If-Match revision and the X-Nines-Plan-Digest header equal that plan. Requires an owner or editor; agents and viewers are refused. Returns 201 for a new pull request and 200 when an identical proposal already has one.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - $ref: '#/components/parameters/IfMatch'
+      - name: X-Nines-Plan-Digest
+        in: header
+        required: true
+        description: Digest from the reviewed plan of the same definition.
+        schema:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+      responses:
+        '200':
+          description: An identical proposal already has a pull request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitProposalResult'
+        '201':
+          description: A pull request was opened.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitProposalResult'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '502': *id001
+        '503': *id001
+      requestBody:
+        required: true
+        content:
+          application/yaml:
+            schema:
+              $ref: '#/components/schemas/Manifest'
+  /api/slos/{id}/gitops/proposals:
+    get:
+      operationId: listGitProposals
+      summary: List Git proposals for an SLO
+      description: Recent pull requests Nines opened for this SLO, read from the Git provider on request. A merged proposal is applied only when its digest equals the live definition's digest.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitProposalList'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '502': *id001
+        '503': *id001
+  /api/slos/{id}/gitops/drift:
+    get:
+      operationId: getGitDrift
+      summary: Compare an SLO with its repository file
+      description: Compares the definition file on the configured base branch with the saved definition by digest. Reports in_sync, drifted, not_in_repo, not_applied or unreadable. A difference is reported, not resolved. Reads the provider on request and writes nothing.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitDrift'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '502': *id001
+        '503': *id001
+  /api/journeys/{id}/gitops/proposals:
+    get:
+      operationId: listGitJourneyProposals
+      summary: List Git proposals for a journey
+      description: Recent pull or merge requests Nines opened for this journey. A merged proposal is applied only when its digest equals the live journey digest.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitProposalList'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '502': *id001
+        '503': *id001
+  /api/journeys/{id}/gitops/drift:
+    get:
+      operationId: getGitJourneyDrift
+      summary: Compare a journey with its repository file
+      description: Compares the journey definition file on the configured base branch with the saved journey by digest, with the same states as SLO drift.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GitDrift'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '502': *id001
+        '503': *id001
+  /api/migrations/convert:
+    post:
+      operationId: convertMigration
+      summary: Convert Sloth or Pyrra definitions into Nines SLO definitions
+      description: Stateless and read-only. Converts one or more Sloth or Pyrra definitions into Nines SLO YAML and reports every approximation as a note and every definition that cannot be converted faithfully as skipped, with the reason. Nothing is saved, planned or applied; review each definition, then use plan and apply. Imported SLOs start experimental unless another lifecycle is requested, so Nines does not page while the original rules still run.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MigrationRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MigrationResult'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+  /api/intent-conversations/usage:
+    get:
+      operationId: getIntentUsage
+      summary: Read aggregate intent workflow progress
+      description: Counts of conversations that reached each workflow stage and median times, computed from this tenant's stored conversations. Read-only; returns no actor, goal text, measurement or telemetry value and sends nothing outside the server. Describes workflow progress, not SLO health or correctness.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - name: days
+        in: query
+        required: false
+        description: Window in days for conversations created in the window. Defaults to 90.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 365
+      responses:
+        '200':
+          description: Aggregate usage with limitations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentUsage'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+  /api/intent-conversations/{id}/activation:
+    get:
+      operationId: inspectIntentActivation
+      summary: Inspect current runtime activation of an applied intent
+      description: Explicit bounded provider reads (ten seconds overall) against administrator-configured destinations. Returns an as-of receipt fenced to applied resource revisions and source identity. Never publishes rules, collects samples, changes definitions or persists an outcome. Saved verification and workflow status remain provider-free.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      responses:
+        '200':
+          description: As-of activation evidence; inspect state and code, not only HTTP success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentActivation'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
   /api/intent-conversations/{id}/status:
     get:
       operationId: getIntentWorkflowStatus
@@ -226,6 +840,68 @@ paths:
         '429': *id001
         '500': *id001
         '503': *id001
+  /api/intent-conversations/{id}/messages:
+    post:
+      operationId: appendIntentAnswer
+      summary: Add clarification context or a replacement typed goal
+      description: preserveGoal keeps existing typed commitments and measurement unchanged while adding context. It cannot accompany a replacement goal. Every new answer invalidates prior confirmation and pending proposals; exact retries are idempotent. This operation cannot apply resources.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppendIntentConversation'
+      responses:
+        '200':
+          description: Saved conversation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentConversation'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+  /api/intent-conversations/{id}/evidence:
+    post:
+      operationId: recordIntentEvidence
+      summary: Collect and attach reviewed intent evidence
+      description: Explicit provider reads for a ready, human-confirmed inline measurement.
+        Saves a server-generated receipt at an exact conversation version. No client report
+        uploads, implicit history, measurement confirmation, approval or resource application.
+        Request at most 4 KiB; overall deadline 80 seconds. Partial and unsupported reports
+        remain explicit as-of evidence. Frozen change sets cannot be refreshed.
+      parameters:
+      - $ref: '#/components/parameters/Tenant'
+      - *id002
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IntentConversation'
+        '400': *id001
+        '401': *id001
+        '403': *id001
+        '404': *id001
+        '409': *id001
+        '429': *id001
+        '500': *id001
+        '503': *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordIntentEvidence'
   /api/intent-conversations/{id}/change-set:
     post:
       operationId: prepareIntentChangeSet
@@ -477,6 +1153,128 @@ paths:
           $ref: '#/components/responses/Error'
         '503':
           $ref: '#/components/responses/Error'
+  /auth/cli/capabilities:
+    get:
+      operationId: cliAuthenticationCapabilities
+      summary: Discover CLI authentication capabilities
+      description: Nines-mediated CLI authentication protocol. Not an upstream IdP OAuth
+        device endpoint. No bearer credential is required. Device polling returns HTTP
+        200 with a typed status; clients must respect intervalSeconds. Never log deviceCode,
+        codeVerifier or token.
+      security: []
+      responses:
+        '200':
+          description: Protocol result; inspect status when present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CLIAuthenticationCapabilities'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /auth/cli/device/start:
+    post:
+      operationId: startCLIDeviceAuthorization
+      summary: Start a Nines device login
+      description: Nines-mediated CLI authentication protocol. Not an upstream IdP OAuth
+        device endpoint. No bearer credential is required. Device polling returns HTTP
+        200 with a typed status; clients must respect intervalSeconds. Never log deviceCode,
+        codeVerifier or token.
+      security: []
+      responses:
+        '200':
+          description: Protocol result; inspect status when present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CLIDeviceAuthorization'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CLIDeviceStart'
+  /auth/cli/device/token:
+    post:
+      operationId: pollCLIDeviceAuthorization
+      summary: Poll a Nines device login
+      description: Nines-mediated CLI authentication protocol. Not an upstream IdP OAuth
+        device endpoint. No bearer credential is required. Device polling returns HTTP
+        200 with a typed status; clients must respect intervalSeconds. Never log deviceCode,
+        codeVerifier or token.
+      security: []
+      responses:
+        '200':
+          description: Protocol result; inspect status when present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CLIDeviceResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CLIDevicePoll'
+  /auth/cli/device/cancel:
+    post:
+      operationId: cancelCLIDeviceAuthorization
+      summary: Cancel a Nines device login
+      description: Nines-mediated CLI authentication protocol. Not an upstream IdP OAuth
+        device endpoint. No bearer credential is required. Device polling returns HTTP
+        200 with a typed status; clients must respect intervalSeconds. Never log deviceCode,
+        codeVerifier or token.
+      security: []
+      responses:
+        '200':
+          description: Protocol result; inspect status when present.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CLIDeviceResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CLIDevicePoll'
 components:
   securitySchemes:
     bearerAuth:
@@ -514,6 +1312,1752 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    MigrationRequest:
+      type: object
+      additionalProperties: false
+      required: [tool, content]
+      properties:
+        tool:
+          type: string
+          enum: [sloth, pyrra]
+        content:
+          type: string
+          maxLength: 1048576
+        project: {type: string}
+        source: {type: string}
+        windowSeconds: {type: integer, format: int64}
+        lifecycle:
+          type: string
+          enum: [experimental, aspirational, committed]
+    MigrationNote:
+      type: object
+      additionalProperties: false
+      required: [level, message]
+      properties:
+        level:
+          type: string
+          enum: [info, review, lossy]
+        field: {type: string}
+        message: {type: string}
+    MigrationDefinition:
+      type: object
+      additionalProperties: false
+      required: [name, origin, yaml, notes]
+      properties:
+        name: {type: string}
+        origin: {type: string}
+        yaml: {type: string}
+        notes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MigrationNote'
+    MigrationSkipped:
+      type: object
+      additionalProperties: false
+      required: [origin, reason]
+      properties:
+        origin: {type: string}
+        reason: {type: string}
+    MigrationResult:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, tool, definitions, skipped, notes, limitations]
+      properties:
+        apiVersion: {type: string}
+        tenant: {type: string}
+        tool: {type: string}
+        definitions:
+          type: array
+          items:
+            $ref: '#/components/schemas/MigrationDefinition'
+        skipped:
+          type: array
+          items:
+            $ref: '#/components/schemas/MigrationSkipped'
+        notes:
+          type: array
+          items:
+            $ref: '#/components/schemas/MigrationNote'
+        limitations:
+          type: array
+          items: {type: string}
+    GitInfo:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, tenant, configured]
+      properties:
+        apiVersion: {type: string}
+        tenant: {type: string}
+        configured: {type: boolean}
+        provider: {type: string}
+        repository: {type: string}
+        baseBranch: {type: string}
+        path: {type: string}
+    GitPullRequest:
+      type: object
+      additionalProperties: false
+      required: [number, url, branch, state, title, createdAt]
+      properties:
+        number: {type: integer}
+        url: {type: string}
+        branch: {type: string}
+        state:
+          type: string
+          enum: [open, merged, closed]
+        title: {type: string}
+        definitionDigest: {type: string}
+        expectedRevision: {type: integer, format: int64}
+        createdAt: {type: string, format: date-time}
+    GitReceipt:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, created, path, pullRequest]
+      properties:
+        apiVersion: {type: string}
+        created: {type: boolean}
+        path: {type: string}
+        pullRequest:
+          $ref: '#/components/schemas/GitPullRequest'
+    GitProposalResult:
+      type: object
+      additionalProperties: false
+      required: [receipt, definitionDigest, expectedRevision, limitations]
+      properties:
+        receipt:
+          $ref: '#/components/schemas/GitReceipt'
+        definitionDigest: {type: string}
+        expectedRevision: {type: integer, format: int64}
+        limitations:
+          type: array
+          items: {type: string}
+    GitProposalStatus:
+      type: object
+      required: [number, url, branch, state, title, createdAt, applied]
+      properties:
+        number: {type: integer}
+        url: {type: string}
+        branch: {type: string}
+        state:
+          type: string
+          enum: [open, merged, closed]
+        title: {type: string}
+        definitionDigest: {type: string}
+        expectedRevision: {type: integer, format: int64}
+        createdAt: {type: string, format: date-time}
+        applied:
+          type: boolean
+          description: True only when the merged definition equals the live one.
+    GitDrift:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, tenant, state, path, limitations]
+      properties:
+        apiVersion: {type: string}
+        tenant: {type: string}
+        state:
+          type: string
+          enum: [in_sync, drifted, not_in_repo, not_applied, unreadable]
+        path: {type: string}
+        repositoryDigest: {type: string}
+        liveDigest: {type: string}
+        limitations:
+          type: array
+          items: {type: string}
+    GitProposalList:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, tenant, configured, proposals, limitations]
+      properties:
+        apiVersion: {type: string}
+        tenant: {type: string}
+        configured: {type: boolean}
+        liveDigest: {type: string}
+        proposals:
+          type: array
+          items:
+            $ref: '#/components/schemas/GitProposalStatus'
+        limitations:
+          type: array
+          items: {type: string}
+    IntentPreparationCheck:
+      type: object
+      additionalProperties: false
+      required: [code, state, message]
+      properties:
+        code: {type: string}
+        state:
+          type: string
+          enum: [missing, invalid, recorded, stale, not_recorded, not_checked]
+        message: {type: string}
+    IntentEvidence:
+      additionalProperties: false
+      properties:
+        adapterCalls:
+          type: integer
+        apiVersion:
+          type: string
+        catalogDigest:
+          type: string
+        comparisons:
+          items:
+            $ref: '#/components/schemas/IntentEvidenceComparison'
+          type: array
+        digest:
+          type: string
+        expectedRevision:
+          type: integer
+        humanConfirmationRequired:
+          type: boolean
+          const: true
+        intentDigest:
+          type: string
+        maxAdapterCalls:
+          type: integer
+        measurementDigest:
+          type: string
+        observedAt:
+          format: date-time
+          type: string
+        sourceDigest:
+          type: string
+        state:
+          type: string
+          enum:
+          - observed
+          - partial
+          - unsupported
+        tenant:
+          type: string
+        warnings:
+          items:
+            type: string
+          type: array
+      required:
+      - apiVersion
+      - tenant
+      - observedAt
+      - intentDigest
+      - measurementDigest
+      - sourceDigest
+      - catalogDigest
+      - expectedRevision
+      - state
+      - adapterCalls
+      - maxAdapterCalls
+      - comparisons
+      - warnings
+      - humanConfirmationRequired
+      - digest
+      type: object
+    IntentEvidenceAlternative:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+          description: Unique comparison ID other than baseline.
+        policies:
+          items:
+            $ref: '#/components/schemas/BurnRatePolicy'
+          type: array
+        target:
+          type: number
+          exclusiveMinimum: 0
+          exclusiveMaximum: 1
+        window:
+          type: string
+          maxLength: 32
+          description: Positive whole-second duration with units within 31 days, for example
+            24h. Subsecond and unitless windows are rejected.
+      required:
+      - name
+      type: object
+    IntentEvidenceComparison:
+      additionalProperties: false
+      properties:
+        allowedBadEventsPerMillion:
+          type: number
+        current:
+          anyOf:
+          - $ref: '#/components/schemas/IntentEvidenceCurrent'
+          - type: 'null'
+        gaps:
+          items:
+            type: string
+          type: array
+        history:
+          anyOf:
+          - $ref: '#/components/schemas/IntentEvidenceHistory'
+          - type: 'null'
+        historyState:
+          type: string
+        lifecycleAllowsAlerts:
+          type: boolean
+        name:
+          type: string
+        policies:
+          items:
+            $ref: '#/components/schemas/IntentPolicyTradeoff'
+          type: array
+        state:
+          type: string
+        target:
+          type: number
+        windowSeconds:
+          type: integer
+      required:
+      - lifecycleAllowsAlerts
+      - name
+      - state
+      - target
+      - windowSeconds
+      - allowedBadEventsPerMillion
+      - policies
+      - historyState
+      - gaps
+      type: object
+    IntentEvidenceCurrent:
+      additionalProperties: false
+      properties:
+        at:
+          format: date-time
+          type: string
+        burnRate:
+          anyOf:
+          - type: number
+          - type: 'null'
+        checks:
+          items:
+            $ref: '#/components/schemas/QualityCheck'
+          type: array
+        coverage:
+          type: number
+        dataStatus:
+          type: string
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+        from:
+          format: date-time
+          type: string
+        good:
+          type: number
+        minimumEvents:
+          type: number
+        reliability:
+          anyOf:
+          - type: number
+          - type: 'null'
+        state:
+          type: string
+        total:
+          type: number
+      required:
+      - state
+      - at
+      - from
+      - good
+      - total
+      - coverage
+      - reliability
+      - burnRate
+      - dataStatus
+      - freshness
+      - minimumEvents
+      - checks
+      type: object
+    IntentEvidenceHistory:
+      additionalProperties: false
+      properties:
+        burnThresholdCutoffs:
+          type: integer
+        completeCutoffs:
+          type: integer
+        from:
+          format: date-time
+          type: string
+        noTrafficCutoffs:
+          type: integer
+        resolutionSeconds:
+          type: integer
+        targetViolationCutoffs:
+          type: integer
+        to:
+          format: date-time
+          type: string
+        unknownCutoffs:
+          type: integer
+      required:
+      - from
+      - to
+      - resolutionSeconds
+      - completeCutoffs
+      - unknownCutoffs
+      - noTrafficCutoffs
+      - targetViolationCutoffs
+      - burnThresholdCutoffs
+      type: object
+    IntentEvidenceInput:
+      additionalProperties: false
+      properties:
+        alternatives:
+          items:
+            $ref: '#/components/schemas/IntentEvidenceAlternative'
+          type: array
+          maxItems: 2
+        catalogDigest:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Optional exact pin from a prior receipt. If omitted, current provenance
+            is captured at request start. Never confirmation or approval.
+        expectedRevision:
+          type: integer
+          minimum: 0
+        history:
+          $ref: '#/components/schemas/IntentEvidenceRange'
+        intentDigest:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Optional exact pin from a prior receipt. If omitted, current provenance
+            is captured at request start. Never confirmation or approval.
+        measurementDigest:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Optional exact pin from a prior receipt. If omitted, current provenance
+            is captured at request start. Never confirmation or approval.
+        plan:
+          type: object
+          properties:
+            intent:
+              $ref: '#/components/schemas/SLOIntent'
+          required:
+          - intent
+          additionalProperties: false
+          description: Complete inline measurement; separate binding references are not
+            accepted.
+        sourceDigest:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+          description: Optional exact pin from a prior receipt. If omitted, current provenance
+            is captured at request start. Never confirmation or approval.
+      required:
+      - plan
+      - expectedRevision
+      type: object
+    IntentEvidenceRange:
+      additionalProperties: false
+      properties:
+        from:
+          format: date-time
+          type: string
+        resolutionSeconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+          description: Aligned to stepSeconds; explicit range at most 72h and 240 cutoffs.
+        to:
+          format: date-time
+          type: string
+      required:
+      - from
+      - to
+      - resolutionSeconds
+      type: object
+    IntentPolicyTradeoff:
+      additionalProperties: false
+      properties:
+        burnRate:
+          type: number
+        forSeconds:
+          type: integer
+        longWindowBudgetFraction:
+          type: number
+        longWindowSeconds:
+          type: integer
+        minCoverage:
+          type: number
+        minEvents:
+          type: number
+        name:
+          type: string
+        severity:
+          type: string
+        shortWindowSeconds:
+          type: integer
+      required:
+      - minCoverage
+      - minEvents
+      - name
+      - severity
+      - shortWindowSeconds
+      - longWindowSeconds
+      - forSeconds
+      - burnRate
+      - longWindowBudgetFraction
+      type: object
+    IntentSelection:
+      additionalProperties: false
+      properties:
+        expectedRevision:
+          type: integer
+        name:
+          type: string
+      required:
+      - name
+      - expectedRevision
+      type: object
+    Metadata:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        project:
+          type: string
+      required:
+      - name
+      - project
+      type: object
+    PlanIntentInput:
+      additionalProperties: false
+      properties:
+        binding:
+          anyOf:
+          - $ref: '#/components/schemas/IntentSelection'
+          - type: 'null'
+        intent:
+          $ref: '#/components/schemas/SLOIntent'
+      required:
+      - intent
+      type: object
+    SLOIntent:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        spec:
+          $ref: '#/components/schemas/IntentSpec'
+      required:
+      - apiVersion
+      - kind
+      - metadata
+      - spec
+      type: object
+    ExtensionReference:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        sha256:
+          type: string
+        version:
+          type: string
+      required:
+      - name
+      - version
+      - sha256
+      type: object
+    IntentCandidateDiscovery:
+      additionalProperties: false
+      properties:
+        adapterCalls:
+          type: integer
+        apiVersion:
+          type: string
+        candidates:
+          items:
+            $ref: '#/components/schemas/IntentMeasurementCandidate'
+          type: array
+        catalogDigest:
+          type: string
+        humanConfirmationRequired:
+          type: boolean
+          const: true
+        maxAdapterCalls:
+          type: integer
+        metricNameDiscovery:
+          type: boolean
+        names:
+          items:
+            type: string
+          type: array
+        observedAt:
+          format: date-time
+          type: string
+        questions:
+          items:
+            type: string
+          type: array
+        scope:
+          $ref: '#/components/schemas/IntentCandidateInput'
+        seriesDiscovery:
+          type: boolean
+        sourceDigest:
+          type: string
+        state:
+          type: string
+          enum:
+          - unsupported
+          - provider_error
+          - partial
+          - no_matching_metrics
+          - needs_input
+        tenant:
+          type: string
+        textTrust:
+          type: string
+        truncated:
+          type: boolean
+        warnings:
+          items:
+            type: string
+          type: array
+      required:
+      - apiVersion
+      - tenant
+      - observedAt
+      - textTrust
+      - scope
+      - sourceDigest
+      - catalogDigest
+      - state
+      - metricNameDiscovery
+      - seriesDiscovery
+      - adapterCalls
+      - maxAdapterCalls
+      - names
+      - truncated
+      - candidates
+      - questions
+      - warnings
+      - humanConfirmationRequired
+      type: object
+    IntentCandidateInput:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+          maxLength: 63
+        limit:
+          type: integer
+          minimum: 0
+          maximum: 3
+          default: 3
+          description: Zero or omission uses the default of three inspections.
+        metrics:
+          items:
+            type: string
+            pattern: ^[a-zA-Z_:][a-zA-Z0-9_:]{0,199}$
+          type: array
+          maxItems: 3
+        outcome:
+          type: string
+          enum:
+          - availability
+          - latency
+        population:
+          additionalProperties:
+            type: string
+            maxLength: 200
+          type: object
+          minProperties: 1
+          maxProperties: 16
+          description: Explicit equality labels. Reserved labels including le and __ prefixes
+            are rejected.
+        prefix:
+          type: string
+          maxLength: 100
+          description: Literal metric prefix, not a query.
+        project:
+          type: string
+          minLength: 1
+          maxLength: 200
+        service:
+          type: string
+          minLength: 1
+          maxLength: 200
+        source:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+        threshold:
+          type: string
+          maxLength: 32
+          description: 'Positive latency duration with explicit units, at most 24h; requires
+            outcome latency. Example: 30ms.'
+      required:
+      - service
+      - source
+      - project
+      - population
+      type: object
+    IntentMeasurementCandidate:
+      additionalProperties: false
+      properties:
+        evidenceDigest:
+          type: string
+        from:
+          format: date-time
+          type: string
+        id:
+          type: string
+        labelNames:
+          items:
+            type: string
+          type: array
+        matchingBoundaryObserved:
+          type: boolean
+        metric:
+          type: string
+        metricType:
+          type: string
+        observedSeries:
+          type: integer
+        questions:
+          items:
+            type: string
+          type: array
+        recipes:
+          items:
+            $ref: '#/components/schemas/IntentRecipeReference'
+          type: array
+        requestedMetric:
+          type: string
+        state:
+          type: string
+        thresholdSeconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+        to:
+          format: date-time
+          type: string
+        truncated:
+          type: boolean
+        unit:
+          type: string
+        warnings:
+          items:
+            type: string
+          type: array
+      required:
+      - id
+      - requestedMetric
+      - metric
+      - state
+      - metricType
+      - unit
+      - observedSeries
+      - labelNames
+      - truncated
+      - matchingBoundaryObserved
+      - recipes
+      - questions
+      - warnings
+      - evidenceDigest
+      type: object
+    IntentRecipeReference:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        digest:
+          type: string
+        extension:
+          anyOf:
+          - $ref: '#/components/schemas/ExtensionReference'
+          - type: 'null'
+        id:
+          type: string
+        match:
+          type: string
+        revision:
+          type: integer
+        sli:
+          type: string
+      required:
+      - id
+      - revision
+      - digest
+      - category
+      - sli
+      - match
+      type: object
+    IntentContextFailure:
+      type: object
+      required:
+      - apiVersion
+      - error
+      properties:
+        apiVersion:
+          const: nines.dev/v1alpha1
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - retryable
+          - recovery
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            retryable:
+              type: boolean
+            recovery:
+              type: string
+          additionalProperties: false
+      additionalProperties: false
+    BindingHealth:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        binding:
+          $ref: '#/components/schemas/BindingReference'
+        checkedAt:
+          format: date-time
+          type: string
+        code:
+          type: string
+        evaluationBlocked:
+          type: boolean
+        fingerprint:
+          type: string
+        measurementDigest:
+          type: string
+        message:
+          type: string
+        sloRevision:
+          type: integer
+        sourceDigest:
+          type: string
+        state:
+          type: string
+        tenant:
+          type: string
+      required:
+      - sourceDigest
+      - apiVersion
+      - tenant
+      - binding
+      - state
+      - code
+      - message
+      - checkedAt
+      - evaluationBlocked
+      type: object
+    BindingReference:
+      additionalProperties: false
+      properties:
+        digest:
+          type: string
+        name:
+          type: string
+        revision:
+          type: integer
+      required:
+      - name
+      - revision
+      - digest
+      type: object
+    BudgetEvidence:
+      additionalProperties: false
+      properties:
+        checks:
+          items:
+            $ref: '#/components/schemas/QualityCheck'
+          type: array
+        coverage:
+          type: number
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+        minimumEvents:
+          type: number
+        total:
+          type: number
+      required:
+      - coverage
+      - total
+      - minimumEvents
+      - freshness
+      - checks
+      type: object
+    BurnRatePolicy:
+      additionalProperties: false
+      properties:
+        burnRate:
+          type: number
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 0.9999
+          description: Zero (off) or 0.5 to 0.9999. Raises each window's required error rate as traffic falls, so few failures cannot page by chance. Applies to Nines evaluation and generated Prometheus-style rules.
+        forSeconds:
+          type: integer
+        longWindowSeconds:
+          type: integer
+        minCoverage:
+          type: number
+        minEvents:
+          type: number
+        name:
+          type: string
+        severity:
+          type: string
+        shortWindowSeconds:
+          type: integer
+      required:
+      - shortWindowSeconds
+      - longWindowSeconds
+      - burnRate
+      - forSeconds
+      - minCoverage
+      type: object
+    CohortReport:
+      additionalProperties: false
+      properties:
+        at:
+          format: date-time
+          type: string
+        items:
+          items:
+            $ref: '#/components/schemas/CohortResult'
+          type: array
+        labels:
+          items:
+            type: string
+          type: array
+        matchesAggregate:
+          type: boolean
+        message:
+          type: string
+        state:
+          type: string
+        windowSeconds:
+          type: integer
+      required:
+      - state
+      - message
+      - at
+      - windowSeconds
+      - labels
+      - items
+      - matchesAggregate
+      type: object
+    CohortResult:
+      additionalProperties: false
+      properties:
+        burnRate:
+          anyOf:
+          - type: number
+          - type: 'null'
+        good:
+          anyOf:
+          - type: number
+          - type: 'null'
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+        reliability:
+          anyOf:
+          - type: number
+          - type: 'null'
+        state:
+          type: string
+        total:
+          type: number
+      required:
+      - labels
+      - good
+      - total
+      - reliability
+      - burnRate
+      - state
+      type: object
+    CollectionHealth:
+      additionalProperties: false
+      properties:
+        attemptedAt:
+          format: date-time
+          type: string
+        completedAt:
+          format: date-time
+          type: string
+        errorCode:
+          type: string
+        from:
+          format: date-time
+          type: string
+        lastSuccessAt:
+          format: date-time
+          type: string
+        measurement:
+          anyOf:
+          - $ref: '#/components/schemas/BindingHealth'
+          - type: 'null'
+        points:
+          type: integer
+        sloRevision:
+          type: integer
+        source:
+          type: string
+        sourceDigest:
+          type: string
+        sourceFrom:
+          format: date-time
+          type: string
+        sourceTo:
+          format: date-time
+          type: string
+        state:
+          type: string
+        to:
+          format: date-time
+          type: string
+      required:
+      - state
+      - points
+      type: object
+    ErrorBudgetDecision:
+      additionalProperties: false
+      properties:
+        advisory:
+          type: boolean
+        apiVersion:
+          type: string
+        budgetRemainingFraction:
+          anyOf:
+          - type: number
+          - type: 'null'
+        definitionDigest:
+          type: string
+        evaluatedAt:
+          format: date-time
+          type: string
+        evidence:
+          anyOf:
+          - $ref: '#/components/schemas/BudgetEvidence'
+          - type: 'null'
+        message:
+          type: string
+        observedAt:
+          format: date-time
+          type: string
+        owner:
+          type: string
+        policyDigest:
+          type: string
+        qualityState:
+          type: string
+        reasonCodes:
+          items:
+            type: string
+          type: array
+        revision:
+          type: integer
+        runbookURL:
+          type: string
+        sloId:
+          type: string
+        sourceDigest:
+          type: string
+        state:
+          type: string
+        tenant:
+          type: string
+      required:
+      - apiVersion
+      - tenant
+      - sloId
+      - revision
+      - definitionDigest
+      - sourceDigest
+      - observedAt
+      - evaluatedAt
+      - state
+      - reasonCodes
+      - message
+      - budgetRemainingFraction
+      - qualityState
+      - advisory
+      type: object
+    ErrorBudgetPolicy:
+      additionalProperties: false
+      properties:
+        onExhausted:
+          type: string
+        owner:
+          type: string
+        reviewBelow:
+          type: number
+        runbookURL:
+          type: string
+      required:
+      - owner
+      - runbookURL
+      - reviewBelow
+      type: object
+    EvidenceReference:
+      additionalProperties: false
+      properties:
+        href:
+          type: string
+        id:
+          type: string
+        kind:
+          type: string
+        revision:
+          type: integer
+      required:
+      - kind
+      - id
+      - revision
+      - href
+      type: object
+    Freshness:
+      additionalProperties: false
+      properties:
+        ageAtObservationSeconds:
+          anyOf:
+          - type: integer
+          - type: 'null'
+        lastSampleAt:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        staleAfterSeconds:
+          type: integer
+        state:
+          type: string
+      required:
+      - state
+      - staleAfterSeconds
+      type: object
+    IntentContext:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        journey:
+          anyOf:
+          - $ref: '#/components/schemas/IntentJourneyContext'
+          - type: 'null'
+        nextActions:
+          items:
+            type: string
+          type: array
+        nextCursor:
+          type: string
+        objectives:
+          items:
+            $ref: '#/components/schemas/SLOContext'
+          type: array
+        observedAt:
+          format: date-time
+          type: string
+        scope:
+          $ref: '#/components/schemas/IntentContextInput'
+        source:
+          $ref: '#/components/schemas/IntentSourceContext'
+        tenant:
+          type: string
+        textTrust:
+          type: string
+        warnings:
+          items:
+            type: string
+          type: array
+      required:
+      - apiVersion
+      - tenant
+      - observedAt
+      - textTrust
+      - scope
+      - source
+      - objectives
+      - warnings
+      - nextActions
+      type: object
+    IntentContextInput:
+      additionalProperties: false
+      properties:
+        cursor:
+          type: string
+          maxLength: 2048
+        journey:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+        journeyRevision:
+          type: integer
+          minimum: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 5
+        project:
+          type: string
+          minLength: 1
+          maxLength: 200
+        service:
+          type: string
+          minLength: 1
+          maxLength: 200
+        source:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9-]{0,62}$
+      required:
+      - service
+      - source
+      - project
+      type: object
+    IntentJourney:
+      additionalProperties: false
+      properties:
+        expectedRevision:
+          type: integer
+        name:
+          type: string
+        required:
+          type: boolean
+        step:
+          type: string
+      required:
+      - name
+      - step
+      - expectedRevision
+      - required
+      type: object
+    IntentJourneyContext:
+      additionalProperties: false
+      properties:
+        linkedSLOs:
+          type: integer
+        resource:
+          $ref: '#/components/schemas/ResourceSummary'
+        stepCount:
+          type: integer
+      required:
+      - resource
+      - stepCount
+      - linkedSLOs
+      type: object
+    IntentSourceContext:
+      additionalProperties: false
+      properties:
+        configured:
+          type: boolean
+        id:
+          type: string
+        kind:
+          type: string
+        metricNameDiscovery:
+          type: boolean
+      required:
+      - id
+      - kind
+      - configured
+      - metricNameDiscovery
+      type: object
+    IntentExclusions:
+      type: object
+      additionalProperties: false
+      properties:
+        none:
+          type: boolean
+        observationBoundaries:
+          type: array
+          minItems: 1
+          maxItems: 8
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 500
+      oneOf:
+        - required: [none]
+          properties:
+            none:
+              const: true
+          not:
+            required: [observationBoundaries]
+        - required: [observationBoundaries]
+          properties:
+            none:
+              const: false
+    IntentSpec:
+      additionalProperties: false
+      properties:
+        exclusions:
+          $ref: '#/components/schemas/IntentExclusions'
+        description:
+          type: string
+        errorBudgetPolicy:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorBudgetPolicy'
+          - type: 'null'
+        journey:
+          anyOf:
+          - $ref: '#/components/schemas/IntentJourney'
+          - type: 'null'
+        lifecycle:
+          type: string
+        measurement:
+          anyOf:
+          - $ref: '#/components/schemas/MeasurementSpec'
+          - type: 'null'
+        noDataPolicy:
+          type: string
+        outcome:
+          type: string
+        policies:
+          items:
+            $ref: '#/components/schemas/BurnRatePolicy'
+          type: array
+        policy:
+          anyOf:
+          - $ref: '#/components/schemas/BurnRatePolicy'
+          - type: 'null'
+        population:
+          additionalProperties:
+            type: string
+          type: object
+        quality:
+          anyOf:
+          - $ref: '#/components/schemas/MeasurementQualityPolicy'
+          - type: 'null'
+        service:
+          type: string
+        source:
+          type: string
+        stepSeconds:
+          type: integer
+        target:
+          type: number
+        thresholdSeconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+        windowSeconds:
+          type: integer
+      required:
+      - description
+      - service
+      - source
+      - outcome
+      - population
+      - target
+      - windowSeconds
+      - noDataPolicy
+      type: object
+    Measurement:
+      additionalProperties: false
+      properties:
+        alertPhase:
+          type: string
+        alertSuppressedReason:
+          type: string
+        budgetRemainingFraction:
+          anyOf:
+          - type: number
+          - type: 'null'
+        burnRate:
+          anyOf:
+          - type: number
+          - type: 'null'
+        coverage:
+          type: number
+        dataStatus:
+          type: string
+        evaluatedAt:
+          format: date-time
+          type: string
+        good:
+          type: number
+        lastAlertEvaluation:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        longBurnRate:
+          anyOf:
+          - type: number
+          - type: 'null'
+        longCoverage:
+          anyOf:
+          - type: number
+          - type: 'null'
+        reliability:
+          anyOf:
+          - type: number
+          - type: 'null'
+        shortBurnRate:
+          anyOf:
+          - type: number
+          - type: 'null'
+        shortCoverage:
+          anyOf:
+          - type: number
+          - type: 'null'
+        target:
+          type: number
+        total:
+          type: number
+        windowStart:
+          format: date-time
+          type: string
+      required:
+      - shortBurnRate
+      - longBurnRate
+      - shortCoverage
+      - longCoverage
+      - evaluatedAt
+      - windowStart
+      - target
+      - reliability
+      - good
+      - total
+      - coverage
+      - dataStatus
+      - budgetRemainingFraction
+      - burnRate
+      - alertPhase
+      type: object
+    MeasurementQuality:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        checks:
+          items:
+            $ref: '#/components/schemas/QualityCheck'
+          type: array
+        cohorts:
+          anyOf:
+          - $ref: '#/components/schemas/CohortReport'
+          - type: 'null'
+        collectedSourceDigest:
+          type: string
+        coverage:
+          type: number
+        definitionDigest:
+          type: string
+        evaluatedAt:
+          format: date-time
+          type: string
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+        good:
+          type: number
+        limitations:
+          items:
+            type: string
+          type: array
+        minimumEvents:
+          type: number
+        observationPoint:
+          type: string
+        observedAt:
+          format: date-time
+          type: string
+        revision:
+          type: integer
+        sloId:
+          type: string
+        sourceDigest:
+          type: string
+        sourceFrom:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        sourceTo:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        state:
+          type: string
+        tenant:
+          type: string
+        total:
+          type: number
+      required:
+      - apiVersion
+      - tenant
+      - sloId
+      - revision
+      - definitionDigest
+      - sourceDigest
+      - observedAt
+      - evaluatedAt
+      - state
+      - freshness
+      - good
+      - total
+      - coverage
+      - minimumEvents
+      - checks
+      - limitations
+      type: object
+    MeasurementQualityPolicy:
+      additionalProperties: false
+      properties:
+        cohortLabels:
+          items:
+            type: string
+          type: array
+        maxSampleAgeSeconds:
+          type: integer
+        minEvents:
+          type: number
+      type: object
+    MeasurementSpec:
+      additionalProperties: false
+      properties:
+        countFrom:
+          type: string
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+        metric:
+          type: string
+        observationPoint:
+          type: string
+        scrapeIntervalSeconds:
+          type: integer
+        successLabels:
+          additionalProperties:
+            type: string
+          type: object
+        thresholdSeconds:
+          anyOf:
+          - type: number
+          - type: 'null'
+        type:
+          type: string
+      required:
+      - type
+      - metric
+      - labels
+      - scrapeIntervalSeconds
+      - observationPoint
+      type: object
+    QualityCheck:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        state:
+          type: string
+      required:
+      - code
+      - state
+      - message
+      type: object
+    ResourceSummary:
+      additionalProperties: false
+      properties:
+        archived:
+          type: boolean
+        displayName:
+          type: string
+        id:
+          type: string
+        kind:
+          type: string
+        project:
+          type: string
+        revision:
+          type: integer
+        service:
+          type: string
+      required:
+      - kind
+      - id
+      - project
+      - displayName
+      - revision
+      type: object
+    RetirementEvent:
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+        actor:
+          type: string
+        at:
+          format: date-time
+          type: string
+        digest:
+          type: string
+        id:
+          type: string
+        revision:
+          type: integer
+      required:
+      - id
+      - action
+      - at
+      - actor
+      - revision
+      - digest
+      type: object
+    SLOContext:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        budgetDecision:
+          anyOf:
+          - $ref: '#/components/schemas/ErrorBudgetDecision'
+          - type: 'null'
+        collection:
+          $ref: '#/components/schemas/CollectionHealth'
+        definition:
+          $ref: '#/components/schemas/SLOParameters'
+        evidence:
+          items:
+            $ref: '#/components/schemas/EvidenceReference'
+          type: array
+        freshness:
+          $ref: '#/components/schemas/Freshness'
+        health:
+          type: string
+        measurement:
+          $ref: '#/components/schemas/Measurement'
+        measurementHealth:
+          anyOf:
+          - $ref: '#/components/schemas/BindingHealth'
+          - type: 'null'
+        observedAt:
+          format: date-time
+          type: string
+        quality:
+          anyOf:
+          - $ref: '#/components/schemas/MeasurementQuality'
+          - type: 'null'
+        resource:
+          $ref: '#/components/schemas/ResourceSummary'
+        retirement:
+          anyOf:
+          - $ref: '#/components/schemas/SLORetirement'
+          - type: 'null'
+        tenant:
+          type: string
+        textTrust:
+          type: string
+        warnings:
+          items:
+            type: string
+          type: array
+      required:
+      - definition
+      - apiVersion
+      - tenant
+      - observedAt
+      - textTrust
+      - resource
+      - health
+      - measurement
+      - freshness
+      - collection
+      - evidence
+      - warnings
+      type: object
+    SLOParameters:
+      additionalProperties: false
+      properties:
+        coverageBasis:
+          type: string
+        intent:
+          anyOf:
+          - $ref: '#/components/schemas/IntentSpec'
+          - type: 'null'
+        lifecycle:
+          type: string
+        measurementBinding:
+          anyOf:
+          - $ref: '#/components/schemas/BindingReference'
+          - type: 'null'
+        measurementMode:
+          type: string
+        policies:
+          items:
+            $ref: '#/components/schemas/BurnRatePolicy'
+          type: array
+        policy:
+          anyOf:
+          - $ref: '#/components/schemas/BurnRatePolicy'
+          - type: 'null'
+        source:
+          type: string
+        stepSeconds:
+          type: integer
+        windowSeconds:
+          type: integer
+      required:
+      - measurementMode
+      - coverageBasis
+      - windowSeconds
+      - stepSeconds
+      type: object
+    SLORetirement:
+      additionalProperties: false
+      properties:
+        archivedAt:
+          format: date-time
+          type: string
+        attempts:
+          type: integer
+        audit:
+          items:
+            $ref: '#/components/schemas/RetirementEvent'
+          type: array
+        cleanup:
+          type: string
+        evaluationAt:
+          format: date-time
+          type: string
+        group:
+          type: string
+        lastAttemptAt:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        message:
+          type: string
+        nextAttemptAt:
+          anyOf:
+          - format: date-time
+            type: string
+          - type: 'null'
+        originalRevision:
+          type: integer
+        resourceUID:
+          type: string
+        routeDigest:
+          type: string
+        ruleDigest:
+          type: string
+      required:
+      - evaluationAt
+      - archivedAt
+      - originalRevision
+      - cleanup
+      - attempts
+      - message
+      - audit
+      type: object
     Error:
       type: object
       required:
@@ -629,6 +3173,191 @@ components:
         reason: *id003
         safetyExceptionReason: *id003
       additionalProperties: false
+    RecordIntentEvidence:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion, intentDigest, readTelemetry]
+      properties:
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        intentDigest:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        readTelemetry:
+          type: boolean
+          const: true
+        history:
+          $ref: '#/components/schemas/IntentEvidenceRange'
+        alternatives:
+          type: array
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/IntentEvidenceAlternative'
+    IntentPreparationEvidence:
+      type: object
+      additionalProperties: false
+      required: [capturedVersion, requestedBy, report]
+      properties:
+        capturedVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        requestedBy:
+          type: object
+          description: Authenticated server-attributed actor; never supplied by the caller.
+          additionalProperties: true
+        report:
+          $ref: '#/components/schemas/IntentEvidence'
+    IntentReviewCandidateReceipt:
+      type: object
+      additionalProperties: false
+      required: [state, runId, runInputDigest, stepDigest, at]
+      properties:
+        state:
+          type: string
+          enum: [recorded, prior_goal, unverified, stale, invalid]
+        runId:
+          type: string
+        runInputDigest:
+          type: string
+        stepDigest:
+          type: string
+        intentDigest:
+          type: string
+        at:
+          type: string
+          format: date-time
+        report:
+          $ref: '#/components/schemas/IntentCandidateDiscovery'
+    IntentReviewExclusions:
+      type: object
+      additionalProperties: false
+      required: [state, definition, intentDigest, confirmation]
+      properties:
+        state:
+          type: string
+          enum: [recorded, unconfirmed]
+        definition:
+          $ref: '#/components/schemas/IntentExclusions'
+        intentDigest:
+          type: string
+        confirmation:
+          type: object
+          additionalProperties: true
+    IntentReviewPacket:
+      type: object
+      additionalProperties: false
+      required: [goal, confirmation, checks, destination, resources, limitations]
+      properties:
+        exclusions:
+          $ref: '#/components/schemas/IntentReviewExclusions'
+        candidateDiscovery:
+          $ref: '#/components/schemas/IntentReviewCandidateReceipt'
+        goal:
+          $ref: '#/components/schemas/Manifest'
+        confirmation:
+          type: object
+          description: Exact saved human measurement confirmation, including actor and timestamp.
+          additionalProperties: true
+        legacyMeasurement:
+          $ref: '#/components/schemas/Manifest'
+        checks:
+          type: array
+          items:
+            $ref: '#/components/schemas/IntentPreparationCheck'
+        destination:
+          $ref: '#/components/schemas/IntentReviewDestination'
+        resources:
+          type: array
+          items:
+            $ref: '#/components/schemas/IntentReviewResource'
+        limitations:
+          type: array
+          items:
+            type: string
+    IntentReviewDestination:
+      type: object
+      additionalProperties: false
+      required: [tenant, project, service, source, sourceDigest, state]
+      properties:
+        tenant:
+          type: string
+        project:
+          type: string
+        service:
+          type: string
+        source:
+          type: string
+        sourceDigest:
+          type: string
+        state:
+          const: not_verified
+    IntentReviewResource:
+      type: object
+      additionalProperties: false
+      required: [kind, name, action, expectedRevision, digest]
+      properties:
+        kind:
+          type: string
+        name:
+          type: string
+        action:
+          type: string
+        expectedRevision:
+          type: integer
+          format: int64
+        digest:
+          type: string
+    IntentRecommendationReview:
+      type: object
+      description: Partial recommendation schema; optional reviewPacket is frozen into the approval digest.
+      additionalProperties: true
+      required: [summary]
+      properties:
+        summary:
+          type: string
+        reviewPacket:
+          $ref: '#/components/schemas/IntentReviewPacket'
+        preparationEvidence:
+          $ref: '#/components/schemas/IntentPreparationEvidence'
+    IntentChangeSetReview:
+      type: object
+      description: Partial change-set schema. Exact manifests and prior definitions remain in changes.
+      additionalProperties: true
+      required: [digest, state, changes]
+      properties:
+        digest:
+          type: string
+        state:
+          type: string
+        changes:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        recommendation:
+          $ref: '#/components/schemas/IntentRecommendationReview'
+    AppendIntentConversation:
+      type: object
+      additionalProperties: false
+      required: [id, expectedVersion, text]
+      properties:
+        id:
+          type: string
+        expectedVersion:
+          type: integer
+          format: int64
+          minimum: 1
+        text:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        preserveGoal:
+          type: boolean
+        goal:
+          $ref: '#/components/schemas/Manifest'
     IntentConversation:
       type: object
       description: Conversation snapshot; further fields are described by the public Go types.
@@ -646,7 +3375,10 @@ components:
           type: integer
           format: int64
         state: *id003
-        changeSet: *id004
+        preparationEvidence:
+          $ref: '#/components/schemas/IntentPreparationEvidence'
+        changeSet:
+          $ref: '#/components/schemas/IntentChangeSetReview'
       additionalProperties: true
     WorkflowStatus:
       type: object
@@ -662,6 +3394,11 @@ components:
       - independentApplierRequired
       - message
       properties:
+        preparationChecks:
+          type: array
+          description: Saved preparation diagnostics before a change set is frozen; not live verification or authorization.
+          items:
+            $ref: '#/components/schemas/IntentPreparationCheck'
         apiVersion: *id003
         tenant: *id003
         conversation: *id003
@@ -710,7 +3447,8 @@ components:
           format: date-time
         status:
           $ref: '#/components/schemas/WorkflowStatus'
-        changeSet: *id004
+        changeSet:
+          $ref: '#/components/schemas/IntentChangeSetReview'
         auditIntegrity:
           const: verified
         auditThrough:
@@ -884,3 +3622,253 @@ components:
           type: array
           items:
             type: string
+    CLIAuthenticationCapabilities:
+      type: object
+      required:
+      - apiVersion
+      - kind
+      - browser
+      - device
+      - refresh
+      - apiKey
+      - sessionMaxSeconds
+      properties:
+        apiVersion:
+          const: nines.dev/v1alpha1
+        kind:
+          const: CLIAuthenticationCapabilities
+        browser:
+          type: boolean
+        device:
+          type: boolean
+        refresh:
+          type: boolean
+        apiKey:
+          type: boolean
+        sessionMaxSeconds:
+          type: integer
+          minimum: 0
+          maximum: 3600
+    CLIDeviceStart:
+      type: object
+      required:
+      - tenant
+      - challenge
+      properties:
+        tenant: &cliauth_id002
+          type: string
+        challenge: &cliauth_id001
+          type: string
+          pattern: ^[A-Za-z0-9_-]{43}$
+          writeOnly: true
+    CLIDeviceAuthorization:
+      type: object
+      required:
+      - deviceCode
+      - userCode
+      - verificationURI
+      - expiresAt
+      - intervalSeconds
+      properties:
+        deviceCode:
+          type: string
+          description: Secret for the original CLI; never put it in a URL or log.
+        userCode:
+          type: string
+          pattern: ^[A-Z2-7]{4}-[A-Z2-7]{4}$
+        verificationURI:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+        intervalSeconds:
+          type: integer
+          minimum: 1
+          maximum: 30
+    CLIDevicePoll:
+      type: object
+      required:
+      - deviceCode
+      - codeVerifier
+      properties:
+        deviceCode: *cliauth_id001
+        codeVerifier: *cliauth_id001
+    CLIDeviceResult:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          enum:
+          - authorization_pending
+          - slow_down
+          - authorized
+          - access_denied
+          - expired_token
+          - cancelled
+        intervalSeconds:
+          type: integer
+          minimum: 1
+          maximum: 30
+        token:
+          type: string
+          description: Only returned once, on authorized; a tenant-scoped Nines credential,
+            never an upstream token.
+        expiresAt:
+          type: string
+          format: date-time
+        tenant: *cliauth_id002
+        identity: *cliauth_id002
+
+    IntentUsage:
+      type: object
+      additionalProperties: false
+      required: [apiVersion, tenant, from, to, windowDays, inspected, started, proposed, approved, applied, rejected, appliedFirstProposal, rolledBack, backtestAttached, guidedRuns, modelRuns, limitations]
+      properties:
+        apiVersion: {type: string}
+        tenant: {type: string}
+        from: {type: string, format: date-time}
+        to: {type: string, format: date-time}
+        windowDays: {type: integer}
+        inspected: {type: integer, description: Conversations in the window that were read.}
+        truncated: {type: boolean, description: True when the inspection cap stopped the scan early.}
+        started: {type: integer}
+        proposed: {type: integer}
+        approved: {type: integer}
+        applied: {type: integer}
+        rejected: {type: integer}
+        appliedFirstProposal: {type: integer, description: Applied conversations whose first proposal was the one applied.}
+        rolledBack: {type: integer, description: Conversations with an applied configuration rollback.}
+        backtestAttached: {type: integer}
+        guidedRuns: {type: integer}
+        modelRuns: {type: integer}
+        medianSecondsToProposal: {type: integer, format: int64}
+        medianSecondsToApplied: {type: integer, format: int64}
+        limitations:
+          type: array
+          items: {type: string}
+    IntentActivation:
+      type: "object"
+      additionalProperties: false
+      required: ["apiVersion", "tenant", "conversation", "version", "changeSetDigest", "operation", "operationDigest", "sourceDigest", "checkedAt", "state", "code", "message", "nextAction", "resources", "limitations"]
+      properties:
+        apiVersion:
+          type: "string"
+          const: "nines.dev/v1alpha1"
+        tenant:
+          type: "string"
+        conversation:
+          type: "string"
+        version:
+          type: "integer"
+          format: "int64"
+        changeSetDigest:
+          type: "string"
+        operation:
+          type: "string"
+        operationDigest:
+          type: "string"
+        sourceDigest:
+          type: "string"
+        checkedAt:
+          type: "string"
+          format: "date-time"
+        retryAt:
+          type: "string"
+          format: "date-time"
+        state:
+          type: "string"
+          enum: ["pending", "verified", "unsupported", "drifted"]
+        code:
+          type: "string"
+        message:
+          type: "string"
+        nextAction:
+          type: "string"
+        resources:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/IntentResourceVerification"
+        integration:
+          $ref: "#/components/schemas/IntegrationStatus"
+        measurement:
+          $ref: "#/components/schemas/MeasurementQuality"
+        limitations:
+          type: "array"
+          items:
+            type: "string"
+
+    IntegrationStage:
+      type: "object"
+      additionalProperties: false
+      required: ["state", "message"]
+      properties:
+        code:
+          type: "string"
+        nextAction:
+          type: "string"
+        state:
+          type: "string"
+        message:
+          type: "string"
+        observedAt:
+          type: "string"
+          format: "date-time"
+
+    IntegrationStatus:
+      type: "object"
+      additionalProperties: false
+      required: ["apiVersion", "kind", "tenant", "sloId", "revision", "checkedAt", "definition", "collection", "deployment", "evaluation"]
+      properties:
+        automation:
+          type: "object"
+          additionalProperties: true
+        apiVersion:
+          type: "string"
+        kind:
+          type: "string"
+        tenant:
+          type: "string"
+        sloId:
+          type: "string"
+        revision:
+          type: "integer"
+          format: "int64"
+        checkedAt:
+          type: "string"
+          format: "date-time"
+        definition:
+          $ref: "#/components/schemas/IntegrationStage"
+        collection:
+          $ref: "#/components/schemas/IntegrationStage"
+        deployment:
+          $ref: "#/components/schemas/IntegrationStage"
+        evaluation:
+          $ref: "#/components/schemas/IntegrationStage"
+        ruleOutput:
+          $ref: "#/components/schemas/IntegrationStage"
+
+    IntentResourceVerification:
+      type: "object"
+      additionalProperties: false
+      required: ["kind", "name", "revision", "digest", "state", "currentRevision", "currentDigest", "health"]
+      properties:
+        kind:
+          type: "string"
+        name:
+          type: "string"
+        revision:
+          type: "integer"
+          format: "int64"
+        digest:
+          type: "string"
+        state:
+          type: "string"
+        currentRevision:
+          type: "integer"
+          format: "int64"
+        currentDigest:
+          type: "string"
+        health:
+          type: "string"

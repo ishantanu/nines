@@ -105,7 +105,7 @@ func TestAPIKeyLoginAndContextCredentialsNeverCrossServerOrTenant(t *testing.T) 
 	t.Setenv("NINES_API_KEY", "")
 	t.Setenv("API_TOKEN", "")
 	e := withConfigLock(p, func() error {
-		return credentialsSave(p, map[string]credential{"prod": {api.URL, "alpha", "stored-browser-key", time.Now().Add(time.Hour)}})
+		return credentialsSave(p, map[string]credential{"prod": {Server: api.URL, Tenant: "alpha", Token: "stored-browser-key", Expires: time.Now().Add(time.Hour)}})
 	})
 	if e != nil {
 		t.Fatal(e)
@@ -340,7 +340,7 @@ func TestLogoutRevokesSavedSessionEvenWhenEnvironmentKeyIsSet(t *testing.T) {
 		if e := configSave(p, c); e != nil {
 			return e
 		}
-		return credentialsSave(p, map[string]credential{"prod": {s.URL, "alpha", "saved-session", time.Now().Add(time.Hour)}})
+		return credentialsSave(p, map[string]credential{"prod": {Server: s.URL, Tenant: "alpha", Token: "saved-session", Expires: time.Now().Add(time.Hour)}})
 	})
 	if e != nil {
 		t.Fatal(e)

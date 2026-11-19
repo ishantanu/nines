@@ -1,0 +1,29 @@
+{
+  "selectedCase": "availability",
+  "suite": "draft",
+  "apiVersion": "nines.dev/v1alpha1",
+  "kind": "IntentEvaluationReport",
+  "mode": "live",
+  "suiteSHA256": "9d9c3f106ec1d9a7007f2836730fdd9777ed64529c34f6f5decb15569af0907d",
+  "generatedAt": "2026-11-02T07:32:55.426792Z",
+  "complete": true,
+  "runtimeVersion": "Ollama 0.40.11; Metal; context 8192; parallel 1; warm",
+  "results": [
+    {
+      "draftDiagnostic": {
+        "modelState": "unavailable",
+        "modelClarification": false
+      },
+      "case": "availability",
+      "provider": "ollama",
+      "model": "qwen3:4b",
+      "passed": false,
+      "status": "unavailable",
+      "failure": "unexpected_status",
+      "durationMilliseconds": 20008
+    }
+  ],
+  "passed": 0,
+  "failed": 1,
+  "skipped": []
+}

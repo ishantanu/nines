@@ -129,7 +129,9 @@ test("successful empty queries explain the missing metric rather than claim coll
 test("viewer browses actual metric names and labels without changing the SLO", async () => {
   role = "viewer";
   await render();
-  expect(button("Read latest measurements").disabled).toBe(true);
+  expect(button("Read latest measurements").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
   await act(async () => button("Browse metrics").click());
   await until(() => !!button("playground_requests_total"));
   await act(async () => button("playground_requests_total").click());
@@ -167,7 +169,9 @@ test("native count providers retain collection without offering unsupported metr
   expect(host.textContent).toContain("New Relic");
   expect(host.textContent).toContain("Metric browsing is unavailable");
   expect(button("Browse metrics")).toBeUndefined();
-  expect(button("Read latest measurements").disabled).toBe(false);
+  expect(
+    button("Read latest measurements").getAttribute("aria-disabled"),
+  ).not.toBe("true");
   expect(host.textContent).not.toContain("every 15 seconds");
 });
 

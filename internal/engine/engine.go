@@ -25,6 +25,10 @@ func Evaluate(s model.SLO, points map[int64]model.Point, at time.Time, window in
 	var cg, ct float64
 	for _, k := range keys {
 		p := points[k]
+		if s.BadInterval != nil {
+			// Count judged intervals instead of events; see model.ClassifyInterval.
+			p.Good, p.Total = model.ClassifyInterval(p.Good, p.Total, s.BadInterval.ErrorRate, s.BadInterval.MinEvents)
+		}
 		yg := p.Good - cg
 		tg := r.Good + yg
 		cg = (tg - r.Good) - yg
@@ -98,7 +102,7 @@ func advanceWith(s model.SLO, previous model.AlertState, at time.Time, evaluate 
 		}
 		return next, nil
 	}
-	breach := *short.BurnRate >= p.BurnRate && *long.BurnRate >= p.BurnRate
+	breach := model.BurnThresholdMet(*p, s.Target, short.Bad, short.Total, *short.BurnRate) && model.BurnThresholdMet(*p, s.Target, long.Bad, long.Total, *long.BurnRate)
 	if !breach {
 		next.Phase = "inactive"
 		next.PendingSince = nil

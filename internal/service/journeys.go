@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 )
 
@@ -20,6 +21,8 @@ type JourneyView struct {
 	Health   string                `json:"health"`
 	Links    []JourneyLinkStatus   `json:"links"`
 	Reasons  []string              `json:"reasons"`
+	// RunObjective is set only when the journey declares a runObjective.
+	RunObjective *v1.JourneyRunObjective `json:"runObjective,omitempty"`
 }
 type JourneyPlan struct {
 	Action           string                 `json:"action"`
@@ -112,6 +115,27 @@ func (s *Service) JourneyView(ctx context.Context, r model.JourneyRevision) (Jou
 			if rank[health] > rank[v.Health] {
 				v.Health = health
 			}
+		}
+	}
+	if objective := r.Manifest.Spec.RunObjective; objective != nil && s.Journeys != nil {
+		runs, err := s.Journeys.Runs(ctx, r.Manifest.Metadata.Name)
+		if err != nil && !errors.Is(err, model.ErrJourneyNotFound) {
+			return v, err
+		}
+		result := model.EvaluateRunObjective(*objective, r.Digest, runs, s.Now())
+		v.RunObjective = &result
+		health := "healthy"
+		switch {
+		case result.State != "available":
+			// Too few judged runs cannot establish health, so it stays unknown.
+			health = "unknown"
+			v.Reasons = append(v.Reasons, fmt.Sprintf("run objective: %s (%d of %d judged runs)", result.State, result.Judged, result.MinRuns))
+		case *result.Reliability < objective.Target:
+			health = "degraded"
+			v.Reasons = append(v.Reasons, fmt.Sprintf("run objective: %.1f%% of judged runs passed against a %.1f%% target", *result.Reliability*100, objective.Target*100))
+		}
+		if rank[health] > rank[v.Health] {
+			v.Health = health
 		}
 	}
 	return v, nil

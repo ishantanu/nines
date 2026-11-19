@@ -1,0 +1,3 @@
+# Generated bundles may contain significant whitespace inside JavaScript strings.
+# Regenerate from web/; CI still checks the exact embedded build output.
+internal/httpapi/web/assets/** linguist-generated=true -whitespace

@@ -125,7 +125,9 @@ test("current references block archival and expose required links accessibly", a
     ),
   );
   await act(async () => button("Review archival").click());
-  expect(button("Archive reviewed objective").disabled).toBe(true);
+  expect(
+    button("Archive reviewed objective").getAttribute("aria-disabled"),
+  ).toBe("true");
   expect(host.textContent).toContain("required link");
   const { default: axe } = await import("axe-core");
   const results = await axe.run(host, {

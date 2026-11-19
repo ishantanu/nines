@@ -192,7 +192,7 @@ func TestModelFlowUsesBoundedToolsAndRequiresExplicitSelection(t *testing.T) {
 		if len(r.Messages) == 1 {
 			return response("find_measurements", map[string]any{}), nil
 		}
-		return response("ask_user", map[string]string{"question": "Which observation point matches eligible user attempts?"}), nil
+		return response("ask_user", map[string]any{"question": "Which observation point matches eligible user attempts?", "fields": []string{"semantics"}}), nil
 	}
 	s.Model = m
 	if _, e = s.Start(ctx, v.ID, v1.CreateIntentFlowRun{ID: "missing-consent", ExpectedVersion: v.Version, Mode: "model"}); e == nil {
@@ -448,7 +448,7 @@ func TestGroundedDraftAndModelContextExcludeIdentity(t *testing.T) {
 		if strings.Contains(r.Messages[0].Text, `"actor"`) || strings.Contains(r.Messages[0].Text, `"subject"`) {
 			t.Fatal("identity sent to model")
 		}
-		return response("ask_user", map[string]string{"question": "Review the goal semantics."}), nil
+		return response("ask_user", map[string]any{"question": "Review the goal semantics.", "fields": []string{"semantics"}}), nil
 	}}
 	v, e = s.Start(ctx, v.ID, v1.CreateIntentFlowRun{ID: "private-context", ExpectedVersion: v.Version, Mode: "model", ModelConsent: true})
 	if e != nil {

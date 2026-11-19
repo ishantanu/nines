@@ -1,12 +1,18 @@
 import { ReplayLabel } from "@/components/replay-label";
+import { NativeSelect } from "@/components/ui/select";
 import { useEffect, useState } from "react";
 import { api, message, percent, type RequestScope, type SLO } from "@/lib/api";
-import { duration, type SLOHistory } from "@/lib/history";
+import {
+  duration,
+  historyRetentionSeconds,
+  type SLOHistory,
+} from "@/lib/history";
 import { Label } from "@/components/ui/label";
 import { ChartTimeRange } from "./chart-time-range";
 import { Timeline, sliTimelineLines } from "./timeline";
 import { rangeQuery, utcInput, type ChartRange } from "@/lib/chart-range";
 export { sliTimelineLines, Timeline } from "./timeline";
+import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -21,15 +27,17 @@ export function SLOPerformance({
   at,
   scope,
   refreshKey,
+  onConfigure,
 }: {
   slo: SLO;
   at: string;
   scope: RequestScope;
   refreshKey: number;
+  onConfigure?: () => void;
 }) {
   const [range, setRange] = useState<ChartRange>({
     kind: "relative",
-    seconds: Math.min(21600, 2 * slo.windowSeconds),
+    seconds: Math.min(21600, Math.max(900, 2 * slo.windowSeconds)),
   });
   const [resolution, setResolution] = useState("0");
   const [policyName, setPolicyName] = useState(slo.policies?.[0]?.name ?? "");
@@ -45,7 +53,10 @@ export function SLOPerformance({
     try {
       // Resolve rolling ranges in one server read, avoiding a stale status
       // cutoff racing retention or the next completed collection interval.
-      query = rangeQuery(range, 2 * slo.windowSeconds);
+      query = rangeQuery(
+        range,
+        historyRetentionSeconds(slo.windowSeconds, slo.stepSeconds),
+      );
       if (policyName) query.set("policy", policyName);
       if (resolution !== "0") query.set("resolutionSeconds", resolution);
     } catch {
@@ -81,12 +92,16 @@ export function SLOPerformance({
     refreshKey,
   ]);
   const point = history?.points[index];
+  const hasPolicies = !!(slo.policies?.length || slo.policy);
   return (
     <div className="min-w-0 space-y-4" aria-busy={loading}>
       <div className="grid min-w-0 items-end gap-3 sm:flex sm:flex-wrap">
         <ChartTimeRange
           value={range}
-          maxSeconds={2 * slo.windowSeconds}
+          maxSeconds={historyRetentionSeconds(
+            slo.windowSeconds,
+            slo.stepSeconds,
+          )}
           stepSeconds={slo.stepSeconds}
           observedTo={history?.to ?? at}
           onChange={setRange}
@@ -96,7 +111,7 @@ export function SLOPerformance({
             <Label htmlFor="chart-policy">
               <ReplayLabel>Alert policy</ReplayLabel>
             </Label>
-            <select
+            <NativeSelect
               id="chart-policy"
               className="mt-1 block h-9 w-full max-w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               value={policyName}
@@ -107,14 +122,14 @@ export function SLOPerformance({
                   {p.name} ({p.severity})
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </div>
         ) : null}
         <div>
           <Label htmlFor="chart-resolution">
             <ReplayLabel>Resolution</ReplayLabel>
           </Label>
-          <select
+          <NativeSelect
             id="chart-resolution"
             className="mt-1 block h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             value={resolution}
@@ -133,7 +148,7 @@ export function SLOPerformance({
                   {duration(n)}
                 </option>
               ))}
-          </select>
+          </NativeSelect>
         </div>
         {loading ? (
           <span role="status" className="pb-2 text-sm text-muted-foreground">
@@ -167,6 +182,14 @@ export function SLOPerformance({
                 ["SLO window", duration(history.windowSeconds)],
                 ["Chart resolution", duration(history.resolutionSeconds)],
                 ["Definition revision", history.configRevision],
+                ...(slo.badInterval
+                  ? [
+                      [
+                        "Counting",
+                        `Judged intervals: bad above ${(slo.badInterval.errorRate * 100).toFixed(2)}% errors`,
+                      ],
+                    ]
+                  : []),
               ].map(([label, value]) => (
                 <div key={label} className="min-w-0">
                   <dt className="text-muted-foreground">{label}</dt>
@@ -175,7 +198,23 @@ export function SLOPerformance({
               ))}
             </dl>
           </details>
-          <div className="performance-grid performance-focused">
+          {!history.policy ? (
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm text-muted-foreground">
+              <p>
+                {hasPolicies
+                  ? "Burn-rate policy history is unavailable for this definition. Refresh to retry."
+                  : "Burn-rate alerts are not configured for this SLO. Add a policy in Configuration to compare short and long burn windows."}
+              </p>
+              {onConfigure ? (
+                <Button variant="outline" size="sm" onClick={onConfigure}>
+                  Open configuration
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          <div
+            className={`performance-grid performance-focused${history.policy ? "" : " performance-no-policy"}`}
+          >
             <Timeline
               title="SLI and SLO target"
               history={history}
@@ -231,18 +270,7 @@ export function SLOPerformance({
                 index={index}
                 onIndex={setIndex}
               />
-            ) : (
-              <Card className="chart-panel gap-0 py-0">
-                <CardHeader>
-                  <h3 className="section-label">
-                    <ReplayLabel>Burn rate</ReplayLabel>
-                  </h3>
-                </CardHeader>
-                <CardContent className="empty-state">
-                  No burn-rate alert policy configured.
-                </CardContent>
-              </Card>
-            )}
+            ) : null}
           </div>
           {point ? (
             <details className="disclosure-panel selected-interval">

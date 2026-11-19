@@ -88,7 +88,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: operator
-          image: nines-operator:dev
+          image: ghcr.io/ishantanu/nines-operator:v0.1.0-alpha.4
           imagePullPolicy: IfNotPresent
           args: [-config, /etc/nines/operator.yaml, -health-addr, ':8081']
           env:

@@ -685,7 +685,8 @@ export function RecordingRules({
                     ))
                   ) : (
                     <p className="empty-state">
-                      No burn-rate alert policy configured.
+                      This rule plan contains no burn-rate alerts. Add an alert
+                      policy to the SLO definition to generate them.
                     </p>
                   )}
                 </TabsContent>

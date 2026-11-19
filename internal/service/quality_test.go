@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -225,5 +226,36 @@ func TestBudgetRequiresCompleteCurrentSourceLineage(t *testing.T) {
 	saved, _ := s.Store.Read(ctx, c.ID)
 	if saved.Collection.SourceDigest != "route-b" || saved.Collection.State != "failed" {
 		t.Fatal("failed query relabeled retained samples", saved.Collection)
+	}
+}
+
+func TestCohortReportCarriesFailureConcentrationWithoutGuessing(t *testing.T) {
+	s, source := cohortFixture(t)
+	ctx := context.Background()
+	q, err := s.MeasurementQuality(ctx, "cohort", 1, true)
+	if err != nil || q.Cohorts.Concentration == nil || q.Cohorts.Concentration.State != "insufficient_failures" || q.Cohorts.Concentration.Verdict != "" {
+		t.Fatalf("one failure is too few to read a pattern: %+v %v", q.Cohorts.Concentration, err)
+	}
+	healthy, none := 970.0, 0.0
+	source.evidence.Counts = []v1.CohortCount{
+		{Labels: map[string]string{"region": "healthy"}, Good: &healthy, Total: 1000},
+		{Labels: map[string]string{"region": "affected"}, Good: &none, Total: 40},
+	}
+	q, err = s.MeasurementQuality(ctx, "cohort", 1, true)
+	c := q.Cohorts.Concentration
+	if err != nil || c == nil || c.State != "available" || c.Verdict != "concentrated" || c.Failures != 70 || c.Contributors[0].Labels["region"] != "affected" {
+		t.Fatalf("%+v %v", c, err)
+	}
+	reconcileNote := false
+	for _, l := range c.Limitations {
+		reconcileNote = reconcileNote || strings.Contains(l, "do not reconcile")
+	}
+	if q.Cohorts.MatchesAggregate || !reconcileNote {
+		t.Fatalf("an unreconciled result must say so: %+v", c.Limitations)
+	}
+	source.evidence.Counts[1].Good = nil
+	q, err = s.MeasurementQuality(ctx, "cohort", 1, true)
+	if err != nil || q.Cohorts.Concentration == nil || q.Cohorts.Concentration.State != "incomplete" || len(q.Cohorts.Concentration.Contributors) != 0 {
+		t.Fatalf("a missing numerator must leave concentration incomplete: %+v %v", q.Cohorts.Concentration, err)
 	}
 }

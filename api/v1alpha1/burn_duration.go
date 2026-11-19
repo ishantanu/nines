@@ -27,6 +27,7 @@ type burnPolicyWire struct {
 	ForSeconds         int64   `json:"forSeconds" yaml:"forSeconds"`
 	MinCoverage        float64 `json:"minCoverage" yaml:"minCoverage"`
 	MinEvents          float64 `json:"minEvents,omitempty" yaml:"minEvents,omitempty"`
+	Confidence         float64 `json:"confidence,omitempty" yaml:"confidence,omitempty"`
 }
 
 func burnWindow(text *string, seconds *int64, name string) (int64, error) {
@@ -57,7 +58,7 @@ func (p *BurnRatePolicy) fromWire(w burnPolicyWire) error {
 	if err != nil {
 		return err
 	}
-	*p = BurnRatePolicy{Name: w.Name, Severity: w.Severity, ShortWindowSeconds: short, LongWindowSeconds: long, BurnRate: w.BurnRate, ForSeconds: w.ForSeconds, MinCoverage: w.MinCoverage, MinEvents: w.MinEvents}
+	*p = BurnRatePolicy{Name: w.Name, Severity: w.Severity, ShortWindowSeconds: short, LongWindowSeconds: long, BurnRate: w.BurnRate, ForSeconds: w.ForSeconds, MinCoverage: w.MinCoverage, MinEvents: w.MinEvents, Confidence: w.Confidence}
 	return nil
 }
 func (p *BurnRatePolicy) UnmarshalJSON(data []byte) error {
@@ -85,7 +86,7 @@ func (p *BurnRatePolicy) UnmarshalYAML(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode {
 		return fmt.Errorf("burn policy must be an object")
 	}
-	allowed := map[string]bool{"name": true, "severity": true, "shortWindow": true, "longWindow": true, "shortWindowSeconds": true, "longWindowSeconds": true, "burnRate": true, "forSeconds": true, "minCoverage": true, "minEvents": true}
+	allowed := map[string]bool{"name": true, "severity": true, "shortWindow": true, "longWindow": true, "shortWindowSeconds": true, "longWindowSeconds": true, "burnRate": true, "forSeconds": true, "minCoverage": true, "minEvents": true, "confidence": true}
 	seen := map[string]bool{}
 	for i := 0; i < len(node.Content); i += 2 {
 		key := node.Content[i].Value
@@ -120,7 +121,7 @@ func formatBurnWindow(seconds int64) string {
 }
 func (p BurnRatePolicy) MarshalYAML() (any, error) {
 	short, long := formatBurnWindow(p.ShortWindowSeconds), formatBurnWindow(p.LongWindowSeconds)
-	return burnPolicyWire{Name: p.Name, Severity: p.Severity, ShortWindow: &short, LongWindow: &long, BurnRate: p.BurnRate, ForSeconds: p.ForSeconds, MinCoverage: p.MinCoverage, MinEvents: p.MinEvents}, nil
+	return burnPolicyWire{Name: p.Name, Severity: p.Severity, ShortWindow: &short, LongWindow: &long, BurnRate: p.BurnRate, ForSeconds: p.ForSeconds, MinCoverage: p.MinCoverage, MinEvents: p.MinEvents, Confidence: p.Confidence}, nil
 }
 
 // CanonicalDefinitionJSON uses the YAML representation of declarative resources

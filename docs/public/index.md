@@ -28,6 +28,7 @@ docker compose -p nines-playground -f compose.playground.yaml up --build -d
 - **Learn how to define an SLO**: [SLO guide](slo-guide.md)
 - **Choose a categorized SLO starting point**: [SLI menus and templates](slo-templates.md)
 - **Measure agents, LLM outputs and inference**: [AI workload SLOs](agent-slos.md)
+- **Choose what an SLO counts**: [SLO types](slo-types.md), including which providers support each
 - **Define what successful requests look like**: [SLOs and measurements](measurements.md)
 - **Set a latency objective and understand its ratios**: [Latency SLOs](latency-slos.md)
 - **Discover Kubernetes links and edit service maps**: [Service dependencies](service-dependencies.md)
@@ -35,9 +36,12 @@ docker compose -p nines-playground -f compose.playground.yaml up --build -d
 - **Integrate over HTTP**: [HTTP API](api.md)
 - **Use the CLI without a running server**: [CLI reference](../cli.md)
 - **Review an SLO proposal in a pull request**: [GitHub reviews](github-reviews.md)
+- **Deliver SLOs through a pull or merge request**: [Git delivery](git-delivery.md)
+- **Bring SLOs from Sloth or Pyrra**: [Migration](migration.md)
 - **Integrate CI and incident workflows**: [Headless workflows](headless-workflows.md) and [signed notifications](workflow-webhooks.md)
 - **Draft and review a change with an agent**: [SLO intents](intents.md)
 - **Connect Prometheus or Mimir and load generated rules**: [Metrics and rules](deployment/metrics-and-rules.md)
+- **Run a released image**: [Container images](deployment/container-images.md)
 - **Run Nines in Kubernetes**: [Server deployment](deployment/kubernetes.md) or [operator](deployment/operator.md)
 - **Configure Entra SSO, LDAP and tenant roles**: [Identity and tenants](deployment/identity-and-tenants.md)
 

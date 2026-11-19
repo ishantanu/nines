@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
@@ -28,6 +29,10 @@ type intentConversationPage struct {
 type intentConversationMessage struct {
 	ConversationID string                      `json:"conversationId"`
 	Input          v1.AppendIntentConversation `json:"input"`
+}
+type intentEvidenceAttachment struct {
+	ConversationID string                  `json:"conversationId"`
+	Input          v1.RecordIntentEvidence `json:"input"`
 }
 type intentConversationRun struct {
 	ConversationID string                 `json:"conversationId"`
@@ -64,6 +69,14 @@ func addIntentConversations(s *mcp.Server, a *apiClient, c Config) {
 	register(s, a, "intent_workflow_capabilities", "Read the intent skill contract, tool budgets and model availability. This neither starts a run nor grants binding confirmation or apply permission.", true, func(ctx context.Context, _ emptyInput) (any, error) {
 		return a.request(ctx, http.MethodGet, "/api/intent-conversations/capabilities", nil)
 	})
+	openActivation := true
+	mcp.AddTool(s, &mcp.Tool{Name: "inspect_intent_activation", Description: "Explicitly read the configured backend to inspect publication, current evaluation and collected SLI for exact applied revisions. Bounded provider reads; no model, publication, collection, definition writes or outcome persistence. Repeat for a fresh as-of receipt. Does not prove target attainment or notification delivery.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: true, OpenWorldHint: &openActivation}}, func(ctx context.Context, _ *mcp.CallToolRequest, in idInput) (*mcp.CallToolResult, output, error) {
+		if err := validID(in.ID); err != nil {
+			return nil, output{}, err
+		}
+		data, err := a.request(ctx, http.MethodGet, "/api/intent-conversations/"+in.ID+"/activation", nil)
+		return nil, output{Tenant: a.tenant, Data: data}, err
+	})
 	register(s, a, "verify_intent_changes", "Read back applied definitions, drift and the saved post-change runtime/SLI outcome, including any review or rollback recommendation. This read does not query providers, approve exceptions or change resources.", true, idRead(func(ctx context.Context, path string) (any, error) { return a.request(ctx, http.MethodGet, path, nil) }, "/api/intent-conversations/", "/change-set/verification"))
 	register(s, a, "export_intent_kubernetes", "Render an exact saved SLO/CUJ change-set digest as Kubernetes YAML in an explicit namespace for GitOps review. This is an offline artifact; it does not connect to Kubernetes or authorize deployment.", true, func(ctx context.Context, in intentKubernetesExport) (any, error) {
 		if e := validID(in.ConversationID); e != nil {
@@ -80,6 +93,18 @@ func addIntentConversations(s *mcp.Server, a *apiClient, c Config) {
 	if !c.AllowWrites {
 		return
 	}
+	openEvidence := true
+	mcp.AddTool(s, &mcp.Tool{Name: "record_intent_evidence", Description: "Read telemetry and save a server-generated evidence receipt for an exact ready, human-confirmed inline intent. Requires enabled writes and readTelemetry consent. Does not confirm, approve or apply changes.", Annotations: &mcp.ToolAnnotations{ReadOnlyHint: false, OpenWorldHint: &openEvidence}}, func(ctx context.Context, _ *mcp.CallToolRequest, in intentEvidenceAttachment) (*mcp.CallToolResult, output, error) {
+		if err := validID(in.ConversationID); err != nil {
+			return nil, output{}, err
+		}
+		requestClient := *a
+		h := *a.http
+		h.Timeout = 85 * time.Second
+		requestClient.http = &h
+		data, err := requestClient.request(ctx, http.MethodPost, "/api/intent-conversations/"+in.ConversationID+"/evidence", in.Input)
+		return nil, output{Tenant: a.tenant, Data: data}, err
+	})
 	register(s, a, "prepare_intent_changes", "Freeze a prepared intent proposal into a reviewable SLO/CUJ change set at an exact conversation version. Requires enabled writes. Cannot approve or apply changes.", false, func(ctx context.Context, in intentConversationCancel) (any, error) {
 		if e := validID(in.ConversationID); e != nil {
 			return nil, e
@@ -92,7 +117,7 @@ func addIntentConversations(s *mcp.Server, a *apiClient, c Config) {
 		}
 		return a.request(ctx, http.MethodPost, "/api/intent-conversations", in)
 	})
-	register(s, a, "append_intent_answer", "Save a user clarification or typed goal with exact conversation version. Invalidates previous selection/proposal; cannot alter scope or apply resources.", false, func(ctx context.Context, in intentConversationMessage) (any, error) {
+	register(s, a, "append_intent_answer", "Save a user clarification or typed goal with exact conversation version. preserveGoal retains a saved typed goal while adding context; omit replacement goal when using it. Invalidates previous selection/proposal; cannot alter scope or apply resources.", false, func(ctx context.Context, in intentConversationMessage) (any, error) {
 		if err := validID(in.ConversationID); err != nil {
 			return nil, err
 		}

@@ -1,3 +1,5 @@
+import { IntentUsagePanel } from "./intent-usage";
+import { TextShimmer } from "./ui/notchset/text-shimmer";
 import { MeasurementLabels } from "./measurement-labels";
 import { SystemOneAdvice, SystemOneConsent } from "./system-one-assessment";
 import { IntentOutcomePanel } from "./intent-outcome";
@@ -423,7 +425,11 @@ export function IntentWorkspace({
       <TabsList>
         <TabsTrigger value="conversations">Conversations</TabsTrigger>
         <TabsTrigger value="form">Definition form</TabsTrigger>
+        <TabsTrigger value="progress">Workflow progress</TabsTrigger>
       </TabsList>
+      <TabsContent value="progress">
+        <IntentUsagePanel scope={scope} />
+      </TabsContent>
       <TabsContent value="form">
         <IntentAuthoring
           scope={scope}
@@ -609,8 +615,9 @@ export function IntentWorkspace({
                   ))}
                   {running ? (
                     <p role="status" className="text-sm text-muted-foreground">
-                      Preparing evidence · {run?.steps.length ?? 0} completed
-                      tools · {run?.modelCalls ?? 0} model calls
+                      <TextShimmer>Preparing evidence</TextShimmer> ·{" "}
+                      {run?.steps.length ?? 0} completed tools ·{" "}
+                      {run?.modelCalls ?? 0} model calls
                       {run?.progress ? (
                         <IntentProgress progress={run.progress} />
                       ) : null}
@@ -621,9 +628,7 @@ export function IntentWorkspace({
                   className="shrink-0 space-y-2 overflow-y-auto border-t p-3 lg:max-h-[65%]"
                   data-replay-block
                 >
-                  <Label htmlFor="intent-reply">
-                    Clarification or revised goal
-                  </Label>
+                  <Label htmlFor="intent-reply">Clarification</Label>
                   <Textarea
                     id="intent-reply"
                     className="h-12 min-h-12 resize-none"
@@ -633,6 +638,11 @@ export function IntentWorkspace({
                     disabled={!writable || busy || running}
                     onChange={(e) => setReply(e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Replies add context while keeping typed values. Use the
+                    definition editor to change the target, window or
+                    measurement. Previous confirmation must be repeated.
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       variant="outline"
@@ -650,6 +660,7 @@ export function IntentWorkspace({
                             id: crypto.randomUUID(),
                             expectedVersion: value.version,
                             text: reply,
+                            preserveGoal: Boolean(value.goal),
                           });
                           setReply("");
                         })

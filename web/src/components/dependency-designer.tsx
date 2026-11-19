@@ -1,4 +1,5 @@
 import { useId, useRef, useState } from "react";
+import { NativeSelect } from "@/components/ui/select";
 import { GripVertical, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -482,7 +483,7 @@ export function DependencyDesigner({
       >
         <div className="space-y-2">
           <Label htmlFor={`${id}-caller`}>Caller</Label>
-          <select
+          <NativeSelect
             id={`${id}-caller`}
             value={caller}
             disabled={disabled}
@@ -495,11 +496,11 @@ export function DependencyDesigner({
                 {n.displayName} ({n.name})
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </div>
         <div className="space-y-2">
           <Label htmlFor={`${id}-callee`}>Depends on</Label>
-          <select
+          <NativeSelect
             id={`${id}-callee`}
             value={callee}
             disabled={disabled}
@@ -514,7 +515,7 @@ export function DependencyDesigner({
                   {n.displayName} ({n.name})
                 </option>
               ))}
-          </select>
+          </NativeSelect>
         </div>
         <Button
           type="submit"

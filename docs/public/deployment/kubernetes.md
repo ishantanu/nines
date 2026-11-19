@@ -6,18 +6,17 @@ The manifests run the normal Nines server with one replica and an external Postg
 - The supplied server manifests have passed a disposable kind cluster rollout, account/RBAC checks and server-restart persistence.
 - This does not establish production storage, ingress, HA or operator conformance across every Kubernetes/provider version.
 
-## Build and provide an image
+## Choose an image
 
-Build the source with the repository Dockerfile and push it to a registry you control:
+Use the published image for the release, pinned by the digest listed in the release notes:
 
 ```sh
-# Replace the registry, repository and immutable tag or digest for your environment.
-export NINES_IMAGE=registry.example.com/reliability/nines:reviewed-build
-docker build -t "$NINES_IMAGE" .
-docker push "$NINES_IMAGE"
+export NINES_IMAGE=ghcr.io/ishantanu/nines:v0.1.0-alpha.4@sha256:DIGEST_FROM_THE_RELEASE_NOTES
 ```
 
-- No public Nines image or Helm chart is assumed. Use a cluster-compatible image architecture. For kind or another local cluster, load the image using that cluster's documented image-loading workflow. Keep dependency notices in the image.
+- The image supports `linux/amd64` and `linux/arm64`, is signed and carries build provenance. See [container images](container-images.md) to verify it.
+- `deploy/kubernetes/deployment.yaml` references the release tag. The `kubectl set image` step below replaces it with your pinned reference.
+- To build your own instead, see [build your own](container-images.md#build-your-own) and push it to a registry your cluster can reach. No Helm chart is provided.
 
 ## Database and credentials
 

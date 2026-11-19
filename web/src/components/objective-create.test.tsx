@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
+import { typeInto } from "@/test-support/fields";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { parse, stringify } from "yaml";
 import { ObjectiveCreate } from "./objective-create";
 import { createTenantSession, type SLO } from "@/lib/api";
+import { activeTab, tabLabel, tabs } from "@/test-support/tabs";
 import { definitionFromSLO } from "@/lib/definitions";
 let root: Root, host: HTMLDivElement;
 const saved = vi.fn();
@@ -102,12 +104,8 @@ async function click(text: string) {
   await act(async () => button(text).click());
 }
 async function tab(name: string) {
-  const b = [
-    ...document.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
-  ].find((b) => b.textContent === name)!;
-  await act(async () =>
-    b.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 })),
-  );
+  const b = tabs().find((b) => tabLabel(b) === name)!;
+  await act(async () => b.click());
 }
 function input(label: string) {
   const l = [...document.querySelectorAll("label")].find(
@@ -118,14 +116,7 @@ function input(label: string) {
 }
 async function field(label: string, value: string) {
   const e = input(label);
-  await act(async () => {
-    const p =
-      e.tagName === "TEXTAREA"
-        ? HTMLTextAreaElement.prototype
-        : HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(p, "value")!.set!.call(e, value);
-    e.dispatchEvent(new Event("input", { bubbles: true }));
-  });
+  await typeInto(e, value);
 }
 async function render(resource: SLO | null = slo) {
   await act(async () =>
@@ -195,9 +186,7 @@ test("invalid YAML stays in YAML and custom queries cannot silently be replaced 
   await tab("YAML");
   await field("ServiceLevelObjective manifest (YAML)", "null");
   await tab("Measurement");
-  expect(
-    document.querySelector('[role="tab"][data-state="active"]')?.textContent,
-  ).toBe("YAML");
+  expect(tabLabel(activeTab())).toBe("YAML");
   expect(document.querySelector('[role="alert"]')).not.toBeNull();
   const d = definitionFromSLO(slo);
   delete d.spec.measurement;
@@ -205,22 +194,22 @@ test("invalid YAML stays in YAML and custom queries cannot silently be replaced 
   d.spec.totalQuery = "vector(100)";
   await field("ServiceLevelObjective manifest (YAML)", stringify(d));
   await tab("Measurement");
-  expect(
-    document.querySelector('[role="tab"][data-state="active"]')?.textContent,
-  ).toBe("YAML");
+  expect(tabLabel(activeTab())).toBe("YAML");
   await tab("Settings");
   expect(input("Good interval-count query").value).toBe("vector(99)");
   expect(
-    [...document.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find(
-      (b) => b.textContent === "Measurement",
-    )!.disabled,
+    tabs()
+      .find((b) => tabLabel(b) === "Measurement")!
+      .getAttribute("aria-disabled") === "true",
   ).toBe(true);
 });
 test("the guided save applies the exact confirmed plan with its revision precondition", async () => {
   await render();
   await field("Metric name", "reviewed_requests_total");
   await click("Verify telemetry and review SLO");
-  expect(button("Save reviewed SLO").disabled).toBe(true);
+  expect(button("Save reviewed SLO").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
   const label = [...document.querySelectorAll("label")].find((l) =>
     l.textContent?.includes("I reviewed the measurement, target"),
   )!;
@@ -240,12 +229,16 @@ test("changing tabs or the definition invalidates previous review and confirmati
   await render();
   await click("Verify telemetry and review SLO");
   await field("Display name", "New name");
-  expect(button("Save reviewed SLO").disabled).toBe(true);
+  expect(button("Save reviewed SLO").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
   await click("Verify telemetry and review SLO");
   await tab("YAML");
-  expect(button("Apply definition").disabled).toBe(true);
+  expect(button("Apply definition").getAttribute("aria-disabled")).toBe("true");
   await tab("Measurement");
-  expect(button("Save reviewed SLO").disabled).toBe(true);
+  expect(button("Save reviewed SLO").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
 });
 test("an incomplete new definition survives a YAML visit without acquiring example metrics", async () => {
   await render(null);
@@ -253,7 +246,8 @@ test("an incomplete new definition survives a YAML visit without acquiring examp
   await tab("YAML");
   const d = parse(input("ServiceLevelObjective manifest (YAML)").value);
   expect(d.spec.displayName).toBe("New checkout objective");
-  expect(d.metadata.name).toBe("");
+  // The identifier follows the display name until it is edited.
+  expect(d.metadata.name).toBe("new-checkout-objective");
   expect(d.spec.measurement.metric).toBe("");
   await tab("Measurement");
   expect(input("Display name").value).toBe("New checkout objective");
@@ -273,5 +267,71 @@ test("YAML cannot rename an existing SLO into a different resource through the e
     ),
   ).toBe(true);
   expect(calls.some((c) => c.init?.method === "POST")).toBe(false);
-  expect(button("Apply definition").disabled).toBe(true);
+  expect(button("Apply definition").getAttribute("aria-disabled")).toBe("true");
+});
+
+test("the common path asks only for name, service, metric and filters, with the rest tucked away", async () => {
+  await render(null);
+  const dialog = document.querySelector('[role="dialog"]')!;
+  const advanced = [...dialog.querySelectorAll("details")].find((d) =>
+    d.textContent?.includes("Advanced: identifier, project and intervals"),
+  )!;
+  expect(advanced.open).toBe(false);
+  const optional = [...dialog.querySelectorAll("details")].find((d) =>
+    d.textContent?.includes("Optional settings"),
+  )!;
+  expect(optional.open).toBe(false);
+  // The identifier is derived, and editing the display name keeps it in step.
+  await field("Display name", "Checkout availability");
+  await tab("YAML");
+  expect(
+    parse(input("ServiceLevelObjective manifest (YAML)").value).metadata.name,
+  ).toBe("checkout-availability");
+  await tab("Measurement");
+  // One compact choice, not tiles, named like the badges and docs.
+  // Per-customer reports and journey objectives are not offered here as
+  // alternatives to the measurement.
+  const text = dialog.textContent ?? "";
+  expect(text).toContain("SLO type");
+  expect(text).not.toContain("Other kinds of SLO");
+  expect(text).not.toContain("Journey run objective");
+  expect(dialog.querySelectorAll("[data-slo-kind]").length).toBe(0);
+  const open = async () =>
+    act(async () =>
+      (document.querySelector("#slo-measure") as HTMLElement).click(),
+    );
+  const options = () =>
+    [...document.querySelectorAll('[role="option"]')].map((o) =>
+      o.textContent?.trim(),
+    );
+  await open();
+  expect(options()).toEqual(
+    expect.arrayContaining([
+      "Availability",
+      "Latency",
+      "Sessions",
+      "Good-minute",
+    ]),
+  );
+  await act(async () => {
+    [...document.querySelectorAll('[role="option"]')]
+      .find((o) => o.textContent?.trim() === "Sessions")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  await tab("YAML");
+  expect(
+    parse(input("ServiceLevelObjective manifest (YAML)").value).spec.measurement
+      .type,
+  ).toBe("sessions");
+  await tab("Measurement");
+  await open();
+  await act(async () => {
+    [...document.querySelectorAll('[role="option"]')]
+      .find((o) => o.textContent?.includes("Good-minute"))!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  });
+  // Good minutes are judged from interval-count queries, so it opens Settings.
+  expect(document.querySelector('[role="dialog"]')!.textContent).toContain(
+    "Judge intervals instead of events",
+  );
 });

@@ -9,6 +9,7 @@ import {
   sloFromMeasurementDraft,
   type MeasurementDraft,
 } from "./measurement";
+import { validateExtras } from "./slo-extras";
 import { duration, durationSeconds } from "./history";
 
 export interface InlineObjectiveDraft {
@@ -20,6 +21,8 @@ export interface InlineObjectiveDraft {
   quality?: SLO["quality"];
   errorBudgetPolicy?: SLO["errorBudgetPolicy"];
   policies: BurnRatePolicy[];
+  labels?: SLO["labels"];
+  customers?: SLO["customers"];
 }
 export function newObjectiveDefinition(): SLODefinition {
   return {
@@ -77,6 +80,8 @@ export function inlineObjectiveDraft(
     lifecycle: s.lifecycle ?? "committed",
     quality: s.quality,
     errorBudgetPolicy: s.errorBudgetPolicy,
+    labels: s.labels,
+    customers: s.customers,
     policies:
       s.policies ??
       (s.policy
@@ -125,6 +130,9 @@ export function inlineObjectiveDefinition(
           successLabels: s.successLabels,
           countFrom: s.countFrom,
           thresholdSeconds: s.thresholdSeconds,
+          ...(s.measurement === "sessions"
+            ? { eventMetric: s.eventMetric }
+            : {}),
           scrapeIntervalSeconds: Number(d.measurement.scrape),
           observationPoint: s.observationPoint,
         },
@@ -136,6 +144,7 @@ export function inlineObjectiveDefinition(
     ...d.base.spec.measurement,
     ...generated.spec.measurement,
   } as SLO["measurement"];
+  if (validate) validateExtras({ labels: d.labels, customers: d.customers });
   generated.spec.target = Number((Number(d.target) / 100).toPrecision(12));
   if (!d.base.spec.source && generated.spec.source === "primary")
     generated.spec.source = d.base.spec.source;
@@ -155,6 +164,8 @@ export function inlineObjectiveDefinition(
     policies: d.policies.length ? d.policies : undefined,
     quality: d.quality,
     errorBudgetPolicy: d.errorBudgetPolicy,
+    labels: d.labels,
+    customers: d.customers,
     lifecycle:
       d.lifecycle === "committed" && !d.base.spec.lifecycle
         ? undefined
@@ -202,6 +213,30 @@ const optional = (v: unknown, check: (v: unknown) => boolean) =>
   v === undefined || check(v);
 const strings = (v: unknown) =>
   record(v) && Object.values(v).every((x) => typeof x === "string");
+const labelsOk = (v: unknown) =>
+  record(v) &&
+  Object.keys(v).length <= 8 &&
+  Object.values(v).every((x) => typeof x === "string");
+const badIntervalOk = (v: unknown) =>
+  record(v) &&
+  typeof v.errorRate === "number" &&
+  finite(v.errorRate) &&
+  v.errorRate > 0 &&
+  v.errorRate < 1 &&
+  optional(v.minEvents, finite);
+const customersOk = (v: unknown) =>
+  record(v) &&
+  typeof v.label === "string" &&
+  Array.isArray(v.customers) &&
+  v.customers.length >= 1 &&
+  v.customers.length <= 20 &&
+  v.customers.every(
+    (c: unknown) =>
+      record(c) &&
+      typeof c.value === "string" &&
+      optional(c.name, (x) => typeof x === "string") &&
+      optional(c.target, finite),
+  );
 const policy = (v: unknown) =>
   record(v) &&
   [
@@ -212,6 +247,7 @@ const policy = (v: unknown) =>
     "minCoverage",
   ].every((k) => finite(v[k])) &&
   optional(v.minEvents, finite) &&
+  optional(v.confidence, finite) &&
   optional(v.name, (x) => typeof x === "string") &&
   optional(v.severity, (x) =>
     ["critical", "warning", "info"].includes(String(x)),
@@ -236,6 +272,9 @@ export function parseObjectiveDefinition(text: string): SLODefinition {
     ) ||
     ![s.target, s.windowSeconds, s.stepSeconds].every(finite) ||
     !optional(s.source, (x) => typeof x === "string") ||
+    !optional(s.labels, labelsOk) ||
+    !optional(s.badInterval, badIntervalOk) ||
+    !optional(s.customers, customersOk) ||
     !optional(s.goodQuery, (x) => typeof x === "string") ||
     !optional(s.totalQuery, (x) => typeof x === "string") ||
     !optional(s.lifecycle, (x) =>
@@ -252,8 +291,9 @@ export function parseObjectiveDefinition(text: string): SLODefinition {
   if (
     m !== undefined &&
     (!record(m) ||
-      !["availability", "latency"].includes(String(m.type)) ||
+      !["availability", "latency", "sessions"].includes(String(m.type)) ||
       typeof m.metric !== "string" ||
+      !optional(m.eventMetric, (x) => typeof x === "string") ||
       !strings(m.labels) ||
       !optional(m.successLabels, strings) ||
       !finite(m.scrapeIntervalSeconds) ||
@@ -272,6 +312,7 @@ export function parseObjectiveDefinition(text: string): SLODefinition {
       (x) =>
         record(x) &&
         typeof x.goodSelector === "string" &&
+        optional(x.badSelector, (y) => typeof y === "string") &&
         typeof x.totalSelector === "string" &&
         finite(x.scrapeIntervalSeconds),
     ) ||
@@ -303,6 +344,18 @@ export function parseObjectiveDefinition(text: string): SLODefinition {
         finite(x.reviewBelow) &&
         optional(x.onExhausted, (y) =>
           ["blocked", "review_required"].includes(String(y)),
+        ) &&
+        optional(
+          x.bands,
+          (y) =>
+            Array.isArray(y) &&
+            y.every(
+              (b) =>
+                record(b) &&
+                typeof b.name === "string" &&
+                finite(b.below) &&
+                typeof b.response === "string",
+            ),
         ),
     ) ||
     !optional(s.intent, record)

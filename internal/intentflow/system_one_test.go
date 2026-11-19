@@ -160,10 +160,14 @@ func TestSystemOneAdviceReachesModelWithoutChangingTools(t *testing.T) {
 		if !strings.Contains(req.System, "Optional System One semantic advice") || !strings.Contains(req.System, "not authorization") {
 			t.Error("missing advisory context")
 		}
-		if len(req.Tools) != 4 {
-			t.Error("System One changed permitted tools", req.Tools)
+		names := []string{}
+		for _, tool := range req.Tools {
+			names = append(names, tool.Name)
 		}
-		return response("ask_user", map[string]string{"question": "Please confirm where you measure completions."}), nil
+		if strings.Join(names, ",") != "list_slo_templates,find_measurements,discover_measurement_candidates,ask_user" {
+			t.Error("System One changed pre-discovery tools", names)
+		}
+		return response("ask_user", map[string]any{"question": "Please confirm where you measure completions.", "fields": []string{"semantics"}}), nil
 	}}
 	v, _ := s.Create(ctx, input())
 	v, err := s.Start(ctx, v.ID, v1.CreateIntentFlowRun{ID: "model", ExpectedVersion: v.Version, Mode: "model", ModelConsent: true, SystemOneConsent: true})

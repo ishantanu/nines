@@ -176,6 +176,10 @@ func (s *Service) Handler() http.Handler {
 		authJSON(w, 200, map[string]any{"enabled": true, "providers": s.Providers()})
 	})
 	mux.HandleFunc("GET /auth/session", s.SessionInfo)
+	mux.HandleFunc("GET /auth/cli/capabilities", s.cliCapabilities)
+	mux.HandleFunc("POST /auth/cli/device/start", s.cliDeviceStart)
+	mux.HandleFunc("POST /auth/cli/device/token", s.cliDevicePoll)
+	mux.HandleFunc("POST /auth/cli/device/cancel", s.cliDevicePoll)
 	mux.HandleFunc("POST /auth/cli/start", s.cliStart)
 	mux.HandleFunc("GET /auth/cli/authorize", s.cliAuthorize)
 	mux.HandleFunc("POST /auth/cli/ldap", s.cliLDAP)
@@ -203,6 +207,10 @@ func (s *Service) Handler() http.Handler {
 }
 func DisabledHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/cli/capabilities" && r.Method == http.MethodGet {
+			authJSON(w, 200, map[string]any{"apiVersion": "nines.dev/v1alpha1", "kind": "CLIAuthenticationCapabilities", "browser": false, "device": false, "refresh": false, "apiKey": true, "sessionMaxSeconds": 0})
+			return
+		}
 		if (r.URL.Path == "/auth/session" || r.URL.Path == "/auth/providers") && r.Method == http.MethodGet {
 			authJSON(w, 200, map[string]any{"enabled": false, "authenticated": false, "providers": []ProviderView{}})
 			return

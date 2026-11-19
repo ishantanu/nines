@@ -72,7 +72,7 @@ test("native review shows dataset and warnings, applies its digest and requires 
     expect(JSON.parse(mocks.api.mock.calls.at(-1)?.[2].body)).toEqual({
       expectedDigest: "reviewed-native-digest",
     });
-    expect(publish?.disabled).toBe(true);
+    expect(publish?.getAttribute("aria-disabled")).toBe("true");
     expect(host.textContent).toContain("Native SLO stored");
     expect(host.textContent).toContain("Evaluation unverified.");
     expect(host.textContent).toContain(
@@ -135,7 +135,7 @@ test("Google native review names its project and immutable resource without offe
     const verify = Array.from(host.querySelectorAll("button")).find(
       (button) => button.textContent === "Verify provider removal",
     );
-    expect(verify?.disabled).toBe(true);
+    expect(verify?.getAttribute("aria-disabled")).toBe("true");
   } finally {
     scope.close();
     await act(async () => root.unmount());
@@ -198,7 +198,7 @@ test("Datadog native review publishes a digest and exposes the verified provider
     expect(JSON.parse(mocks.api.mock.calls.at(-1)?.[2].body)).toEqual({
       expectedDigest: "dd-reviewed",
     });
-    expect(publish.disabled).toBe(true);
+    expect(publish.getAttribute("aria-disabled")).toBe("true");
     const link = host.querySelector<HTMLAnchorElement>(
       'a[href*="app.uk1.datadoghq.com"]',
     );
@@ -285,7 +285,7 @@ test("New Relic review shows entity routing and exposes generated SLI metric que
     expect(JSON.parse(mocks.api.mock.calls.at(-1)?.[2].body)).toEqual({
       expectedDigest: "nr-reviewed",
     });
-    expect(publish.disabled).toBe(true);
+    expect(publish.getAttribute("aria-disabled")).toBe("true");
     expect(host.querySelector('a[href*="one.eu.newrelic.com"]')).not.toBeNull();
     expect(host.textContent).toContain("Inspect native SLI metrics");
     expect(host.textContent).toContain(

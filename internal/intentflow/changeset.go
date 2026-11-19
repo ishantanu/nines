@@ -82,6 +82,11 @@ func (s *Service) PrepareChangeSet(ctx context.Context, id string, version int64
 		if r.Session.State != "ready" || r.Session.Goal == nil || r.Session.Selection == nil || p == nil || p.Status != "ready" || p.Compiled == nil || p.SourceDigest != s.Platform.SourceFingerprint(r.Session.Scope.Source) || p.IntentDigest != hash(*r.Session.Goal) || r.Session.Selection.IntentDigest != p.IntentDigest {
 			return model.Invalid("prepare and review an intent proposal with an explicitly confirmed measurement first")
 		}
+		if r.Session.PreparationEvidence != nil {
+			if err := s.preparationEvidenceCurrent(ctx, r.Session); err != nil {
+				return err
+			}
+		}
 		c := v1.IntentChangeSet{ID: model.NewID(), SourceDigest: p.SourceDigest, State: "proposed", CreatedAt: now, CreatedBy: a, IntentDigest: p.IntentDigest, Binding: r.Session.Selection.Binding, Changes: []v1.IntentDefinitionChange{}}
 		def := model.SLODefinition(p.Compiled.Manifest)
 		before, err := s.Platform.PlanDefinition(ctx, model.Definition{SLO: &def})

@@ -71,12 +71,12 @@ Protected-resource metadata is served at both:
 
 The metadata advertises the configured issuer and minimal read scope. Clients discover the external issuer's RFC 8414/OIDC metadata and obtain resource-bound tokens there.
 
-| OAuth scope | Additional operator opt-in | Effect |
-| --- | --- | --- |
-| `nines:read` | None | Read-only tool surface, including native provider results, discovery/import drafts and integration evidence |
-| `nines:write` | `allowWrites: true` | Existing direct writes and proposal/preparation tools; server RBAC and revision checks still apply |
-| `nines:deploy` | Both write and deployment flags | Reviewed rule/native publication tools; Nines owner permission and exact digest required |
-| `nines:withdraw` | All three flags | Reviewed withdrawal, preserving provider-specific safeguards |
+| OAuth scope      | Additional operator opt-in      | Effect                                                                                                      |
+| ---------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `nines:read`     | None                            | Read-only tool surface, including native provider results, discovery/import drafts and integration evidence |
+| `nines:write`    | `allowWrites: true`             | Existing direct writes and proposal/preparation tools; server RBAC and revision checks still apply          |
+| `nines:deploy`   | Both write and deployment flags | Reviewed rule/native publication tools; Nines owner permission and exact digest required                    |
+| `nines:withdraw` | All three flags                 | Reviewed withdrawal, preserving provider-specific safeguards                                                |
 
 Additional scopes must be explicitly requested at your authorization server/client; they are not granted by a tool call or advertised as the default. Human approval/rollback review gates remain in the human CLI/API. Enabling writes does not expose agent approval tools.
 
@@ -102,13 +102,13 @@ Additional scopes must be explicitly requested at your authorization server/clie
 
 ## Client conformance and reproducible checks
 
-| Client/profile | Evidence |
-| --- | --- |
+| Client/profile                         | Evidence                                                                                                                                                                           |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Official Go SDK v1.8.0, MCP 2026-07-28 | Credential-free OAuth discovery, authorization-code S256 PKCE/resource binding, token exchange, tools/list/call, distinct identities, revocation, reconnect and interruption tests |
-| Legacy MCP 2025-11-25 HTTP profile | Raw protocol initialization, stateless tool calls, metadata, chunked body bounds and interrupted upstream cancellation tests |
-| Existing stdio SDK client | Preserved executable stdio initialize/list/call regression |
-| Hosted managed-agent products | Not exercised in this pass; validate the client's OAuth registration and HTTP profile before enabling |
-| Other issuers/opaque tokens/JWTs | Accepted only through the documented introspection fields/profile; no universal JWT or IdP compatibility claim |
+| Legacy MCP 2025-11-25 HTTP profile     | Raw protocol initialization, stateless tool calls, metadata, chunked body bounds and interrupted upstream cancellation tests                                                       |
+| Existing stdio SDK client              | Preserved executable stdio initialize/list/call regression                                                                                                                         |
+| Hosted managed-agent products          | Not exercised in this pass; validate the client's OAuth registration and HTTP profile before enabling                                                                              |
+| Other issuers/opaque tokens/JWTs       | Accepted only through the documented introspection fields/profile; no universal JWT or IdP compatibility claim                                                                     |
 
 Run without any paid-platform credentials:
 

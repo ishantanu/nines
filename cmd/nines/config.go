@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -28,10 +30,14 @@ type savedConfig struct {
 	Contexts   map[string]savedContext `json:"contexts" yaml:"contexts"`
 }
 type credential struct {
-	Server  string    `json:"server"`
-	Tenant  string    `json:"tenant"`
-	Token   string    `json:"token"`
-	Expires time.Time `json:"expiresAt"`
+	Server     string    `json:"server"`
+	Tenant     string    `json:"tenant"`
+	Token      string    `json:"token,omitempty"`
+	Identity   string    `json:"identity,omitempty"`
+	Storage    string    `json:"storage,omitempty"`
+	KeychainID string    `json:"keychainID,omitempty"`
+	Method     string    `json:"method,omitempty"`
+	Expires    time.Time `json:"expiresAt"`
 }
 
 func (o *options) configPath() (string, error) {
@@ -48,12 +54,25 @@ func (o *options) configPath() (string, error) {
 	}
 	return filepath.Join(d, "nines", "config.yaml"), nil
 }
+
+// tooOpen reports Unix group or other permission bits on a CLI configuration
+// file or directory. Windows has no such bits: Go reports every file as 0666
+// and every directory as 0777, and access is governed by ACLs instead. The
+// default location under %AppData% is private to the user, so the check is
+// skipped there rather than refusing every configuration.
+func tooOpen(m fs.FileMode) bool {
+	return goos != "windows" && m.Perm()&0077 != 0
+}
+
+// goos is runtime.GOOS, replaceable in tests.
+var goos = runtime.GOOS
+
 func privateRead(path string, limit int64) ([]byte, error) {
 	st, e := os.Lstat(path)
 	if e != nil {
 		return nil, e
 	}
-	if !st.Mode().IsRegular() || st.Mode().Perm()&0077 != 0 {
+	if !st.Mode().IsRegular() || tooOpen(st.Mode()) {
 		return nil, usage("CLI configuration and credentials must be regular files with mode 0600")
 	}
 	f, e := os.Open(path)
@@ -111,7 +130,7 @@ func withConfigLock(path string, fn func() error) (resultErr error) {
 	if e != nil {
 		return e
 	}
-	if !st.IsDir() || st.Mode().Perm()&0077 != 0 {
+	if !st.IsDir() || tooOpen(st.Mode()) {
 		return usage("CLI configuration directory must be private with mode 0700")
 	}
 	f, e := os.OpenFile(path+".lock", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
@@ -127,7 +146,7 @@ func withConfigLock(path string, fn func() error) (resultErr error) {
 	return fn()
 }
 func privateWrite(path string, b []byte) error {
-	if st, e := os.Lstat(path); e == nil && (!st.Mode().IsRegular() || st.Mode().Perm()&0077 != 0) {
+	if st, e := os.Lstat(path); e == nil && (!st.Mode().IsRegular() || tooOpen(st.Mode())) {
 		return usage("refusing unsafe CLI configuration path")
 	}
 	f, e := os.CreateTemp(filepath.Dir(path), ".nines-*")
@@ -231,7 +250,7 @@ func (o *options) resolve(cmd *cobra.Command) error {
 	if _, e = client.New(client.Config{URL: o.Server, Tenant: o.Tenant, Token: o.Token}); e != nil {
 		return usage(e.Error())
 	}
-	if o.Token == "" && o.Context != "" {
+	if o.Token == "" && o.Context != "" && cmd.Name() != "diagnose" && cmd.Name() != "login" {
 		m, e := credentialsLoad(p)
 		if e != nil {
 			return e
@@ -241,8 +260,18 @@ func (o *options) resolve(cmd *cobra.Command) error {
 			if !v.Expires.After(time.Now()) && cmd.Name() != "login" && cmd.Name() != "logout" {
 				return &cliError{"unauthenticated", "CLI session expired; run nines login or set NINES_API_KEY", 3}
 			}
-			o.Token = v.Token
+			if cmd.Name() != "logout" {
+				o.Token, e = storedToken(p, v, o.Agent)
+				if e != nil {
+					return e
+				}
+			}
 			o.credentialSource = "browser-session"
+			if v.Storage == "keychain" {
+				o.credentialSource = "keychain-session"
+			} else if v.Method == "device" {
+				o.credentialSource = "device-session"
+			}
 		}
 	}
 	return nil

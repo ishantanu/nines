@@ -44,6 +44,30 @@ spec:
   - API, Go client, CLI and the read-only `slo_budget_decision` MCP tool return the same decision with definition, source and policy digests.
   - The policy does not silence burn alerts or reclassify a measured violation.
 
+## Agree responses for each budget level
+
+`bands` state the response the owner has agreed as the remaining budget falls. Each band has a `name`, a `below` fraction and a `response` of up to 300 characters, and a policy holds at most five.
+
+```yaml
+errorBudgetPolicy:
+  owner: payments-oncall
+  runbookURL: https://example.com/runbooks/api
+  reviewBelow: 0.25
+  bands:
+    - name: watch
+      below: 0.5
+      response: Prioritize reliability bugs over feature work.
+    - name: protect
+      below: 0.25
+      response: Pause risky launches until the owner reviews.
+```
+
+- The decision carries the most severe band that applies, meaning the lowest `below` at or above the remaining budget. An exhausted or overspent budget matches the lowest band. The portal shows it as a response level.
+- Bands describe the agreed response. They never change the decision state, which still comes from `reviewBelow` and `onExhausted`, and they grant or block nothing.
+- No band is shown when evidence is insufficient, the objective is not committed, or a historical view is read, because no decision is made then.
+- Rolling back a definition cannot restore budget that has been spent. A band reflects the budget actually consumed in the current window.
+- Windows are rolling. A calendar-aligned refresh is not supported.
+
 ## Enforce in CI
 
 ```sh

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { parse, stringify } from "yaml";
 import { ManifestEditor } from "./manifest-editor";
 import { createTenantSession, type Manifest, type Revision } from "@/lib/api";
+import { activeTab, tabLabel, tabs } from "@/test-support/tabs";
 import { newJourney } from "@/lib/journeys";
 let host: HTMLDivElement, root: Root;
 const saved = vi.fn(),
@@ -105,12 +106,8 @@ async function render(
   );
 }
 async function tab(name: string) {
-  const b = [
-    ...document.querySelectorAll<HTMLButtonElement>('[role="tab"]'),
-  ].find((b) => b.textContent === name)!;
-  await act(async () =>
-    b.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 })),
-  );
+  const b = tabs().find((b) => tabLabel(b) === name)!;
+  await act(async () => b.click());
 }
 async function field(label: string, value: string) {
   const l = [...document.querySelectorAll("label")].find(
@@ -136,7 +133,9 @@ test("opens the guided definition and saves exactly the reviewed manifest with a
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
     "API availability",
   );
-  expect(button("Save reviewed journey").disabled).toBe(true);
+  expect(button("Save reviewed journey").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
   await field("Display name", "Purchase confirmed");
   await click("Validate and plan");
   const planned = parse(
@@ -154,15 +153,21 @@ test("changing a form field invalidates review and server validation/conflicts n
   await click("Edit definition");
   await click("Validate and plan");
   await field("Owner", "team-api");
-  expect(button("Save reviewed journey").disabled).toBe(true);
+  expect(button("Save reviewed journey").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
   failPlan = true;
   await click("Validate and plan");
-  expect(button("Save reviewed journey").disabled).toBe(true);
+  expect(button("Save reviewed journey").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
   failPlan = false;
   await click("Validate and plan");
   failSave = true;
   await click("Save reviewed journey");
-  expect(button("Save reviewed journey").disabled).toBe(true);
+  expect(button("Save reviewed journey").getAttribute("aria-disabled")).toBe(
+    "true",
+  );
   expect(saved).not.toHaveBeenCalled();
 });
 test("YAML changes survive switching to the form; invalid shapes stay editable in YAML", async () => {
@@ -187,9 +192,7 @@ test("YAML changes survive switching to the form; invalid shapes stay editable i
   await tab("YAML");
   await field("CriticalUserJourney manifest (YAML)", "null");
   await tab("Definition");
-  expect(
-    document.querySelector('[role="tab"][data-state="active"]')?.textContent,
-  ).toBe("YAML");
+  expect(tabLabel(activeTab())).toBe("YAML");
   expect(document.querySelector('[role="alert"]')).not.toBeNull();
 });
 test("agent submits a UUID proposal and never applies directly; viewer cannot open the editor", async () => {
@@ -204,7 +207,7 @@ test("agent submits a UUID proposal and never applies directly; viewer cannot op
   expect(calls.some((c) => c.path.endsWith("/apply"))).toBe(false);
   expect(proposed).toHaveBeenCalledOnce();
   await render("viewer");
-  expect(button("Edit definition").disabled).toBe(true);
+  expect(button("Edit definition").getAttribute("aria-disabled")).toBe("true");
 });
 test("closing the editor cancels tenant-scoped SLO discovery", async () => {
   let aborted = false;

@@ -94,8 +94,8 @@ export function DocsLayout({
             Documentation
           </a>
           <DocumentSearch />
-          <Button asChild variant="outline" size="sm">
-            <a href={repository}>GitHub</a>
+          <Button href={repository} type="button" variant="outline" size="sm">
+            GitHub
           </Button>
         </div>
       </header>

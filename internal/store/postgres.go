@@ -187,6 +187,9 @@ func (p *Postgres) Update(ctx context.Context, id string, fn func(*model.Record)
 	if err != nil {
 		return err
 	}
+	if err = checkCollectionLease(ctx, tx, id, true); err != nil {
+		return err
+	}
 	before := clone(r)
 	if err = fn(&r); err != nil {
 		return err
@@ -266,6 +269,9 @@ func (p *Postgres) Update(ctx context.Context, id string, fn func(*model.Record)
 		if _, err = tx.Exec(ctx, "INSERT INTO alert_outbox(id,event,next_attempt) VALUES($1,$2,$3)", e.ID, body, e.Time); err != nil {
 			return err
 		}
+	}
+	if err = checkCollectionLease(ctx, tx, id, false); err != nil {
+		return err
 	}
 	return tx.Commit(ctx)
 }

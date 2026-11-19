@@ -222,7 +222,7 @@ test("a full conversation offers a new goal-only conversation without copying ap
     return new Response(JSON.stringify(full));
   });
   await act(async () => navigateTo(workspacePath("alpha", "intents", "full")));
-  expect(button("Prepare proposal").disabled).toBe(true);
+  expect(button("Prepare proposal").getAttribute("aria-disabled")).toBe("true");
   expect(host.textContent).toContain(
     "new proposals need fresh checks and review",
   );

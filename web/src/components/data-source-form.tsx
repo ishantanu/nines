@@ -2,6 +2,7 @@ import {
   managedProviders,
   providerCredentialFields,
 } from "@/lib/telemetry-providers";
+import { NativeSelect } from "@/components/ui/select";
 import { FormField } from "@/components/ui/form-layout";
 import { useState } from "react";
 import { api, message, type RequestScope } from "@/lib/api";
@@ -184,7 +185,7 @@ export function DataSourceForm({
                 />
               </FormField>
               <FormField htmlFor="source-kind" label="Provider">
-                <select
+                <NativeSelect
                   id="source-kind"
                   className="h-9 w-full rounded-md border bg-background px-3"
                   value={draft.kind}
@@ -226,7 +227,7 @@ export function DataSourceForm({
                       {provider.label}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
                 <p className="mt-2 text-xs text-muted-foreground">
                   Google Cloud Monitoring is configured by a server
                   administrator in the tenant file. Existing connections are
@@ -271,7 +272,7 @@ export function DataSourceForm({
                   }
                   description="Accounts and datasets are authorized in the server tenant configuration."
                 >
-                  <select
+                  <NativeSelect
                     id="source-route"
                     required
                     aria-describedby="source-route-description"
@@ -301,7 +302,7 @@ export function DataSourceForm({
                         {route}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                 </FormField>
               ) : null}
               {draft.kind === "victoriametrics" ? (
@@ -310,7 +311,7 @@ export function DataSourceForm({
                   label="VictoriaMetrics routing"
                   description="Use the single-node origin, or a cluster account/project approved in the server tenant configuration. Do not include /select or /api in the endpoint."
                 >
-                  <select
+                  <NativeSelect
                     id="source-vm-route"
                     className="h-9 w-full rounded-md border bg-background px-3"
                     aria-describedby="source-vm-route-description"
@@ -338,7 +339,7 @@ export function DataSourceForm({
                         Cluster {route}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                   <p className="mt-2 text-xs text-muted-foreground">
                     Use explicit PromQL or MetricsQL interval-count queries.
                     Metric browsing, guided measurement and recording-rule
@@ -378,7 +379,7 @@ export function DataSourceForm({
                 label="Measurement collection"
                 description="Automatic collection queries the provider on the server schedule. Manual collection runs only when explicitly requested."
               >
-                <select
+                <NativeSelect
                   id="source-collection-mode"
                   className="h-9 w-full rounded-md border bg-background px-3"
                   aria-describedby="source-collection-mode-description"
@@ -389,7 +390,7 @@ export function DataSourceForm({
                 >
                   <option value="automatic">Automatic</option>
                   <option value="manual">Manual</option>
-                </select>
+                </NativeSelect>
               </FormField>
               {draft.kind === "newrelic" ? (
                 <div className="space-y-3">
@@ -421,7 +422,7 @@ export function DataSourceForm({
                       label="Associated New Relic entity"
                       description="Choose an entity approved by the server administrator. Publication verifies that it belongs to the selected account."
                     >
-                      <select
+                      <NativeSelect
                         id="source-native-entity"
                         className="h-9 w-full rounded-md border bg-background px-3"
                         required
@@ -442,7 +443,7 @@ export function DataSourceForm({
                             </option>
                           ),
                         )}
-                      </select>
+                      </NativeSelect>
                     </FormField>
                   ) : null}
                   <p className="text-xs leading-5 text-muted-foreground">

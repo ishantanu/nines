@@ -1,7 +1,18 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
+import { resolveThemeTokens } from "@astryxdesign/core/theme";
+import { ninesTheme } from "@/astryx-theme";
 
 const css = readFileSync(new URL("../index.css", import.meta.url), "utf8");
+// Legacy variables alias Astryx tokens (see index.css); resolve them for the
+// mode under test so the checks run against the colors actually shipped.
+const hexOf = (value: string, mode: "light" | "dark") => {
+  const alias = value.match(/^var\((--[\w-]+)\)$/);
+  const resolved = alias
+    ? resolveThemeTokens(ninesTheme, { mode })[alias[1]]
+    : value;
+  return resolved.replace("#", "").slice(0, 6);
+};
 const luminance = (rgb: number[]) =>
   rgb
     .map((v) => {
@@ -17,8 +28,14 @@ const contrast = (a: number[], b: number[]) => {
 for (const theme of [":root", ".dark"]) {
   test(`${theme} chart text, series and controls meet WCAG AA contrast`, () => {
     const declarations = css.slice(css.indexOf(theme + " {")).split("}")[0];
+    const rootBlock = css.slice(css.indexOf(":root {")).split("}")[0];
     const color = (name: string) => {
-      const hex = declarations.match(new RegExp(`--${name}: #(\\w+);`))![1];
+      const pattern = new RegExp(`--${name}: (#\\w+|var\\(--[\\w-]+\\));`);
+      // .dark only redeclares what differs; the rest cascades from :root.
+      const hex = hexOf(
+        (declarations.match(pattern) ?? rootBlock.match(pattern))![1],
+        theme === ".dark" ? "dark" : "light",
+      );
       const full =
         hex.length === 3
           ? hex

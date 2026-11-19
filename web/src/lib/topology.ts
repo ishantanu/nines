@@ -112,9 +112,11 @@ export interface BindingManifest {
     displayName: string;
     service: string;
     source: string;
-    measurement: "availability" | "latency";
+    measurement: "availability" | "latency" | "sessions";
     countFrom?: "counter" | "histogram";
     metric: string;
+    /** Sessions only: counter of sessions that experienced the bad event. */
+    eventMetric?: string;
     labels: Record<string, string>;
     successLabels?: Record<string, string>;
     thresholdSeconds?: number;

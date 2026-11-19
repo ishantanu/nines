@@ -26,8 +26,8 @@ An interval sample represents good and total event counts over `(T-step, T]`, no
   - Prometheus file output, Prometheus Operator resources and Mimir ruler datasets have different ownership and loading requirements.
   - Deploying a YAML file does not prove a Prometheus server selected it.
   - Do not let both the platform and Kubernetes operator own the same rule group.
-- The MVP targets one collecting server process.
-  - Reads and transactional writes are bounded, but high-cardinality scale, distributed scheduling, queued large backfills and HA operation are not release claims. [Reviewed SLO archival and deletion](slo-retirement.md) retain audit receipts and require owned-rule cleanup.
+- The default server combines the API, control-plane workers and collection. PostgreSQL-backed collection can also run in separate replicas.
+  - See [collector scheduling and measured limits](deployment/collectors.md). Keep one control-plane process: replicated collection does not establish full-platform HA. High-cardinality scale and queued large backfills are not release claims. [Reviewed SLO archival and deletion](slo-retirement.md) retain audit receipts and require owned-rule cleanup.
   - Calendar windows and silences are not offered.
   - Up to eight named severity policies have independent alert lifecycles; notification grouping and inhibition remain external Alertmanager configuration.
   - PostgreSQL is required for durable normal deployments.
@@ -44,7 +44,7 @@ An interval sample represents good and total event counts over `(T-step, T]`, no
   - Editing an absolute range does not query the server until applied; Cancel preserves the existing range.
   - Absolute bounds align inward to complete measurement intervals.
   - Future or invalid ranges are rejected, and the server enforces retention and its latest completed evaluation cutoff.
-  - History is retained for at most two SLO windows; data availability can be shorter.
+  - History retention is 24 hours or two SLO windows, whichever is longer; actual data availability can be shorter. At one-second intervals, the one-day minimum retains up to 86,400 interval observations per SLO. Provider-window mode retains each distinct measurement window; observation limits and bounded batches still apply.
 - Panels resize with their container and stack when two columns would crowd the plots.
   - Hover, tap or focus a chart and use Left/Right, Home or End to inspect the same interval across panels.
   - Missing or zero-traffic intervals remain gaps; partial rolling coverage is shown separately and does not establish full-window compliance.

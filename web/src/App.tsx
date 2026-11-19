@@ -1,3 +1,12 @@
+import { Theme } from "@astryxdesign/core/theme";
+import {
+  SideNav,
+  SideNavHeading,
+  SideNavItem,
+  SideNavSection,
+} from "@astryxdesign/core/SideNav";
+import { replayLabels } from "@/lib/replay-labels";
+import { ninesTheme } from "./astryx-theme";
 import { providerLabel } from "@/lib/telemetry-providers";
 import { ReplayLabel } from "@/components/replay-label";
 import { Brand } from "@/components/brand";
@@ -12,6 +21,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import {
+  PanelLeftClose,
+  PanelLeftOpen,
   Activity,
   BookOpen,
   Video,
@@ -39,6 +50,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  NativeSelect,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -116,6 +128,11 @@ const PlatformConsole = lazy(() =>
 const Login = lazy(() =>
   import("@/components/login").then((m) => ({ default: m.Login })),
 );
+const MigrationImport = lazy(() =>
+  import("@/components/migration-import").then((module) => ({
+    default: module.MigrationImport,
+  })),
+);
 const ObjectiveCreate = lazy(() =>
   import("@/components/objective-create").then((module) => ({
     default: module.ObjectiveCreate,
@@ -183,7 +200,11 @@ const navigation = [
     label: "Service level objectives",
     icon: Activity,
   },
-  { id: "intents" as const, label: "SLO intents", icon: Activity },
+  {
+    id: "intents" as const,
+    label: "Create from a goal",
+    icon: Activity,
+  },
   { id: "maps" as const, label: "Service dependencies", icon: Network },
 
   { id: "replays" as const, label: "Session replay", icon: Video },
@@ -222,8 +243,8 @@ const copy = {
     "Record reliability questions, findings and revision-bound evidence.",
   ],
   intents: [
-    "SLO intents",
-    "Turn a reliability goal into a measured, reviewable SLO and journey link.",
+    "Create an SLO from a goal",
+    "Describe the user outcome. Nines finds candidate telemetry, shows evidence and a backtest, and prepares a change for review. A model is optional.",
   ],
   maps: [
     "Service dependencies",
@@ -317,6 +338,9 @@ function Credentials({
       </DialogContent>
     </Dialog>
   );
+}
+function ExternalLink(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  return <a {...props} target="_blank" rel="noreferrer" />;
 }
 export default function App() {
   const route = useRoute();
@@ -560,7 +584,7 @@ export default function App() {
     }
   }
   return (
-    <>
+    <Theme theme={ninesTheme} mode={darkMode ? "dark" : "light"}>
       {!session ? (
         <Button
           variant="ghost"
@@ -738,7 +762,7 @@ export default function App() {
           setConnection((n) => n + 1);
         }}
       />
-    </>
+    </Theme>
   );
 }
 function TenantWorkspace({
@@ -796,6 +820,22 @@ function TenantWorkspace({
   const [loading, setLoading] = useState(true);
   const [refresh, setRefresh] = useState(0);
   const [query, setQuery] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("nines.navigation.collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  function toggleSidebar() {
+    const next = !sidebarCollapsed;
+    setSidebarCollapsed(next);
+    try {
+      localStorage.setItem("nines.navigation.collapsed", String(next));
+    } catch {
+      /* Navigation remains usable when storage is unavailable. */
+    }
+  }
   const [replayFilter, setReplayFilter] = useState("all");
   const [updated, setUpdated] = useState<Date | null>(null);
   useEffect(() => {
@@ -967,7 +1007,10 @@ function TenantWorkspace({
     );
   }
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div
+      className="portal-shell min-h-screen bg-background text-foreground"
+      data-sidebar-collapsed={sidebarCollapsed}
+    >
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:bg-white focus:p-3"
@@ -975,60 +1018,63 @@ function TenantWorkspace({
         Skip to content
       </a>
       <aside className="sidebar" aria-label="Workspace navigation">
-        <div className="sidebar-brand">
-          <Brand />
-        </div>
-        <nav className="sidebar-navigation" aria-label="Main navigation">
-          {[{ label: "", pages: ["home"] }, ...navigationGroups].map(
+        <SideNav
+          header={
+            <SideNavHeading
+              heading="Nines"
+              icon={<img src="/nines-mark.svg" alt="" width="20" height="22" />}
+              headingHref={workspacePath(scope.tenant, "home")}
+            />
+          }
+          collapsible={{
+            isCollapsed: sidebarCollapsed,
+            onCollapsedChange: toggleSidebar,
+            hasButton: true,
+          }}
+          footer={
+            <SideNavItem
+              label="Documentation"
+              aria-label="Documentation (opens in a new tab)"
+              icon={BookOpen}
+              href="https://ishantanu.github.io/nines/docs/"
+              as={ExternalLink}
+            />
+          }
+        >
+          {[{ label: "Overview", pages: ["home"] }, ...navigationGroups].map(
             (group) => (
-              <div
-                className="navigation-group"
-                key={group.label || "home"}
-                role="group"
-                aria-label={group.label || "Overview"}
+              <SideNavSection
+                key={group.label}
+                title={group.label}
+                isHeaderHidden={group.label === "Overview"}
               >
-                {group.label ? (
-                  <p className="navigation-group-label">{group.label}</p>
-                ) : null}
                 {group.pages.map((id) => {
                   const n = navigation.find((item) => item.id === id)!;
+                  const href = workspacePath(scope.tenant, n.id);
                   return (
-                    <a
-                      href={workspacePath(scope.tenant, n.id)}
+                    <SideNavItem
                       key={n.id}
-                      className={cn(
-                        "nav-item",
-                        activePage === n.id && "nav-active",
-                      )}
+                      label={n.label}
+                      icon={n.icon}
+                      href={href}
+                      isSelected={activePage === n.id}
+                      data-replay-label={
+                        replayLabels.has(n.label) ? n.label : undefined
+                      }
                       onClick={(event) => {
-                        followLink(event, workspacePath(scope.tenant, n.id));
+                        followLink(event, href);
                         if (event.defaultPrevented) {
                           setQuery("");
                           setReplayFilter("all");
                         }
                       }}
-                      aria-current={activePage === n.id ? "page" : undefined}
-                    >
-                      <n.icon className="size-4 shrink-0" aria-hidden="true" />
-                      <ReplayLabel>{n.label}</ReplayLabel>
-                    </a>
+                    />
                   );
                 })}
-              </div>
+              </SideNavSection>
             ),
           )}
-        </nav>
-        <div className="shrink-0 border-t p-3">
-          <a
-            className="nav-item"
-            href="https://ishantanu.github.io/nines/docs/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <BookOpen className="size-4" aria-hidden="true" />
-            Documentation<span className="sr-only"> (opens in a new tab)</span>
-          </a>
-        </div>
+        </SideNav>
       </aside>
       <div className="workspace">
         <WorkspaceHeader
@@ -1188,6 +1234,7 @@ function TenantWorkspace({
                       >
                         <ReplayLabel>Create from intent</ReplayLabel>
                       </Button>
+                      <MigrationImport scope={scope} onApplied={reload} />
                       <ObjectiveCreate scope={scope} onCreated={reload} />
                     </Suspense>
                   ) : null
@@ -1394,6 +1441,7 @@ function TenantWorkspace({
                     >
                       <Home
                         data={data}
+                        scope={scope}
                         onNavigate={navigate}
                         onSLO={setSLO}
                         onJourney={openJourney}
@@ -1446,54 +1494,30 @@ function TenantWorkspace({
                     </Suspense>
                   ) : page === "journeys" || page === "agents" ? (
                     shown.length ? (
-                      <div className="resource-split">
-                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-1">
-                          {shown.map((j) => (
-                            <button
-                              key={j.resource.manifest.metadata.name}
-                              aria-pressed={chosen === j}
-                              onClick={() =>
-                                setSelected(j.resource.manifest.metadata.name)
-                              }
-                              className={cn(
-                                "journey-option",
-                                chosen === j && "journey-selected",
-                              )}
-                            >
-                              <div className="mb-3 flex items-center justify-between">
-                                <div
-                                  className={cn(
-                                    "rounded border p-1.5",
-                                    chosen === j
-                                      ? "border-teal-200 bg-teal-50"
-                                      : "border-slate-200 bg-slate-50",
-                                  )}
-                                >
-                                  {j.resource.manifest.spec.agentic ? (
-                                    <Bot className="size-4 text-slate-500" />
-                                  ) : (
-                                    <Waypoints className="size-4 text-primary" />
-                                  )}
-                                </div>
-                                <Status value={j.health} />
-                              </div>
-                              <h2 className="text-sm font-semibold">
+                      <div className="min-w-0 space-y-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Label htmlFor="selected-journey">
+                            Critical user journey
+                          </Label>
+                          <NativeSelect
+                            id="selected-journey"
+                            className="h-9 w-full min-w-0 max-w-lg rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+                            value={
+                              chosen?.resource.manifest.metadata.name ?? ""
+                            }
+                            onChange={(event) =>
+                              setSelected(event.target.value)
+                            }
+                          >
+                            {shown.map((j) => (
+                              <option
+                                key={j.resource.manifest.metadata.name}
+                                value={j.resource.manifest.metadata.name}
+                              >
                                 {j.resource.manifest.spec.displayName}
-                              </h2>
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {j.resource.manifest.spec.owner}
-                              </p>
-                              <div className="mt-3 flex gap-3 text-xs text-muted-foreground">
-                                <span>
-                                  {j.resource.manifest.spec.steps.length} steps
-                                </span>
-                                <span>{j.links.length} SLOs</span>
-                                <span className="ml-auto">
-                                  v{j.resource.revision}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
+                              </option>
+                            ))}
+                          </NativeSelect>
                         </div>
                         {chosen ? (
                           <div className="min-w-0">
@@ -1549,6 +1573,7 @@ function TenantWorkspace({
                     )
                   ) : page === "objectives" ? (
                     <Objectives
+                      scope={scope}
                       connections={data.workspace.connections}
                       items={objectives.filter((o) =>
                         JSON.stringify(o.slo).toLowerCase().includes(search),

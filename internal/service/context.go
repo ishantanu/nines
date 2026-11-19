@@ -150,7 +150,7 @@ func (s *Service) sloContextFromRecord(rec model.Record, now, requested time.Tim
 	if c.Retired() {
 		retentionNow = c.Retirement.ArchivedAt
 	}
-	if at.Before(retentionNow.Add(-2 * time.Duration(c.WindowSeconds) * time.Second)) {
+	if at.Before(retentionNow.Add(-time.Duration(c.RetentionSeconds()) * time.Second)) {
 		return v1.SLOContext{}, model.Invalid("context time exceeds SLO sample retention")
 	}
 	evaluation := rec

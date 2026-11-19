@@ -11,7 +11,16 @@ p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("result", type=Path)
 p.add_argument(
     "--required",
-    choices=["database", "mimir", "operator", "prometheus", "identity", "topology"],
+    choices=[
+        "database",
+        "mimir",
+        "operator",
+        "prometheus",
+        "identity",
+        "topology",
+        "collector",
+        "collector-load",
+    ],
     required=True,
 )
 a = p.parse_args()
@@ -25,6 +34,8 @@ skips = []
 seen = False
 
 prefixes = {
+    "collector": "Test",
+    "collector-load": "TestRealCollector",
     "topology": "TestRealInstrumentedDependency",
     "mimir": "TestRealMimir",
     "operator": "TestRealOperator",
@@ -44,6 +55,10 @@ for row in rows:
             and "Postgres" in test
         )
         if a.required == "database"
+        else test.startswith(
+            ("TestCollection", "TestPostgresCollection", "TestCollectorOnly")
+        )
+        if a.required == "collector"
         else test.startswith(prefixes[a.required])
     )
     if required:
@@ -51,6 +66,19 @@ for row in rows:
         if row.get("Action") == "skip":
             skips.append(package + "/" + test)
 anchors = {
+    "collector": [
+        "TestPostgresCollectionReplicaFailoverAndRestart",
+        "TestCollectionLeaseFencesLateAndCrossTenantWrites/postgres",
+        "TestCollectionLeaseExpiryDuringCommitRollsBack/postgres",
+        "TestCollectionSchedulerFairnessBoundsAndCancellation",
+        "TestCollectionSchedulerCoalescesAcrossReplicas",
+        "TestCollectorOnlyStartupSkipsUnrelatedWorkersAndModels",
+    ],
+    "collector-load": [
+        "TestRealCollectorScalingWorkload/baseline",
+        "TestRealCollectorScalingWorkload/long-window-throttled",
+        "TestRealCollectorScalingWorkload/slow-source",
+    ],
     "topology": ["TestRealInstrumentedDependencyEvidence"],
     "database": [
         "TestPostgresIdentitySessionSurvivesRestart",
@@ -58,6 +86,7 @@ anchors = {
     ],
     "mimir": [
         "TestRealMimirRetirement",
+        "TestRealMimirIntentActivation",
         "TestRealMimirTenantCollection",
         "TestRealMimirRuleDestinations",
         "TestRealMimirLifecycleAndMinEvents",
@@ -65,6 +94,7 @@ anchors = {
     ],
     "prometheus": [
         "TestRealPrometheusRetirement",
+        "TestRealPrometheusIntentActivation",
         "TestRealPrometheusReviewedActivation",
         "TestRealPrometheusLifecycleAndMinEvents",
     ],

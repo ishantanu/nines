@@ -1,6 +1,20 @@
 # Changelog
 
-## Unreleased (v0.1.0-alpha.3)
+## Unreleased (v0.1.0-alpha.4)
+
+- Move the portal, public site and documentation pages onto Astryx with the shared `nines` theme and self-hosted Figtree. Documentation markdown renders Astryx headings, links, code, quotes and tables as static HTML with no added client script. New login page, home overview and SLI charts.
+- Add SLO practices drawn from SRE guidance, each opt-in and deterministic: low-traffic confidence for burn alerts, SLO labels and roll-ups, graduated error-budget response levels, journey run objectives for agentic journeys, session SLIs, good-minute SLOs, per-customer reports, failure concentration, cohort peer comparison, composed availability ceilings, target-change comparison with delivered reliability, and an adoption review. Missing data stays unknown and approximations are labelled.
+- Give every SLO type a guided form (availability, latency, sessions, good-minute, per-customer, labels and journey run objectives) and highlight the types in the portal (type badges and filter, Home overview). The Define dialog is simplified to one **SLO type** choice that defaults to availability, then a name, service, metric and filters, with identifiers, intervals, templates and optional settings collapsed; it is about 55% shorter. Type names are the same in the select, badges, filters and documentation, and templates are offered only for the chosen type. A new SLO types guide includes a provider support table.
+- Add optional Git delivery on GitHub and GitLab: **Propose via Git** opens a pull or merge request with the exact reviewed SLO or journey definition instead of applying it. Includes digest and revision checks, idempotent retries, orphan-branch cleanup, applied-state and drift reporting, owner/editor-only authorization, CLI (`nines git`), Go client and OpenAPI operations.
+- Add migration from Sloth and Pyrra: offline conversion to reviewed Nines SLOs with per-SLO notes, explicit skips for anything that cannot be converted faithfully, experimental-by-default lifecycle, a portal import dialog with plan-then-apply, `nines import`, `POST /api/migrations/convert` and conformance tests against the projects' published examples.
+- Add native CLI device login with optional operating-system credential storage, and read-only intent measurement candidates, service context, evidence/trade-off comparison, preparation-gap evidence and review packets across API, Go client, CLI and MCP.
+- Tighten release hygiene: lint-clean Go and Python, OpenAPI contract version 0.1.0-alpha.4, and attribution for third-party conformance fixtures.
+- Publish signed multi-architecture container images for each release: `ghcr.io/ishantanu/nines` (server and MCP server) and `ghcr.io/ishantanu/nines-operator` for `linux/amd64` and `linux/arm64`, with keyless Cosign signatures, GitHub build provenance and SBOMs. The shipped Kubernetes and operator manifests reference them, and a new container images guide covers running and verifying them. The server image now cross-compiles and moves to Alpine 3.23.
+- Add Windows amd64 and arm64 release archives with the CLI, server and MCP server, smoke-tested on a Windows runner. The CLI no longer rejects its own configuration on Windows, where Unix permission bits do not apply.
+- Fix portal dialogs opening out of frame on a scrolled page, and documentation tables that clipped columns and broke words mid-letter.
+- Update Go to 1.27.4 (fixes GO-2026-6859 in `net/http`) and dependencies: `golang.org/x/net` 0.62.0, `pgx` 5.12.0, `go-jose` 4.1.7, AWS SDK for Go v2 1.47.5 (S3 1.114.6, credentials 1.20.13), Vite 8.3.5, `@vitejs/plugin-react` 6.1.2, `lucide-react` 1.66.0, `cn` 0.5.1 and `@types/node` 26.6.6. The unused Astryx CLI development dependency was removed.
+
+## v0.1.0-alpha.3
 
 - Catch up delayed scheduled collection from the last successful source watermark, with bounded requests and regression coverage for alert recovery; add focused diagnostics to packaged recovery tests.
 

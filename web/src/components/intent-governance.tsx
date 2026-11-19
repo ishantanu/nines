@@ -57,6 +57,65 @@ export function IntentRecommendationReport({
     >
       <h3 className="text-sm font-medium">Why this recommendation</h3>
       <p className="text-sm">{report.summary}</p>
+      {report.reviewPacket && (
+        <details className="text-sm">
+          <summary className="cursor-pointer font-medium">
+            Frozen preparation context
+          </summary>
+          <div className="mt-3 space-y-3">
+            <p className="text-muted-foreground">
+              Saved at proposal preparation. This does not verify current
+              telemetry or authorize a change.
+            </p>
+            <dl className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-muted-foreground">Candidate discovery</dt>
+                <dd>
+                  {report.reviewPacket.candidateDiscovery
+                    ? {
+                        recorded: "Recorded for this goal",
+                        prior_goal: "Recorded for an earlier goal",
+                        unverified: "Goal binding not verified",
+                        stale: "Scope or source has changed",
+                        invalid: "Receipt integrity could not be verified",
+                      }[report.reviewPacket.candidateDiscovery.state]
+                    : "Not recorded"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">
+                  Observation exclusions
+                </dt>
+                <dd>
+                  {report.reviewPacket.exclusions?.state === "recorded"
+                    ? "Included in measurement confirmation"
+                    : report.reviewPacket.exclusions
+                      ? "Not confirmed"
+                      : "Not recorded"}
+                </dd>
+              </div>
+            </dl>
+            {report.reviewPacket.exclusions?.definition.none ? (
+              <p>No additional observation exclusions were identified.</p>
+            ) : report.reviewPacket.exclusions?.definition.observationBoundaries
+                ?.length ? (
+              <ul className="list-disc space-y-1 pl-5">
+                {report.reviewPacket.exclusions.definition.observationBoundaries.map(
+                  (boundary, i) => (
+                    <li key={i}>{boundary}</li>
+                  ),
+                )}
+              </ul>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              Observation notes do not change query filters. Candidate discovery
+              does not confirm that a suggestion became the selected
+              measurement.
+            </p>
+          </div>
+        </details>
+      )}
+
       {report.systemOne ? (
         <SystemOneAdvice
           assessment={report.systemOne}

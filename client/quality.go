@@ -47,3 +47,21 @@ func (c *Client) ErrorBudgetDecision(ctx context.Context, id string, expected in
 	}
 	return out, err
 }
+
+// CustomerReport reads per-customer reliability for the SLO's own allowlist. It
+// is an explicit, bounded provider read and never changes a definition.
+func (c *Client) CustomerReport(ctx context.Context, id string, expected int64) (v1.CustomerReport, error) {
+	var out v1.CustomerReport
+	if !identifier.MatchString(id) || expected < 0 {
+		return out, fmt.Errorf("invalid customer request")
+	}
+	path := "/api/slos/" + id + "/customers"
+	if expected > 0 {
+		path += "?expectedRevision=" + strconv.FormatInt(expected, 10)
+	}
+	err := c.contextRead(ctx, path, &out)
+	if err == nil && (out.APIVersion != v1.APIVersion || out.Tenant != c.tenant || out.SLOID != id || out.Revision < 1 || (expected > 0 && out.Revision != expected)) {
+		return v1.CustomerReport{}, fmt.Errorf("customer response scope or revision changed")
+	}
+	return out, err
+}

@@ -26,11 +26,11 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 		t.Fatal("unexpected OpenAPI version")
 	}
 	info, ok := spec["info"].(map[string]any)
-	if !ok || info["version"] != "0.1.0-alpha.2" {
+	if !ok || info["version"] != "0.1.0-alpha.4" {
 		t.Fatal("unexpected contract version")
 	}
 	paths, ok := spec["paths"].(map[string]any)
-	if !ok || len(paths) != 14 {
+	if !ok || len(paths) != 32 {
 		t.Fatal("unexpected contract scope")
 	}
 	components, ok := spec["components"].(map[string]any)
@@ -38,7 +38,7 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 		t.Fatal("missing components")
 	}
 	registered := ""
-	for _, f := range []string{"../../internal/httpapi/server.go", "../../internal/intentflow/http.go"} {
+	for _, f := range []string{"../../internal/httpapi/server.go", "../../internal/intentflow/http.go", "../../internal/intentflow/preparation_evidence_http.go", "../../internal/identity/http.go"} {
 		b, e := os.ReadFile(f)
 		if e != nil {
 			t.Fatal(e)
@@ -70,7 +70,12 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 				t.Error("missing success response", id)
 			}
 			params, ok := operation["parameters"].([]any)
-			if !ok || len(params) == 0 {
+			if strings.HasPrefix(path, "/auth/cli/") {
+				security, public := operation["security"].([]any)
+				if !public || len(security) != 0 {
+					t.Error("CLI bootstrap must not require a resource bearer credential", id)
+				}
+			} else if !ok || len(params) == 0 {
 				t.Error("missing tenant parameter", id)
 			}
 		}
@@ -118,7 +123,7 @@ func TestCriticalSchemaFieldsFollowGoContracts(t *testing.T) {
 		t.Fatal(err)
 	}
 	schemas := spec["components"].(map[string]any)["schemas"].(map[string]any)
-	for name, value := range map[string]any{"NativeSLOResults": v1.NativeSLOResults{}, "NativeSLOCatalog": v1.NativeSLOCatalog{}, "NativeSLODraft": v1.NativeSLODraft{}, "ReviewRequest": v1.ReviewIntentChangeSet{}, "WorkflowStatus": v1.IntentWorkflowStatus{}, "ReviewArtifact": v1.IntentReviewArtifact{}, "IntentConversation": v1.IntentConversation{}} {
+	for name, value := range map[string]any{"IntentActivation": v1.IntentActivation{}, "IntentResourceVerification": v1.IntentResourceVerification{}, "IntegrationStatus": v1.IntegrationStatus{}, "IntegrationStage": v1.IntegrationStage{}, "MeasurementQuality": v1.MeasurementQuality{}, "IntentReviewCandidateReceipt": v1.IntentReviewCandidateReceipt{}, "IntentReviewExclusions": v1.IntentReviewExclusions{}, "AppendIntentConversation": v1.AppendIntentConversation{}, "IntentReviewPacket": v1.IntentReviewPacket{}, "IntentReviewDestination": v1.IntentReviewDestination{}, "IntentReviewResource": v1.IntentReviewResource{}, "IntentRecommendationReview": v1.IntentRecommendation{}, "IntentChangeSetReview": v1.IntentChangeSet{}, "RecordIntentEvidence": v1.RecordIntentEvidence{}, "IntentPreparationEvidence": v1.IntentPreparationEvidence{}, "IntentPreparationCheck": v1.IntentPreparationCheck{}, "IntentEvidence": v1.IntentEvidence{}, "IntentEvidenceInput": v1.IntentEvidenceInput{}, "IntentEvidenceCurrent": v1.IntentEvidenceCurrent{}, "IntentEvidenceHistory": v1.IntentEvidenceHistory{}, "IntentEvidenceComparison": v1.IntentEvidenceComparison{}, "IntentPolicyTradeoff": v1.IntentPolicyTradeoff{}, "IntentEvidenceAlternative": v1.IntentEvidenceAlternative{}, "IntentEvidenceRange": v1.IntentEvidenceRange{}, "IntentCandidateDiscovery": v1.IntentCandidateDiscovery{}, "IntentCandidateInput": v1.IntentCandidateInput{}, "IntentMeasurementCandidate": v1.IntentMeasurementCandidate{}, "IntentRecipeReference": v1.IntentRecipeReference{}, "IntentContext": v1.IntentContext{}, "IntentContextInput": v1.IntentContextInput{}, "IntentSourceContext": v1.IntentSourceContext{}, "IntentJourneyContext": v1.IntentJourneyContext{}, "CLIAuthenticationCapabilities": v1.CLIAuthenticationCapabilities{}, "CLIDeviceStart": v1.CLIDeviceStart{}, "CLIDeviceAuthorization": v1.CLIDeviceAuthorization{}, "CLIDevicePoll": v1.CLIDevicePoll{}, "CLIDeviceResult": v1.CLIDeviceResult{}, "NativeSLOResults": v1.NativeSLOResults{}, "NativeSLOCatalog": v1.NativeSLOCatalog{}, "NativeSLODraft": v1.NativeSLODraft{}, "ReviewRequest": v1.ReviewIntentChangeSet{}, "WorkflowStatus": v1.IntentWorkflowStatus{}, "ReviewArtifact": v1.IntentReviewArtifact{}, "IntentConversation": v1.IntentConversation{}, "GitInfo": v1.GitInfo{}, "GitPullRequest": v1.GitPullRequest{}, "GitReceipt": v1.GitReceipt{}, "GitProposalResult": v1.GitProposalResult{}, "GitProposalStatus": v1.GitProposalStatus{}, "GitProposalList": v1.GitProposalList{}, "GitDrift": v1.GitDrift{}, "MigrationRequest": v1.MigrationRequest{}, "MigrationNote": v1.MigrationNote{}, "MigrationDefinition": v1.MigrationDefinition{}, "MigrationSkipped": v1.MigrationSkipped{}, "MigrationResult": v1.MigrationResult{}} {
 		schema := schemas[name].(map[string]any)
 		props := schema["properties"].(map[string]any)
 		typ := reflect.TypeOf(value)

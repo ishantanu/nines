@@ -476,6 +476,7 @@ export function JourneyFields({
                 agentic: e.target.checked
                   ? { successDefinition: "", approvalRequired: false }
                   : undefined,
+                ...(e.target.checked ? {} : { runObjective: undefined }),
               })
             }
           />
@@ -548,6 +549,99 @@ export function JourneyFields({
               />
               Require approval evidence
             </Label>
+            <Label className="form-check">
+              <input
+                type="checkbox"
+                checked={!!m.spec.runObjective}
+                onChange={(e) =>
+                  spec({
+                    runObjective: e.target.checked
+                      ? { target: 0.9, windowSeconds: 7 * 86400, minRuns: 20 }
+                      : undefined,
+                  })
+                }
+              />
+              Measure judged runs with an objective
+            </Label>
+            {m.spec.runObjective ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Passed runs are good; failed and violated runs are bad.
+                  Incomplete and inconclusive runs are never counted as success,
+                  and only runs for the current contract count. With too few
+                  judged runs the journey stays unknown.
+                </p>
+                <div className="form-grid">
+                  <FormField
+                    htmlFor={id("run-target")}
+                    label="Target (% passing)"
+                  >
+                    <Input
+                      id={id("run-target")}
+                      type="number"
+                      min={0}
+                      max={100}
+                      step="any"
+                      value={Number(
+                        (m.spec.runObjective.target * 100).toPrecision(12),
+                      )}
+                      onChange={(e) =>
+                        spec({
+                          runObjective: {
+                            ...m.spec.runObjective!,
+                            target: Number(
+                              (Number(e.target.value) / 100).toPrecision(12),
+                            ),
+                          },
+                        })
+                      }
+                    />
+                  </FormField>
+                  <FormField
+                    htmlFor={id("run-window")}
+                    label="Window (hours, 1 to 744)"
+                  >
+                    <Input
+                      id={id("run-window")}
+                      type="number"
+                      min={1}
+                      max={744}
+                      value={m.spec.runObjective.windowSeconds / 3600}
+                      onChange={(e) =>
+                        spec({
+                          runObjective: {
+                            ...m.spec.runObjective!,
+                            windowSeconds: Math.round(
+                              Number(e.target.value) * 3600,
+                            ),
+                          },
+                        })
+                      }
+                    />
+                  </FormField>
+                  <FormField
+                    htmlFor={id("run-min")}
+                    label="Minimum judged runs (1 to 1000)"
+                  >
+                    <Input
+                      id={id("run-min")}
+                      type="number"
+                      min={1}
+                      max={1000}
+                      value={m.spec.runObjective.minRuns}
+                      onChange={(e) =>
+                        spec({
+                          runObjective: {
+                            ...m.spec.runObjective!,
+                            minRuns: Number(e.target.value),
+                          },
+                        })
+                      }
+                    />
+                  </FormField>
+                </div>
+              </>
+            ) : null}
           </>
         ) : null}
       </FormSection>

@@ -9,6 +9,25 @@ type ErrorBudgetPolicy struct {
 	RunbookURL  string  `json:"runbookURL" yaml:"runbookURL"`
 	ReviewBelow float64 `json:"reviewBelow" yaml:"reviewBelow"`
 	OnExhausted string  `json:"onExhausted,omitempty" yaml:"onExhausted,omitempty"`
+	// Bands state, as the remaining budget falls, the response the owner has
+	// agreed for each level. They communicate the response; they never change
+	// the decision state or grant any permission.
+	Bands []BudgetBand `json:"bands,omitempty" yaml:"bands,omitempty"`
+}
+
+// BudgetBand is one agreed response level, active when the remaining budget
+// fraction is at or below Below.
+type BudgetBand struct {
+	Name     string  `json:"name" yaml:"name"`
+	Below    float64 `json:"below" yaml:"below"`
+	Response string  `json:"response" yaml:"response"`
+}
+
+// BudgetBandMatch is the most severe band that applies to the current budget.
+type BudgetBandMatch struct {
+	Name     string  `json:"name"`
+	Below    float64 `json:"below"`
+	Response string  `json:"response"`
 }
 type BudgetEvidence struct {
 	Coverage      float64        `json:"coverage"`
@@ -36,4 +55,7 @@ type ErrorBudgetDecision struct {
 	BudgetRemainingFraction *float64        `json:"budgetRemainingFraction"`
 	QualityState            string          `json:"qualityState"`
 	Advisory                bool            `json:"advisory"`
+	// Band is the agreed response level for the remaining budget, when bands are
+	// configured and one applies. It never changes State.
+	Band *BudgetBandMatch `json:"band,omitempty"`
 }

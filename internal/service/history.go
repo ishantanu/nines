@@ -40,19 +40,19 @@ func (s *Service) historyFromRecord(ctx context.Context, r model.Record, now, fr
 		to = current
 	}
 	if from.IsZero() {
-		seconds := min(int64(86400), 2*r.SLO.WindowSeconds)
+		seconds := min(int64(86400), r.SLO.RetentionSeconds())
 		if len(requestedRange) > 0 {
 			seconds = requestedRange[0]
 		}
 		from = to.Add(-time.Duration(seconds) * time.Second).Truncate(time.Duration(r.SLO.StepSeconds) * time.Second)
 	}
-	if !aligned(from, r.SLO.StepSeconds) || !aligned(to, r.SLO.StepSeconds) || !to.After(from) || to.After(current) || to.Sub(from) > time.Duration(2*r.SLO.WindowSeconds)*time.Second || from.Before(current.Add(-time.Duration(2*r.SLO.WindowSeconds)*time.Second)) {
-		return engine.History{}, model.Invalid("history requires aligned from < to within two retained SLO windows, ending at or before the current evaluation")
+	if !aligned(from, r.SLO.StepSeconds) || !aligned(to, r.SLO.StepSeconds) || !to.After(from) || to.After(current) || to.Sub(from) > time.Duration(r.SLO.RetentionSeconds())*time.Second || from.Before(current.Add(-time.Duration(r.SLO.RetentionSeconds())*time.Second)) {
+		return engine.History{}, model.Invalid("history requires aligned from < to within retained history, ending at or before the current evaluation")
 	}
 	if resolution == 0 {
 		resolution = max(r.SLO.StepSeconds, ((int64(to.Sub(from)/time.Second)/300+r.SLO.StepSeconds-1)/r.SLO.StepSeconds)*r.SLO.StepSeconds)
 	}
-	if resolution > 2*r.SLO.WindowSeconds || resolution < r.SLO.StepSeconds || resolution%r.SLO.StepSeconds != 0 || int64(to.Sub(from)/time.Second)/resolution+1 > 1500 {
+	if resolution > r.SLO.RetentionSeconds() || resolution < r.SLO.StepSeconds || resolution%r.SLO.StepSeconds != 0 || int64(to.Sub(from)/time.Second)/resolution+1 > 1500 {
 		return engine.History{}, model.Invalid("resolution must be a multiple of stepSeconds with at most 1500 chart points")
 	}
 	evaluation := r

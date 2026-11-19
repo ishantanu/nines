@@ -1,7 +1,9 @@
-import { useId, useRef } from "react";
+import { useId, useRef, useState } from "react";
 import { duration, type HistoryPoint, type SLOHistory } from "@/lib/history";
-import { nearestPointIndex } from "@/lib/chart-range";
+import { sliDomain, nearestPointIndex } from "@/lib/chart-range";
 import { useChartSize } from "@/lib/use-chart-size";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Text } from "@astryxdesign/core/Text";
 import { ReplayLabel } from "@/components/replay-label";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 interface Line {
@@ -42,6 +44,7 @@ export function Timeline({
   const { ref, width, height } = useChartSize();
   const id = useId();
   const plot = useRef<SVGSVGElement>(null);
+  const [inspecting, setInspecting] = useState(false);
   const finite = (v: number | null): v is number =>
     v !== null && Number.isFinite(v);
   const values = history.points
@@ -59,8 +62,7 @@ export function Timeline({
   if (title === "Burn rate") low = Math.max(0, low);
   if (percentages) high = Math.min(1, high);
   if (title === "SLI and SLO target") {
-    low = Math.max(0, low);
-    high = Math.min(1, high);
+    ({ low, high } = sliDomain(values, threshold));
   }
   const left = width < 400 ? 80 : 92,
     right = Math.max(left + 1, width - 12),
@@ -190,47 +192,28 @@ export function Timeline({
     <Card className="chart-panel">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-semibold">
+          <Heading level={3}>
             <ReplayLabel>{title}</ReplayLabel>
-          </h3>
+          </Heading>
           {lines.length === 1 && selected ? (
-            <span
-              className="text-xl font-semibold tabular-nums tracking-tight sm:text-2xl"
+            <Heading
+              level={2}
+              accessibilityLevel={4}
+              className="tabular-nums"
               aria-label={`Selected ${lines[0].name}: ${valueText(lines[0], selected)}`}
             >
               {finite(lines[0].get(selected))
                 ? inspectValue(lines[0].get(selected)!)
                 : "No data"}
-            </span>
+            </Heading>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-2 text-sm text-foreground">
-          {lines.map((line) => (
-            <span key={line.name} className="inline-flex items-center gap-1.5">
-              <span
-                aria-hidden="true"
-                className="inline-block w-6"
-                style={{
-                  borderTop: `2px ${line.dashed ? "dashed" : "solid"} ${line.color}`,
-                }}
-              />
-              <ReplayLabel>{line.name}</ReplayLabel>
-            </span>
-          ))}
-          <span className="inline-flex items-center gap-1.5">
-            <span
-              aria-hidden="true"
-              className="w-6 border-t-2 border-dotted border-muted-foreground"
-            />
-            {thresholdLabel}
-          </span>
-        </div>
         {hasPartial ? (
-          <p className="text-sm text-muted-foreground">
+          <Text as="p" size="sm" color="secondary">
             Dashed SLI segments have incomplete{" "}
             {duration(history.windowSeconds)} history. They do not establish
             full-window attainment.
-          </p>
+          </Text>
         ) : null}
       </CardHeader>
       <CardContent className="flex min-h-0 flex-col">
@@ -241,7 +224,7 @@ export function Timeline({
         >
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="chart-inspection-plot absolute inset-0 block size-full touch-pan-y rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="select-none chart-inspection-plot absolute inset-0 block size-full touch-pan-y rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             ref={plot}
             role="slider"
             tabIndex={0}
@@ -267,7 +250,12 @@ export function Timeline({
                   selectedIndex +
                   Math.max(1, Math.ceil(history.points.length / 10)),
               };
+              if (event.key === "Escape") {
+                setInspecting(false);
+                return;
+              }
               if (Object.hasOwn(moves, event.key)) {
+                setInspecting(true);
                 event.preventDefault();
                 onIndex(
                   Math.max(
@@ -278,14 +266,19 @@ export function Timeline({
               }
             }}
             aria-labelledby={`${id}-title`}
-            aria-describedby={`${id}-description`}
-            onPointerMove={(event) =>
+            aria-describedby={`${id}-description${inspecting && selected ? ` ${id}-tooltip` : ""}`}
+            onFocus={() => setInspecting(true)}
+            onBlur={() => setInspecting(false)}
+            onPointerLeave={() => setInspecting(false)}
+            onPointerMove={(event) => {
+              setInspecting(true);
               inspect(
                 event.clientX,
                 event.currentTarget.getBoundingClientRect(),
-              )
-            }
+              );
+            }}
             onPointerDown={(event) => {
+              setInspecting(true);
               plot.current?.focus({ preventScroll: true });
               inspect(
                 event.clientX,
@@ -337,15 +330,14 @@ export function Timeline({
                     x2={right}
                     y1={y(value)}
                     y2={y(value)}
-                    stroke="var(--border)"
-                    strokeDasharray="3 5"
+                    stroke="var(--color-border)"
                   />
                   <text
                     x={left - 8}
                     y={y(value) + 4}
                     textAnchor="end"
-                    fill="var(--muted-foreground)"
-                    fontSize={13}
+                    fill="var(--color-text-secondary)"
+                    style={{ fontSize: "var(--font-size-sm, 12px)" }}
                   >
                     {format(value)}
                   </text>
@@ -460,40 +452,41 @@ export function Timeline({
                     ) : null,
                   )
                 : null}
-              {selected ? (
-                <g>
-                  <line
-                    x1={x(selectedIndex)}
-                    x2={x(selectedIndex)}
-                    y1={top}
-                    y2={bottom}
-                    stroke="var(--muted-foreground)"
-                    strokeDasharray="3 3"
-                  />
-                  {lines.map((line) => {
-                    const value = line.get(selected);
-                    return finite(value) ? (
-                      <g key={line.name} data-chart-marker>
-                        <circle
-                          cx={x(selectedIndex)}
-                          cy={y(value)}
-                          r={8}
-                          fill="var(--card)"
-                        />
-                        <circle
-                          cx={x(selectedIndex)}
-                          cy={y(value)}
-                          r={4.5}
-                          fill="var(--card)"
-                          stroke={line.color}
-                          strokeWidth={2.5}
-                        />
-                      </g>
-                    ) : null;
-                  })}
-                </g>
-              ) : null}
             </g>
+            {/* Inspection markers may extend across the plot boundary. Keep data paths clipped. */}
+            {selected ? (
+              <g data-chart-inspection>
+                <line
+                  x1={x(selectedIndex)}
+                  x2={x(selectedIndex)}
+                  y1={top}
+                  y2={bottom}
+                  stroke="var(--muted-foreground)"
+                  strokeDasharray="3 3"
+                />
+                {lines.map((line) => {
+                  const value = line.get(selected);
+                  return finite(value) ? (
+                    <g key={line.name} data-chart-marker>
+                      <circle
+                        cx={x(selectedIndex)}
+                        cy={y(value)}
+                        r={8}
+                        fill="var(--card)"
+                      />
+                      <circle
+                        cx={x(selectedIndex)}
+                        cy={y(value)}
+                        r={4.5}
+                        fill="var(--card)"
+                        stroke={line.color}
+                        strokeWidth={2.5}
+                      />
+                    </g>
+                  ) : null;
+                })}
+              </g>
+            ) : null}
             {Array.from({ length: ticks }, (_, i) => {
               const time = start + (span * i) / (ticks - 1);
               return (
@@ -502,7 +495,7 @@ export function Timeline({
                   x={xTime(time)}
                   y={height - 9}
                   fill="var(--muted-foreground)"
-                  fontSize={13}
+                  style={{ fontSize: "var(--font-size-sm, 12px)" }}
                   textAnchor={
                     i === 0 ? "start" : i === ticks - 1 ? "end" : "middle"
                   }
@@ -512,11 +505,88 @@ export function Timeline({
               );
             })}
           </svg>
+          {inspecting && selected ? (
+            <div
+              id={`${id}-tooltip`}
+              role="tooltip"
+              className="chart-tooltip pointer-events-none absolute top-2 z-10 w-60 max-w-[calc(100%-1rem)] rounded-sm border p-3 text-sm shadow-md"
+              style={{
+                left: Math.max(
+                  8,
+                  Math.min(
+                    width - 248,
+                    x(selectedIndex) > width / 2
+                      ? x(selectedIndex) - 252
+                      : x(selectedIndex) + 12,
+                  ),
+                ),
+              }}
+            >
+              <time
+                dateTime={selected.at}
+                className="block text-xs tabular-nums text-muted-foreground"
+              >
+                {utcStamp(selected.at, history.stepSeconds < 60)}
+              </time>
+              <dl className="mt-2 space-y-2">
+                {lines.map((line) => (
+                  <div key={line.name}>
+                    <dt className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span
+                        aria-hidden="true"
+                        className="inline-block w-4"
+                        style={{
+                          borderTop: `2px ${line.dashed ? "dashed" : "solid"} ${line.color}`,
+                        }}
+                      />
+                      {line.name}
+                    </dt>
+                    <dd className="mt-0.5 font-semibold tabular-nums">
+                      {valueText(line, selected)}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="mt-2 border-t pt-2 text-xs text-muted-foreground">
+                {thresholdLabel}
+              </p>
+            </div>
+          ) : null}
           {!values.length ? (
             <p className="pointer-events-none absolute inset-x-0 top-1/2 text-center text-sm text-muted-foreground">
               No measurements available in this range
             </p>
           ) : null}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+          {lines.map((line) => (
+            <Text
+              key={line.name}
+              as="span"
+              size="sm"
+              className="inline-flex items-center gap-1.5"
+            >
+              <span
+                aria-hidden="true"
+                className="inline-block w-6"
+                style={{
+                  borderTop: `2px ${line.dashed ? "dashed" : "solid"} ${line.color}`,
+                }}
+              />
+              <ReplayLabel>{line.name}</ReplayLabel>
+            </Text>
+          ))}
+          <Text
+            as="span"
+            size="sm"
+            className="inline-flex items-center gap-1.5"
+          >
+            <span
+              aria-hidden="true"
+              className="w-6 border-t-2 border-dotted border-muted-foreground"
+            />
+            {thresholdLabel}
+          </Text>
         </div>
         <div
           className="mt-3 flex flex-wrap items-baseline justify-between gap-x-5 gap-y-2 border-t pt-3 text-xs"

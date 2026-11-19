@@ -92,7 +92,9 @@ describe("workflow review controls", () => {
     expect(html).toContain("commerce-tenant");
     expect(html).toContain("Approve &amp; apply revision");
     expect(html).toContain("Coverage is incomplete");
-    expect(html).toMatch(/disabled=""[^>]*>Reject proposal/);
+    expect(html).toMatch(
+      /aria-disabled="true"[^>]*>(?:<[^>]+>)*Reject proposal/,
+    );
   });
   it.each(["editor", "agent", "viewer"] as const)(
     "keeps %s proposal inspection available without decision controls",

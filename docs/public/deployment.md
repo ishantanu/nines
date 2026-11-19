@@ -6,11 +6,12 @@ Nines supports a server/portal deployment and a standalone Kubernetes operator.
 - The operator uses GitOps CRDs and Kubernetes RBAC without a Nines server or database.
 - The server can also publish reviewed portal SLOs to the operator through a namespace-scoped bridge.
 - Start with a local demo, then choose a single-instance deployment.
-- The project currently requires Go 1.27.3 to build from source.
+- The project currently requires Go 1.27.4 to build from source.
 - Node 24 is needed to rebuild the UI or product site.
 
 * **Local integration playground**: [Prometheus playground](deployment/playground.md) · Synthetic traffic, recording and burn-rate rules; optional Mimir profile
 * **Local demonstration**: [README quickstart](../../README.md#try-the-demo) · Synthetic, ephemeral and loopback-only
+* **Container images**: [Published images](deployment/container-images.md) · Signed `linux/amd64` and `linux/arm64` server and operator images on GitHub Container Registry
 * **Docker Compose**: [Persistent container setup](deployment/docker-compose.md) · Recommended first evaluation with a dedicated database volume
 * **Linux service**: [Native binary and systemd](deployment/linux-service.md) · One server behind a TLS reverse proxy
 * **Kubernetes**: [Single-replica manifests](deployment/kubernetes.md) · Server deployment with optional reviewed operator publishing

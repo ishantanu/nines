@@ -31,6 +31,9 @@ func Invalid(format string, args ...any) error { return &ValidationError{fmt.Spr
 type Policy = v1alpha1.BurnRatePolicy
 
 type SLO struct {
+	Customers          *v1alpha1.CustomerPolicy           `json:"customers,omitempty"`
+	BadInterval        *v1alpha1.BadIntervalPolicy        `json:"badInterval,omitempty"`
+	Labels             map[string]string                  `json:"labels,omitempty"`
 	RuleDestination    string                             `json:"ruleDestination,omitempty"`
 	Retirement         *v1alpha1.SLORetirement            `json:"retirement,omitempty"`
 	ErrorBudgetPolicy  *v1alpha1.ErrorBudgetPolicy        `json:"errorBudgetPolicy,omitempty"`
@@ -77,6 +80,15 @@ func (s SLO) Validate() error {
 	if err := validateQuality(s.Quality, s.StepSeconds); err != nil {
 		return err
 	}
+	if err := ValidateSLOLabels(s.Labels); err != nil {
+		return err
+	}
+	if err := validateBadInterval(s); err != nil {
+		return err
+	}
+	if err := validateCustomers(s); err != nil {
+		return err
+	}
 	if !s.Lifecycle.Valid() {
 		return Invalid("lifecycle must be experimental, aspirational, committed or deprecated")
 	}
@@ -95,7 +107,14 @@ func (s SLO) Validate() error {
 		if p.ScrapeIntervalSeconds < 1 || p.ScrapeIntervalSeconds > s.StepSeconds/2 || s.StepSeconds%p.ScrapeIntervalSeconds != 0 {
 			return Invalid("scrapeIntervalSeconds must divide stepSeconds with at least two scrapes per step")
 		}
-		for _, q := range []struct{ field, text string }{{"providerWindow.goodSelector", p.GoodSelector}, {"providerWindow.totalSelector", p.TotalSelector}} {
+		selectors := []struct{ field, text string }{{"providerWindow.goodSelector", p.GoodSelector}, {"providerWindow.totalSelector", p.TotalSelector}}
+		if p.BadSelector != "" {
+			if p.GoodSelector != "" {
+				return Invalid("providerWindow takes either goodSelector or badSelector, not both")
+			}
+			selectors = []struct{ field, text string }{{"providerWindow.badSelector", p.BadSelector}, {"providerWindow.totalSelector", p.TotalSelector}}
+		}
+		for _, q := range selectors {
 			if (!counterSelector.MatchString(q.text) && !canonicalHistogramSelector(q.text)) || len(q.text) > 8000 {
 				return Invalid("providerWindow requires exact label matchers or the generated equivalent-integer histogram boundary matcher")
 			}

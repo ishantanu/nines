@@ -23,6 +23,7 @@ beforeEach(() => {
     "ResizeObserver",
     class {
       observe() {}
+      unobserve() {}
       disconnect() {}
     },
   );
@@ -70,7 +71,7 @@ test("native results stay on demand and label provider evidence", async () => {
   mocks.api.mockResolvedValue(result);
   await open();
   expect(mocks.api).not.toHaveBeenCalled();
-  expect(host.querySelectorAll("label")).toHaveLength(2);
+  expect(host.querySelectorAll('label[data-slot="label"]')).toHaveLength(2);
   await read();
   expect(mocks.api).toHaveBeenCalledOnce();
   expect(mocks.api.mock.calls[0][0]).toMatch(
@@ -103,13 +104,13 @@ test("revision conflicts and provider errors do not retain evidence", async () =
   mocks.api.mockResolvedValue({ ...result, revision: 1 });
   await open();
   await read();
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-    "SLO changed",
-  );
+  expect(
+    host.querySelector('[role="alert"]:not(:empty)')?.textContent,
+  ).toContain("SLO changed");
   expect(host.textContent).not.toContain("95.00%");
   mocks.api.mockRejectedValue(Error("Provider unavailable"));
   await read();
-  expect(host.querySelector('[role="alert"]')?.textContent).toContain(
-    "Provider unavailable",
-  );
+  expect(
+    host.querySelector('[role="alert"]:not(:empty)')?.textContent,
+  ).toContain("Provider unavailable");
 });

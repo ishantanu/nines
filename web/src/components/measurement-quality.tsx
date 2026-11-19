@@ -7,6 +7,8 @@ import {
   type RequestScope,
 } from "@/lib/api";
 import { Button } from "./ui/button";
+import { CohortConcentrationSummary } from "./cohort-concentration";
+import { CohortOutlierSummary } from "./cohort-outliers";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 export function MeasurementQualityPanel({
   report,
@@ -150,6 +152,14 @@ export function MeasurementQualityPanel({
                     ? "Cohort counts match the saved aggregate at this cutoff."
                     : "Cohort counts do not reconcile with the saved aggregate. Review missing numerators, collection timing and query semantics."}
                 </p>
+                {cohorts.concentration ? (
+                  <CohortConcentrationSummary
+                    concentration={cohorts.concentration}
+                  />
+                ) : null}
+                {cohorts.outliers ? (
+                  <CohortOutlierSummary outliers={cohorts.outliers} />
+                ) : null}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>

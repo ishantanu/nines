@@ -161,7 +161,7 @@ func (s *Service) MeasurementQuality(ctx context.Context, id string, expected in
 	}
 	report.Labels = append([]string(nil), r.SLO.Quality.CohortLabels...)
 	reader, ok := s.CollectorFor(r.SLO).(CohortSource)
-	if !ok || r.SLO.ProviderWindow == nil {
+	if !ok || r.SLO.ProviderWindow == nil || r.SLO.ProviderWindow.BadSelector != "" {
 		report.State = "unsupported"
 		report.Message = "This provider or measurement mode cannot supply cohort counts."
 		return q, nil
@@ -248,6 +248,16 @@ func (s *Service) MeasurementQuality(ctx context.Context, id string, expected in
 	}
 	report.Items = items
 	report.MatchesAggregate = complete && math.Abs(total-x.Total) <= 8*(math.Nextafter(math.Max(1, x.Total), math.Inf(1))-math.Max(1, x.Total)) && math.Abs(good-x.Good) <= 8*(math.Nextafter(math.Max(1, x.Good), math.Inf(1))-math.Max(1, x.Good))
+	concentration := model.ConcentrateFailures(items)
+	if !report.MatchesAggregate {
+		concentration.Limitations = append(concentration.Limitations, "Cohort counts do not reconcile with the saved aggregate at this cutoff, so this may not describe the whole SLO.")
+	}
+	report.Concentration = &concentration
+	outliers := model.FindCohortOutliers(items)
+	if !report.MatchesAggregate {
+		outliers.Limitations = append(outliers.Limitations, "Cohort counts do not reconcile with the saved aggregate at this cutoff, so this may not describe the whole SLO.")
+	}
+	report.Outliers = &outliers
 	report.State = "available"
 	report.Message = "Observed cohort estimates at the same cutoff. Missing numerators remain unknown; cohort coverage and statistical confidence are not independently verified."
 	sort.Slice(report.Items, func(i, j int) bool {

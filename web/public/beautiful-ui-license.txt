@@ -1,0 +1,81 @@
+MIT License
+
+Copyright (c) 2026 Chimpy (Beautiful UI)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+Source: https://beautiful-ui.dev/r/notchset.json
+License: https://beautiful-ui.dev/license (Free Items)
+Nines incorporates scoped adaptations of the free theme palette and the
+Sparkline, Donut Chart and Bar Chart components (v1.0.0).
+Component sources: https://beautiful-ui.dev/r/sparkline.json
+https://beautiful-ui.dev/r/donut-chart.json
+https://beautiful-ui.dev/r/bar-chart.json
+No Beautiful UI Pro component source is incorporated.
+
+Additional scoped adaptations: Animated Counter, Metric Card, Badge, Sign In,
+Text Shimmer and Text Reveal (v1.0.0), from the free registry items:
+https://beautiful-ui.dev/r/radix-nova/animated-counter.json
+https://beautiful-ui.dev/r/radix-nova/metric-card.json
+https://beautiful-ui.dev/r/radix-nova/badge.json
+https://beautiful-ui.dev/r/radix-nova/sign-in.json
+https://beautiful-ui.dev/r/text-shimmer.json
+https://beautiful-ui.dev/r/text-reveal.json
+Nines retains existing authentication and uses compact, accessible adaptations.
+No Beautiful UI Device Login block or Pro source is incorporated.
+
+The Sign In block is now vendored at components/ui/notchset/blocks/sign-in.tsx,
+with its free Input OTP, Segmented Control, field/button classes and scoped
+instrument helpers. Nines adds an account-form slot and disables passwordless
+and signup controls in the shipped adapter. The original source is preserved
+with these local modifications; audio is disabled by the root attributes.
+Dependency component sources:
+https://beautiful-ui.dev/r/radix-nova/input-otp.json
+https://beautiful-ui.dev/r/radix-nova/segmented-control.json
+
+Dependency: input-otp 1.5.0 (https://github.com/guilhermerodz/input-otp)
+MIT License
+
+Copyright (c) 2024 Guilherme Rodz
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+The public homepage incorporates the actual free Feature Bento v1.0.0 block,
+with Nines illustration content, generic burn-rate formatting, guide links,
+accessible chart controls and pause/visibility/reduced-motion handling.
+Source: https://beautiful-ui.dev/r/radix-nova/feature-bento.json
+Its silent showcase helpers do not load the portal authentication or audio code.
+
+The SLO Metric Card frame in components/ui/notchset/blocks/metric-card.tsx is adapted from https://beautiful-ui.dev/r/radix-nova/metric-card.json (Metric Card v1.0.0). Exact measured values and existing gap-aware SLI history replace rolling digits, generic deltas and sample series.

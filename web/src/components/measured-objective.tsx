@@ -10,6 +10,9 @@ import {
   inlineObjectiveDraft,
   type InlineObjectiveDraft,
 } from "@/lib/objective-editor";
+import { GitProposeButton } from "./git-delivery";
+import { CustomerReportEditor, LabelsEditor } from "./slo-extras-editors";
+import { SLOKindSelect } from "./slo-kind-chooser";
 import { SLOTemplatePicker } from "./slo-template-picker";
 import { draftFromSLOTemplate } from "@/lib/slo-templates";
 import { MeasurementFields } from "./measurement-editor";
@@ -68,6 +71,7 @@ export function MeasuredObjective({
   value,
   onChange,
   fixedName,
+  onChooseGoodMinute,
   connections,
   footer,
 }: {
@@ -77,6 +81,8 @@ export function MeasuredObjective({
   value: InlineObjectiveDraft;
   onChange: (value: InlineObjectiveDraft) => void;
   fixedName?: boolean;
+  /** Switches the dialog to Settings with interval judging enabled. */
+  onChooseGoodMinute?: () => void;
   connections: { id: string; kind: string }[];
   footer?: HTMLElement | null;
 }) {
@@ -174,32 +180,56 @@ export function MeasuredObjective({
       >
         Save reviewed SLO
       </Button>
+      <GitProposeButton
+        scope={scope}
+        manifest={preview?.plan.manifest}
+        plan={preview?.plan ?? null}
+        disabled={busy || !preview || !ack}
+      />
     </div>
   );
   return (
     <div className="space-y-5">
-      <p className="text-sm text-muted-foreground">
-        Define what counts as success, then set the target and window. The
-        measurement is saved and versioned inside this SLO.
-      </p>
       {!fixedName ? (
-        <SLOTemplatePicker
-          onBusyChange={working}
-          scope={scope}
-          disabled={busy || !canEdit(scope)}
-          onSelect={(template) =>
-            change(() => {
-              const next = inlineObjectiveDraft(template.manifest);
-              onChange({
-                ...next,
-                measurement: {
-                  ...draftFromSLOTemplate(template),
-                  source: draft.source,
-                },
-              });
-            })
-          }
-        />
+        <>
+          <SLOKindSelect
+            value={draft.measurement}
+            disabled={busy || !canEdit(scope)}
+            onChoose={(kind) => {
+              if (kind === "good-minute") return onChooseGoodMinute?.();
+              change(() =>
+                onChange({
+                  ...value,
+                  customers: kind === "sessions" ? undefined : value.customers,
+                  measurement: { ...draft, measurement: kind },
+                }),
+              );
+            }}
+          />
+          <details className="disclosure-panel">
+            <summary>Start from a template</summary>
+            <div className="pt-3">
+              <SLOTemplatePicker
+                onBusyChange={working}
+                scope={scope}
+                measure={draft.measurement}
+                disabled={busy || !canEdit(scope)}
+                onSelect={(template) =>
+                  change(() => {
+                    const next = inlineObjectiveDraft(template.manifest);
+                    onChange({
+                      ...next,
+                      measurement: {
+                        ...draftFromSLOTemplate(template),
+                        source: draft.source,
+                      },
+                    });
+                  })
+                }
+              />
+            </div>
+          </details>
+        </>
       ) : null}
       <FormSection
         title="Measurement"
@@ -210,6 +240,7 @@ export function MeasuredObjective({
           connections={connections}
           disabled={busy || !canEdit(scope)}
           fixedName={fixedName}
+          simple
           onChange={(value) => change(() => update({ measurement: value }))}
         />
       </FormSection>
@@ -244,26 +275,62 @@ export function MeasuredObjective({
           </div>
         </div>
       </FormSection>
-      <BudgetPolicyEditor
-        value={errorBudgetPolicy}
-        disabled={busy}
-        onChange={(value) => change(() => update({ errorBudgetPolicy: value }))}
-      />
-      <QualityPolicyEditor
-        value={quality}
-        disabled={busy}
-        onChange={(value) => change(() => update({ quality: value }))}
-      />
-      <SLOLifecycleSelect
-        value={lifecycle}
-        disabled={busy}
-        onChange={(value) => change(() => update({ lifecycle: value }))}
-      />
-      <PolicyEditor
-        policies={policies}
-        disabled={busy}
-        onChange={(value) => change(() => update({ policies: value }))}
-      />
+      <details
+        className="disclosure-panel"
+        open={
+          !!fixedName ||
+          !!errorBudgetPolicy ||
+          !!quality ||
+          !!value.labels ||
+          !!value.customers ||
+          policies.length > 0 ||
+          lifecycle !== "committed"
+        }
+      >
+        <summary>
+          Optional settings: per-customer, labels, alerts, budget response,
+          lifecycle, quality
+        </summary>
+        <div className="space-y-5 pt-3">
+          <BudgetPolicyEditor
+            value={errorBudgetPolicy}
+            disabled={busy}
+            onChange={(value) =>
+              change(() => update({ errorBudgetPolicy: value }))
+            }
+          />
+          <QualityPolicyEditor
+            value={quality}
+            disabled={busy}
+            onChange={(value) => change(() => update({ quality: value }))}
+          />
+          <SLOLifecycleSelect
+            value={lifecycle}
+            disabled={busy}
+            onChange={(value) => change(() => update({ lifecycle: value }))}
+          />
+          <LabelsEditor
+            value={value.labels}
+            disabled={busy}
+            onChange={(labels) => change(() => update({ labels }))}
+          />
+          <CustomerReportEditor
+            value={value.customers}
+            disabled={busy}
+            unsupported={
+              draft.measurement === "sessions"
+                ? "not available for session measurements, which cannot be grouped by customer yet."
+                : undefined
+            }
+            onChange={(customers) => change(() => update({ customers }))}
+          />
+          <PolicyEditor
+            policies={policies}
+            disabled={busy}
+            onChange={(value) => change(() => update({ policies: value }))}
+          />
+        </div>
+      </details>
       {error ? (
         <p ref={errorRef} role="alert" className="text-sm text-destructive">
           {error}

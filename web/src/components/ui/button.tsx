@@ -1,63 +1,124 @@
 import * as React from "react";
-import { cva, type VariantProps } from "class-variance-authority";
-import { cn } from "cn";
-import { Slot } from "radix-ui";
+import { Button as AstryxButton } from "@astryxdesign/core/Button";
 
-const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-  {
-    variants: {
-      variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive-surface text-white hover:bg-destructive-surface/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40",
-        outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-background dark:hover:bg-accent",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
-        link: "text-primary underline-offset-4 hover:underline",
-      },
-      size: {
-        default: "h-9 px-4 py-2 has-[>svg]:px-3",
-        xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5",
-        lg: "h-10 rounded-md px-6 has-[>svg]:px-4",
-        icon: "size-9",
-        "icon-xs": "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  },
-);
+// Adapter over Astryx Button. Call sites keep the established variant/size
+// vocabulary; the mapping to Astryx lives here so it changes in one place.
+type Variant =
+  "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+type Size =
+  "default" | "xs" | "sm" | "lg" | "icon" | "icon-xs" | "icon-sm" | "icon-lg";
+
+const variants = {
+  default: "primary",
+  destructive: "destructive",
+  outline: "secondary",
+  secondary: "secondary",
+  ghost: "ghost",
+  link: "ghost",
+} as const;
+const sizes = {
+  default: "md",
+  xs: "sm",
+  sm: "sm",
+  lg: "lg",
+  icon: "md",
+  "icon-xs": "sm",
+  "icon-sm": "sm",
+  "icon-lg": "lg",
+} as const;
+
+function textOf(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (React.isValidElement<{ children?: React.ReactNode }>(node))
+    return textOf(node.props.children);
+  return "";
+}
+
+// Astryx lays out `icon` before the label and `endContent` after it. Children
+// that mix icons and text would otherwise all land in the text span, where a
+// block-level SVG wraps onto its own line, so route icons to their slots.
+function isIcon(node: React.ReactNode): node is React.ReactElement {
+  if (!React.isValidElement<{ children?: React.ReactNode }>(node)) return false;
+  return (
+    node.type === "svg" ||
+    (typeof node.type !== "string" && node.props.children === undefined)
+  );
+}
+function splitIcons(children: React.ReactNode) {
+  const nodes = React.Children.toArray(children);
+  const firstText = nodes.findIndex((n) => !isIcon(n));
+  if (firstText === -1) return { icon: undefined, end: undefined, rest: null };
+  let lastText = nodes.length - 1;
+  while (lastText > firstText && isIcon(nodes[lastText])) lastText--;
+  return {
+    icon: firstText > 0 ? nodes[0] : undefined,
+    end: lastText < nodes.length - 1 ? nodes[lastText + 1] : undefined,
+    rest: nodes.slice(firstText > 0 ? 1 : 0, lastText + 1),
+  };
+}
+
+type AstryxProps = React.ComponentProps<typeof AstryxButton>;
+type ButtonProps = Omit<
+  AstryxProps,
+  "label" | "variant" | "size" | "isIconOnly" | "isDisabled" | "tooltip"
+> & {
+  variant?: Variant;
+  size?: Size;
+  disabled?: boolean;
+  title?: string;
+  label?: string;
+};
 
 function Button({
-  className,
   variant = "default",
   size = "default",
-  asChild = false,
+  disabled,
+  title,
+  label,
+  children,
+  // Established behavior: a button inside a form submits unless told otherwise.
+  type = "submit",
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean;
-  }) {
-  const Comp = asChild ? Slot.Root : "button";
-
+}: ButtonProps) {
+  const iconOnly = size.startsWith("icon");
+  const name =
+    label ?? props["aria-label"] ?? title ?? (textOf(children) || undefined);
+  if (iconOnly)
+    return (
+      <AstryxButton
+        {...props}
+        type={type}
+        label={name ?? ""}
+        variant={variants[variant]}
+        size={sizes[size]}
+        isDisabled={disabled}
+        tooltip={title}
+        isIconOnly
+        icon={children}
+      />
+    );
+  const { icon, end, rest } = splitIcons(children);
+  const hasSlots = icon !== undefined || end !== undefined;
   return (
-    <Comp
-      data-slot="button"
-      data-variant={variant}
-      data-size={size}
-      className={cn(buttonVariants({ variant, size, className }))}
+    <AstryxButton
       {...props}
-    />
+      type={type}
+      label={name ?? ""}
+      variant={variants[variant]}
+      size={sizes[size]}
+      isDisabled={disabled}
+      tooltip={title}
+      {...(hasSlots
+        ? {
+            icon: icon ?? props.icon,
+            endContent: end as AstryxProps["endContent"],
+          }
+        : {})}
+    >
+      {hasSlots ? rest : children}
+    </AstryxButton>
   );
 }
 
-export { Button, buttonVariants };
+export { Button };

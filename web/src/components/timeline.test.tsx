@@ -2,6 +2,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { beforeEach, afterEach, expect, test, vi } from "vitest";
+import { SLOPerformance } from "./slo-performance";
+import { createTenantSession, type SLO } from "@/lib/api";
 import { Timeline, sliTimelineLines } from "./timeline";
 import type { HistoryPoint, SLOHistory } from "@/lib/history";
 let root: Root, host: HTMLDivElement;
@@ -53,6 +55,7 @@ beforeEach(() => {
         resize = callback;
       }
       observe() {}
+      unobserve() {}
       disconnect() {}
     },
   );
@@ -274,4 +277,146 @@ test("summary describes the selected measurement and never substitutes a missing
     host.querySelector('[aria-label^="Selected Measured SLI"]')?.textContent,
   ).toBe("No data");
   expect(host.querySelector("[data-chart-marker]")).toBeNull();
+});
+
+test("inspection tooltip exposes values, missing data and supports Escape", async () => {
+  await render();
+  const plot = host.querySelector('svg[role="slider"]')!;
+  expect(host.querySelector('[role="tooltip"]')).toBeNull();
+  await act(async () =>
+    plot.dispatchEvent(new Event("pointermove", { bubbles: true })),
+  );
+  const tooltip = host.querySelector('[role="tooltip"]')!;
+  expect(tooltip.textContent).toContain("Measured SLI");
+  expect(tooltip.textContent).toContain("99.000%");
+  expect(tooltip.textContent).toContain("Target 99.9%");
+  expect(plot.getAttribute("aria-describedby")).toContain(tooltip.id);
+  await act(async () =>
+    plot.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+    ),
+  );
+  expect(host.querySelector('[role="tooltip"]')).toBeNull();
+  await render({ ...history, points: [point("2026-10-24T10:00:00Z", null)] });
+  await act(async () =>
+    host
+      .querySelector('svg[role="slider"]')!
+      .dispatchEvent(new FocusEvent("focusin", { bubbles: true })),
+  );
+  expect(host.querySelector('[role="tooltip"]')?.textContent).toContain(
+    "No data",
+  );
+  await act(async () =>
+    host
+      .querySelector('svg[role="slider"]')!
+      .dispatchEvent(new FocusEvent("focusout", { bubbles: true })),
+  );
+  expect(host.querySelector('[role="tooltip"]')).toBeNull();
+});
+
+test.each([false, true])(
+  "missing policy chart explains saved configuration accurately (configured=%s)",
+  async (configured) => {
+    const scope = createTenantSession("fixture-only", "alpha", "owner");
+    const onConfigure = vi.fn();
+    const policy = {
+      name: "fast",
+      severity: "critical" as const,
+      shortWindowSeconds: 60,
+      longWindowSeconds: 300,
+      burnRate: 14,
+      forSeconds: 0,
+      minCoverage: 1,
+    };
+    const slo: SLO = {
+      id: "api",
+      name: "API",
+      project: "p",
+      service: "api",
+      target: 0.999,
+      windowSeconds: 3600,
+      stepSeconds: 60,
+      policies: configured ? [policy] : [],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(history))),
+    );
+    try {
+      await act(async () =>
+        root.render(
+          <SLOPerformance
+            slo={slo}
+            at={history.to}
+            scope={scope}
+            refreshKey={0}
+            onConfigure={onConfigure}
+          />,
+        ),
+      );
+      expect(host.textContent).toContain(
+        configured
+          ? "policy history is unavailable"
+          : "Burn-rate alerts are not configured for this SLO",
+      );
+      expect(host.textContent).not.toContain(
+        "No burn-rate alert policy configured.",
+      );
+      expect(
+        [...host.querySelectorAll("h3")].some(
+          (h) => h.textContent === "Burn rate",
+        ),
+      ).toBe(false);
+      const configure = [...host.querySelectorAll("button")].find(
+        (b) => b.textContent === "Open configuration",
+      )!;
+      await act(async () => configure.click());
+      expect(onConfigure).toHaveBeenCalledOnce();
+      expect(
+        host
+          .querySelector("svg.chart-inspection-plot")
+          ?.classList.contains("select-none"),
+      ).toBe(true);
+    } finally {
+      scope.close();
+    }
+  },
+);
+
+test("inspection circles remain whole at time endpoints and the top and bottom of the plot", async () => {
+  const extremes = {
+    ...history,
+    points: [point(history.from, 0), point(history.to, 1)],
+  };
+  for (const index of [0, 1]) {
+    await act(async () =>
+      root.render(
+        <Timeline
+          title="SLI and SLO target"
+          history={extremes}
+          lines={sliTimelineLines}
+          threshold={extremes.target}
+          thresholdLabel="Target"
+          percentages
+          index={index}
+          onIndex={onIndex}
+        />,
+      ),
+    );
+    const plot = host.querySelector<SVGElement>('svg[role="slider"]')!;
+    await act(async () =>
+      plot.dispatchEvent(new FocusEvent("focusin", { bubbles: true })),
+    );
+    const markers = [...host.querySelectorAll("[data-chart-marker]")];
+    expect(markers.length).toBeGreaterThan(0);
+    for (const marker of markers) {
+      expect(marker.closest("[clip-path]")).toBeNull();
+      expect(marker.querySelectorAll("circle")).toHaveLength(2);
+      expect(marker.closest("[data-chart-inspection]")).not.toBeNull();
+    }
+    expect(host.querySelector("[clip-path] path")).not.toBeNull();
+    expect(host.querySelector('[role="tooltip"]')!.textContent).toContain(
+      index === 0 ? "0.000%" : "100.000%",
+    );
+  }
 });

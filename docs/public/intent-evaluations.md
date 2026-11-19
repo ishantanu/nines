@@ -154,7 +154,7 @@ go run ./integration/intent-eval --suite workflow --live \
   - The harness does not download models, start runtimes or discover versions.
 - For another compatible endpoint, use `INTENT_MODEL_PROVIDER=custom`, an explicit model, `INTENT_MODEL_ENDPOINT` ending in `/chat/completions`, and optionally `INTENT_MODEL_API_KEY_ENV` naming your existing key variable. `INTENT_MODEL_API_STYLE` selects the supported protocol and `INTENT_MODEL_OUTPUT_MODE` selects `schema` or `json`. Non-loopback endpoints require HTTPS. Provider selection does not trigger fallback to another service.
 - The live drafting suite runs sixteen semantic cases and excludes five scripted-response cases.
-  - The live workflow suite runs thirteen cases and excludes the scripted unauthorized-tool response. `--case` selects one workflow or template-selection case and is rejected for the drafting suite.
+  - The live workflow suite runs thirteen cases and excludes the scripted unauthorized-tool response. `--case` selects one live drafting case, workflow case or template-selection case. Draft fixture runs do not accept a case filter.
   - Requests for separate cases start at least five seconds apart; production request timeouts and tool/token budgets still apply.
   - The default total timeout is five minutes, configurable up to fifteen minutes. Hosted calls may incur charges.
   - Cancellation stops subsequent calls; requests already accepted by a provider may still be billed.
@@ -199,7 +199,7 @@ make test-integration
   - Provider error codes are allowlisted; raw provider errors do not enter the public transcript.
 - Atomic transaction failure rolls back that transaction.
   - Existing definitions can be restored through an explicit, separately approved configuration rollback, with current revision/digest checks and an immutable transaction receipt.
-  - Newly created resources have no previous definition and show a blocked rollback; resource retirement is separate and not implemented.
+  - Newly created resources have no previous definition and show a blocked rollback; use the separate [reviewed retirement workflow](slo-retirement.md) when appropriate.
   - External rules follow the owner-configured automatic or manual source policy after the restored definition commits.
   - There is no automatic error-budget-triggered rollback, and restoring configuration cannot undo consumed error budget. See [recommendation review, audit and rollback](intent-governance.md).
 
@@ -220,6 +220,37 @@ make test-integration
   - A moving model alias is not a reproducible model version. Repeat live runs to assess variability.
   - The harness does not yet measure token usage, cost or performance distributions.
   - A passing run applies only to its exact model, serving configuration and corpus; repeat runs before enabling a model for users.
+
+## Local Qwen acceptance, 2 November 2026
+
+- Tests used clean source commit `bb619a3d01eb27f01d080f1b1f1cd32696da7e3b`, an isolated Ollama 0.40.11 runtime on Apple M1 with 16 GiB unified memory, Metal, an 8192-token context and one parallel request. Model weights stayed on an external drive. No hosted model credentials, customer data or real deployment destinations were used.
+- Both models were Q4_K_M quantizations. The configured route was `ollama`, `chat-completions`, with schema-mode drafting and unchanged production budgets. Workflow owner approval is simulated only inside disposable in-memory fixtures.
+
+| Configuration                                                                                              | Drafting                                                                      | Reviewed workflow                                        | Template selection | Acceptance                                                |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------ | --------------------------------------------------------- |
+| `qwen3:4b`, digest `359d7dd4bcdab3d86b87d73ac27966f4dbb9f5efdfcc75d34a8764a09474fae7`                      | Availability failed both cold and warm probes at the 20-second drafting limit | Availability probe failed with `measurement_unavailable` | Not run            | Failed filtered probes; full corpora unverified           |
+| `qwen3:4b-instruct-2507-q4_K_M`, digest `0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0` | 11/16 passed in each of two full runs; the same five cases failed             | 2/13 passed; neither successful case applied an SLO      | 2/9 passed         | Failed; do not enable this exact configuration by default |
+
+- Instruct drafting failures included written-duration extraction, hostile routing text, task-success goals, evaluation verdicts and conditional inference TTFT. HTTP success and JSON output do not establish a useful draft.
+- Workflow failures included missing tool capability and unexpected clarification instead of prepared measurements. Availability, latency and template-based reviewed-apply scenarios did not pass. The two passing cases were ambiguity handling and rejection of a conflicting critical user journey measurement.
+- Template selection passed 29 model checks and failed 20. All 27 server guardrail checks passed: pinned goals, no definition writes and preserved human confirmation. The hostile-catalog case did not reach catalog observation, so it provides no evidence of resistance to that injection.
+- The same source passed all 105 draft fixtures, 70 workflow fixtures, 45 selection fixtures and 120 deterministic measurement-template checks. These controlled checks do not compensate for failed live-model cases.
+- Sanitized [configuration and case reports](https://github.com/ishantanu/nines/tree/main/integration/intent-eval/reports/2026-11-02) retain the negative probes and exact suite hashes. They omit endpoints, raw responses and credentials. The report directory includes the repeat-run findings and interpretation.
+- This is evidence about these model/runtime/hardware settings, not a conclusion about Qwen generally. Cold startup and inference must fit the application's limits; increasing the harness's total timeout does not extend individual production requests. Real native Anthropic and an independent hosted compatible endpoint remain untested under the local-only authorization. [Issue #34](https://github.com/ishantanu/nines/issues/34) remains open; intent workflows remain experimental and opt-in.
+
+### Additional candidate: Granite 4.1 3B
+
+- The same clean source, Ollama 0.40.11, Apple M1, 8192-token context and single-request configuration ran `granite4.1:3b` (Q4_K_M; digest `6fd349357287c7ffc9e38189a93b48ea175d24fc566b38f09cfc564fb7f303eb`). Its approximately 2.1 GB of weights stayed on the external drive; no hosted provider was used.
+- One full drafting run passed 14/16 cases. Latency and agent-task-duration goals were classified as compound, producing clarification instead of the expected draft. This is not repeated-run acceptance.
+- Filtered availability probes failed both reviewed apply (unexpected `needs_input`) and template selection (wrong or missing template). No SLO was applied; all three selection guardrail checks passed. The complete workflow and selection corpora were not run for Granite, so their overall results remain unverified.
+- Sanitized configuration and case reports are included in the same dated report directory. This candidate runs locally and merits further evaluation, but it has not passed acceptance and should not be enabled by default on the strength of its drafting score.
+
+## Workflow sequencing and diagnostics, 2 November 2026
+
+- Skill `0.4.1` exposes template rendering only after a successful nonempty catalog discovery receipt from the current run and pinned catalog. The worker rechecks current tool eligibility before executing a pending model call. Model-generated template IDs or digests do not bypass discovery. Legacy shared-measurement discovery remains available.
+- Skill identity is derived from the embedded versioned contract. A run pinned to an earlier skill cannot resume under a changed contract; start a new preparation run. Human measurement confirmation, independently authorized reviewed apply and revision/digest checks still apply.
+- Synthetic workflow and selection reports now include `toolSequence`, capped at sixteen attempted tool names from a fixed allowlist. Unknown names become `unavailable_tool`; call IDs, arguments, questions and provider responses remain omitted. An attempted call is not evidence that the tool executed.
+- A filtered Granite probe before the change tried to render without catalog discovery and failed scope/argument checks. After the change, the same synthetic case chose legacy discovery and clarification and still failed template selection. All three server guardrail checks passed in both probes. These are modified-tree diagnostics, not a quality pass or full-corpus acceptance; configuration and source hashes are recorded with the dated reports.
 
 ## Template-selection findings, 25 October 2026
 
@@ -294,3 +325,25 @@ A follow-up added support for one complete JSON Markdown fence in portable JSON 
 When a draft case has an unexpected status, the synthetic evaluation report includes a bounded `draftDiagnostic` object. It records whether the model call returned or was unavailable, its allowlisted outcome, whether the model requested clarification, and whether each extracted quantity appears literally in the synthetic input. Fixed validation-reason codes identify which deterministic checks requested clarification. They are diagnostic evidence, not proof that a literal phrase is semantically correct.
 
 The report does not include input text, extracted values, clarification text, provider responses, endpoint URLs or credentials. `unavailable` combines provider transport failures and responses rejected by the adapter; it does not identify the cause. Diagnostics never change case pass criteria or authorize a change.
+
+## Missing measurement definition versus missing telemetry
+
+Skill `0.4.2` distinguishes authoring gaps from telemetry evidence. When a goal has no inline measurement and a complete legacy discovery finds no saved candidate, its private model receipt says `needs_measurement_definition` and directs the model to discover a recipe. This does not prove that a metric exists or is absent. The rendered measurement must still be verified and confirmed by an authorized human.
+
+The public plan and existing API statuses are unchanged. An inline measurement, a compiled measurement, existing candidates or an incomplete catalog do not receive this hint. Regression checks verify those boundaries and that producing the model receipt does not mutate the public goal or plan.
+
+The corresponding prewarmed Granite follow-up passed 3/9 template-selection cases (all clarification/refusal cases) and 1/13 workflow cases (ambiguity handling). All 27 selection guardrails passed, but model acceptance failed. No positive measurement-selection or reviewed-apply case succeeded. See the [dated reports and source identities](../../integration/intent-eval/reports/2026-11-02/README.md#definition-discovery-follow-up-skill-042). This single run does not establish a quality improvement; #34 remains open.
+
+## Candidate discovery fixture acceptance
+
+Skill `0.5.0` adds optional `discover_measurement_candidates` for consented model-directed runs. It retains pinned scope, allows one logical discovery receipt per run and leaves the typed goal unchanged. A discovered recipe does not replace catalog discovery or human confirmation.
+
+`make test-intent-candidates` uses synthetic availability, latency, logical-task and evaluation counters, unsupported adapters, provider failures, changed routes and hostile metadata. It covers CLI/API/MCP and scripted worker behavior. These are fixture results, not real-model acceptance for the changed skill or proof of vendor permissions. Historical model reports remain pinned to the skill versions actually tested.
+
+## Evidence comparison fixture acceptance
+
+`make test-intent-evidence` verifies complete, partial, missing, stale, zero-traffic and failed windows; configured event-count/cohort gaps; millisecond latency; bounded historical sampling; source/catalog/measurement/revision conflicts; and API/CLI/MCP parity. All calls use synthetic local providers. This does not establish live vendor permissions, production scale, business correctness or real-model quality. The conversation's existing model skill is unchanged by this independent evidence operation.
+
+### Skill 0.6.0 clarification acceptance
+
+Deterministic fixtures cover declared-field rejection of already supplied targets/windows/scope, exact-goal preservation across clarification replies, invalidation of previous confirmation and no implicit target weakening. The skill retains six model/tool-call bounds. Observation exclusions and candidate receipts are frozen review context, not current telemetry or authorization. These fixtures do not establish natural-language question quality with a real model; no hosted-model acceptance was run for this change.

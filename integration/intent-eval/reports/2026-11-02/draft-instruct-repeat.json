@@ -1,0 +1,200 @@
+{
+  "suite": "draft",
+  "apiVersion": "nines.dev/v1alpha1",
+  "kind": "IntentEvaluationReport",
+  "mode": "live",
+  "suiteSHA256": "9d9c3f106ec1d9a7007f2836730fdd9777ed64529c34f6f5decb15569af0907d",
+  "generatedAt": "2026-11-02T07:45:26.657712Z",
+  "complete": true,
+  "runtimeVersion": "Ollama 0.40.11; Metal; context 8192; parallel 1; prewarmed; repeat",
+  "results": [
+    {
+      "case": "availability",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 2695
+    },
+    {
+      "case": "latency",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 1993
+    },
+    {
+      "draftDiagnostic": {
+        "modelState": "returned",
+        "outcome": "latency",
+        "modelClarification": false,
+        "targetEvidence": "appears_in_input",
+        "windowEvidence": "appears_in_input",
+        "thresholdEvidence": "not_in_input",
+        "validationReasons": [
+          "threshold_invalid"
+        ]
+      },
+      "case": "written-duration",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "needs_clarification",
+      "failure": "unexpected_status",
+      "durationMilliseconds": 2035
+    },
+    {
+      "case": "missing-target",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 1701
+    },
+    {
+      "case": "missing-window",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 3403
+    },
+    {
+      "case": "calendar-month",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 2307
+    },
+    {
+      "case": "conflicting-targets",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 2779
+    },
+    {
+      "case": "compound-outcome",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 2693
+    },
+    {
+      "case": "percentile-request",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 2870
+    },
+    {
+      "draftDiagnostic": {
+        "modelState": "returned",
+        "outcome": "availability",
+        "modelClarification": true,
+        "targetEvidence": "appears_in_input",
+        "windowEvidence": "appears_in_input",
+        "thresholdEvidence": "missing"
+      },
+      "case": "hostile-routing-request",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "needs_clarification",
+      "failure": "unexpected_status",
+      "durationMilliseconds": 7904
+    },
+    {
+      "draftDiagnostic": {
+        "modelState": "returned",
+        "outcome": "availability",
+        "modelClarification": true,
+        "targetEvidence": "missing",
+        "windowEvidence": "appears_in_input",
+        "thresholdEvidence": "missing",
+        "validationReasons": [
+          "target_invalid"
+        ]
+      },
+      "case": "agent-task-success",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "needs_clarification",
+      "failure": "unexpected_status",
+      "durationMilliseconds": 3028
+    },
+    {
+      "case": "agent-task-duration",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "draft",
+      "durationMilliseconds": 2002
+    },
+    {
+      "draftDiagnostic": {
+        "modelState": "returned",
+        "outcome": "availability",
+        "modelClarification": true,
+        "targetEvidence": "appears_in_input",
+        "windowEvidence": "appears_in_input",
+        "thresholdEvidence": "missing"
+      },
+      "case": "llm-evaluation-pass",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "needs_clarification",
+      "failure": "unexpected_status",
+      "durationMilliseconds": 2687
+    },
+    {
+      "draftDiagnostic": {
+        "modelState": "returned",
+        "outcome": "latency",
+        "modelClarification": true,
+        "targetEvidence": "appears_in_input",
+        "windowEvidence": "appears_in_input",
+        "thresholdEvidence": "appears_in_input"
+      },
+      "case": "inference-conditional-ttft",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": false,
+      "status": "needs_clarification",
+      "failure": "unexpected_status",
+      "durationMilliseconds": 6868
+    },
+    {
+      "case": "llm-undefined-quality",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 4190
+    },
+    {
+      "case": "agent-joint-conditions",
+      "provider": "ollama",
+      "model": "qwen3:4b-instruct-2507-q4_K_M",
+      "passed": true,
+      "status": "needs_clarification",
+      "durationMilliseconds": 7181
+    }
+  ],
+  "passed": 11,
+  "failed": 5,
+  "skipped": [
+    "invented-quantity",
+    "duplicate-quantity",
+    "discarded-clarification",
+    "invented-query-field",
+    "null-clarification-item"
+  ]
+}

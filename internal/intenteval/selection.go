@@ -233,7 +233,8 @@ func evaluateSelection(ctx context.Context, c selectionCase, provider string, ba
 	flow := intentflow.New(platform, intentflow.NewMemory())
 	defer flow.Repository.Close()
 	flow.Templates = registry
-	trace := &selectionTrace{Model: backend, test: c, registry: registry}
+	observed := &toolTrace{Model: backend}
+	trace := &selectionTrace{Model: observed, test: c, registry: registry}
 	flow.Model = trace
 	flow.Authorize = func(context.Context, v1.InvestigationActor) error { return nil }
 	owner := tenancy.WithPrincipal(ctx, tenancy.Principal{TenantID: "evaluation", Role: "owner", Subject: "fixture-owner", Kind: "user"})
@@ -259,6 +260,7 @@ func evaluateSelection(ctx context.Context, c selectionCase, provider string, ba
 	result.Status = value.State
 	result.ModelCalls = trace.modelCalls
 	result.ToolAttempts = trace.attempts
+	result.ToolSequence = append([]string(nil), observed.sequence...)
 	if len(value.Runs) > 0 {
 		result.WorkflowError = value.Runs[len(value.Runs)-1].ErrorCode
 	}

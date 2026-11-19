@@ -1,5 +1,11 @@
+import { MetricCard } from "./ui/notchset/metric-card";
+import { SLOCards } from "./slo-cards";
+import { OverviewCharts } from "./overview-charts";
+import { LabelRollup } from "./label-rollup";
+import { SLOTypesOverview } from "./slo-types-overview";
+import { AdoptionReview } from "./adoption-review";
+import type { RequestScope } from "@/lib/api";
 import { providerLabel } from "@/lib/telemetry-providers";
-import { SLOProvider } from "./provider-identity";
 import { useState } from "react";
 import { ReplayLabel } from "@/components/replay-label";
 import {
@@ -7,7 +13,6 @@ import {
   ArrowRight,
   Database,
   ShieldCheck,
-  ChevronDown,
   CircleCheck,
   CircleHelp,
   TriangleAlert,
@@ -16,17 +21,28 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Status } from "@/components/status";
-import { SLIValue } from "@/components/sli-value";
-import { healthOf, percent, type Data } from "@/lib/api";
+import { Heading } from "@astryxdesign/core/Heading";
+import { Text } from "@astryxdesign/core/Text";
+import { Collapsible } from "@astryxdesign/core/Collapsible";
+import { ClickableCard } from "@astryxdesign/core/ClickableCard";
+import { healthOf, type Data } from "@/lib/api";
 export function Home({
   data,
+  scope,
   onNavigate,
   onSLO,
   onJourney,
 }: {
   data: Data;
+  scope?: RequestScope;
   onNavigate: (
-    page: "objectives" | "journeys" | "connections" | "access" | "clients",
+    page:
+      | "objectives"
+      | "journeys"
+      | "connections"
+      | "access"
+      | "clients"
+      | "intents",
   ) => void;
   onSLO: (id: string) => void;
   onJourney: (id: string) => void;
@@ -65,32 +81,38 @@ export function Home({
       <section className="overview-brief" aria-labelledby="overview-focus">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2
-              id="overview-focus"
-              className="text-xl font-semibold tracking-tight"
-            >
+            <Heading level={2} type="display-3" id="overview-focus">
               {!active.length
                 ? "Start measuring reliability"
                 : attention.length
                   ? `${attention.length} ${attention.length === 1 ? "objective needs" : "objectives need"} review`
                   : "No objectives require attention"}
-            </h2>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            </Heading>
+            <Text as="p" color="secondary" className="mt-2 max-w-2xl">
               {active.length
                 ? `${active.length} active ${active.length === 1 ? "objective" : "objectives"} across ${new Set(active.map((o) => o.slo.service)).size} ${new Set(active.map((o) => o.slo.service)).size === 1 ? "service" : "services"} and ${data.journeys.length} critical user ${data.journeys.length === 1 ? "journey" : "journeys"}.`
                 : "Define an SLO to start monitoring service reliability."}
-            </p>
+            </Text>
           </div>
-          <Button
-            size="sm"
-            variant={attention.length ? "default" : "outline"}
-            onClick={() =>
-              attention.length ? setReviewOnly(true) : onNavigate("objectives")
-            }
-          >
-            {attention.length ? "Review objectives" : "Open objectives"}
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Button>
+          {!active.length ? (
+            <Button size="sm" onClick={() => onNavigate("intents")}>
+              Create an SLO from a goal
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant={attention.length ? "default" : "outline"}
+              onClick={() =>
+                attention.length
+                  ? setReviewOnly(true)
+                  : onNavigate("objectives")
+              }
+            >
+              {attention.length ? "Review objectives" : "Open objectives"}
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Button>
+          )}
         </div>
         {active.length ? (
           <>
@@ -98,27 +120,33 @@ export function Home({
               {groups
                 .filter((g) => g.count > 0)
                 .map(({ key, label, Icon, count }) => (
-                  <div key={key}>
-                    <dt>
-                      <Icon
-                        className={`size-4 status-${key.replace("_", "-")}`}
-                        aria-hidden="true"
-                      />
-                      <ReplayLabel>{label}</ReplayLabel>
-                    </dt>
-                    <dd>{count}</dd>
-                  </div>
+                  <MetricCard
+                    key={key}
+                    value={count}
+                    label={
+                      <>
+                        <Icon
+                          className={`size-4 status-${key.replace("_", "-")}`}
+                          aria-hidden="true"
+                        />
+                        <ReplayLabel>{label}</ReplayLabel>
+                      </>
+                    }
+                  />
                 ))}
             </dl>
           </>
         ) : null}
       </section>
-      <div className="overview-columns">
-        <Card className="overview-panel gap-0 py-0">
-          <div className="overview-panel-header">
-            <div className="overview-panel-heading">
+      <div className="space-y-5">
+        <section aria-labelledby="overview-objectives-title">
+          <div className="space-y-3 pb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-semibold">
+                <h2
+                  id="overview-objectives-title"
+                  className="text-base font-semibold"
+                >
                   Service level objectives
                 </h2>
               </div>
@@ -127,12 +155,12 @@ export function Home({
                 size="sm"
                 onClick={() => onNavigate("objectives")}
               >
-                View SLOs
+                View all SLOs
                 <ArrowRight className="size-3.5" />
               </Button>
             </div>
             <div
-              className="overview-objective-filters"
+              className="flex flex-wrap gap-2"
               role="group"
               aria-label="Overview objective filter"
             >
@@ -154,34 +182,18 @@ export function Home({
               </Button>
             </div>
           </div>
-          <CardContent className="overview-objective-list p-0">
+          <div>
             {visible.length ? (
-              visible.slice(0, 6).map((o) => (
-                <button
-                  key={o.slo.id}
-                  className="overview-resource-row overview-objective-row"
-                  onClick={() => onSLO(o.slo.id)}
-                >
-                  <div>
-                    <span className="overview-resource-name text-sm font-medium">
-                      {o.slo.name}
-                    </span>
-                    <div className="mt-1">
-                      <SLOProvider
-                        slo={o.slo}
-                        connections={data.workspace.connections}
-                      />
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {o.slo.service} ·{" "}
-                      {o.status.budgetRemainingFraction == null
-                        ? "Budget estimate unavailable"
-                        : `${percent(o.status.budgetRemainingFraction, 1)} budget remaining`}
-                    </p>
-                  </div>
-                  <SLIValue status={o.status} target={o.slo.target} />
-                </button>
-              ))
+              <SLOCards
+                compact
+                items={visible.slice(0, 6)}
+                connections={data.workspace.connections}
+                journeys={data.journeys}
+                scope={scope}
+                rangeSeconds={900}
+                onSelect={onSLO}
+                onJourney={onJourney}
+              />
             ) : (
               <div className="empty-state space-y-3">
                 <p>
@@ -208,9 +220,15 @@ export function Home({
                 ) : null}
               </div>
             )}
-          </CardContent>
-        </Card>
-        <Card className="overview-panel gap-0 py-0">
+          </div>
+          {visible.length > 6 && (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Showing 6 of {visible.length} objectives, prioritised by alert
+              state and remaining budget. Open all SLOs for the full inventory.
+            </p>
+          )}
+        </section>
+        <Card className="gap-0 py-0">
           <div className="overview-panel-header">
             <div className="overview-panel-heading">
               <div>
@@ -280,59 +298,78 @@ export function Home({
           </CardContent>
         </Card>
       </div>
-      <details className="workspace-setup rounded-md border bg-card">
-        <summary className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm font-medium">
-          <span>Workspace setup</span>
-          <span className="inline-flex items-center gap-2 text-xs font-normal text-muted-foreground">
-            {data.workspace.source.configured
-              ? "Telemetry configured"
-              : "Manual ingestion"}{" "}
-            · {data.workspace.role}
-            <ChevronDown
-              className="size-4 disclosure-chevron"
-              aria-hidden="true"
-            />
-          </span>
-        </summary>
-        <div className="grid gap-0 border-t md:grid-cols-3">
-          {[
-            {
-              page: "connections" as const,
-              label: "Telemetry connections",
-              detail: data.workspace.source.configured
-                ? (data.workspace.source.connectionCount ?? 1) > 1
-                  ? `${data.workspace.source.connectionCount} configured connections`
-                  : `${providerLabel(data.workspace.source.kind)} configured`
-                : "No connected source · manual ingestion",
-              Icon: Database,
-            },
-            {
-              page: "access" as const,
-              label: "Access control",
-              detail: `Your tenant role: ${data.workspace.role}`,
-              Icon: ShieldCheck,
-            },
-            {
-              page: "clients" as const,
-              label: "API and clients",
-              detail: "Go SDK, CLI and YAML resource API",
-              Icon: Activity,
-            },
-          ].map((x) => (
-            <button
-              className="flex min-w-0 items-start gap-3 border-b p-5 text-left last:border-0 hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring focus-visible:-outline-offset-2 md:border-b-0 md:border-r"
-              onClick={() => onNavigate(x.page)}
-              key={x.page}
-            >
-              <x.Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-              <div>
-                <span className="text-sm font-medium">{x.label}</span>
-                <p className="mt-1 text-xs text-muted-foreground">{x.detail}</p>
-              </div>
-            </button>
-          ))}
-        </div>
-      </details>
+      <LabelRollup objectives={data.objectives} />
+      <SLOTypesOverview objectives={data.objectives} />
+      <AdoptionReview objectives={data.objectives} journeys={data.journeys} />
+      <OverviewCharts objectives={active} />
+      <Card className="workspace-setup gap-0 py-0">
+        <Collapsible
+          trigger={
+            <span className="flex flex-wrap items-center justify-between gap-3">
+              <Text weight="medium">Workspace setup</Text>
+              <Text size="sm" color="secondary">
+                {data.workspace.source.configured
+                  ? "Telemetry configured"
+                  : "Manual ingestion"}{" "}
+                · {data.workspace.role}
+              </Text>
+            </span>
+          }
+        >
+          <div className="grid gap-3 p-3 md:grid-cols-3">
+            {[
+              {
+                page: "connections" as const,
+                label: "Telemetry connections",
+                detail: data.workspace.source.configured
+                  ? (data.workspace.source.connectionCount ?? 1) > 1
+                    ? `${data.workspace.source.connectionCount} configured connections`
+                    : `${providerLabel(data.workspace.source.kind)} configured`
+                  : "No connected source · manual ingestion",
+                Icon: Database,
+              },
+              {
+                page: "access" as const,
+                label: "Access control",
+                detail: `Your tenant role: ${data.workspace.role}`,
+                Icon: ShieldCheck,
+              },
+              {
+                page: "clients" as const,
+                label: "API and clients",
+                detail: "Go SDK, CLI and YAML resource API",
+                Icon: Activity,
+              },
+            ].map((x) => (
+              <ClickableCard
+                key={x.page}
+                label={x.label}
+                onClick={() => onNavigate(x.page)}
+              >
+                <span className="flex min-w-0 items-start gap-3 text-left">
+                  <x.Icon
+                    className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <span>
+                    <Text as="span" weight="medium" className="block">
+                      {x.label}
+                    </Text>
+                    <Text
+                      size="sm"
+                      color="secondary"
+                      as="span"
+                      className="mt-1 block"
+                    >
+                      {x.detail}
+                    </Text>
+                  </span>
+                </span>
+              </ClickableCard>
+            ))}
+          </div>
+        </Collapsible>
+      </Card>
     </div>
   );
 }

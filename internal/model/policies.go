@@ -48,6 +48,9 @@ func validateBurnPolicies(s SLO) error {
 		if !Finite(p.MinEvents) || p.MinEvents < 0 || p.MinEvents > 1e18 {
 			return Invalid("minEvents must be a finite count between 0 and 1e18")
 		}
+		if p.Confidence != 0 && (!Finite(p.Confidence) || p.Confidence < 0.5 || p.Confidence > 0.9999) {
+			return Invalid("confidence must be 0 (off) or between 0.5 and 0.9999")
+		}
 		maximum := 1 / (1 - s.Target)
 		if p.BurnRate > maximum*(1+1e-12) {
 			return Invalid("burnRate %g is unreachable for target %g; maximum is %g", p.BurnRate, s.Target, maximum)
