@@ -1,0 +1,1 @@
+import{K as e,U as t}from"./focusOutline.stylex-B3Dg982V.js";import{rn as n}from"./useLayerDismissal-C5prfjwB.js";var r=e(t(),1),i=n(`InteractiveRoleContext`,1,null);i.displayName=`InteractiveRoleContext`;function a(){return(0,r.use)(i)}export{a as n,i as t};
