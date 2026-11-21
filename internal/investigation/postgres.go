@@ -10,6 +10,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/observability"
+	"github.com/ishantanu/nines/internal/schema"
 )
 
 type postgres struct{ pool *pgxpool.Pool }
@@ -28,7 +29,7 @@ func NewPostgres(ctx context.Context, dsn string) (Repository, error) {
 		_ = tx.Rollback(context.Background())
 	}()
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(654239121)"); err == nil {
-		_, err = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS reliability_investigations(id text PRIMARY KEY, summary jsonb NOT NULL, document bytea NOT NULL);`+runTableDDL)
+		err = schema.Apply(ctx, tx, "investigation", Migrations)
 	}
 	if err == nil {
 		err = tx.Commit(ctx)
@@ -134,3 +135,11 @@ func (p *postgres) Update(ctx context.Context, id string, fn func(*v1.Investigat
 	}
 	return v, tx.Commit(ctx)
 }
+
+// Migrations is the investigation schema history. Never edit or remove a
+// released migration: append a new one.
+var Migrations = []schema.Migration{
+	{ID: 1, Name: "alpha baseline", SQL: alphaBaseline},
+}
+
+const alphaBaseline = `CREATE TABLE IF NOT EXISTS reliability_investigations(id text PRIMARY KEY, summary jsonb NOT NULL, document bytea NOT NULL);` + runTableDDL

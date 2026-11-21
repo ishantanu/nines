@@ -83,6 +83,9 @@ anchors = {
     "database": [
         "TestPostgresIdentitySessionSurvivesRestart",
         "TestPostgresRestartPreservesSamplesStateAndOutbox",
+        "TestApplyRecordsAndRunsOnce",
+        "TestNewerDatabaseIsRefused",
+        "TestFailedMigrationLeavesNothingBehind",
     ],
     "mimir": [
         "TestRealMimirRetirement",

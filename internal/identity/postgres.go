@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/ishantanu/nines/internal/observability"
+	migrations "github.com/ishantanu/nines/internal/schema"
 )
 
 // Records have independent indexed keys; session reads do not load a directory.
@@ -51,10 +52,7 @@ func NewPostgres(ctx context.Context, url string) (*Postgres, error) {
 	if _, err = tx.Exec(ctx, "CREATE SCHEMA IF NOT EXISTS "+pgx.Identifier{schema}.Sanitize()); err != nil {
 		return fail(err)
 	}
-	_, err = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS identity_metadata(key text PRIMARY KEY,value text NOT NULL);
- CREATE TABLE IF NOT EXISTS identity_records(kind text NOT NULL,scope text NOT NULL,id text NOT NULL,data jsonb NOT NULL,expires_at timestamptz,PRIMARY KEY(kind,scope,id));
- CREATE INDEX IF NOT EXISTS identity_expiration ON identity_records(expires_at) WHERE expires_at IS NOT NULL;
- INSERT INTO identity_metadata(key,value) VALUES('schema_version','1') ON CONFLICT DO NOTHING;`)
+	err = migrations.Apply(ctx, tx, "identity", Migrations)
 	if err != nil {
 		return fail(err)
 	}
@@ -170,3 +168,15 @@ func (t *postgresTx) Ensure(kind, scope, id string, b json.RawMessage) error {
 	_, err := t.tx.Exec(t.ctx, "INSERT INTO identity_records(kind,scope,id,data) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING", kind, scope, id, []byte(b))
 	return err
 }
+
+// Migrations is the identity schema history. Never edit or remove a released
+// migration: append a new one. identity_metadata.schema_version stays at 1 for
+// releases that predate the migration ledger.
+var Migrations = []migrations.Migration{
+	{ID: 1, Name: "alpha baseline", SQL: alphaBaseline},
+}
+
+const alphaBaseline = `CREATE TABLE IF NOT EXISTS identity_metadata(key text PRIMARY KEY,value text NOT NULL);
+ CREATE TABLE IF NOT EXISTS identity_records(kind text NOT NULL,scope text NOT NULL,id text NOT NULL,data jsonb NOT NULL,expires_at timestamptz,PRIMARY KEY(kind,scope,id));
+ CREATE INDEX IF NOT EXISTS identity_expiration ON identity_records(expires_at) WHERE expires_at IS NOT NULL;
+ INSERT INTO identity_metadata(key,value) VALUES('schema_version','1') ON CONFLICT DO NOTHING;`

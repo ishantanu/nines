@@ -163,7 +163,7 @@ func TestRealCollectorScalingWorkload(t *testing.T) {
 		tree = "modified"
 	}
 	hashes := map[string]string{}
-	for _, file := range []string{"integration/collector/load_test.go", "internal/store/collection_jobs.go", "internal/store/schema.sql", "internal/store/postgres.go", "internal/store/memory.go", "internal/service/collection_scheduler.go", "internal/service/workers.go", "internal/service/service.go", "cmd/server/main.go", "cmd/server/tenants.go"} {
+	for _, file := range []string{"integration/collector/load_test.go", "internal/store/collection_jobs.go", "internal/store/migrations/0001_alpha_baseline.sql", "internal/store/postgres.go", "internal/store/memory.go", "internal/service/collection_scheduler.go", "internal/service/workers.go", "internal/service/service.go", "cmd/server/main.go", "cmd/server/tenants.go"} {
 		data, err := os.ReadFile("../../" + file)
 		if err != nil {
 			t.Fatal(err)

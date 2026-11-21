@@ -1,0 +1,8 @@
+# Released schema migrations: component, migration ID, checksum.
+# Lines are append-only. See released_test.go.
+identity 1 ccfd569a6762a04c
+intent 1 e084b3c26aedee53
+investigation 1 a2671f8ba01b4881
+replay 1 e62c896f00dc44b4
+store 1 b4a33d37b8c24d9b
+workflow 1 028321339cb7b020

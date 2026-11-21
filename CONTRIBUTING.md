@@ -44,8 +44,13 @@ make test-collector    # owns disposable PostgreSQL; race contracts and syntheti
 make test-mimir       # starts/removes only its own loopback Mimir fixture
 make test-victoriametrics # disposable backend, synthetic interval-count acceptance
 make test-operator    # private Docker API/controller; never uses your kubecontext
+make test-upgrade     # upgrades databases created by each published release; needs Docker and network
 make release-check
 ```
+
+### Changing the database schema
+
+Each package that stores data in PostgreSQL declares a `Migrations` list (for example `internal/store` and `internal/identity`), applied through `internal/schema`. To change a schema, append a migration with the next ID; never edit or remove one that has shipped. `TestReleasedMigrationsAreUnchanged` compares every migration with `internal/schema/released.txt`; record a new migration with `RECORD_MIGRATIONS=1 go test ./internal/schema`. When a release is published, add it to the version list in `integration/upgrade/run.sh` so later builds keep upgrading it.
 
 The CI Go job supplies a disposable PostgreSQL service and fails if PostgreSQL checks are skipped. The Mimir job uses a digest-pinned disposable image and exercises collection, rule destinations, query-output identity and independent alert lifecycle timing. Prometheus and Mimir also require real-backend intent-activation receipts: stored definitions/files alone cannot pass; current evaluation/output and collected SLI must be verified separately. The operator job uses an agentless disposable API, real upstream controller, shipped RBAC, actual Nines reconciliation/failover/cleanup and a packaged container smoke check. It does not schedule workload pods. Its runner requires kubectl, curl, base64 and shasum in addition to Docker/Go. Unit tests use local HTTP/identity fixtures; they do not need real provider credentials. Do not point integration tests at production data.
 
