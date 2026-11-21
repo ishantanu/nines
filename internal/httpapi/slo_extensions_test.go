@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/slotemplates"
@@ -90,7 +91,7 @@ func TestExtensionCatalogIsSharedByAPIAndTenantIntentWorker(t *testing.T) {
 	}
 	makeWorkspace := func(id, token string, templates *slotemplates.Registry) Workspace {
 		platform := service.New(store.NewMemory(), nil)
-		return Workspace{ID: id, Name: id, Service: platform, Templates: templates, IntentConversations: intentflow.New(platform, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: token, Role: "viewer"}}}
+		return Workspace{Features: features.All(), ID: id, Name: id, Service: platform, Templates: templates, IntentConversations: intentflow.New(platform, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: token, Role: "viewer"}}}
 	}
 	workspaces := []Workspace{makeWorkspace("alpha", "alpha", registry), makeWorkspace("beta", "beta", nil)}
 	handler, err := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))

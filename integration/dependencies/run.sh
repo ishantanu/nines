@@ -88,7 +88,7 @@ docker run -d --name "$runtime" --label nines.acceptance=dependencies \
   --env NINES_DISCOVERY_TEST_OWNER --env NINES_DISCOVERY_TEST_VIEWER --env NINES_DISCOVERY_TEST_OTHER \
   --mount "type=bind,src=$work/config,dst=/etc/nines,readonly" \
   --mount "type=bind,src=$work/serviceaccount,dst=/var/run/secrets/kubernetes.io/serviceaccount,readonly" \
-  "$name-image" -memory -tenants-file /etc/nines/tenants.yaml -addr 0.0.0.0:8080 >/dev/null
+  "$name-image" -memory -features observed-dependencies -tenants-file /etc/nines/tenants.yaml -addr 0.0.0.0:8080 >/dev/null
 mapping=$(docker port "$runtime" 8080/tcp) || { echo 'Nines fixture has no published port'; exit 1; }
 port=${mapping##*:}
 export NINES_DISCOVERY_TEST_URL="http://127.0.0.1:$port"

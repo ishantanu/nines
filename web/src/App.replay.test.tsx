@@ -74,6 +74,7 @@ beforeEach(() => {
                       allowed.find((item) => item.id === tenant)?.role ??
                       "viewer",
                     source: { kind: "manual", configured: false },
+                    features: ["session-replay"],
                   }
                 : path === "/api/slos"
                   ? [

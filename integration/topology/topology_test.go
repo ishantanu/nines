@@ -16,6 +16,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/client"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/prometheus"
 	"github.com/ishantanu/nines/internal/service"
@@ -42,7 +43,7 @@ func TestRealInstrumentedDependencyEvidence(t *testing.T) {
 	svc.TenantID = "commerce"
 	other := service.New(store.NewMemory(), nil)
 	other.TenantID = "other"
-	handler, e := httpapi.NewMulti([]httpapi.Workspace{{ID: "commerce", Name: "Commerce", Service: svc, Grants: []tenancy.Grant{{Token: "fixture-viewer", Role: "viewer"}, {Token: "fixture-owner", Role: "owner"}}}, {ID: "other", Name: "Other", Service: other, Grants: []tenancy.Grant{{Token: "other-viewer", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	handler, e := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "commerce", Name: "Commerce", Service: svc, Grants: []tenancy.Grant{{Token: "fixture-viewer", Role: "viewer"}, {Token: "fixture-owner", Role: "owner"}}}, {Features: features.All(), ID: "other", Name: "Other", Service: other, Grants: []tenancy.Grant{{Token: "other-viewer", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if e != nil {
 		t.Fatal(e)
 	}

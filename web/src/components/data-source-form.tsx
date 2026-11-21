@@ -1,4 +1,5 @@
-import { providerMaturity } from "@/lib/maturity";
+import { providerMaturity, providerOn } from "@/lib/maturity";
+import { useEnabledFeatures } from "@/lib/features";
 import {
   managedProviders,
   providerCredentialFields,
@@ -61,6 +62,10 @@ export function DataSourceForm({
   onSaved: () => void;
   allowedRoutes?: Record<string, string[]>;
 }) {
+  const enabledFeatures = useEnabledFeatures();
+  const offeredProviders = managedProviders.filter((p) =>
+    providerOn(enabledFeatures, p.kind),
+  );
   const [draft, setDraft] = useState<Draft | null>(null),
     [remove, setRemove] = useState(false),
     [busy, setBusy] = useState(false),
@@ -223,7 +228,7 @@ export function DataSourceForm({
                     });
                   }}
                 >
-                  {managedProviders.map((provider) => (
+                  {offeredProviders.map((provider) => (
                     <option key={provider.kind} value={provider.kind}>
                       {provider.label}
                       {providerMaturity(provider.kind)?.level === "experimental"

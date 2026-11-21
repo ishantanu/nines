@@ -1,3 +1,4 @@
+import { FeaturesProvider } from "@/lib/features";
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -90,18 +91,21 @@ function button(text: string) {
 async function click(text: string) {
   await act(async () => button(text).click());
 }
+let features: string[] = ["workflows"];
 async function render(
   role: "owner" | "agent" | "viewer" = "owner",
   resource: Revision | undefined = revision,
 ) {
   await act(async () =>
     root.render(
-      <ManifestEditor
-        scope={createTenantSession("fixture", "alpha", role)}
-        resource={resource}
-        onApplied={saved}
-        onProposed={proposed}
-      />,
+      <FeaturesProvider enabled={features}>
+        <ManifestEditor
+          scope={createTenantSession("fixture", "alpha", role)}
+          resource={resource}
+          onApplied={saved}
+          onProposed={proposed}
+        />
+      </FeaturesProvider>,
     ),
   );
 }

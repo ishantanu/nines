@@ -94,8 +94,14 @@ func TestGuideMatchesCatalog(t *testing.T) {
 	}
 	row := regexp.MustCompile(`(?m)^\| \[([^\]]+)\]\(([^)]+)\.md(?:#[^)]*)?\) +\| (Stable|Beta|Experimental) +\|`)
 	rows := map[string][2]string{}
+	lines := map[string]string{}
 	for _, m := range row.FindAllStringSubmatch(string(text), -1) {
 		rows[m[1]] = [2]string{m[2], strings.ToLower(m[3])}
+	}
+	for _, line := range strings.Split(string(text), "\n") {
+		if m := row.FindStringSubmatch(line); m != nil {
+			lines[m[1]] = line
+		}
 	}
 	for _, f := range Catalog() {
 		got, ok := rows[f.Name]
@@ -104,6 +110,9 @@ func TestGuideMatchesCatalog(t *testing.T) {
 		}
 		if got[0] != f.Docs || got[1] != string(f.Level) {
 			t.Fatalf("maturity.md row for %q is %v, want %s.md at %s", f.Name, got, f.Docs, f.Level)
+		}
+		if gate := "`NINES_FEATURES=" + f.ID + "`"; f.Gated != strings.Contains(lines[f.Name], gate) {
+			t.Fatalf("maturity.md row for %q must name %s exactly when the feature is gated", f.Name, gate)
 		}
 		delete(rows, f.Name)
 	}

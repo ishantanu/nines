@@ -17,6 +17,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/ishantanu/nines/examples"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
@@ -181,8 +182,8 @@ func TestMCPRealSLOUpdateRuleReviewAndTenantIsolation(t *testing.T) {
 	}
 	manager := &rules.Manager{Tenant: "commerce", Targets: map[string]rules.Target{"primary": {Connection: "primary", Kind: "prometheus", Namespace: "nines", Directory: t.TempDir()}}}
 	handler, err := httpapi.NewMulti([]httpapi.Workspace{
-		{ID: "commerce", Name: "Commerce", Service: commerce, Rules: manager, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}},
-		{ID: "operations", Name: "Operations", Service: operations, Grants: []tenancy.Grant{{Token: "operations-owner", Role: "owner"}}},
+		{Features: features.All(), ID: "commerce", Name: "Commerce", Service: commerce, Rules: manager, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}},
+		{Features: features.All(), ID: "operations", Name: "Operations", Service: operations, Grants: []tenancy.Grant{{Token: "operations-owner", Role: "owner"}}},
 	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)

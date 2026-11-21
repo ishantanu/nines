@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/ishantanu/nines/internal/datasources"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/model"
 )
 
@@ -21,6 +22,10 @@ func (a *Server) connectionSave(w http.ResponseWriter, r *http.Request) {
 	}
 	if name := r.PathValue("connection"); name != "" && name != in.Name {
 		a.fail(w, r, model.Invalid("connection name cannot change"))
+		return
+	}
+	if !a.Workspace.Features.ProviderEnabled(in.Kind) {
+		write(w, 404, map[string]string{"error": features.Disabled(in.Kind), "code": "feature_disabled", "feature": in.Kind})
 		return
 	}
 	a.Service.DefinitionMu.Lock()

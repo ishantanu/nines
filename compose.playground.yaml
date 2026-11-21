@@ -72,6 +72,8 @@ services:
       AUTH_CONFIG_FILE: /etc/nines/auth.yaml
       NINES_PUBLIC_URL: http://127.0.0.1:${NINES_PLAYGROUND_PORT:-18080}
       NINES_BOOTSTRAP_PASSWORD: ${NINES_PLAYGROUND_PASSWORD:-admin}
+      # The playground shows every experimental feature; set a list to try fewer.
+      NINES_FEATURES: ${NINES_FEATURES:-all}
       NINES_SOURCE_HOSTS: ${NINES_PLAYGROUND_SOURCE_HOSTS:-prometheus}
       NINES_SOURCE_ENCRYPTION_KEY: bmluZXMtcGxheWdyb3VuZC10ZXN0LWtleS0wMDAwMDA=
       NINES_MANAGED_RULE_DIRECTORY: /rules

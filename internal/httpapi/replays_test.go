@@ -13,6 +13,7 @@ import (
 	"time"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/replay"
 	"github.com/ishantanu/nines/internal/service"
@@ -28,7 +29,7 @@ func replayHandler(t *testing.T) http.Handler {
 		if err := s.Store.Create(context.Background(), model.SLO{ID: "checkout", Name: "Checkout", Project: "commerce", Service: "api", Target: .99, WindowSeconds: 3600, StepSeconds: 60}); err != nil {
 			t.Fatal(err)
 		}
-		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, Replays: replay.New(s, replay.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "editor", Role: "editor"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}})
+		workspaces = append(workspaces, Workspace{Features: features.All(), ID: id, Name: id, Service: s, Replays: replay.New(s, replay.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "editor", Role: "editor"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}})
 	}
 	h, err := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {

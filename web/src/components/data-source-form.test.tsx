@@ -1,3 +1,4 @@
+import { FeaturesProvider } from "@/lib/features";
 // @vitest-environment jsdom
 import { chooseOption, optionLabels } from "@/test-support/fields";
 import { act } from "react";
@@ -30,23 +31,28 @@ afterEach(async () => {
   host.remove();
   vi.unstubAllGlobals();
 });
+// Experimental providers are offered only when the server turns them on.
+const allProviders = ["datadog", "newrelic", "dash0", "victoriametrics"];
+let providers: string[] = allProviders;
 async function open(
   connection?: Parameters<typeof DataSourceForm>[0]["connection"],
 ) {
   await act(async () =>
     root.render(
-      <DataSourceForm
-        scope={scope}
-        enabled
-        connection={connection}
-        allowedRoutes={{
-          newrelic: ["123456"],
-          "newrelic-entity": ["approved-entity"],
-          dash0: ["default"],
-          victoriametrics: ["42:7"],
-        }}
-        onSaved={onSaved}
-      />,
+      <FeaturesProvider enabled={providers}>
+        <DataSourceForm
+          scope={scope}
+          enabled
+          connection={connection}
+          allowedRoutes={{
+            newrelic: ["123456"],
+            "newrelic-entity": ["approved-entity"],
+            dash0: ["default"],
+            victoriametrics: ["42:7"],
+          }}
+          onSaved={onSaved}
+        />
+      </FeaturesProvider>,
     ),
   );
   await act(async () =>
@@ -279,3 +285,13 @@ test.each(["", "42:7"])(
     });
   },
 );
+
+test("a server without experimental providers offers only Prometheus and Mimir", async () => {
+  providers = [];
+  try {
+    await open();
+    expect(await optionLabels("source-kind")).toEqual(["Prometheus", "Mimir"]);
+  } finally {
+    providers = allProviders;
+  }
+});

@@ -22,6 +22,7 @@ import (
 
 	"github.com/ishantanu/nines/examples"
 	"github.com/ishantanu/nines/internal/buildinfo"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
@@ -359,8 +360,8 @@ func TestMCPRealTenantAPIProposalBoundary(t *testing.T) {
 		}
 	}
 	handler, err := httpapi.NewMulti([]httpapi.Workspace{
-		{ID: "commerce", Name: "Commerce", Service: commerce, Grants: []tenancy.Grant{{Token: "commerce-agent", Role: "agent"}, {Token: "commerce-owner", Role: "owner"}}, Workflows: workflow.New(commerce, workflow.NewMemory())},
-		{ID: "operations", Name: "Operations", Service: operations, Grants: []tenancy.Grant{{Token: "operations-agent", Role: "agent"}}, Workflows: workflow.New(operations, workflow.NewMemory())},
+		{Features: features.All(), ID: "commerce", Name: "Commerce", Service: commerce, Grants: []tenancy.Grant{{Token: "commerce-agent", Role: "agent"}, {Token: "commerce-owner", Role: "owner"}}, Workflows: workflow.New(commerce, workflow.NewMemory())},
+		{Features: features.All(), ID: "operations", Name: "Operations", Service: operations, Grants: []tenancy.Grant{{Token: "operations-agent", Role: "agent"}}, Workflows: workflow.New(operations, workflow.NewMemory())},
 	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)

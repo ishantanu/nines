@@ -17,6 +17,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/datasources"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/identity"
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/investigation"
@@ -52,6 +53,9 @@ type Workspace struct {
 	Identity  *identity.Service
 	// GitOps is nil unless the tenant configures Git delivery.
 	GitOps GitDelivery
+	// Features turns gated experimental capabilities on; the zero value offers
+	// only the stable core.
+	Features features.Set
 }
 type tenantDescriptor struct {
 	ID   string `json:"id"`
@@ -396,6 +400,10 @@ func NewMulti(workspaces []Workspace, log *slog.Logger, identities ...*identity.
 		}
 		if auth != nil && actor.Session && r.Method != http.MethodGet && r.Method != http.MethodHead && !auth.RequireCSRF(r, actor) {
 			write(w, 403, map[string]string{"error": "CSRF validation failed"})
+			return
+		}
+		if feature, gated := features.ForPath(r.URL.Path); gated && !mounted[id].workspace.Features.Enabled(feature) {
+			write(w, 404, map[string]string{"error": features.Disabled(feature), "code": "feature_disabled", "feature": feature})
 			return
 		}
 		observability.Tenant(r.Context(), id)

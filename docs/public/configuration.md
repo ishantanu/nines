@@ -82,6 +82,7 @@ See the [deployment guides](deployment.md) for container, Linux, Kubernetes, ide
 
 ## Managed telemetry connections
 
+- Set `NINES_FEATURES` (or `-features`) to turn on experimental features, for example `NINES_FEATURES=create-from-goal,session-replay` or `all`. Without it the server offers only the beta features. See [feature maturity](maturity.md#turn-on-experimental-features).
 - Set `NINES_SOURCE_HOSTS` to a comma-separated list of exact approved hostnames to enable **Telemetry connections → Add telemetry connection** for tenant owners.
   - Set a private base64 32-byte `NINES_SOURCE_ENCRYPTION_KEY` to permit bearer credentials; keep it outside source control and back it up separately from the database.
   - The encrypted tokens are never included in GET responses.

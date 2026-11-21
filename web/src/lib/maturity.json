@@ -141,7 +141,8 @@
       "level": "experimental",
       "docs": "intents",
       "page": "intents",
-      "remaining": "Freeze the intent schema and pass real-provider acceptance for model drafting (#34)."
+      "remaining": "Freeze the intent schema and pass real-provider acceptance for model drafting (#34).",
+      "gated": true
     },
     {
       "id": "reliability-reviews",
@@ -149,7 +150,8 @@
       "level": "experimental",
       "docs": "architecture",
       "page": "investigations",
-      "remaining": "Settle the review schema and its link to incidents and postmortems."
+      "remaining": "Settle the review schema and its link to incidents and postmortems.",
+      "gated": true
     },
     {
       "id": "workflows",
@@ -157,7 +159,8 @@
       "level": "experimental",
       "docs": "workflow-webhooks",
       "page": "workflows",
-      "remaining": "Freeze the workflow event contract and accept it with a real webhook consumer."
+      "remaining": "Freeze the workflow event contract and accept it with a real webhook consumer.",
+      "gated": true
     },
     {
       "id": "agent-evidence",
@@ -165,7 +168,8 @@
       "level": "experimental",
       "docs": "visual-evaluations",
       "page": "agents",
-      "remaining": "Freeze the run evidence schema and accept it with real agent workloads."
+      "remaining": "Freeze the run evidence schema and accept it with real agent workloads.",
+      "gated": true
     },
     {
       "id": "session-replay",
@@ -173,7 +177,8 @@
       "level": "experimental",
       "docs": "session-replay",
       "page": "replays",
-      "remaining": "Browser and platform compatibility, a masking and privacy review, and offline-player acceptance."
+      "remaining": "Browser and platform compatibility, a masking and privacy review, and offline-player acceptance.",
+      "gated": true
     },
     {
       "id": "git-delivery",
@@ -187,14 +192,16 @@
       "name": "Migration from Sloth and Pyrra",
       "level": "experimental",
       "docs": "migration",
-      "remaining": "Acceptance with real-world Sloth and Pyrra files beyond the projects' published examples."
+      "remaining": "Acceptance with real-world Sloth and Pyrra files beyond the projects' published examples.",
+      "gated": true
     },
     {
       "id": "observed-dependencies",
       "name": "Observed dependency evidence",
       "level": "experimental",
       "docs": "service-dependencies",
-      "remaining": "Instrumentation coverage and production-scale validation."
+      "remaining": "Instrumentation coverage and production-scale validation.",
+      "gated": true
     },
     {
       "id": "remote-mcp",
@@ -244,7 +251,8 @@
       "level": "experimental",
       "docs": "provider-adapters",
       "provider": "victoriametrics",
-      "remaining": "Interval and throughput acceptance on a real cluster, including MetricsQL."
+      "remaining": "Interval and throughput acceptance on a real cluster, including MetricsQL.",
+      "gated": true
     },
     {
       "id": "datadog",
@@ -252,7 +260,8 @@
       "level": "experimental",
       "docs": "provider-adapters",
       "provider": "datadog",
-      "remaining": "Opt-in live-account acceptance for collection and native publication."
+      "remaining": "Opt-in live-account acceptance for collection and native publication.",
+      "gated": true
     },
     {
       "id": "newrelic",
@@ -260,7 +269,8 @@
       "level": "experimental",
       "docs": "new-relic",
       "provider": "newrelic",
-      "remaining": "Opt-in live-account acceptance for collection and native publication."
+      "remaining": "Opt-in live-account acceptance for collection and native publication.",
+      "gated": true
     },
     {
       "id": "dash0",
@@ -268,7 +278,8 @@
       "level": "experimental",
       "docs": "dash0",
       "provider": "dash0",
-      "remaining": "Opt-in live-account acceptance, including sessions and interval SLOs."
+      "remaining": "Opt-in live-account acceptance, including sessions and interval SLOs.",
+      "gated": true
     },
     {
       "id": "googlecloud",
@@ -276,7 +287,8 @@
       "level": "experimental",
       "docs": "google-cloud",
       "provider": "googlecloud",
-      "remaining": "Opt-in live-project acceptance for collection and native publication."
+      "remaining": "Opt-in live-project acceptance for collection and native publication.",
+      "gated": true
     }
   ]
 }

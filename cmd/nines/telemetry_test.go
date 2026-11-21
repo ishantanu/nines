@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
@@ -88,7 +89,7 @@ func TestRuleAutomationCLIControls(t *testing.T) {
 		t.Fatal(e)
 	}
 	m := &rules.Manager{Tenant: "alpha", Targets: map[string]rules.Target{"primary": {Connection: "primary", Kind: "prometheus", QueryURL: "http://127.0.0.1:1", Directory: t.TempDir(), Namespace: "nines", Reload: true, AutoDeploy: true}}}
-	h, e := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Service: s, Rules: m, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, e := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: s, Rules: m, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if e != nil {
 		t.Fatal(e)
 	}
