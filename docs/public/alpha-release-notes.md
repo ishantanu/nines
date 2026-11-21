@@ -32,7 +32,7 @@ An early-access release of the self-hosted SLO and critical user journey platfor
 ## Experimental boundaries
 
 - Git delivery and Sloth/Pyrra migration are new in this alpha. The GitHub and GitLab adapters are tested against in-memory fakes of their APIs, not live services, and the importers are checked against the projects' published examples, not every real-world file. Review each proposal and each converted definition before relying on it. Converted alert thresholds are standard burn-rate policies, not a copy of your current alerts.
-- The newer SLO types depend on the provider: sessions, good-minute SLOs and per-customer reports work with Prometheus and Mimir, sessions and good-minute SLOs are accepted for Dash0 in YAML but not run against a live account, and Datadog, New Relic and Google Cloud accept none of them. See the [provider table](slo-types.md#which-providers-support-which-types).
+- The newer SLO types depend on the provider: sessions, good-minute and throughput SLOs and per-customer reports work with Prometheus and Mimir; sessions, good-minute and throughput SLOs are accepted for Dash0 but not run against a live account; VictoriaMetrics accepts good-minute and throughput only as untested PromQL; and Datadog, New Relic and Google Cloud accept none of them. See the [provider table](slo-types.md#which-providers-support-which-types).
 - Session, good-minute and per-customer SLOs refuse unsupported combinations with a reason (for example per-customer reports on sessions, or good-minute on provider-evaluated windows) instead of partly working.
 
 - Model-assisted preparation, template selection, session replay, remote MCP HTTP/OAuth and the additional provider adapters remain experimental.
@@ -67,7 +67,7 @@ After extracting the archive (on Windows, run `.\nines.exe` and `.\nines-server.
 ./nines-server -demo
 ```
 
-Or run the demo in a container. A container listens on all interfaces, so it needs a random `API_TOKEN`; enter it when the browser asks:
+Or run the demo in a container. A container listens on all interfaces, so it needs a random `API_TOKEN`. In the browser, choose **Set API token** and paste it before the demo sign-in:
 
 ```sh
 export API_TOKEN="$(openssl rand -hex 24)"; echo "$API_TOKEN"
@@ -89,4 +89,4 @@ docker run --rm -p 127.0.0.1:8080:8080 -e API_TOKEN ghcr.io/ishantanu/nines:v0.1
   - See the operator guide before installing CRDs or deploying its image.
   - Intent workflows and session replay remain experimental.
   - This alpha does not establish production-scale readiness or stable API compatibility.
-  - Windows binaries and a hosted service are not included.
+  - A hosted service is not included. Windows archives contain the CLI, server and MCP server; the operator runs only in Linux containers.

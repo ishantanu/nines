@@ -259,10 +259,25 @@ func seed(ctx context.Context, svc *service.Service) error {
 			return err
 		}
 	}
+	registerDemoSource(svc)
+	for _, c := range demoTypedSLOs() {
+		if err := svc.Create(ctx, c); err != nil {
+			return err
+		}
+		// Backfill the same chart history the ingested demo SLOs have.
+		history := min(2880*c.StepSeconds, c.RetentionSeconds())
+		if _, err := svc.Collect(ctx, c.ID, now.Add(-time.Duration(history)*time.Second), now); err != nil {
+			return err
+		}
+	}
 	for _, text := range []string{examples.Checkout, examples.AgentResolution} {
 		j, err := model.ParseJourney([]byte(text))
 		if err != nil {
 			return err
+		}
+		if j.Spec.Agentic != nil {
+			// Show a journey run objective: judged runs against the contract.
+			j.Spec.RunObjective = &v1.RunObjective{Target: .7, WindowSeconds: 86400, MinRuns: 5}
 		}
 		rev, err := svc.ApplyJourney(ctx, j, 0)
 		if err != nil {
@@ -333,6 +348,9 @@ func runDemo(ctx context.Context, svc *service.Service, log *slog.Logger) {
 				if err := refreshDemoSLO(ctx, svc, id, n, now); err != nil && ctx.Err() == nil {
 					log.Error("refresh demo samples", "error", err)
 				}
+			}
+			if err := collectDemo(ctx, svc, last, now); err != nil && ctx.Err() == nil {
+				log.Error("collect synthetic demo telemetry", "error", err)
 			}
 			last = now
 		}

@@ -64,14 +64,14 @@ Service level objectives and critical user journeys as versioned YAML, with a po
 
 3. Open [localhost:8080](http://127.0.0.1:8080) and sign in with **admin / admin**.
 
-Or run a released image without cloning. A container listens on all interfaces, so it needs a random API token, which the browser asks for before the demo sign-in:
+Or run a released image without cloning. A container listens on all interfaces, so it needs a random API token. Open the page, choose **Set API token**, paste the token, then sign in with **admin / admin**:
 
 ```sh
 export API_TOKEN="$(openssl rand -hex 24)"; echo "$API_TOKEN"
 docker run --rm -p 127.0.0.1:8080:8080 -e API_TOKEN ghcr.io/ishantanu/nines:v0.1.0-alpha.4 -demo
 ```
 
-- Includes synthetic SLOs, critical user journeys and critical/warning burn policies.
+- Includes synthetic SLOs of several types (availability, latency, freshness, sessions and throughput), critical user journeys with an agentic run objective, and critical/warning burn policies. The typed SLOs read from an in-process synthetic source; the demo contacts no external service.
 - Resets on restart; keep this demonstration on loopback.
 - Node is not required to run the committed UI build.
 

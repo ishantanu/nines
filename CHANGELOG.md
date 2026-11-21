@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased (v0.1.0-alpha.4)
+## Unreleased
+
+- The demo now shows the SLO types: latency, freshness, sessions and throughput SLOs read from an in-process synthetic source through Nines' normal collection, window evaluation and measurement contract checks, and the agentic journey has a run objective. The demo still contacts no external service and keeps no default telemetry connection.
+- Release drafts link to the documentation site instead of relative paths, the container quick starts name the **Set API token** step, and the release notes and SLO practices status match what shipped in alpha.4.
+
+## v0.1.0-alpha.4
 
 - Move the portal, public site and documentation pages onto Astryx with the shared `nines` theme and self-hosted Figtree. Documentation markdown renders Astryx headings, links, code, quotes and tables as static HTML with no added client script. New login page, home overview and SLI charts.
 - Add SLO practices drawn from SRE guidance, each opt-in and deterministic: low-traffic confidence for burn alerts, SLO labels and roll-ups, graduated error-budget response levels, journey run objectives for agentic journeys, session SLIs, good-minute SLOs, per-customer reports, failure concentration, cohort peer comparison, composed availability ceilings, target-change comparison with delivered reliability, and an adoption review. Missing data stays unknown and approximations are labelled.

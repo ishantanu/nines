@@ -170,7 +170,7 @@ export API_TOKEN="$(openssl rand -hex 24)"; echo "$API_TOKEN"
 docker run --rm -p 127.0.0.1:8080:8080 -e API_TOKEN ghcr.io/ishantanu/nines:{a.version} -demo
 ```
 
-A container listens on all interfaces, so the server requires a random `API_TOKEN` of at least 24 characters even for the demo. Enter it when the browser asks, then sign in with `admin` / `admin`.
+A container listens on all interfaces, so the server requires a random `API_TOKEN` of at least 24 characters even for the demo. In the browser, choose **Set API token** and paste it, then sign in with `admin` / `admin`.
 
 Multi-architecture images for `linux/amd64` and `linux/arm64` are published as `ghcr.io/ishantanu/nines` and `ghcr.io/ishantanu/nines-operator` with the same version tag, signed and with build provenance. See [container images](docs/public/deployment/container-images.md).
 
