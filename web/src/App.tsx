@@ -10,6 +10,8 @@ import { ninesTheme } from "./astryx-theme";
 import { providerLabel } from "@/lib/telemetry-providers";
 import { ReplayLabel } from "@/components/replay-label";
 import { Brand } from "@/components/brand";
+import { MaturityBadge } from "@/components/maturity-badge";
+import { pageMaturity } from "@/lib/maturity";
 import {
   lazy,
   Suspense,
@@ -1222,6 +1224,7 @@ function TenantWorkspace({
                 replayTitle
                 title={copy[page][0]}
                 description={copy[page][1]}
+                badge={<MaturityBadge feature={pageMaturity(page)} />}
               >
                 {page === "objectives" ? (
                   canEdit(scope) ? (

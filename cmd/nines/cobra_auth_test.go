@@ -64,6 +64,22 @@ func TestCobraHelpCompletionOfflineAndInterspersedFlags(t *testing.T) {
 	if !strings.Contains(out.String(), `"effect": "deploy"`) || !strings.Contains(out.String(), `"command": "nines auth status"`) {
 		t.Fatal("missing capability boundaries")
 	}
+	// Agents can tell the stable core from experimental features offline.
+	var maturity struct {
+		Maturity struct {
+			Features []struct{ ID, Level string }
+		}
+	}
+	if err := json.Unmarshal(out.Bytes(), &maturity); err != nil {
+		t.Fatal(err)
+	}
+	levels := map[string]string{}
+	for _, f := range maturity.Maturity.Features {
+		levels[f.ID] = f.Level
+	}
+	if levels["slo-definitions"] != "beta" || levels["create-from-goal"] != "experimental" || levels["datadog"] != "experimental" {
+		t.Fatalf("capabilities do not report feature maturity: %v", levels)
+	}
 }
 func TestAPIKeyLoginAndContextCredentialsNeverCrossServerOrTenant(t *testing.T) {
 	p := cliEnv(t)

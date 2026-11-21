@@ -1,3 +1,4 @@
+import { providerMaturity } from "@/lib/maturity";
 import {
   managedProviders,
   providerCredentialFields,
@@ -225,6 +226,9 @@ export function DataSourceForm({
                   {managedProviders.map((provider) => (
                     <option key={provider.kind} value={provider.kind}>
                       {provider.label}
+                      {providerMaturity(provider.kind)?.level === "experimental"
+                        ? " (experimental)"
+                        : ""}
                     </option>
                   ))}
                 </NativeSelect>

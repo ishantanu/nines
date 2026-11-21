@@ -56,10 +56,11 @@ async function open(
 const LABELS: Record<string, string> = {
   prometheus: "Prometheus",
   mimir: "Mimir",
-  datadog: "Datadog",
-  newrelic: "New Relic",
-  dash0: "Dash0",
-  victoriametrics: "VictoriaMetrics",
+  // Experimental providers say so where they are chosen.
+  datadog: "Datadog (experimental)",
+  newrelic: "New Relic (experimental)",
+  dash0: "Dash0 (experimental)",
+  victoriametrics: "VictoriaMetrics (experimental)",
   "": "Single-node (no cluster route)",
   "42:7": "Cluster 42:7",
 };
@@ -107,10 +108,10 @@ test.each([
     expect(await optionLabels("source-kind")).toEqual([
       "Prometheus",
       "Mimir",
-      "Datadog",
-      "New Relic",
-      "Dash0",
-      "VictoriaMetrics",
+      "Datadog (experimental)",
+      "New Relic (experimental)",
+      "Dash0 (experimental)",
+      "VictoriaMetrics (experimental)",
     ]);
     await select("source-kind", kind);
     await input("source-name", "trial");
