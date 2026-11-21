@@ -22,7 +22,7 @@ echo "$API_TOKEN"
 docker run --rm -p 127.0.0.1:8080:8080 -e API_TOKEN ghcr.io/ishantanu/nines:v0.1.0-alpha.4 -demo
 ```
 
-Open `http://127.0.0.1:8080`, enter the token when asked, then sign in with `admin` / `admin`. The demo keeps its data in memory and resets on restart.
+Open `http://127.0.0.1:8080`, choose **Set API token** and paste the token, then sign in with `admin` / `admin`. The demo keeps its data in memory and resets on restart.
 
 ## Run a persistent server
 
