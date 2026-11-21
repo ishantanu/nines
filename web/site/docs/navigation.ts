@@ -230,6 +230,11 @@ export const docGroups: DocGroup[] = [
         "Connect managed agent clients through scoped HTTP authorization and explicit tenant bindings.",
       ),
       page(
+        "maturity",
+        "Feature maturity",
+        "See which capabilities are beta and which are experimental, and what each level promises.",
+      ),
+      page(
         "experimental",
         "Experimental features",
         "Check the current support boundary before enabling a feature.",

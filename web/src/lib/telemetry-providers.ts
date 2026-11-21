@@ -38,7 +38,11 @@ export const managedProviders = telemetryProviders.filter(
 export function providerLabel(kind: string) {
   return (
     telemetryProviders.find((p) => p.kind === kind)?.label ??
-    { manual: "Manual ingestion", multiple: "Multiple providers" }[kind] ??
+    {
+      manual: "Manual ingestion",
+      multiple: "Multiple providers",
+      synthetic: "Synthetic demo data",
+    }[kind] ??
     kind
   );
 }

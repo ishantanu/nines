@@ -1,4 +1,6 @@
 import { ProviderIdentity } from "./provider-identity";
+import { MaturityBadge } from "./maturity-badge";
+import { providerMaturity } from "@/lib/maturity";
 import { DataSourceForm } from "./data-source-form";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Check, Minus, RefreshCw, PlugZap } from "lucide-react";
@@ -298,9 +300,12 @@ export function Connections({ scope }: { scope: RequestScope }) {
             <Card className="gap-0 py-0" key={c.id}>
               <div className="panel-header">
                 <h2 className="text-sm font-semibold">Connection: {c.id}</h2>
-                <Badge variant="secondary" className="capitalize">
-                  <ProviderIdentity kind={c.kind} />
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge variant="secondary" className="capitalize">
+                    <ProviderIdentity kind={c.kind} />
+                  </Badge>
+                  <MaturityBadge feature={providerMaturity(c.kind)} />
+                </div>
               </div>
               <CardContent className="space-y-4 p-5">
                 <dl className="grid gap-4 text-sm sm:grid-cols-2">

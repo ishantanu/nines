@@ -157,19 +157,28 @@ export function PageHeader({
   replayTitle = false,
   title,
   description,
+  badge,
   children,
 }: {
   replayTitle?: boolean;
   title: string;
   description: string;
+  badge?: ReactNode;
   children?: ReactNode;
 }) {
   return (
     <div className="page-header">
       <div className="min-w-0">
-        <Heading level={1} type="display-3" className="page-title break-words">
-          {replayTitle ? <ReplayLabel>{title}</ReplayLabel> : title}
-        </Heading>
+        <div className="flex flex-wrap items-center gap-2">
+          <Heading
+            level={1}
+            type="display-3"
+            className="page-title break-words"
+          >
+            {replayTitle ? <ReplayLabel>{title}</ReplayLabel> : title}
+          </Heading>
+          {badge}
+        </div>
         <Text as="p" color="secondary" className="mt-1.5 max-w-3xl break-words">
           {description}
         </Text>

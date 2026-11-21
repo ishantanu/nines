@@ -1,0 +1,282 @@
+{
+  "levels": [
+    {
+      "level": "stable",
+      "name": "Stable",
+      "promise": "Covered by the compatibility and deprecation policy. Definitions, API fields, CLI flags and behavior change only through announced deprecation."
+    },
+    {
+      "level": "beta",
+      "name": "Beta",
+      "promise": "Feature complete and tested end to end. From the first beta release, breaking changes go through deprecation; these features become stable with the first stable release."
+    },
+    {
+      "level": "experimental",
+      "name": "Experimental",
+      "promise": "Opt-in and may change or be removed in any release without deprecation. Use it to evaluate, not to depend on."
+    }
+  ],
+  "features": [
+    {
+      "id": "slo-definitions",
+      "name": "SLO definitions and SLO types",
+      "level": "beta",
+      "docs": "slo-types",
+      "page": "objectives"
+    },
+    {
+      "id": "slo-lifecycle",
+      "name": "SLO lifecycle, editing and retirement",
+      "level": "beta",
+      "docs": "slo-retirement"
+    },
+    {
+      "id": "slo-templates",
+      "name": "SLO templates",
+      "level": "beta",
+      "docs": "slo-templates"
+    },
+    {
+      "id": "journeys",
+      "name": "Critical user journeys and run objectives",
+      "level": "beta",
+      "docs": "critical-user-journeys",
+      "page": "journeys"
+    },
+    {
+      "id": "burn-alerts",
+      "name": "Recording rules and burn-rate alerts",
+      "level": "beta",
+      "docs": "deployment/metrics-and-rules",
+      "page": "alerts"
+    },
+    {
+      "id": "error-budget-policy",
+      "name": "Error budget policies",
+      "level": "beta",
+      "docs": "error-budget-policy"
+    },
+    {
+      "id": "measurement-quality",
+      "name": "Labels, per-customer reports and cohorts",
+      "level": "beta",
+      "docs": "measurement-quality"
+    },
+    {
+      "id": "service-dependencies",
+      "name": "Declared service dependency maps",
+      "level": "beta",
+      "docs": "service-dependencies",
+      "page": "maps"
+    },
+    {
+      "id": "prometheus",
+      "name": "Prometheus",
+      "level": "beta",
+      "docs": "provider-adapters",
+      "provider": "prometheus"
+    },
+    {
+      "id": "mimir",
+      "name": "Grafana Mimir",
+      "level": "beta",
+      "docs": "provider-adapters",
+      "provider": "mimir"
+    },
+    {
+      "id": "portal",
+      "name": "Web portal",
+      "level": "beta",
+      "docs": "index"
+    },
+    {
+      "id": "cli",
+      "name": "CLI",
+      "level": "beta",
+      "docs": "../cli",
+      "page": "clients"
+    },
+    {
+      "id": "http-api",
+      "name": "HTTP API and Go client",
+      "level": "beta",
+      "docs": "api"
+    },
+    {
+      "id": "mcp",
+      "name": "MCP server over stdio",
+      "level": "beta",
+      "docs": "mcp"
+    },
+    {
+      "id": "identity",
+      "name": "Local accounts, OIDC, LDAP and RBAC",
+      "level": "beta",
+      "docs": "deployment/identity-and-tenants",
+      "page": "access"
+    },
+    {
+      "id": "tenancy",
+      "name": "Tenants and telemetry connections",
+      "level": "beta",
+      "docs": "configuration",
+      "page": "connections"
+    },
+    {
+      "id": "audit-log",
+      "name": "Audit log",
+      "level": "beta",
+      "docs": "operations",
+      "page": "audit"
+    },
+    {
+      "id": "operator",
+      "name": "Kubernetes operator",
+      "level": "beta",
+      "docs": "deployment/operator"
+    },
+    {
+      "id": "create-from-goal",
+      "name": "Create from a goal",
+      "level": "experimental",
+      "docs": "intents",
+      "page": "intents",
+      "remaining": "Freeze the intent schema and pass real-provider acceptance for model drafting (#34)."
+    },
+    {
+      "id": "reliability-reviews",
+      "name": "Reliability reviews",
+      "level": "experimental",
+      "docs": "architecture",
+      "page": "investigations",
+      "remaining": "Settle the review schema and its link to incidents and postmortems."
+    },
+    {
+      "id": "workflows",
+      "name": "Workflows and webhooks",
+      "level": "experimental",
+      "docs": "workflow-webhooks",
+      "page": "workflows",
+      "remaining": "Freeze the workflow event contract and accept it with a real webhook consumer."
+    },
+    {
+      "id": "agent-evidence",
+      "name": "Agent evidence and visual evaluations",
+      "level": "experimental",
+      "docs": "visual-evaluations",
+      "page": "agents",
+      "remaining": "Freeze the run evidence schema and accept it with real agent workloads."
+    },
+    {
+      "id": "session-replay",
+      "name": "Session replay",
+      "level": "experimental",
+      "docs": "session-replay",
+      "page": "replays",
+      "remaining": "Browser and platform compatibility, a masking and privacy review, and offline-player acceptance."
+    },
+    {
+      "id": "git-delivery",
+      "name": "Git delivery",
+      "level": "experimental",
+      "docs": "git-delivery",
+      "remaining": "Acceptance against live GitHub and GitLab, not only API fakes."
+    },
+    {
+      "id": "migration",
+      "name": "Migration from Sloth and Pyrra",
+      "level": "experimental",
+      "docs": "migration",
+      "remaining": "Acceptance with real-world Sloth and Pyrra files beyond the projects' published examples."
+    },
+    {
+      "id": "observed-dependencies",
+      "name": "Observed dependency evidence",
+      "level": "experimental",
+      "docs": "service-dependencies",
+      "remaining": "Instrumentation coverage and production-scale validation."
+    },
+    {
+      "id": "remote-mcp",
+      "name": "Remote MCP over HTTP with OAuth",
+      "level": "experimental",
+      "docs": "remote-mcp",
+      "remaining": "Hosted agent-client interoperability and production issuer acceptance."
+    },
+    {
+      "id": "audit-archive",
+      "name": "Immutable audit archival",
+      "level": "experimental",
+      "docs": "deployment/audit-archive",
+      "remaining": "Production IAM and KMS, high availability and real AWS acceptance."
+    },
+    {
+      "id": "github-reviews",
+      "name": "GitHub review comments",
+      "level": "experimental",
+      "docs": "github-reviews",
+      "remaining": "Settle together with Git delivery so one GitHub integration remains."
+    },
+    {
+      "id": "slo-extensions",
+      "name": "SLO template extensions",
+      "level": "experimental",
+      "docs": "slo-extensions",
+      "remaining": "A stable extension contract; Go extensions need a custom build today."
+    },
+    {
+      "id": "openslo",
+      "name": "OpenSLO export",
+      "level": "experimental",
+      "docs": "openslo",
+      "remaining": "Round-trip acceptance with OpenSLO tooling."
+    },
+    {
+      "id": "system-one",
+      "name": "Jev advice",
+      "level": "experimental",
+      "docs": "system-one",
+      "remaining": "Real-provider acceptance and calibration evidence."
+    },
+    {
+      "id": "victoriametrics",
+      "name": "VictoriaMetrics",
+      "level": "experimental",
+      "docs": "provider-adapters",
+      "provider": "victoriametrics",
+      "remaining": "Interval and throughput acceptance on a real cluster, including MetricsQL."
+    },
+    {
+      "id": "datadog",
+      "name": "Datadog",
+      "level": "experimental",
+      "docs": "provider-adapters",
+      "provider": "datadog",
+      "remaining": "Opt-in live-account acceptance for collection and native publication."
+    },
+    {
+      "id": "newrelic",
+      "name": "New Relic",
+      "level": "experimental",
+      "docs": "new-relic",
+      "provider": "newrelic",
+      "remaining": "Opt-in live-account acceptance for collection and native publication."
+    },
+    {
+      "id": "dash0",
+      "name": "Dash0",
+      "level": "experimental",
+      "docs": "dash0",
+      "provider": "dash0",
+      "remaining": "Opt-in live-account acceptance, including sessions and interval SLOs."
+    },
+    {
+      "id": "googlecloud",
+      "name": "Google Cloud Monitoring",
+      "level": "experimental",
+      "docs": "google-cloud",
+      "provider": "googlecloud",
+      "remaining": "Opt-in live-project acceptance for collection and native publication."
+    }
+  ]
+}

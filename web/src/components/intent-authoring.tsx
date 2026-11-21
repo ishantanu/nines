@@ -1,6 +1,5 @@
 import { latencySeconds, latencyDuration } from "@/lib/latency-duration";
 import { measureChoices } from "./slo-kind-chooser";
-import { Badge } from "@/components/ui/badge";
 import type { MeasurementKind } from "@/lib/measurement";
 import { isThresholdKind, measurementWords } from "@/lib/measurement";
 import { MeasurementLabels } from "./measurement-labels";
@@ -584,7 +583,6 @@ export function IntentAuthoring({
                     >
                       Draft goal from description
                     </Button>
-                    <Badge variant="secondary">Experimental</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Sends only this description to the configured model. Include
