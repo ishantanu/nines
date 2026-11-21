@@ -12,6 +12,7 @@ import (
 	"time"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/investigation"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
@@ -29,7 +30,7 @@ func investigationHandler(t *testing.T) http.Handler {
 			t.Fatal(err)
 		}
 		s.TenantID = id
-		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, Investigations: investigation.New(s, investigation.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "editor", Role: "editor"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}})
+		workspaces = append(workspaces, Workspace{Features: features.All(), ID: id, Name: id, Service: s, Investigations: investigation.New(s, investigation.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "editor", Role: "editor"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}})
 	}
 	h, err := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {

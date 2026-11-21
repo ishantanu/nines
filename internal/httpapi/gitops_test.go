@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/examples"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/gitops"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
@@ -175,7 +176,7 @@ func TestGitProposalsAreReviewedExactlyAuthorizedAndNeverApplied(t *testing.T) {
 func TestGitDriftComparesRepositoryAndLiveByDigestWithoutChoosingASide(t *testing.T) {
 	git := &fakeGit{}
 	svc := service.New(store.NewMemory(), nil)
-	h, err := NewMulti([]Workspace{{ID: "alpha", Name: "Alpha", Service: svc, GitOps: git, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, err := NewMulti([]Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: svc, GitOps: git, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +242,7 @@ func TestGitDriftComparesRepositoryAndLiveByDigestWithoutChoosingASide(t *testin
 func TestGitJourneysUseTheSameReviewedProposalDriftAndStatusFlow(t *testing.T) {
 	git := &fakeGit{}
 	svc := service.New(store.NewMemory(), nil)
-	h, err := NewMulti([]Workspace{{ID: "alpha", Name: "Alpha", Service: svc, GitOps: git, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, err := NewMulti([]Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: svc, GitOps: git, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,7 +301,7 @@ func TestGitJourneysUseTheSameReviewedProposalDriftAndStatusFlow(t *testing.T) {
 
 func TestMigrationConvertIsStatelessReadOnlyAndAvailableToEveryRole(t *testing.T) {
 	svc := service.New(store.NewMemory(), nil)
-	h, err := NewMulti([]Workspace{{ID: "alpha", Name: "Alpha", Service: svc, Grants: []tenancy.Grant{{Token: "viewer", Role: "viewer"}, {Token: "agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, err := NewMulti([]Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: svc, Grants: []tenancy.Grant{{Token: "viewer", Role: "viewer"}, {Token: "agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

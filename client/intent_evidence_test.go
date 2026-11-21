@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/ishantanu/nines/client"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/tenancy"
 	"github.com/ishantanu/nines/internal/testtelemetry"
@@ -20,7 +21,7 @@ func TestIntentEvidenceClientViewerTenantAndStrictRequests(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Service: s, Grants: []tenancy.Grant{{Token: "viewer", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, err := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: s, Grants: []tenancy.Grant{{Token: "viewer", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

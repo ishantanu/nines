@@ -14,6 +14,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/client"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
@@ -22,8 +23,8 @@ import (
 
 func TestPublicClientActualTenantAPICreatePlanCASAndJourney(t *testing.T) {
 	h, err := httpapi.NewMulti([]httpapi.Workspace{
-		{ID: "alpha", Name: "Alpha", Service: service.New(store.NewMemory(), nil), Grants: []tenancy.Grant{{Token: "alpha-owner", Role: "owner"}, {Token: "alpha-viewer", Role: "viewer"}}},
-		{ID: "beta", Name: "Beta", Service: service.New(store.NewMemory(), nil), Grants: []tenancy.Grant{{Token: "beta-owner", Role: "owner"}}},
+		{Features: features.All(), ID: "alpha", Name: "Alpha", Service: service.New(store.NewMemory(), nil), Grants: []tenancy.Grant{{Token: "alpha-owner", Role: "owner"}, {Token: "alpha-viewer", Role: "viewer"}}},
+		{Features: features.All(), ID: "beta", Name: "Beta", Service: service.New(store.NewMemory(), nil), Grants: []tenancy.Grant{{Token: "beta-owner", Role: "owner"}}},
 	}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)

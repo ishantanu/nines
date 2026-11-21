@@ -4,9 +4,12 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MaturityBadge } from "./maturity-badge";
 import {
+  featureOn,
   maturityFeatures,
   pageMaturity,
+  pageOn,
   providerMaturity,
+  providerOn,
 } from "@/lib/maturity";
 
 let container: HTMLDivElement;
@@ -54,5 +57,18 @@ describe("feature maturity", () => {
     ]);
     expect(providerMaturity("prometheus")?.level).toBe("beta");
     expect(providerMaturity("datadog")?.level).toBe("experimental");
+  });
+});
+
+describe("feature gates in the portal", () => {
+  it("shows the stable core always and gated features only when turned on", () => {
+    expect(pageOn(undefined, "objectives")).toBe(true);
+    expect(pageOn(undefined, "replays")).toBe(false);
+    expect(pageOn([], "intents")).toBe(false);
+    expect(pageOn(["create-from-goal"], "intents")).toBe(true);
+    expect(featureOn([], "git-delivery")).toBe(true);
+    expect(providerOn([], "prometheus")).toBe(true);
+    expect(providerOn([], "datadog")).toBe(false);
+    expect(providerOn(["datadog"], "datadog")).toBe(true);
   });
 });

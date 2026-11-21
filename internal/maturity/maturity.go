@@ -36,6 +36,10 @@ type Feature struct {
 	Provider string `json:"provider,omitempty"`
 	// Remaining states what stands between an experimental feature and beta.
 	Remaining string `json:"remaining,omitempty"`
+	// Gated experimental features are off until a server turns them on with
+	// a feature gate. Ungated experimental features are already opt-in
+	// through their own configuration.
+	Gated bool `json:"gated,omitempty"`
 }
 
 // Levels returns the level definitions, most to least committed.
@@ -71,25 +75,25 @@ func Catalog() []Feature {
 		{ID: "operator", Name: "Kubernetes operator", Level: Beta, Docs: "deployment/operator"},
 
 		// Experimental.
-		{ID: "create-from-goal", Name: "Create from a goal", Level: Experimental, Docs: "intents", Page: "intents", Remaining: "Freeze the intent schema and pass real-provider acceptance for model drafting (#34)."},
-		{ID: "reliability-reviews", Name: "Reliability reviews", Level: Experimental, Docs: "architecture", Page: "investigations", Remaining: "Settle the review schema and its link to incidents and postmortems."},
-		{ID: "workflows", Name: "Workflows and webhooks", Level: Experimental, Docs: "workflow-webhooks", Page: "workflows", Remaining: "Freeze the workflow event contract and accept it with a real webhook consumer."},
-		{ID: "agent-evidence", Name: "Agent evidence and visual evaluations", Level: Experimental, Docs: "visual-evaluations", Page: "agents", Remaining: "Freeze the run evidence schema and accept it with real agent workloads."},
-		{ID: "session-replay", Name: "Session replay", Level: Experimental, Docs: "session-replay", Page: "replays", Remaining: "Browser and platform compatibility, a masking and privacy review, and offline-player acceptance."},
+		{ID: "create-from-goal", Name: "Create from a goal", Level: Experimental, Docs: "intents", Page: "intents", Remaining: "Freeze the intent schema and pass real-provider acceptance for model drafting (#34).", Gated: true},
+		{ID: "reliability-reviews", Name: "Reliability reviews", Level: Experimental, Docs: "architecture", Page: "investigations", Remaining: "Settle the review schema and its link to incidents and postmortems.", Gated: true},
+		{ID: "workflows", Name: "Workflows and webhooks", Level: Experimental, Docs: "workflow-webhooks", Page: "workflows", Remaining: "Freeze the workflow event contract and accept it with a real webhook consumer.", Gated: true},
+		{ID: "agent-evidence", Name: "Agent evidence and visual evaluations", Level: Experimental, Docs: "visual-evaluations", Page: "agents", Remaining: "Freeze the run evidence schema and accept it with real agent workloads.", Gated: true},
+		{ID: "session-replay", Name: "Session replay", Level: Experimental, Docs: "session-replay", Page: "replays", Remaining: "Browser and platform compatibility, a masking and privacy review, and offline-player acceptance.", Gated: true},
 		{ID: "git-delivery", Name: "Git delivery", Level: Experimental, Docs: "git-delivery", Remaining: "Acceptance against live GitHub and GitLab, not only API fakes."},
-		{ID: "migration", Name: "Migration from Sloth and Pyrra", Level: Experimental, Docs: "migration", Remaining: "Acceptance with real-world Sloth and Pyrra files beyond the projects' published examples."},
-		{ID: "observed-dependencies", Name: "Observed dependency evidence", Level: Experimental, Docs: "service-dependencies", Remaining: "Instrumentation coverage and production-scale validation."},
+		{ID: "migration", Name: "Migration from Sloth and Pyrra", Level: Experimental, Docs: "migration", Remaining: "Acceptance with real-world Sloth and Pyrra files beyond the projects' published examples.", Gated: true},
+		{ID: "observed-dependencies", Name: "Observed dependency evidence", Level: Experimental, Docs: "service-dependencies", Remaining: "Instrumentation coverage and production-scale validation.", Gated: true},
 		{ID: "remote-mcp", Name: "Remote MCP over HTTP with OAuth", Level: Experimental, Docs: "remote-mcp", Remaining: "Hosted agent-client interoperability and production issuer acceptance."},
 		{ID: "audit-archive", Name: "Immutable audit archival", Level: Experimental, Docs: "deployment/audit-archive", Remaining: "Production IAM and KMS, high availability and real AWS acceptance."},
 		{ID: "github-reviews", Name: "GitHub review comments", Level: Experimental, Docs: "github-reviews", Remaining: "Settle together with Git delivery so one GitHub integration remains."},
 		{ID: "slo-extensions", Name: "SLO template extensions", Level: Experimental, Docs: "slo-extensions", Remaining: "A stable extension contract; Go extensions need a custom build today."},
 		{ID: "openslo", Name: "OpenSLO export", Level: Experimental, Docs: "openslo", Remaining: "Round-trip acceptance with OpenSLO tooling."},
 		{ID: "system-one", Name: "Jev advice", Level: Experimental, Docs: "system-one", Remaining: "Real-provider acceptance and calibration evidence."},
-		{ID: "victoriametrics", Name: "VictoriaMetrics", Level: Experimental, Docs: "provider-adapters", Provider: "victoriametrics", Remaining: "Interval and throughput acceptance on a real cluster, including MetricsQL."},
-		{ID: "datadog", Name: "Datadog", Level: Experimental, Docs: "provider-adapters", Provider: "datadog", Remaining: "Opt-in live-account acceptance for collection and native publication."},
-		{ID: "newrelic", Name: "New Relic", Level: Experimental, Docs: "new-relic", Provider: "newrelic", Remaining: "Opt-in live-account acceptance for collection and native publication."},
-		{ID: "dash0", Name: "Dash0", Level: Experimental, Docs: "dash0", Provider: "dash0", Remaining: "Opt-in live-account acceptance, including sessions and interval SLOs."},
-		{ID: "googlecloud", Name: "Google Cloud Monitoring", Level: Experimental, Docs: "google-cloud", Provider: "googlecloud", Remaining: "Opt-in live-project acceptance for collection and native publication."},
+		{ID: "victoriametrics", Name: "VictoriaMetrics", Level: Experimental, Docs: "provider-adapters", Provider: "victoriametrics", Remaining: "Interval and throughput acceptance on a real cluster, including MetricsQL.", Gated: true},
+		{ID: "datadog", Name: "Datadog", Level: Experimental, Docs: "provider-adapters", Provider: "datadog", Remaining: "Opt-in live-account acceptance for collection and native publication.", Gated: true},
+		{ID: "newrelic", Name: "New Relic", Level: Experimental, Docs: "new-relic", Provider: "newrelic", Remaining: "Opt-in live-account acceptance for collection and native publication.", Gated: true},
+		{ID: "dash0", Name: "Dash0", Level: Experimental, Docs: "dash0", Provider: "dash0", Remaining: "Opt-in live-account acceptance, including sessions and interval SLOs.", Gated: true},
+		{ID: "googlecloud", Name: "Google Cloud Monitoring", Level: Experimental, Docs: "google-cloud", Provider: "googlecloud", Remaining: "Opt-in live-project acceptance for collection and native publication.", Gated: true},
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/gitops"
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/investigation"
@@ -30,6 +31,9 @@ type Server struct {
 	requests  atomic.Uint64
 }
 
+// New serves one workspace for tests, harnesses and embedding, with every
+// feature on. Servers use NewMulti, whose workspaces carry the configured
+// feature gates.
 func New(s *service.Service, token string, log *slog.Logger) http.Handler {
 	id := s.TenantID
 	if id == "" {
@@ -39,7 +43,7 @@ func New(s *service.Service, token string, log *slog.Logger) http.Handler {
 	if name == "" {
 		name = "Default workspace"
 	}
-	workspace := Workspace{ID: id, Name: name, Service: s, Anonymous: token == ""}
+	workspace := Workspace{ID: id, Name: name, Service: s, Anonymous: token == "", Features: features.All()}
 	if token != "" {
 		workspace.Grants = []tenancy.Grant{{Token: token, Role: "owner"}}
 	}
@@ -113,7 +117,7 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 		if len(kinds) > 1 {
 			kind = "multiple"
 		}
-		write(w, 200, map[string]any{"mode": mode, "connections": connections, "prometheusConfigured": count > 0, "journeysConfigured": s.Journeys != nil, "tenant": map[string]string{"id": s.TenantID, "name": s.TenantName}, "source": map[string]any{"kind": kind, "configured": count > 0, "connectionCount": count}, "role": role, "workflowsConfigured": workflows != nil, "replayCaptureEnabled": workspace.Replays != nil && !workspace.Replays.Privacy.Disabled})
+		write(w, 200, map[string]any{"mode": mode, "connections": connections, "prometheusConfigured": count > 0, "journeysConfigured": s.Journeys != nil, "tenant": map[string]string{"id": s.TenantID, "name": s.TenantName}, "source": map[string]any{"kind": kind, "configured": count > 0, "connectionCount": count}, "role": role, "workflowsConfigured": workflows != nil && workspace.Features.Enabled("workflows"), "replayCaptureEnabled": workspace.Replays != nil && !workspace.Replays.Privacy.Disabled && workspace.Features.Enabled("session-replay"), "features": workspace.Features.List()})
 	})
 	api.HandleFunc("GET /api/visual-evaluations/capabilities", a.visualCapabilities)
 	api.HandleFunc("GET /api/journeys/{id}/visual-evaluations", a.visualList)

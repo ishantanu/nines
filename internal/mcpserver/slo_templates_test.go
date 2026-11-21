@@ -11,6 +11,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/slotemplates"
@@ -20,7 +21,7 @@ import (
 
 func TestTemplateToolsStayReadOnlyAndTenantBound(t *testing.T) {
 	s := service.New(store.NewMemory(), nil)
-	handler, err := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Service: s, Grants: []tenancy.Grant{{Token: "template-agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	handler, err := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: s, Grants: []tenancy.Grant{{Token: "template-agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +59,7 @@ func TestExtensionMCPUsesPinnedTypedRecipeWithoutWrites(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := service.New(store.NewMemory(), nil)
-	handler, err := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Templates: registry, Service: s, Grants: []tenancy.Grant{{Token: "agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	handler, err := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Templates: registry, Service: s, Grants: []tenancy.Grant{{Token: "agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

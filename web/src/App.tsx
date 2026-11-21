@@ -11,7 +11,9 @@ import { providerLabel } from "@/lib/telemetry-providers";
 import { ReplayLabel } from "@/components/replay-label";
 import { Brand } from "@/components/brand";
 import { MaturityBadge } from "@/components/maturity-badge";
-import { pageMaturity } from "@/lib/maturity";
+import { featureOn, pageMaturity, pageOn } from "@/lib/maturity";
+import { FeaturesProvider } from "@/lib/features";
+import { FeatureOff } from "@/components/feature-off";
 import {
   lazy,
   Suspense,
@@ -880,6 +882,8 @@ function TenantWorkspace({
   const objectives = data?.objectives ?? [];
   const events = data?.events ?? [];
   const isDemo = data?.workspace.mode === "demo";
+  const enabledFeatures = data?.workspace.features;
+  const replaysOn = featureOn(enabledFeatures, "session-replay");
   const nativeCapture = useMemo(() => new MaskedReplayCapture(), [scope]);
   const nativeState = useSyncExternalStore(
     nativeCapture.subscribe,
@@ -1009,679 +1013,710 @@ function TenantWorkspace({
     );
   }
   return (
-    <div
-      className="portal-shell min-h-screen bg-background text-foreground"
-      data-sidebar-collapsed={sidebarCollapsed}
-    >
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:bg-white focus:p-3"
+    <FeaturesProvider enabled={enabledFeatures}>
+      <div
+        className="portal-shell min-h-screen bg-background text-foreground"
+        data-sidebar-collapsed={sidebarCollapsed}
       >
-        Skip to content
-      </a>
-      <aside className="sidebar" aria-label="Workspace navigation">
-        <SideNav
-          header={
-            <SideNavHeading
-              heading="Nines"
-              icon={<img src="/nines-mark.svg" alt="" width="20" height="22" />}
-              headingHref={workspacePath(scope.tenant, "home")}
-            />
-          }
-          collapsible={{
-            isCollapsed: sidebarCollapsed,
-            onCollapsedChange: toggleSidebar,
-            hasButton: true,
-          }}
-          footer={
-            <SideNavItem
-              label="Documentation"
-              aria-label="Documentation (opens in a new tab)"
-              icon={BookOpen}
-              href="https://ishantanu.github.io/nines/docs/"
-              as={ExternalLink}
-            />
-          }
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:bg-white focus:p-3"
         >
-          {[{ label: "Overview", pages: ["home"] }, ...navigationGroups].map(
-            (group) => (
-              <SideNavSection
-                key={group.label}
-                title={group.label}
-                isHeaderHidden={group.label === "Overview"}
-              >
-                {group.pages.map((id) => {
-                  const n = navigation.find((item) => item.id === id)!;
-                  const href = workspacePath(scope.tenant, n.id);
-                  return (
-                    <SideNavItem
-                      key={n.id}
-                      label={n.label}
-                      icon={n.icon}
-                      href={href}
-                      isSelected={activePage === n.id}
-                      data-replay-label={
-                        replayLabels.has(n.label) ? n.label : undefined
-                      }
-                      onClick={(event) => {
-                        followLink(event, href);
-                        if (event.defaultPrevented) {
-                          setQuery("");
-                          setReplayFilter("all");
-                        }
-                      }}
-                    />
-                  );
-                })}
-              </SideNavSection>
-            ),
-          )}
-        </SideNav>
-      </aside>
-      <div className="workspace">
-        <WorkspaceHeader
-          onPlatformAdmin={
-            platformAdmin ? () => navigateTo("/admin/tenants") : undefined
-          }
-          tenants={tenants}
-          tenant={scope.tenant}
-          role={scope.role}
-          demo={data?.workspace.mode === "demo"}
-          loading={loading}
-          onTenant={onTenant}
-          onRefresh={reload}
-          onCredentials={onCredentials}
-          identityLabel={
-            identityLabel ?? (isDemo ? "Demo administrator" : undefined)
-          }
-          onSignOut={
-            onSignOut || isDemo
-              ? () => {
-                  nativeCapture.discard();
-                  (onSignOut ?? onDemoSignOut)();
+          Skip to content
+        </a>
+        <aside className="sidebar" aria-label="Workspace navigation">
+          <SideNav
+            header={
+              <SideNavHeading
+                heading="Nines"
+                icon={
+                  <img src="/nines-mark.svg" alt="" width="20" height="22" />
                 }
-              : undefined
-          }
-          darkMode={darkMode}
-          onToggleTheme={onToggleTheme}
-        />
-        <nav className="mobile-navigation" aria-label="Mobile navigation">
-          <Select
-            value={activePage}
-            onValueChange={(value) => {
-              const item = navigation.find((n) => n.id === value);
-              if (item) navigate(item.id);
+                headingHref={workspacePath(scope.tenant, "home")}
+              />
+            }
+            collapsible={{
+              isCollapsed: sidebarCollapsed,
+              onCollapsedChange: toggleSidebar,
+              hasButton: true,
             }}
+            footer={
+              <SideNavItem
+                label="Documentation"
+                aria-label="Documentation (opens in a new tab)"
+                icon={BookOpen}
+                href="https://ishantanu.github.io/nines/docs/"
+                as={ExternalLink}
+              />
+            }
           >
-            <SelectTrigger className="w-full" aria-label="Navigate to page">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="home">Home</SelectItem>
-              {navigationGroups.map((group) => (
-                <SelectGroup key={group.label}>
-                  <SelectLabel>{group.label}</SelectLabel>
-                  {group.pages.map((id) => {
-                    const n = navigation.find((item) => item.id === id)!;
-                    return (
-                      <SelectItem key={n.id} value={n.id}>
-                        <ReplayLabel>{n.label}</ReplayLabel>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
-        </nav>
-        <main
-          id="main"
-          ref={main}
-          tabIndex={-1}
-          className="workspace-main outline-none"
-        >
-          {nativeState.status !== "idle" ? (
-            <div
-              data-replay-block
-              role="status"
-              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-xs"
-            >
-              <span>
-                {nativeState.status === "ready"
-                  ? "A masked recording is ready to save."
-                  : nativeState.status === "paused"
-                    ? "Session recording paused on this screen."
-                    : "Recording this tab. Private data is masked."}
-              </span>
-              <div className="flex gap-2">
-                {nativeState.status !== "ready" ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      nativeCapture.stop();
-                      navigate("replays");
-                    }}
-                  >
-                    <ReplayLabel>Stop recording</ReplayLabel>
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => navigate("replays")}
-                  >
-                    Open recording
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => nativeCapture.discard()}
+            {[{ label: "Overview", pages: ["home"] }, ...navigationGroups].map(
+              (group) => (
+                <SideNavSection
+                  key={group.label}
+                  title={group.label}
+                  isHeaderHidden={group.label === "Overview"}
                 >
-                  Discard
-                </Button>
-              </div>
-            </div>
-          ) : null}
-          {data &&
-          ((slo && !objectives.some((o) => o.slo.id === slo)) ||
-            (selected &&
-              !journeys.some(
-                (j) => j.resource.manifest.metadata.name === selected,
-              ))) ? (
-            <div className="empty-state">
-              <h1>Resource not found</h1>
-              <p>This resource is unavailable in this workspace.</p>
-              <Button onClick={() => navigate(page)}>
-                Back to {copy[page][0]}
-              </Button>
-            </div>
-          ) : slo && objectives.some((o) => o.slo.id === slo) ? (
-            <ObjectiveDetail
-              connections={data?.workspace.connections}
-              refreshKey={updated?.getTime() ?? 0}
-              objective={objectives.find((o) => o.slo.id === slo)}
-              scope={scope}
-              journeys={journeys}
-              onClose={() => setSLO("")}
-              onJourney={openJourney}
-              onConnections={() => navigate("connections")}
-              onReplays={() => {
-                const obj = objectives.find((o) => o.slo.id === slo);
-                if (obj)
-                  openReplays({
-                    kind: "ServiceLevelObjective",
-                    id: slo,
-                    revision: obj.slo.revision ?? 1,
-                  });
+                  {group.pages
+                    .filter((id) => pageOn(enabledFeatures, id))
+                    .map((id) => {
+                      const n = navigation.find((item) => item.id === id)!;
+                      const href = workspacePath(scope.tenant, n.id);
+                      return (
+                        <SideNavItem
+                          key={n.id}
+                          label={n.label}
+                          icon={n.icon}
+                          href={href}
+                          isSelected={activePage === n.id}
+                          data-replay-label={
+                            replayLabels.has(n.label) ? n.label : undefined
+                          }
+                          onClick={(event) => {
+                            followLink(event, href);
+                            if (event.defaultPrevented) {
+                              setQuery("");
+                              setReplayFilter("all");
+                            }
+                          }}
+                        />
+                      );
+                    })}
+                </SideNavSection>
+              ),
+            )}
+          </SideNav>
+        </aside>
+        <div className="workspace">
+          <WorkspaceHeader
+            onPlatformAdmin={
+              platformAdmin ? () => navigateTo("/admin/tenants") : undefined
+            }
+            tenants={tenants}
+            tenant={scope.tenant}
+            role={scope.role}
+            demo={data?.workspace.mode === "demo"}
+            loading={loading}
+            onTenant={onTenant}
+            onRefresh={reload}
+            onCredentials={onCredentials}
+            identityLabel={
+              identityLabel ?? (isDemo ? "Demo administrator" : undefined)
+            }
+            onSignOut={
+              onSignOut || isDemo
+                ? () => {
+                    nativeCapture.discard();
+                    (onSignOut ?? onDemoSignOut)();
+                  }
+                : undefined
+            }
+            darkMode={darkMode}
+            onToggleTheme={onToggleTheme}
+          />
+          <nav className="mobile-navigation" aria-label="Mobile navigation">
+            <Select
+              value={activePage}
+              onValueChange={(value) => {
+                const item = navigation.find((n) => n.id === value);
+                if (item) navigate(item.id);
               }}
-              onRefresh={reload}
-            />
-          ) : (
-            <>
-              <PageHeader
-                replayTitle
-                title={copy[page][0]}
-                description={copy[page][1]}
-                badge={<MaturityBadge feature={pageMaturity(page)} />}
+            >
+              <SelectTrigger className="w-full" aria-label="Navigate to page">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="home">Home</SelectItem>
+                {navigationGroups.map((group) => (
+                  <SelectGroup key={group.label}>
+                    <SelectLabel>{group.label}</SelectLabel>
+                    {group.pages
+                      .filter((id) => pageOn(enabledFeatures, id))
+                      .map((id) => {
+                        const n = navigation.find((item) => item.id === id)!;
+                        return (
+                          <SelectItem key={n.id} value={n.id}>
+                            <ReplayLabel>{n.label}</ReplayLabel>
+                          </SelectItem>
+                        );
+                      })}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+          </nav>
+          <main
+            id="main"
+            ref={main}
+            tabIndex={-1}
+            className="workspace-main outline-none"
+          >
+            {nativeState.status !== "idle" ? (
+              <div
+                data-replay-block
+                role="status"
+                className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border bg-muted/30 p-3 text-xs"
               >
-                {page === "objectives" ? (
-                  canEdit(scope) ? (
-                    <Suspense
-                      fallback={<span role="status">Loading YAML editor…</span>}
-                    >
-                      <Button
-                        variant="outline"
-                        title="Prepare an SLO from a goal, with telemetry evidence and a separate approval before it is applied"
-                        onClick={() => navigate("intents")}
-                      >
-                        <ReplayLabel>Create from a goal</ReplayLabel>
-                      </Button>
-                      <MigrationImport scope={scope} onApplied={reload} />
-                      <ObjectiveCreate scope={scope} onCreated={reload} />
-                    </Suspense>
-                  ) : null
-                ) : page === "journeys" || page === "agents" ? (
-                  <ManifestEditor
-                    scope={scope}
-                    onApplied={(id) => {
-                      reload();
-                      if (id) {
-                        setQuery("");
-                        openJourney(id);
-                      }
-                    }}
-                    onProposed={
-                      data?.workspace.workflowsConfigured
-                        ? () => navigate("workflows")
-                        : undefined
-                    }
-                  />
-                ) : null}
-              </PageHeader>
-              {error ? (
-                <div
-                  role="alert"
-                  className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
-                >
-                  <span>{error}</span>
-                  <div className="flex gap-2">
+                <span>
+                  {nativeState.status === "ready"
+                    ? "A masked recording is ready to save."
+                    : nativeState.status === "paused"
+                      ? "Session recording paused on this screen."
+                      : "Recording this tab. Private data is masked."}
+                </span>
+                <div className="flex gap-2">
+                  {nativeState.status !== "ready" ? (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => onCredentials()}
+                      onClick={() => {
+                        nativeCapture.stop();
+                        navigate("replays");
+                      }}
                     >
-                      Set API token
+                      <ReplayLabel>Stop recording</ReplayLabel>
                     </Button>
-                    <Button size="sm" variant="outline" onClick={reload}>
-                      <ReplayLabel>Retry</ReplayLabel>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate("replays")}
+                    >
+                      Open recording
                     </Button>
-                  </div>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => nativeCapture.discard()}
+                  >
+                    Discard
+                  </Button>
                 </div>
-              ) : null}
-              {loading && !data ? (
-                <div
-                  role="status"
-                  className="empty-state rounded-md border bg-white"
+              </div>
+            ) : null}
+            {data &&
+            ((slo && !objectives.some((o) => o.slo.id === slo)) ||
+              (selected &&
+                !journeys.some(
+                  (j) => j.resource.manifest.metadata.name === selected,
+                ))) ? (
+              <div className="empty-state">
+                <h1>Resource not found</h1>
+                <p>This resource is unavailable in this workspace.</p>
+                <Button onClick={() => navigate(page)}>
+                  Back to {copy[page][0]}
+                </Button>
+              </div>
+            ) : slo && objectives.some((o) => o.slo.id === slo) ? (
+              <ObjectiveDetail
+                connections={data?.workspace.connections}
+                refreshKey={updated?.getTime() ?? 0}
+                objective={objectives.find((o) => o.slo.id === slo)}
+                scope={scope}
+                journeys={journeys}
+                onClose={() => setSLO("")}
+                onJourney={openJourney}
+                onConnections={() => navigate("connections")}
+                onReplays={
+                  replaysOn
+                    ? () => {
+                        const obj = objectives.find((o) => o.slo.id === slo);
+                        if (obj)
+                          openReplays({
+                            kind: "ServiceLevelObjective",
+                            id: slo,
+                            revision: obj.slo.revision ?? 1,
+                          });
+                      }
+                    : undefined
+                }
+                onRefresh={reload}
+              />
+            ) : !pageOn(enabledFeatures, page) ? (
+              data ? (
+                <FeatureOff feature={pageMaturity(page)!} />
+              ) : null
+            ) : (
+              <>
+                <PageHeader
+                  replayTitle
+                  title={copy[page][0]}
+                  description={copy[page][1]}
+                  badge={<MaturityBadge feature={pageMaturity(page)} />}
                 >
-                  Loading workspace…
-                </div>
-              ) : data ? (
-                <>
-                  {page === "journeys" ||
-                  page === "agents" ||
-                  page === "objectives" ? (
-                    <dl className="summary-grid">
-                      {(page === "objectives"
-                        ? [
-                            {
-                              label: "Objectives",
-                              value: objectives.filter((o) => !o.slo.retirement)
-                                .length,
-                            },
-                            {
-                              label: "Healthy",
-                              value: objectives.filter(
-                                (o) =>
-                                  !o.slo.retirement &&
-                                  healthOf(o.status) === "healthy",
-                              ).length,
-                            },
-                            {
-                              label: "Needs attention",
-                              value: objectives.filter(
-                                (o) =>
-                                  !o.slo.retirement &&
-                                  ["degraded", "at_risk"].includes(
-                                    healthOf(o.status),
-                                  ),
-                              ).length,
-                            },
-                            {
-                              label: "Without full coverage",
-                              value: objectives.filter(
-                                (o) =>
-                                  !o.slo.retirement &&
-                                  healthOf(o.status) === "unknown",
-                              ).length,
-                            },
-                          ]
-                        : [
-                            {
-                              label:
-                                page === "agents"
-                                  ? "Agentic journeys"
-                                  : "Journeys",
-                              value: visibleJourneys.length,
-                            },
-                            {
-                              label: "Healthy",
-                              value: visibleJourneys.filter(
-                                (j) => j.health === "healthy",
-                              ).length,
-                            },
-                            {
-                              label: "Linked objectives",
-                              value: new Set(
-                                visibleJourneys.flatMap((j) =>
-                                  j.links.map((l) => l.link.id),
-                                ),
-                              ).size,
-                            },
-                            {
-                              label: "Needs attention",
-                              value: visibleJourneys.filter(
-                                (j) =>
-                                  j.health !== "healthy" &&
-                                  j.health !== "unknown",
-                              ).length,
-                            },
-                          ]
-                      ).map((metric) => (
-                        <div className="summary-metric" key={metric.label}>
-                          <dt>
-                            <ReplayLabel>{metric.label}</ReplayLabel>
-                          </dt>
-                          <dd>{metric.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
+                  {page === "objectives" ? (
+                    canEdit(scope) ? (
+                      <Suspense
+                        fallback={
+                          <span role="status">Loading YAML editor…</span>
+                        }
+                      >
+                        {featureOn(enabledFeatures, "create-from-goal") ? (
+                          <Button
+                            variant="outline"
+                            title="Prepare an SLO from a goal, with telemetry evidence and a separate approval before it is applied"
+                            onClick={() => navigate("intents")}
+                          >
+                            <ReplayLabel>Create from a goal</ReplayLabel>
+                          </Button>
+                        ) : null}
+                        {featureOn(enabledFeatures, "migration") ? (
+                          <MigrationImport scope={scope} onApplied={reload} />
+                        ) : null}
+                        <ObjectiveCreate scope={scope} onCreated={reload} />
+                      </Suspense>
+                    ) : null
+                  ) : page === "journeys" || page === "agents" ? (
+                    <ManifestEditor
+                      scope={scope}
+                      onApplied={(id) => {
+                        reload();
+                        if (id) {
+                          setQuery("");
+                          openJourney(id);
+                        }
+                      }}
+                      onProposed={
+                        data?.workspace.workflowsConfigured
+                          ? () => navigate("workflows")
+                          : undefined
+                      }
+                    />
                   ) : null}
-                  {page === "journeys" ||
-                  page === "agents" ||
-                  page === "objectives" ? (
-                    <div className="resource-toolbar">
-                      <div className="relative w-full max-w-sm">
-                        <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
-                        <Input
-                          className="bg-white pl-9"
-                          aria-label={
-                            page === "objectives"
-                              ? "Search objectives"
-                              : "Search critical user journeys"
-                          }
-                          placeholder={
-                            page === "objectives"
-                              ? "Search objectives"
-                              : "Search journeys"
-                          }
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                        />
-                      </div>
-                      <span className="hidden whitespace-nowrap text-xs text-muted-foreground sm:block">
-                        {page === "objectives"
-                          ? "Sorted by remaining budget"
-                          : `${shown.length} journeys`}
-                      </span>
+                </PageHeader>
+                {error ? (
+                  <div
+                    role="alert"
+                    className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+                  >
+                    <span>{error}</span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onCredentials()}
+                      >
+                        Set API token
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={reload}>
+                        <ReplayLabel>Retry</ReplayLabel>
+                      </Button>
                     </div>
-                  ) : null}
-                  {page === "investigations" ? (
-                    <Suspense fallback={<p role="status">Loading reviews…</p>}>
-                      <Investigations
-                        key={scope.tenant}
-                        scope={scope}
-                        objectives={objectives}
-                        journeys={journeys}
-                        onSLO={(id) => {
-                          setSLO(id);
-                        }}
-                        onJourney={openJourney}
-                      />
-                    </Suspense>
-                  ) : page === "audit" ? (
-                    <Suspense
-                      fallback={<p role="status">Loading audit log…</p>}
-                    >
-                      <AuditLog key={scope.tenant} scope={scope} />
-                    </Suspense>
-                  ) : page === "replays" ? (
-                    <Suspense
-                      fallback={<p role="status">Loading session replay…</p>}
-                    >
-                      <SessionReplays
-                        key={scope.tenant}
-                        scope={scope}
-                        capture={nativeCapture}
-                        initialFilter={replayFilter}
-                        options={replayOptions}
-                        onResource={(ref) => {
-                          if (ref.kind === "ServiceLevelObjective") {
-                            setSLO(ref.id);
-                          } else if (ref.kind === "CriticalUserJourney") {
-                            openJourney(ref.id);
-                          } else navigate("alerts");
-                        }}
-                      />
-                    </Suspense>
-                  ) : page === "home" ? (
-                    <Suspense
-                      fallback={
-                        <p role="status" className="empty-state">
-                          Loading overview…
-                        </p>
-                      }
-                    >
-                      <Home
-                        data={data}
-                        scope={scope}
-                        onNavigate={navigate}
-                        onSLO={setSLO}
-                        onJourney={openJourney}
-                      />
-                    </Suspense>
-                  ) : page === "maps" ||
-                    page === "bindings" ||
-                    page === "intents" ? (
-                    <Suspense
-                      fallback={
-                        <p role="status" className="empty-state">
-                          Loading telemetry workspace…
-                        </p>
-                      }
-                    >
-                      {page === "intents" ? (
-                        <IntentAuthoring
+                  </div>
+                ) : null}
+                {loading && !data ? (
+                  <div
+                    role="status"
+                    className="empty-state rounded-md border bg-white"
+                  >
+                    Loading workspace…
+                  </div>
+                ) : data ? (
+                  <>
+                    {page === "journeys" ||
+                    page === "agents" ||
+                    page === "objectives" ? (
+                      <dl className="summary-grid">
+                        {(page === "objectives"
+                          ? [
+                              {
+                                label: "Objectives",
+                                value: objectives.filter(
+                                  (o) => !o.slo.retirement,
+                                ).length,
+                              },
+                              {
+                                label: "Healthy",
+                                value: objectives.filter(
+                                  (o) =>
+                                    !o.slo.retirement &&
+                                    healthOf(o.status) === "healthy",
+                                ).length,
+                              },
+                              {
+                                label: "Needs attention",
+                                value: objectives.filter(
+                                  (o) =>
+                                    !o.slo.retirement &&
+                                    ["degraded", "at_risk"].includes(
+                                      healthOf(o.status),
+                                    ),
+                                ).length,
+                              },
+                              {
+                                label: "Without full coverage",
+                                value: objectives.filter(
+                                  (o) =>
+                                    !o.slo.retirement &&
+                                    healthOf(o.status) === "unknown",
+                                ).length,
+                              },
+                            ]
+                          : [
+                              {
+                                label:
+                                  page === "agents"
+                                    ? "Agentic journeys"
+                                    : "Journeys",
+                                value: visibleJourneys.length,
+                              },
+                              {
+                                label: "Healthy",
+                                value: visibleJourneys.filter(
+                                  (j) => j.health === "healthy",
+                                ).length,
+                              },
+                              {
+                                label: "Linked objectives",
+                                value: new Set(
+                                  visibleJourneys.flatMap((j) =>
+                                    j.links.map((l) => l.link.id),
+                                  ),
+                                ).size,
+                              },
+                              {
+                                label: "Needs attention",
+                                value: visibleJourneys.filter(
+                                  (j) =>
+                                    j.health !== "healthy" &&
+                                    j.health !== "unknown",
+                                ).length,
+                              },
+                            ]
+                        ).map((metric) => (
+                          <div className="summary-metric" key={metric.label}>
+                            <dt>
+                              <ReplayLabel>{metric.label}</ReplayLabel>
+                            </dt>
+                            <dd>{metric.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    ) : null}
+                    {page === "journeys" ||
+                    page === "agents" ||
+                    page === "objectives" ? (
+                      <div className="resource-toolbar">
+                        <div className="relative w-full max-w-sm">
+                          <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                          <Input
+                            className="bg-white pl-9"
+                            aria-label={
+                              page === "objectives"
+                                ? "Search objectives"
+                                : "Search critical user journeys"
+                            }
+                            placeholder={
+                              page === "objectives"
+                                ? "Search objectives"
+                                : "Search journeys"
+                            }
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                          />
+                        </div>
+                        <span className="hidden whitespace-nowrap text-xs text-muted-foreground sm:block">
+                          {page === "objectives"
+                            ? "Sorted by remaining budget"
+                            : `${shown.length} journeys`}
+                        </span>
+                      </div>
+                    ) : null}
+                    {page === "investigations" ? (
+                      <Suspense
+                        fallback={<p role="status">Loading reviews…</p>}
+                      >
+                        <Investigations
                           key={scope.tenant}
                           scope={scope}
+                          objectives={objectives}
                           journeys={journeys}
-                          onApplied={reload}
-                        />
-                      ) : page === "maps" ? (
-                        <DependencyMaps
-                          scope={scope}
-                          onSLO={setSLO}
+                          onSLO={(id) => {
+                            setSLO(id);
+                          }}
                           onJourney={openJourney}
                         />
-                      ) : (
-                        <MeasurementBindings scope={scope} />
-                      )}
-                    </Suspense>
-                  ) : page === "connections" ||
-                    page === "access" ||
-                    page === "clients" ? (
-                    <Suspense
-                      fallback={
-                        <p role="status" className="empty-state">
-                          Loading settings…
-                        </p>
-                      }
-                    >
-                      {page === "connections" ? (
-                        <Connections scope={scope} />
-                      ) : page === "access" ? (
-                        <AccessControl scope={scope} />
-                      ) : (
-                        <Clients scope={scope} />
-                      )}
-                    </Suspense>
-                  ) : page === "journeys" || page === "agents" ? (
-                    shown.length ? (
-                      <div className="min-w-0 space-y-4">
-                        <div className="flex flex-wrap items-center gap-3">
-                          <Label htmlFor="selected-journey">
-                            Critical user journey
-                          </Label>
-                          <NativeSelect
-                            id="selected-journey"
-                            className="h-9 w-full min-w-0 max-w-lg rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
-                            value={
-                              chosen?.resource.manifest.metadata.name ?? ""
-                            }
-                            onChange={(event) =>
-                              setSelected(event.target.value)
-                            }
-                          >
-                            {shown.map((j) => (
-                              <option
-                                key={j.resource.manifest.metadata.name}
-                                value={j.resource.manifest.metadata.name}
-                              >
-                                {j.resource.manifest.spec.displayName}
-                              </option>
-                            ))}
-                          </NativeSelect>
-                        </div>
-                        {chosen ? (
-                          <div className="min-w-0">
-                            <Suspense
-                              fallback={
-                                <p role="status" className="empty-state">
-                                  Loading journey…
-                                </p>
-                              }
-                            >
-                              <JourneyDetail
-                                connections={data.workspace.connections}
-                                key={chosen.resource.manifest.metadata.name}
-                                refreshKey={updated?.getTime() ?? 0}
-                                journey={chosen}
-                                scope={scope}
-                                onSLO={setSLO}
-                                onReplays={() =>
-                                  openReplays({
-                                    kind: "CriticalUserJourney",
-                                    id: chosen.resource.manifest.metadata.name,
-                                    revision: chosen.resource.revision,
-                                  })
-                                }
-                                onRefresh={reload}
-                                onProposed={
-                                  data?.workspace.workflowsConfigured
-                                    ? () => navigate("workflows")
-                                    : undefined
-                                }
-                                evidenceOnly={page === "agents"}
-                              />
-                            </Suspense>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="empty-state rounded-md border bg-white">
-                        <Waypoints className="mx-auto mb-4 size-8 text-slate-300" />
-                        <h2 className="text-base font-semibold text-slate-700">
-                          {query
-                            ? "No journeys match your search"
-                            : page === "agents"
-                              ? "No agentic contracts yet"
-                              : "No critical user journeys"}
-                        </h2>
-                        <p className="mx-auto mt-2 max-w-md text-sm">
-                          {query
-                            ? "Try a journey name, team, or project."
-                            : "Create a journey definition and link its service level objectives."}
-                        </p>
-                      </div>
-                    )
-                  ) : page === "objectives" ? (
-                    <Objectives
-                      scope={scope}
-                      connections={data.workspace.connections}
-                      items={objectives.filter((o) =>
-                        JSON.stringify(o.slo).toLowerCase().includes(search),
-                      )}
-                      journeys={journeys}
-                      onSelect={setSLO}
-                      onJourney={openJourney}
-                    />
-                  ) : page === "workflows" ? (
-                    data.workspace.workflowsConfigured ? (
+                      </Suspense>
+                    ) : page === "audit" ? (
+                      <Suspense
+                        fallback={<p role="status">Loading audit log…</p>}
+                      >
+                        <AuditLog key={scope.tenant} scope={scope} />
+                      </Suspense>
+                    ) : page === "replays" ? (
+                      <Suspense
+                        fallback={<p role="status">Loading session replay…</p>}
+                      >
+                        <SessionReplays
+                          key={scope.tenant}
+                          scope={scope}
+                          capture={nativeCapture}
+                          initialFilter={replayFilter}
+                          options={replayOptions}
+                          onResource={(ref) => {
+                            if (ref.kind === "ServiceLevelObjective") {
+                              setSLO(ref.id);
+                            } else if (ref.kind === "CriticalUserJourney") {
+                              openJourney(ref.id);
+                            } else navigate("alerts");
+                          }}
+                        />
+                      </Suspense>
+                    ) : page === "home" ? (
                       <Suspense
                         fallback={
                           <p role="status" className="empty-state">
-                            Loading workflow tools…
+                            Loading overview…
                           </p>
                         }
                       >
-                        <Workflows scope={scope} journeys={journeys} />
+                        <Home
+                          data={data}
+                          scope={scope}
+                          onNavigate={navigate}
+                          onSLO={setSLO}
+                          onJourney={openJourney}
+                        />
                       </Suspense>
-                    ) : (
-                      <p className="empty-state rounded-md border bg-white">
-                        Workflows are not configured for this tenant.
-                      </p>
-                    )
-                  ) : (
-                    <Card className="gap-0 py-0">
-                      <CardContent className="p-0">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="pl-6">Transition</TableHead>
-                              <TableHead>Objective</TableHead>
-                              <TableHead>Burn (short / long)</TableHead>
-                              <TableHead>Delivery</TableHead>
-                              <TableHead>Time</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {events.map((d) => (
-                              <TableRow key={d.event.id}>
-                                <TableCell className="py-5 pl-6">
-                                  <Status
-                                    value={
-                                      d.event.kind === "firing"
-                                        ? "degraded"
-                                        : "healthy"
-                                    }
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <button
-                                    className="font-medium hover:text-primary"
-                                    onClick={() => setSLO(d.event.sloId)}
-                                  >
-                                    {d.event.sloId}
-                                  </button>
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">
-                                  {d.event.shortBurn.toFixed(2)}× /{" "}
-                                  {d.event.longBurn.toFixed(2)}×
-                                </TableCell>
-                                <TableCell className="text-xs">
-                                  {d.status} · {d.attempts} attempts
-                                  {d.lastError ? (
-                                    <div className="text-destructive">
-                                      {d.lastError}
-                                    </div>
-                                  ) : null}
-                                </TableCell>
-                                <TableCell className="text-xs text-muted-foreground">
-                                  {date(d.event.time)}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                        {!events.length ? (
-                          <p className="empty-state">
-                            No alert transitions have been recorded.
+                    ) : page === "maps" ||
+                      page === "bindings" ||
+                      page === "intents" ? (
+                      <Suspense
+                        fallback={
+                          <p role="status" className="empty-state">
+                            Loading telemetry workspace…
                           </p>
-                        ) : null}
-                      </CardContent>
-                    </Card>
-                  )}
-                </>
-              ) : null}
-            </>
-          )}
-        </main>
-        <WorkspaceFooter
-          source={
-            !data
-              ? "Unavailable"
-              : data.workspace.source.configured
-                ? (data.workspace.source.connectionCount ?? 1) > 1
-                  ? `${data.workspace.source.connectionCount} metrics connections`
-                  : providerLabel(data.workspace.source.kind)
-                : "Manual ingestion"
-          }
-          updated={updated}
-          loading={loading}
-          error={!!error}
-        />
+                        }
+                      >
+                        {page === "intents" ? (
+                          <IntentAuthoring
+                            key={scope.tenant}
+                            scope={scope}
+                            journeys={journeys}
+                            onApplied={reload}
+                          />
+                        ) : page === "maps" ? (
+                          <DependencyMaps
+                            scope={scope}
+                            onSLO={setSLO}
+                            onJourney={openJourney}
+                          />
+                        ) : (
+                          <MeasurementBindings scope={scope} />
+                        )}
+                      </Suspense>
+                    ) : page === "connections" ||
+                      page === "access" ||
+                      page === "clients" ? (
+                      <Suspense
+                        fallback={
+                          <p role="status" className="empty-state">
+                            Loading settings…
+                          </p>
+                        }
+                      >
+                        {page === "connections" ? (
+                          <Connections scope={scope} />
+                        ) : page === "access" ? (
+                          <AccessControl scope={scope} />
+                        ) : (
+                          <Clients scope={scope} />
+                        )}
+                      </Suspense>
+                    ) : page === "journeys" || page === "agents" ? (
+                      shown.length ? (
+                        <div className="min-w-0 space-y-4">
+                          <div className="flex flex-wrap items-center gap-3">
+                            <Label htmlFor="selected-journey">
+                              Critical user journey
+                            </Label>
+                            <NativeSelect
+                              id="selected-journey"
+                              className="h-9 w-full min-w-0 max-w-lg rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-ring"
+                              value={
+                                chosen?.resource.manifest.metadata.name ?? ""
+                              }
+                              onChange={(event) =>
+                                setSelected(event.target.value)
+                              }
+                            >
+                              {shown.map((j) => (
+                                <option
+                                  key={j.resource.manifest.metadata.name}
+                                  value={j.resource.manifest.metadata.name}
+                                >
+                                  {j.resource.manifest.spec.displayName}
+                                </option>
+                              ))}
+                            </NativeSelect>
+                          </div>
+                          {chosen ? (
+                            <div className="min-w-0">
+                              <Suspense
+                                fallback={
+                                  <p role="status" className="empty-state">
+                                    Loading journey…
+                                  </p>
+                                }
+                              >
+                                <JourneyDetail
+                                  connections={data.workspace.connections}
+                                  key={chosen.resource.manifest.metadata.name}
+                                  refreshKey={updated?.getTime() ?? 0}
+                                  journey={chosen}
+                                  scope={scope}
+                                  onSLO={setSLO}
+                                  onReplays={
+                                    replaysOn
+                                      ? () =>
+                                          openReplays({
+                                            kind: "CriticalUserJourney",
+                                            id: chosen.resource.manifest
+                                              .metadata.name,
+                                            revision: chosen.resource.revision,
+                                          })
+                                      : undefined
+                                  }
+                                  onRefresh={reload}
+                                  onProposed={
+                                    data?.workspace.workflowsConfigured
+                                      ? () => navigate("workflows")
+                                      : undefined
+                                  }
+                                  evidenceOnly={page === "agents"}
+                                />
+                              </Suspense>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="empty-state rounded-md border bg-white">
+                          <Waypoints className="mx-auto mb-4 size-8 text-slate-300" />
+                          <h2 className="text-base font-semibold text-slate-700">
+                            {query
+                              ? "No journeys match your search"
+                              : page === "agents"
+                                ? "No agentic contracts yet"
+                                : "No critical user journeys"}
+                          </h2>
+                          <p className="mx-auto mt-2 max-w-md text-sm">
+                            {query
+                              ? "Try a journey name, team, or project."
+                              : "Create a journey definition and link its service level objectives."}
+                          </p>
+                        </div>
+                      )
+                    ) : page === "objectives" ? (
+                      <Objectives
+                        scope={scope}
+                        connections={data.workspace.connections}
+                        items={objectives.filter((o) =>
+                          JSON.stringify(o.slo).toLowerCase().includes(search),
+                        )}
+                        journeys={journeys}
+                        onSelect={setSLO}
+                        onJourney={openJourney}
+                      />
+                    ) : page === "workflows" ? (
+                      data.workspace.workflowsConfigured ? (
+                        <Suspense
+                          fallback={
+                            <p role="status" className="empty-state">
+                              Loading workflow tools…
+                            </p>
+                          }
+                        >
+                          <Workflows scope={scope} journeys={journeys} />
+                        </Suspense>
+                      ) : (
+                        <p className="empty-state rounded-md border bg-white">
+                          Workflows are not configured for this tenant.
+                        </p>
+                      )
+                    ) : (
+                      <Card className="gap-0 py-0">
+                        <CardContent className="p-0">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="pl-6">
+                                  Transition
+                                </TableHead>
+                                <TableHead>Objective</TableHead>
+                                <TableHead>Burn (short / long)</TableHead>
+                                <TableHead>Delivery</TableHead>
+                                <TableHead>Time</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {events.map((d) => (
+                                <TableRow key={d.event.id}>
+                                  <TableCell className="py-5 pl-6">
+                                    <Status
+                                      value={
+                                        d.event.kind === "firing"
+                                          ? "degraded"
+                                          : "healthy"
+                                      }
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <button
+                                      className="font-medium hover:text-primary"
+                                      onClick={() => setSLO(d.event.sloId)}
+                                    >
+                                      {d.event.sloId}
+                                    </button>
+                                  </TableCell>
+                                  <TableCell className="font-mono text-xs">
+                                    {d.event.shortBurn.toFixed(2)}× /{" "}
+                                    {d.event.longBurn.toFixed(2)}×
+                                  </TableCell>
+                                  <TableCell className="text-xs">
+                                    {d.status} · {d.attempts} attempts
+                                    {d.lastError ? (
+                                      <div className="text-destructive">
+                                        {d.lastError}
+                                      </div>
+                                    ) : null}
+                                  </TableCell>
+                                  <TableCell className="text-xs text-muted-foreground">
+                                    {date(d.event.time)}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                          {!events.length ? (
+                            <p className="empty-state">
+                              No alert transitions have been recorded.
+                            </p>
+                          ) : null}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                ) : null}
+              </>
+            )}
+          </main>
+          <WorkspaceFooter
+            source={
+              !data
+                ? "Unavailable"
+                : data.workspace.source.configured
+                  ? (data.workspace.source.connectionCount ?? 1) > 1
+                    ? `${data.workspace.source.connectionCount} metrics connections`
+                    : providerLabel(data.workspace.source.kind)
+                  : "Manual ingestion"
+            }
+            updated={updated}
+            loading={loading}
+            error={!!error}
+          />
+        </div>
       </div>
-    </div>
+    </FeaturesProvider>
   );
 }

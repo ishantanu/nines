@@ -1,3 +1,4 @@
+import { useFeature } from "@/lib/features";
 import { useEffect, useRef, useState } from "react";
 import { stringifyDefinition as stringify } from "@/lib/definition-yaml";
 import { Plus, Settings2, FileCheck2 } from "lucide-react";
@@ -57,7 +58,11 @@ export function ManifestEditor({
       block: "nearest",
     });
   }, [plan, error]);
-  const editable = canEdit(scope) || (scope.role === "agent" && !!onProposed);
+  // Agents propose through workflows; without them an agent cannot change
+  // a journey, so the editor stays read-only rather than failing on submit.
+  const workflowsOn = useFeature("workflows");
+  const editable =
+    canEdit(scope) || (scope.role === "agent" && !!onProposed && workflowsOn);
   useEffect(() => {
     setOpen(false);
     setPlan(null);

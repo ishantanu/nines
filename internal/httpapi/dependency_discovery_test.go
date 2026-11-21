@@ -13,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/kubediscovery"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
@@ -42,7 +43,7 @@ func TestDependencyDiscoveryIsReadOnlyTenantBoundAndPositionsAreRevisioned(t *te
 	reader := &discoveryFixture{inventory: inventory}
 	a, b := service.New(store.NewMemory(), nil), service.New(store.NewMemory(), nil)
 	a.KubernetesDiscovery = reader
-	handler, err := NewMulti([]Workspace{{ID: "alpha", Name: "Alpha", Service: a, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}, {Token: "agent", Role: "agent"}}}, {ID: "beta", Name: "Beta", Service: b, Grants: []tenancy.Grant{{Token: "beta", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	handler, err := NewMulti([]Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: a, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}, {Token: "agent", Role: "agent"}}}, {Features: features.All(), ID: "beta", Name: "Beta", Service: b, Grants: []tenancy.Grant{{Token: "beta", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

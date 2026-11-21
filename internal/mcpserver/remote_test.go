@@ -23,6 +23,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
 	"github.com/ishantanu/nines/examples"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
@@ -403,7 +404,7 @@ func TestRemotePerClientConcurrencyAndNoCredentialLeak(t *testing.T) {
 func TestRemoteOAuthDoesNotBypassActualNinesRBAC(t *testing.T) {
 	f := newRemoteFixture(t, true)
 	svc := service.New(store.NewMemory(), nil)
-	handler, e := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Service: svc, Grants: []tenancy.Grant{{Token: "api-alice", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	handler, e := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: svc, Grants: []tenancy.Grant{{Token: "api-alice", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if e != nil {
 		t.Fatal(e)
 	}

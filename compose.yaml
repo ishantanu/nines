@@ -30,6 +30,8 @@ services:
       AUTH_CONFIG_FILE: /etc/nines/local-auth.yaml
       NINES_PUBLIC_URL: ${NINES_PUBLIC_URL:-http://127.0.0.1:8080}
       NINES_BOOTSTRAP_PASSWORD: ${NINES_BOOTSTRAP_PASSWORD:-}
+      # Experimental features to turn on, for example create-from-goal; empty keeps the stable core.
+      NINES_FEATURES: ${NINES_FEATURES:-}
       NINES_SOURCE_HOSTS: ${NINES_SOURCE_HOSTS:-}
       NINES_SOURCE_ENCRYPTION_KEY: ${NINES_SOURCE_ENCRYPTION_KEY:-}
       NINES_MANAGED_RULE_DIRECTORY: ${NINES_MANAGED_RULE_DIRECTORY:-}
