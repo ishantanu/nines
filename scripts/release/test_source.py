@@ -159,6 +159,13 @@ class RequiredIntegrationTests(unittest.TestCase):
                 "Test": "TestPostgresRestartPreservesSamplesStateAndOutbox",
                 "Package": "app/internal/store",
             },
+        ] + [
+            {"Action": "pass", "Test": name, "Package": "app/internal/schema"}
+            for name in (
+                "TestApplyRecordsAndRunsOnce",
+                "TestNewerDatabaseIsRefused",
+                "TestFailedMigrationLeavesNothingBehind",
+            )
         ]
         self.assertEqual(self.run_gate(rows, "database"), 0)
         self.assertNotEqual(self.run_gate(rows[:1], "database"), 0)

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Database changes now go through numbered, recorded migrations (`nines_schema_migrations`) applied once at startup under a lock. A release refuses to start against a database a newer release has migrated, naming the migration and the fix, and rollback means restoring the pre-upgrade backup. CI upgrades databases created by every published release (from v0.1.0-alpha.3) and checks that definitions, revisions, samples, journeys and status survive.
 - Every capability now has one maturity level, beta for the stable core or experimental, recorded in one catalog that drives the new feature maturity guide, `nines capabilities` and the portal. Experimental pages carry an Experimental badge with what remains before beta, experimental telemetry providers say so where they are chosen, and Create from a goal is experimental as a whole.
 - The demo now shows the SLO types: latency, freshness, sessions and throughput SLOs read from an in-process synthetic source through Nines' normal collection, window evaluation and measurement contract checks, and the agentic journey has a run objective. The demo still contacts no external service and keeps no default telemetry connection.
 - Release drafts link to the documentation site instead of relative paths, the container quick starts name the **Set API token** step, and the release notes and SLO practices status match what shipped in alpha.4.

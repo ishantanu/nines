@@ -10,6 +10,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/observability"
+	"github.com/ishantanu/nines/internal/schema"
 )
 
 type postgres struct{ pool *pgxpool.Pool }
@@ -33,7 +34,7 @@ func NewPostgres(ctx context.Context, dsn string) (Repository, error) {
 		p.Close()
 		return nil, err
 	}
-	_, err = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS browser_session_replays(id text PRIMARY KEY,expires_at timestamptz NOT NULL,created_at timestamptz NOT NULL,metadata bytea NOT NULL,document bytea NOT NULL);CREATE INDEX IF NOT EXISTS browser_session_replays_expiry ON browser_session_replays(expires_at);`)
+	err = schema.Apply(ctx, tx, "replay", Migrations)
 	if err != nil {
 		_ = tx.Rollback(context.Background())
 		p.Close()
@@ -169,3 +170,11 @@ func (p *postgres) Delete(ctx context.Context, id string, version int64) error {
 	}
 	return tx.Commit(ctx)
 }
+
+// Migrations is the replay schema history. Never edit or remove a released
+// migration: append a new one.
+var Migrations = []schema.Migration{
+	{ID: 1, Name: "alpha baseline", SQL: alphaBaseline},
+}
+
+const alphaBaseline = `CREATE TABLE IF NOT EXISTS browser_session_replays(id text PRIMARY KEY,expires_at timestamptz NOT NULL,created_at timestamptz NOT NULL,metadata bytea NOT NULL,document bytea NOT NULL);CREATE INDEX IF NOT EXISTS browser_session_replays_expiry ON browser_session_replays(expires_at);`

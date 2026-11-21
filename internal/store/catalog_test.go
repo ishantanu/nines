@@ -129,7 +129,9 @@ func TestCollectionHealthUpgradeAndReopen(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = admin.Exec(ctx, "ALTER TABLE slos DROP COLUMN collection_health"); err != nil {
+	// A database from a release before collection health and the migration
+	// ledger lacks both.
+	if _, err = admin.Exec(ctx, "ALTER TABLE slos DROP COLUMN collection_health; DROP TABLE nines_schema_migrations"); err != nil {
 		t.Fatal(err)
 	}
 	admin.Close()

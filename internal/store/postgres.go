@@ -12,10 +12,18 @@ import (
 
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/observability"
+	"github.com/ishantanu/nines/internal/schema"
 )
 
-//go:embed schema.sql
-var schema string
+//go:embed migrations/0001_alpha_baseline.sql
+var alphaBaseline string
+
+// Migrations is the SLO store's schema history, applied in order and recorded
+// per tenant schema. Never edit or remove a released migration: append a new
+// one. TestReleasedMigrationsAreUnchanged enforces this.
+var Migrations = []schema.Migration{
+	{ID: 1, Name: "alpha baseline", SQL: alphaBaseline},
+}
 
 type Postgres struct{ pool postgresDB }
 
@@ -38,7 +46,7 @@ func NewPostgres(ctx context.Context, url string) (*Postgres, error) {
 		_ = tx.Rollback(context.Background())
 	}()
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(654239118)"); err == nil {
-		_, err = tx.Exec(ctx, schema)
+		err = schema.Apply(ctx, tx, "store", Migrations)
 	}
 	if err == nil {
 		err = tx.Commit(ctx)

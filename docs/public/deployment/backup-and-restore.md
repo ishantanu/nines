@@ -60,7 +60,14 @@ docker compose -p nines-restore exec -T database pg_restore --exit-on-error --no
 2. Stop the single collecting server and create a verified database/configuration backup.
 3. Start the reviewed replacement, inspect startup logs and verify authenticated access to each tenant.
 4. Check query freshness, rule destinations and alert routing before ending maintenance.
-5. If rollback is needed, verify schema compatibility first. Where compatibility is unknown, restore the pre-upgrade database into an isolated replacement and recover deliberately.
+5. To roll back, restore the backup from step 2 and start the previous release against it. Do not start an older release against a database a newer release has upgraded.
+
+### How Nines changes the database
+
+- Each part of Nines that stores data (SLOs and their history, accounts and sessions, workflows, reviews, replays, intent conversations) applies numbered schema migrations at startup and records them in `nines_schema_migrations`. Each tenant's schema has its own record.
+- Migrations only move forward and run once, in one transaction per component under a lock, so several servers starting together apply them once. A failed migration changes nothing.
+- A release refuses to start against a database that a newer release has migrated, and names the migration and the fix: run the newer release, or restore the backup taken before the upgrade. This replaces silently reading a schema it does not understand.
+- Every published release since v0.1.0-alpha.3 is upgraded to the current build in CI, checking that definitions, revisions, samples, journeys and status survive. Upgrade directly from any of them; there is no need to step through intermediate releases.
 
 - Do not run old and new collecting processes simultaneously. The normal [Kubernetes reference](kubernetes.md) uses `Recreate`, and the native service upgrade replaces one stopped process.
 - Reference: PostgreSQL's [pg_dump](https://www.postgresql.org/docs/17/app-pgdump.html) and [pg_restore](https://www.postgresql.org/docs/17/app-pgrestore.html) documentation.

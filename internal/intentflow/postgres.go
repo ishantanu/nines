@@ -11,6 +11,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/observability"
+	"github.com/ishantanu/nines/internal/schema"
 )
 
 type postgres struct{ pool *pgxpool.Pool }
@@ -26,23 +27,7 @@ func NewPostgres(ctx context.Context, dsn string) (Repository, error) {
 		return nil, e
 	}
 	if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(88621950)`); e == nil {
-		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_conversations(id text PRIMARY KEY,summary jsonb NOT NULL,document bytea NOT NULL,status text NOT NULL,lease_until timestamptz NOT NULL);CREATE INDEX IF NOT EXISTS intent_conversations_queue ON intent_conversations(status,lease_until,id)`)
-	}
-	journalExisted := true
-	if e == nil {
-		e = tx.QueryRow(ctx, `SELECT to_regclass('intent_audit_events') IS NOT NULL`).Scan(&journalExisted)
-	}
-	if e == nil {
-		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_audit_events(id uuid PRIMARY KEY,tenant text NOT NULL,conversation text NOT NULL,sequence bigint NOT NULL,at timestamptz NOT NULL,actor text NOT NULL,action text NOT NULL,outcome text NOT NULL,resources text[] NOT NULL,document bytea NOT NULL,summary bytea,UNIQUE(tenant,conversation,sequence)); CREATE INDEX IF NOT EXISTS intent_audit_time ON intent_audit_events(tenant,at DESC,id DESC);ALTER TABLE intent_audit_events ADD COLUMN IF NOT EXISTS summary bytea`)
-	}
-	if e == nil && !journalExisted {
-		e = bootstrapAuditJournal(ctx, tx)
-	}
-	if e == nil {
-		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_audit_archives(tenant text NOT NULL,target text NOT NULL,record_id uuid NOT NULL,token text NOT NULL,lease_until timestamptz NOT NULL,next_attempt timestamptz NOT NULL,retain_until timestamptz NOT NULL,attempts integer NOT NULL,last_error text NOT NULL DEFAULT '',receipt jsonb,PRIMARY KEY(tenant,target,record_id));CREATE INDEX IF NOT EXISTS intent_audit_archive_queue ON intent_audit_archives(tenant,target,next_attempt,lease_until) WHERE receipt IS NULL`)
-	}
-	if e == nil {
-		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_webhook_deliveries(tenant text NOT NULL,target text NOT NULL,record_id uuid NOT NULL,token text NOT NULL,lease_until timestamptz NOT NULL,next_attempt timestamptz NOT NULL,attempts integer NOT NULL,last_error text NOT NULL DEFAULT '',delivered boolean NOT NULL DEFAULT false,PRIMARY KEY(tenant,target,record_id));CREATE INDEX IF NOT EXISTS intent_webhook_queue ON intent_webhook_deliveries(tenant,target,next_attempt,lease_until) WHERE NOT delivered`)
+		e = schema.Apply(ctx, tx, "intent", Migrations)
 	}
 	if e == nil {
 		e = tx.Commit(ctx)
@@ -338,4 +323,34 @@ func bootstrapAuditJournal(ctx context.Context, tx pgx.Tx) error {
 			}
 		}
 	}
+}
+
+// alphaBaseline creates the intent tables as the alpha releases left them,
+// including the one-time audit journal bootstrap for databases that predate
+// the journal. It is migration 1 and must not change.
+func alphaBaseline(ctx context.Context, tx pgx.Tx) error {
+	_, e := tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_conversations(id text PRIMARY KEY,summary jsonb NOT NULL,document bytea NOT NULL,status text NOT NULL,lease_until timestamptz NOT NULL);CREATE INDEX IF NOT EXISTS intent_conversations_queue ON intent_conversations(status,lease_until,id)`)
+	journalExisted := true
+	if e == nil {
+		e = tx.QueryRow(ctx, `SELECT to_regclass('intent_audit_events') IS NOT NULL`).Scan(&journalExisted)
+	}
+	if e == nil {
+		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_audit_events(id uuid PRIMARY KEY,tenant text NOT NULL,conversation text NOT NULL,sequence bigint NOT NULL,at timestamptz NOT NULL,actor text NOT NULL,action text NOT NULL,outcome text NOT NULL,resources text[] NOT NULL,document bytea NOT NULL,summary bytea,UNIQUE(tenant,conversation,sequence)); CREATE INDEX IF NOT EXISTS intent_audit_time ON intent_audit_events(tenant,at DESC,id DESC);ALTER TABLE intent_audit_events ADD COLUMN IF NOT EXISTS summary bytea`)
+	}
+	if e == nil && !journalExisted {
+		e = bootstrapAuditJournal(ctx, tx)
+	}
+	if e == nil {
+		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_audit_archives(tenant text NOT NULL,target text NOT NULL,record_id uuid NOT NULL,token text NOT NULL,lease_until timestamptz NOT NULL,next_attempt timestamptz NOT NULL,retain_until timestamptz NOT NULL,attempts integer NOT NULL,last_error text NOT NULL DEFAULT '',receipt jsonb,PRIMARY KEY(tenant,target,record_id));CREATE INDEX IF NOT EXISTS intent_audit_archive_queue ON intent_audit_archives(tenant,target,next_attempt,lease_until) WHERE receipt IS NULL`)
+	}
+	if e == nil {
+		_, e = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS intent_webhook_deliveries(tenant text NOT NULL,target text NOT NULL,record_id uuid NOT NULL,token text NOT NULL,lease_until timestamptz NOT NULL,next_attempt timestamptz NOT NULL,attempts integer NOT NULL,last_error text NOT NULL DEFAULT '',delivered boolean NOT NULL DEFAULT false,PRIMARY KEY(tenant,target,record_id));CREATE INDEX IF NOT EXISTS intent_webhook_queue ON intent_webhook_deliveries(tenant,target,next_attempt,lease_until) WHERE NOT delivered`)
+	}
+	return e
+}
+
+// Migrations is the intent store's schema history. Never edit or remove a
+// released migration: append a new one.
+var Migrations = []schema.Migration{
+	{ID: 1, Name: "alpha baseline", Run: alphaBaseline, Version: "alpha.4"},
 }
