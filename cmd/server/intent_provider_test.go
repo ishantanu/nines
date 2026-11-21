@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 )
 
@@ -48,7 +49,9 @@ func TestNativeAnthropicEnvironmentBootstrapThroughHTTP(t *testing.T) {
 	if calls != 0 {
 		t.Fatal("bootstrap called the provider")
 	}
-	h, err := httpapi.NewMulti([]httpapi.Workspace{runtimes[0].Workspace}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	workspace := runtimes[0].Workspace
+	workspace.Features = features.All()
+	h, err := httpapi.NewMulti([]httpapi.Workspace{workspace}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

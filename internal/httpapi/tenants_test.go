@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ishantanu/nines/examples"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
@@ -28,7 +29,7 @@ func TestTenantAuthorizationIsolationAndAgentBoundaries(t *testing.T) {
 	beta.Now = alpha.Now
 	aw := workflow.New(alpha, workflow.NewMemory())
 	bw := workflow.New(beta, workflow.NewMemory())
-	h, err := NewMulti([]Workspace{{ID: "alpha", Name: "Alpha", Service: alpha, Workflows: aw, Grants: []tenancy.Grant{{Token: "alpha-owner", Role: "owner"}, {Token: "shared-owner", Role: "owner"}, {Token: "alpha-agent", Role: "agent"}, {Token: "alpha-viewer", Role: "viewer"}}}, {ID: "beta", Name: "Beta", Service: beta, Workflows: bw, Grants: []tenancy.Grant{{Token: "beta-owner", Role: "owner"}, {Token: "shared-owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, err := NewMulti([]Workspace{{ID: "alpha", Name: "Alpha", Service: alpha, Workflows: aw, Features: features.All(), Grants: []tenancy.Grant{{Token: "alpha-owner", Role: "owner"}, {Token: "shared-owner", Role: "owner"}, {Token: "alpha-agent", Role: "agent"}, {Token: "alpha-viewer", Role: "viewer"}}}, {ID: "beta", Name: "Beta", Service: beta, Workflows: bw, Features: features.All(), Grants: []tenancy.Grant{{Token: "beta-owner", Role: "owner"}, {Token: "shared-owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

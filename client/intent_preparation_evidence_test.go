@@ -9,6 +9,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/client"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/tenancy"
@@ -22,7 +23,7 @@ func TestIntentEvidenceAttachmentClientHTTPAndRBAC(t *testing.T) {
 	}
 	s.TenantID = "alpha"
 	flow := intentflow.New(s, intentflow.NewMemory())
-	h, err := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Service: s, IntentConversations: flow, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, err := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: s, IntentConversations: flow, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -45,8 +45,18 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 [ "$ready" = true ] || { echo 'Disposable Kubernetes API did not become ready'; exit 1; }
+# kubectl wait fails at once, instead of waiting, while a new CRD has no
+# status conditions yet, so retry until every CRD reports Established.
+wait_crds() {
+  for _ in $(seq 1 60); do
+    if docker exec "$server" kubectl wait --for=condition=Established --timeout=5s crd --all >/dev/null 2>&1; then return 0; fi
+    sleep 1
+  done
+  echo 'CustomResourceDefinitions did not become Established'
+  exit 1
+}
 docker exec -i "$server" kubectl apply --server-side -f - < "$work/crds.yaml" >/dev/null
-docker exec "$server" kubectl wait --for=condition=Established --timeout=60s crd --all >/dev/null
+wait_crds
 docker cp "$server:/etc/rancher/k3s/k3s.yaml" "$work/kubeconfig" >/dev/null
 # kubectl config view reads only this private file; it contacts no cluster.
 for item in ca cert key; do
@@ -71,7 +81,7 @@ docker run -d --name "$controller" --network "$network" --user 0:0 \
   --disable-unmanaged-prometheus-configuration >/dev/null
 # Install the shipped namespace Role/ServiceAccount and generated domain CRDs.
 docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/crds.yaml" >/dev/null
-docker exec "$server" kubectl wait --for=condition=Established --timeout=60s crd --all >/dev/null
+wait_crds
 docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/operator.yaml" >/dev/null
 docker exec "$server" kubectl -n team-commerce scale deployment nines-operator --replicas=0 >/dev/null
 docker exec "$server" kubectl -n team-commerce create token nines-operator --duration=15m > "$work/token"

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
 	"github.com/ishantanu/nines/internal/tenancy"
@@ -16,7 +17,7 @@ import (
 
 func TestMigrationWarnsWhenTheChosenConnectionDoesNotSpeakPromQL(t *testing.T) {
 	svc := service.New(store.NewMemory(), nil)
-	ws := Workspace{ID: "alpha", Name: "Alpha", Service: svc, Source: tenancy.Source{Kind: "datadog"},
+	ws := Workspace{Features: features.All(), ID: "alpha", Name: "Alpha", Service: svc, Source: tenancy.Source{Kind: "datadog"},
 		Connections: []tenancy.Connection{{Name: "prom", Source: tenancy.Source{Kind: "prometheus"}}, {Name: "obs", Source: tenancy.Source{Kind: "dash0"}}, {Name: "nr", Source: tenancy.Source{Kind: "newrelic"}}},
 		Grants:      []tenancy.Grant{{Token: "viewer", Role: "viewer"}}}
 	h, err := NewMulti([]Workspace{ws}, slog.New(slog.NewTextHandler(io.Discard, nil)))

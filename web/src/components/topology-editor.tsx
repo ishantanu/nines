@@ -1,3 +1,4 @@
+import { useFeature } from "@/lib/features";
 import { useEffect, useId, useRef, useState } from "react";
 import { api, message, type RequestScope } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ export function TopologyEditor({
   label: string;
   onApplied: (id: string) => void;
 }) {
+  const discoveryOn = useFeature("observed-dependencies");
   const id = useId();
   const epoch = useRef(0);
   const dialog = useRef<HTMLDivElement>(null);
@@ -223,9 +225,11 @@ export function TopologyEditor({
             >
               <TabsTrigger value="visual">Visual editor</TabsTrigger>
               <TabsTrigger value="yaml">YAML</TabsTrigger>
-              <TabsTrigger value="discover">
-                Discover from Kubernetes
-              </TabsTrigger>
+              {discoveryOn ? (
+                <TabsTrigger value="discover">
+                  Discover from Kubernetes
+                </TabsTrigger>
+              ) : null}
             </TabsList>
             <TabsContent value="visual">
               {parsed ? (
@@ -244,7 +248,7 @@ export function TopologyEditor({
               {yamlEditor}
             </TabsContent>
             <TabsContent value="discover">
-              {parsed ? (
+              {!discoveryOn ? null : parsed ? (
                 <DependencyDiscovery
                   scope={scope}
                   value={parsed}

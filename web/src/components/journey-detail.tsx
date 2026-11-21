@@ -1,3 +1,4 @@
+import { useFeature } from "@/lib/features";
 import { SLOProvider } from "./provider-identity";
 import type { Workspace } from "@/lib/api";
 import { VisualEvidence } from "./visual-evidence";
@@ -164,6 +165,7 @@ export function JourneyDetail({
   evidenceOnly?: boolean;
   refreshKey?: number;
 }) {
+  const agentEvidenceOn = useFeature("agent-evidence");
   const [runs, setRuns] = useState<Run[]>([]);
   const [history, setHistory] = useState<Revision[]>([]);
   const [error, setError] = useState("");
@@ -370,12 +372,14 @@ export function JourneyDetail({
             </p>
           </TabsContent>
           <TabsContent value="evidence">
-            <VisualEvidence
-              key={`${scope.tenant}:${resource.manifest.metadata.name}:${resource.revision}`}
-              scope={scope}
-              journeyID={resource.manifest.metadata.name}
-              revision={resource.revision}
-            />
+            {agentEvidenceOn ? (
+              <VisualEvidence
+                key={`${scope.tenant}:${resource.manifest.metadata.name}:${resource.revision}`}
+                scope={scope}
+                journeyID={resource.manifest.metadata.name}
+                revision={resource.revision}
+              />
+            ) : null}
             {a ? (
               <>
                 <div className="mb-4 flex items-center justify-between gap-2">

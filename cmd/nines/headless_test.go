@@ -14,6 +14,7 @@ import (
 	"time"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/githubreview"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/intentflow"
@@ -39,7 +40,7 @@ func TestHeadlessCLIReviewedChangeAndRollback(t *testing.T) {
 	platform.TenantID = "alpha"
 	platform.Collector = &headlessTelemetry{source}
 	flow := intentflow.New(platform, intentflow.NewMemory())
-	handler, err := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Headless acceptance", Service: platform, IntentConversations: flow, Grants: []tenancy.Grant{{Token: "headless-owner", Role: "owner"}, {Token: "headless-applier", Role: "editor"}, {Token: "headless-agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	handler, err := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "alpha", Name: "Headless acceptance", Service: platform, IntentConversations: flow, Grants: []tenancy.Grant{{Token: "headless-owner", Role: "owner"}, {Token: "headless-applier", Role: "editor"}, {Token: "headless-agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

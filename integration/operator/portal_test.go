@@ -18,6 +18,7 @@ import (
 
 	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/operator"
@@ -58,7 +59,7 @@ func TestRealOperatorPortalPublication(t *testing.T) {
 	publisher := &operator.Publisher{Tenant: "commerce", Store: st, APIFor: func(namespace string) (*operator.API, error) { return &api, nil }}
 	target := rules.Target{Kind: "operator", ProviderKind: "mimir", Connection: "primary", Namespace: "team-commerce", Publisher: "portal-fixture", QueryURL: f.mimir + "/prometheus", MimirOrgID: "portal-fixture"}
 	manager := &rules.Manager{Tenant: "commerce", Targets: map[string]rules.Target{"primary": target}, External: publisher}
-	handler, err := httpapi.NewMulti([]httpapi.Workspace{{ID: "commerce", Name: "Commerce", Service: svc, Rules: manager, Grants: []tenancy.Grant{{Token: "portal-owner", Role: "owner"}, {Token: "portal-viewer", Role: "viewer"}, {Token: "portal-agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	handler, err := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "commerce", Name: "Commerce", Service: svc, Rules: manager, Grants: []tenancy.Grant{{Token: "portal-owner", Role: "owner"}, {Token: "portal-viewer", Role: "viewer"}, {Token: "portal-agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

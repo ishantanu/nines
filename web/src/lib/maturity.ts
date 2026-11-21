@@ -10,6 +10,7 @@ export type MaturityFeature = {
   page?: string;
   provider?: string;
   remaining?: string;
+  gated?: boolean;
 };
 
 export const maturityFeatures = catalog.features as MaturityFeature[];
@@ -37,4 +38,24 @@ export function providerMaturity(kind: string) {
 
 export function maturityPromise(level: MaturityLevel) {
   return maturityLevels.find((l) => l.level === level)?.promise ?? "";
+}
+
+/** Whether a feature is on, given the gated features a server turned on. */
+export function featureOn(enabled: readonly string[] | undefined, id: string) {
+  const feature = maturityFeatures.find((f) => f.id === id);
+  if (!feature?.gated) return true;
+  return enabled?.includes(id) ?? false;
+}
+
+export function pageOn(enabled: readonly string[] | undefined, page: string) {
+  const feature = pageMaturity(page);
+  return !feature || featureOn(enabled, feature.id);
+}
+
+export function providerOn(
+  enabled: readonly string[] | undefined,
+  kind: string,
+) {
+  const feature = providerMaturity(kind);
+  return !feature || featureOn(enabled, feature.id);
 }

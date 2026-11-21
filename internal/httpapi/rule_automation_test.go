@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
@@ -29,7 +30,7 @@ func TestAutomaticRulesControlsRequireOwnerExactRevisionAndExplicitAction(t *tes
 		for _, role := range []string{"owner", "editor", "agent", "viewer"} {
 			grants = append(grants, tenancy.Grant{Token: id + "-" + role, Role: role})
 		}
-		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, Rules: m, Grants: grants})
+		workspaces = append(workspaces, Workspace{Features: features.All(), ID: id, Name: id, Service: s, Rules: m, Grants: grants})
 	}
 	h, e := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if e != nil {

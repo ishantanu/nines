@@ -383,6 +383,8 @@ export interface Workspace {
   role: Role;
   workflowsConfigured: boolean;
   replayCaptureEnabled?: boolean;
+  /** Gated experimental features this server has turned on. */
+  features?: string[];
 }
 export type Role = "owner" | "editor" | "agent" | "viewer";
 export interface Tenant {

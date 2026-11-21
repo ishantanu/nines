@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/tenancy"
@@ -23,7 +24,7 @@ func TestIntentConversationAPIRolesScopeAndStrictRequests(t *testing.T) {
 			t.Fatal(e)
 		}
 		s.TenantID = id
-		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, IntentConversations: intentflow.New(s, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}, {Token: "agent", Role: "agent"}}})
+		workspaces = append(workspaces, Workspace{Features: features.All(), ID: id, Name: id, Service: s, IntentConversations: intentflow.New(s, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}, {Token: "agent", Role: "agent"}}})
 	}
 	h, e := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if e != nil {
@@ -106,7 +107,7 @@ func TestIntentWorkflowStatusIsScopedReadOnly(t *testing.T) {
 			t.Fatal(err)
 		}
 		s.TenantID = id
-		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, IntentConversations: intentflow.New(s, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}}})
+		workspaces = append(workspaces, Workspace{Features: features.All(), ID: id, Name: id, Service: s, IntentConversations: intentflow.New(s, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}}})
 	}
 	h, err := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -140,7 +141,7 @@ func TestIntentUsageIsAggregateTenantScopedAndReadOnly(t *testing.T) {
 			t.Fatal(e)
 		}
 		s.TenantID = id
-		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, IntentConversations: intentflow.New(s, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}, {Token: "agent", Role: "agent"}}})
+		workspaces = append(workspaces, Workspace{Features: features.All(), ID: id, Name: id, Service: s, IntentConversations: intentflow.New(s, intentflow.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}, {Token: "agent", Role: "agent"}}})
 	}
 	h, e := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if e != nil {

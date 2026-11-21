@@ -39,27 +39,41 @@ Nines has not had a stable release, so no capability is stable yet. The beta fea
 
 Experimental features are opt-in. Turn them on deliberately, expect changes, and do not build automation that depends on their output.
 
-| Feature                                                        | Level        | Before it can be beta                                                                            |
-| -------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------ |
-| [Create from a goal](intents.md)                               | Experimental | Freeze the intent schema and pass real-provider acceptance for model drafting (#34).             |
-| [Reliability reviews](architecture.md)                         | Experimental | Settle the review schema and its link to incidents and postmortems.                              |
-| [Workflows and webhooks](workflow-webhooks.md)                 | Experimental | Freeze the workflow event contract and accept it with a real webhook consumer.                   |
-| [Agent evidence and visual evaluations](visual-evaluations.md) | Experimental | Freeze the run evidence schema and accept it with real agent workloads.                          |
-| [Session replay](session-replay.md)                            | Experimental | Browser and platform compatibility, a masking and privacy review, and offline-player acceptance. |
-| [Git delivery](git-delivery.md)                                | Experimental | Acceptance against live GitHub and GitLab, not only API fakes.                                   |
-| [Migration from Sloth and Pyrra](migration.md)                 | Experimental | Acceptance with real-world Sloth and Pyrra files beyond the projects' published examples.        |
-| [Observed dependency evidence](service-dependencies.md)        | Experimental | Instrumentation coverage and production-scale validation.                                        |
-| [Remote MCP over HTTP with OAuth](remote-mcp.md)               | Experimental | Hosted agent-client interoperability and production issuer acceptance.                           |
-| [Immutable audit archival](deployment/audit-archive.md)        | Experimental | Production IAM and KMS, high availability and real AWS acceptance.                               |
-| [GitHub review comments](github-reviews.md)                    | Experimental | Settle together with Git delivery so one GitHub integration remains.                             |
-| [SLO template extensions](slo-extensions.md)                   | Experimental | A stable extension contract; Go extensions need a custom build today.                            |
-| [OpenSLO export](openslo.md)                                   | Experimental | Round-trip acceptance with OpenSLO tooling.                                                      |
-| [Jev advice](system-one.md)                                    | Experimental | Real-provider acceptance and calibration evidence.                                               |
-| [VictoriaMetrics](provider-adapters.md)                        | Experimental | Interval and throughput acceptance on a real cluster, including MetricsQL.                       |
-| [Datadog](provider-adapters.md)                                | Experimental | Opt-in live-account acceptance for collection and native publication.                            |
-| [New Relic](new-relic.md)                                      | Experimental | Opt-in live-account acceptance for collection and native publication.                            |
-| [Dash0](dash0.md)                                              | Experimental | Opt-in live-account acceptance, including sessions and interval SLOs.                            |
-| [Google Cloud Monitoring](google-cloud.md)                     | Experimental | Opt-in live-project acceptance for collection and native publication.                            |
+| Feature                                                        | Level        | Turn on with                           | Before it can be beta                                                                            |
+| -------------------------------------------------------------- | ------------ | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| [Create from a goal](intents.md)                               | Experimental | `NINES_FEATURES=create-from-goal`      | Freeze the intent schema and pass real-provider acceptance for model drafting (#34).             |
+| [Reliability reviews](architecture.md)                         | Experimental | `NINES_FEATURES=reliability-reviews`   | Settle the review schema and its link to incidents and postmortems.                              |
+| [Workflows and webhooks](workflow-webhooks.md)                 | Experimental | `NINES_FEATURES=workflows`             | Freeze the workflow event contract and accept it with a real webhook consumer.                   |
+| [Agent evidence and visual evaluations](visual-evaluations.md) | Experimental | `NINES_FEATURES=agent-evidence`        | Freeze the run evidence schema and accept it with real agent workloads.                          |
+| [Session replay](session-replay.md)                            | Experimental | `NINES_FEATURES=session-replay`        | Browser and platform compatibility, a masking and privacy review, and offline-player acceptance. |
+| [Git delivery](git-delivery.md)                                | Experimental | Its own configuration                  | Acceptance against live GitHub and GitLab, not only API fakes.                                   |
+| [Migration from Sloth and Pyrra](migration.md)                 | Experimental | `NINES_FEATURES=migration`             | Acceptance with real-world Sloth and Pyrra files beyond the projects' published examples.        |
+| [Observed dependency evidence](service-dependencies.md)        | Experimental | `NINES_FEATURES=observed-dependencies` | Instrumentation coverage and production-scale validation.                                        |
+| [Remote MCP over HTTP with OAuth](remote-mcp.md)               | Experimental | Its own configuration                  | Hosted agent-client interoperability and production issuer acceptance.                           |
+| [Immutable audit archival](deployment/audit-archive.md)        | Experimental | Its own configuration                  | Production IAM and KMS, high availability and real AWS acceptance.                               |
+| [GitHub review comments](github-reviews.md)                    | Experimental | Its own configuration                  | Settle together with Git delivery so one GitHub integration remains.                             |
+| [SLO template extensions](slo-extensions.md)                   | Experimental | Its own configuration                  | A stable extension contract; Go extensions need a custom build today.                            |
+| [OpenSLO export](openslo.md)                                   | Experimental | Its own configuration                  | Round-trip acceptance with OpenSLO tooling.                                                      |
+| [Jev advice](system-one.md)                                    | Experimental | Its own configuration                  | Real-provider acceptance and calibration evidence.                                               |
+| [VictoriaMetrics](provider-adapters.md)                        | Experimental | `NINES_FEATURES=victoriametrics`       | Interval and throughput acceptance on a real cluster, including MetricsQL.                       |
+| [Datadog](provider-adapters.md)                                | Experimental | `NINES_FEATURES=datadog`               | Opt-in live-account acceptance for collection and native publication.                            |
+| [New Relic](new-relic.md)                                      | Experimental | `NINES_FEATURES=newrelic`              | Opt-in live-account acceptance for collection and native publication.                            |
+| [Dash0](dash0.md)                                              | Experimental | `NINES_FEATURES=dash0`                 | Opt-in live-account acceptance, including sessions and interval SLOs.                            |
+| [Google Cloud Monitoring](google-cloud.md)                     | Experimental | `NINES_FEATURES=googlecloud`           | Opt-in live-project acceptance for collection and native publication.                            |
+
+## Turn on experimental features
+
+A server offers only the beta features unless you turn experimental ones on. Set `NINES_FEATURES` (or the server flag `-features`) to a comma-separated list of the IDs in the table above, or to `all`:
+
+```sh
+NINES_FEATURES=create-from-goal,session-replay nines-server ...
+```
+
+- Turned-off features disappear from the portal, and their API calls return HTTP 404 with `"code": "feature_disabled"` and the setting that turns them on.
+- A tenant configured with a turned-off telemetry provider stops the server at startup with the same instruction, instead of being ignored.
+- Features marked "Its own configuration" are already opt-in through their own settings, such as Git delivery or audit archival, and need no feature gate.
+- The synthetic demo (`-demo`) and the Compose playground turn every experimental feature on.
+- `nines capabilities --agent` lists every feature, and `GET /api/workspace` returns the ones a server has turned on.
 
 ## How a feature becomes beta
 

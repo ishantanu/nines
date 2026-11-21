@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
@@ -54,7 +55,7 @@ func TestSingleSLOReadUsesOnlySelectedTenantRecord(t *testing.T) {
 		if err := svc.Ingest(ctx, "checkout", []model.Point{{Time: at, Good: []float64{99, 80}[i], Total: 100}}); err != nil {
 			t.Fatal(err)
 		}
-		workspaces = append(workspaces, Workspace{ID: name, Name: name, Service: svc, Grants: []tenancy.Grant{{Token: name, Role: "viewer"}}})
+		workspaces = append(workspaces, Workspace{Features: features.All(), ID: name, Name: name, Service: svc, Grants: []tenancy.Grant{{Token: name, Role: "viewer"}}})
 	}
 	h, err := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {

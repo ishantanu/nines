@@ -16,6 +16,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/examples"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/identity"
 	"github.com/ishantanu/nines/internal/model"
@@ -52,6 +53,7 @@ func run(log *slog.Logger) error {
 	extensionLock := flag.String("extension-lock", "", "Administrator-owned lockfile shared across tenants; local files only")
 	processRole := flag.String("process-role", "all", "all, control-plane (no scheduled collection), or collector (collection/evaluation only; no HTTP)")
 	collectionWorkers := flag.Int("collection-workers", 4, "maximum concurrent scheduled collection jobs per process (1-32)")
+	featureList := flag.String("features", os.Getenv(features.Env), "experimental features to turn on: comma-separated gated feature IDs, all or none (default from NINES_FEATURES; the demo turns all on)")
 	flag.Parse()
 	if *processRole != "all" && *processRole != "control-plane" && *processRole != "collector" {
 		return fmt.Errorf("invalid process role")
@@ -105,9 +107,18 @@ func run(log *slog.Logger) error {
 			return err
 		}
 	}
+	gates, err := serverFeatures(*featureList, *demo, flagSet("features"))
+	if err != nil {
+		return err
+	}
+	if err = checkProviderGates(runtimes, gates); err != nil {
+		return err
+	}
+	log.Info("feature gates", "experimental", gates.List())
 	workspaces := make([]httpapi.Workspace, 0, len(runtimes))
 	for _, runtime := range runtimes {
 		workspace := runtime.Workspace
+		workspace.Features = gates
 		if sharedTemplates != nil {
 			if workspace.Templates != nil {
 				return fmt.Errorf("configure shared or tenant-local extension locks, not both")

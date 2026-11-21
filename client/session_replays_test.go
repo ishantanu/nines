@@ -13,6 +13,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/client"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/replay"
 	"github.com/ishantanu/nines/internal/service"
@@ -25,7 +26,7 @@ func TestReplayClientPreservesScopeAndSeparatesPayload(t *testing.T) {
 	for _, id := range []string{"alpha", "beta"} {
 		s := service.New(store.NewMemory(), nil)
 		s.TenantID = id
-		workspaces = append(workspaces, httpapi.Workspace{ID: id, Name: id, Service: s, Replays: replay.New(s, replay.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}}})
+		workspaces = append(workspaces, httpapi.Workspace{Features: features.All(), ID: id, Name: id, Service: s, Replays: replay.New(s, replay.NewMemory()), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "viewer", Role: "viewer"}}})
 	}
 	h, err := httpapi.NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -78,7 +79,7 @@ func TestReplayClientDeletionUsesScopedResponse(t *testing.T) {
 	s := service.New(store.NewMemory(), nil)
 	s.TenantID = "alpha"
 	rp := replay.New(s, replay.NewMemory())
-	h, e := httpapi.NewMulti([]httpapi.Workspace{{ID: "alpha", Name: "Alpha", Service: s, Replays: rp, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, e := httpapi.NewMulti([]httpapi.Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: s, Replays: rp, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if e != nil {
 		t.Fatal(e)
 	}

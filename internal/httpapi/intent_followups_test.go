@@ -11,6 +11,7 @@ import (
 	"time"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/tenancy"
 	"github.com/ishantanu/nines/internal/testtelemetry"
 )
@@ -28,7 +29,7 @@ func TestIntentFollowupsTenantRolesAndStrictRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.IntentDrafter = apiDraftModel{}
-	h, err := NewMulti([]Workspace{{ID: "alpha", Name: "Alpha", Service: s, Grants: []tenancy.Grant{{Token: "view", Role: "viewer"}, {Token: "agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h, err := NewMulti([]Workspace{{Features: features.All(), ID: "alpha", Name: "Alpha", Service: s, Grants: []tenancy.Grant{{Token: "view", Role: "viewer"}, {Token: "agent", Role: "agent"}}}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/ishantanu/nines/client"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
@@ -61,7 +62,7 @@ func visualHandler(t *testing.T) (http.Handler, *visualStub, []*store.Memory) {
 		}
 		flow := intentflow.New(s, intentflow.NewMemory())
 		flow.SystemOne = stub
-		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, IntentConversations: flow, Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "editor", Role: "editor"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}})
+		workspaces = append(workspaces, Workspace{ID: id, Name: id, Service: s, IntentConversations: flow, Features: features.All(), Grants: []tenancy.Grant{{Token: "owner", Role: "owner"}, {Token: "editor", Role: "editor"}, {Token: "agent", Role: "agent"}, {Token: "viewer", Role: "viewer"}}})
 	}
 	h, e := NewMulti(workspaces, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if e != nil {
