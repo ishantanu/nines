@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/ishantanu/nines/internal/observability"
+	"github.com/ishantanu/nines/internal/schema"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,7 +30,7 @@ func NewPostgres(ctx context.Context, url string) (Repository, error) {
 		_ = tx.Rollback(context.Background())
 	}()
 	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(654239120)"); err == nil {
-		_, err = tx.Exec(ctx, `CREATE TABLE IF NOT EXISTS reliability_workflows(id text PRIMARY KEY,created_at timestamptz NOT NULL,document jsonb NOT NULL); CREATE INDEX IF NOT EXISTS reliability_workflows_created ON reliability_workflows(created_at DESC,id);`)
+		err = schema.Apply(ctx, tx, "workflow", Migrations)
 	}
 	if err == nil {
 		err = tx.Commit(ctx)
@@ -147,3 +148,11 @@ func (p *postgres) Update(ctx context.Context, id string, fn func(*Workflow) err
 	}
 	return w, tx.Commit(ctx)
 }
+
+// Migrations is the workflow schema history. Never edit or remove a
+// released migration: append a new one.
+var Migrations = []schema.Migration{
+	{ID: 1, Name: "alpha baseline", SQL: alphaBaseline},
+}
+
+const alphaBaseline = `CREATE TABLE IF NOT EXISTS reliability_workflows(id text PRIMARY KEY,created_at timestamptz NOT NULL,document jsonb NOT NULL); CREATE INDEX IF NOT EXISTS reliability_workflows_created ON reliability_workflows(created_at DESC,id);`

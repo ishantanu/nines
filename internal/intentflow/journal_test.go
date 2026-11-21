@@ -193,7 +193,9 @@ func TestFirstJournalStartRecoversRetainedAuditWithoutHidingLaterDeletion(t *tes
 	}
 	db := s.Repository.(*postgres)
 	dsn := db.pool.Config().ConnString()
-	if _, err = db.pool.Exec(ctx, `DROP TABLE intent_audit_events`); err != nil {
+	// A database from a release before the audit journal and the migration
+	// ledger has neither table.
+	if _, err = db.pool.Exec(ctx, `DROP TABLE intent_audit_events; DROP TABLE nines_schema_migrations`); err != nil {
 		t.Fatal(err)
 	}
 	recovered, err := NewPostgres(ctx, dsn)
