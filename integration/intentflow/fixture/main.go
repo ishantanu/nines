@@ -14,6 +14,7 @@ import (
 	"time"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/intentflow"
 	rm "github.com/ishantanu/nines/internal/reviewmodel"
@@ -106,7 +107,7 @@ func main() {
 		flow := intentflow.New(s, intentflow.NewMemory())
 		flow.Model = fixtureModel{}
 		services = append(services, flow)
-		workspaces = append(workspaces, httpapi.Workspace{ID: id, Name: s.TenantName, Service: s, IntentConversations: flow, Anonymous: true})
+		workspaces = append(workspaces, httpapi.Workspace{ID: id, Name: s.TenantName, Service: s, IntentConversations: flow, Anonymous: true, Features: features.All()})
 	}
 	h, e := httpapi.NewMulti(workspaces, log)
 	if e != nil {
