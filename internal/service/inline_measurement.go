@@ -3,8 +3,6 @@ package service
 import (
 	"context"
 
-	"gopkg.in/yaml.v3"
-
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 )
@@ -38,7 +36,7 @@ func (s *Service) CompileMeasurement(ctx context.Context, manifest v1.ServiceLev
 	out.MeasurementDigest = MeasurementDigest(c)
 	out.Evidence = evidence
 	out.Digest = model.DefinitionDigest(manifest)
-	body, err := yaml.Marshal(manifest)
+	body, err := model.SLOYAML(manifest)
 	out.YAML = string(body)
 	out.Warnings = []string{"Review the observation point, eligible population, success criteria and retry semantics before applying.", "Recent telemetry metadata and series verify the measurement contract, not business correctness or full historical coverage.", "Compilation saves no resources and deploys no rules. The SLO and its measurement are reviewed and versioned together."}
 	return out, err

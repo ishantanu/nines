@@ -36,7 +36,7 @@ nines --offline validate -f support-completion.slo.yaml
 nines --offline rules generate -f support-completion.slo.yaml --tenant support
 ```
 
-- `generate` prints native `nines.dev/v1alpha1` ServiceLevelObjective YAML by default. `--out` writes a new file and refuses to overwrite. `--agent` emits a structured draft receipt containing the manifest, YAML, template ID/revision/digest, manifest digest, warnings and `telemetryVerified: false`. `--output yaml` emits that receipt as YAML; omit it for bare SLO YAML.
+- `generate` prints a `nines.dev/v1beta1` ServiceLevelObjective by default. `--out` writes a new file and refuses to overwrite. `--agent` emits a structured draft receipt containing the manifest, YAML, template ID/revision/digest, manifest digest, warnings and `telemetryVerified: false`. `--output yaml` emits that receipt as YAML; omit it for bare SLO YAML.
 
 Use a values file to set targets and replace the example measurement. These are command inputs, not another persisted resource or DSL:
 

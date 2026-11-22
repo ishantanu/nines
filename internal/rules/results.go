@@ -4,8 +4,6 @@ import (
 	"context"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/newrelic"
@@ -163,7 +161,7 @@ func (m *Manager) NativeDraft(ctx context.Context, source, nativeID, name, proje
 	if !found {
 		return out, model.ErrNotFound
 	}
-	b, err := yaml.Marshal(manifest)
+	b, err := model.SLOYAML(manifest)
 	if err != nil {
 		return out, err
 	}

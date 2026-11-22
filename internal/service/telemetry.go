@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/prometheus"
@@ -435,7 +433,7 @@ func (s *Service) CompileBinding(ctx context.Context, id string, in v1.CompileBi
 	if latest.Revision != r.Revision {
 		return out, model.ErrRevisionConflict
 	}
-	encoded, err := yaml.Marshal(out.Manifest)
+	encoded, err := model.SLOYAML(out.Manifest)
 	if err != nil {
 		return out, err
 	}

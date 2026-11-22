@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -325,15 +326,29 @@ func (s *Service) sloLookup(ctx context.Context) v1beta1.SLOLookup {
 // express it. Without this, editing such an SLO as v1beta1 would erase how it
 // was made, including its recorded exclusions.
 func (s *Service) keepProvenance(ctx context.Context, d model.Definition) model.Definition {
-	if d.SLO == nil || d.SourceAPIVersion != v1beta1.APIVersion || d.SLO.Spec.Intent != nil {
+	if d.SLO == nil || d.SourceAPIVersion != v1beta1.APIVersion {
 		return d
 	}
 	r, err := s.Store.Read(ctx, d.SLO.Metadata.Name)
-	if err != nil || r.SLO.Intent == nil {
-		return d
-	}
+	stored := err == nil
 	slo := *d.SLO
-	slo.Spec.Intent = r.SLO.Intent
+	if stored && slo.Spec.Intent == nil && r.SLO.Intent != nil {
+		slo.Spec.Intent = r.SLO.Intent
+	}
+	// A v1beta1 binding reference says only which binding is measured; the
+	// queries or window come from that binding revision. Keep the stored ones
+	// for the same revision (older SLOs may use per-interval queries), or
+	// derive the window as compiling the binding does.
+	if ref := slo.Spec.MeasurementBinding; ref != nil && slo.Spec.GoodQuery == "" && slo.Spec.TotalQuery == "" && slo.Spec.ProviderWindow == nil {
+		if stored && r.SLO.MeasurementBinding != nil && *r.SLO.MeasurementBinding == *ref {
+			slo.Spec.GoodQuery, slo.Spec.TotalQuery, slo.Spec.ProviderWindow = r.SLO.GoodQuery, r.SLO.TotalQuery, r.SLO.ProviderWindow
+		} else if rev, err := s.ReadTopology(ctx, v1.BindingKind, ref.Name, ref.Revision); err == nil && rev.Digest == ref.Digest {
+			var b model.MeasurementBinding
+			if json.Unmarshal(rev.Manifest, &b) == nil {
+				slo.Spec.ProviderWindow = BindingWindow(b)
+			}
+		}
+	}
 	d.SLO = &slo
 	return d
 }

@@ -108,6 +108,7 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			}
 		})
 		var definition model.Definition
+		var original []byte
 		switch action {
 		case "init":
 			if kind != "slo" || *name == "" {
@@ -158,6 +159,7 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			original = body
 		}
 		if definition.Manifest() != nil && definition.SLO == nil {
 			for key := range visited {
@@ -346,7 +348,10 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			}
 			method = http.MethodPost
 			path = "/api/resources/" + action
-			body, _ = yaml.Marshal(definition.Manifest())
+			body, err = requestManifest(definition, original, visited)
+			if err != nil {
+				return err
+			}
 			media = "application/yaml"
 		case "get":
 			switch kind {
@@ -803,4 +808,24 @@ func historyCSV(out io.Writer, h engine.History) error {
 	}
 	w.Flush()
 	return w.Error()
+}
+
+// overrideFlags change a definition read from a file.
+var overrideFlags = []string{"name", "project", "service", "display-name", "source", "target", "window", "step", "short-window", "long-window", "burn-rate", "for", "min-coverage", "min-events", "confidence", "label", "lifecycle", "good-query", "total-query", "no-policy"}
+
+// requestManifest is the body plan and apply send. An unmodified file goes as
+// written, so the server sees its apiVersion: a v1beta1 journey's dimensions,
+// a binding reference's measurement and stored provenance are resolved there.
+func requestManifest(d model.Definition, original []byte, visited map[string]bool) ([]byte, error) {
+	edited := original == nil
+	for _, key := range overrideFlags {
+		edited = edited || visited[key]
+	}
+	if !edited {
+		return original, nil
+	}
+	if d.SLO != nil && d.SourceAPIVersion == v1beta1.APIVersion {
+		return model.SLOYAML(v1.ServiceLevelObjective(*d.SLO))
+	}
+	return yaml.Marshal(d.Manifest())
 }

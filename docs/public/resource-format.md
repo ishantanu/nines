@@ -117,4 +117,6 @@ v1alpha1 field names are rejected in a v1beta1 document, so a half-converted fil
 - Export a stored definition: `nines export slo <id>` (or `journey`, `binding`, `dependency-map`). The YAML view in the portal shows the same thing.
 - Exporting and applying the result changes nothing; the plan reports `unchanged`.
 - To read v1alpha1 from the HTTP API, add `?apiVersion=nines.dev/v1alpha1` to a manifest request.
+- Template drafts, native imports and compiled bindings are written as v1beta1. An SLO compiled from an intent stays v1alpha1, because only v1alpha1 can carry its `spec.intent` provenance.
+- `nines plan` and `nines apply` send a file as written, so the server resolves journey dimensions and binding measurements against what it has stored.
 - Intents, extension bundles, CLI configuration and other operational documents remain `nines.dev/v1alpha1`.

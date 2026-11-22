@@ -74,11 +74,49 @@ spec:
 		t.Fatal(err)
 	}
 	b, err := os.ReadFile(path)
-	if err != nil || !bytes.Contains(b, []byte("measurementBinding:")) {
+	if err != nil || !bytes.Contains(b, []byte("apiVersion: nines.dev/v1beta1")) || !bytes.Contains(b, []byte("binding:")) {
 		t.Fatal(string(b), err)
 	}
 	if err = run(args, io.Discard); err == nil {
 		t.Fatal("overwrote existing output file")
+	}
+	// The v1beta1 file names only the binding; applying it stores the
+	// measurement window that compilation derived from that binding.
+	if err = run([]string{"apply", "-f", path, "-expected-revision", "0"}, io.Discard); err != nil {
+		t.Fatal("applying the compiled v1beta1 SLO:", err)
+	}
+	if r, err := s.Store.Read(context.Background(), "compiled"); err != nil || r.SLO.ProviderWindow == nil || r.SLO.MeasurementBinding == nil {
+		t.Fatal("compiled SLO stored without its binding window", err)
+	}
+	// Files are sent as written, so the server resolves a v1beta1 journey's
+	// omitted dimension from the linked SLO's type.
+	journeyPath := filepath.Join(t.TempDir(), "journey.yaml")
+	journey := `apiVersion: nines.dev/v1beta1
+kind: CriticalUserJourney
+metadata: {name: browse, project: production}
+spec:
+  displayName: Browse
+  description: A shopper browses the catalog.
+  owner: team
+  criticality: high
+  slos: [{id: request-latency, required: true}]
+  steps: [{id: browse, name: Browse, actor: user, sloRefs: [request-latency]}]
+`
+	if err = os.WriteFile(journeyPath, []byte(journey), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range []string{"../../examples/request-latency.slo.yaml", journeyPath} {
+		if err = run([]string{"apply", "-f", f, "-expected-revision", "0"}, io.Discard); err != nil {
+			t.Fatal(f, err)
+		}
+	}
+	views, err := s.ListJourneys(context.Background())
+	resolved := false
+	for _, v := range views {
+		resolved = resolved || v.Resource.Manifest.Metadata.Name == "browse" && v.Resource.Manifest.Spec.SLOs[0].Dimension == "latency"
+	}
+	if err != nil || !resolved {
+		t.Fatal("journey dimension not resolved from the latency SLO", err)
 	}
 }
 

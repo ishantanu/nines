@@ -2,6 +2,7 @@ package slotemplates
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
@@ -34,6 +35,10 @@ func TestCatalogProducesIndependentValidNonPagingSLOs(t *testing.T) {
 			d, err := model.ParseSLODefinition([]byte(draft.YAML))
 			if err != nil {
 				t.Fatal(err)
+			}
+			// Drafts are written as v1beta1 and parse back to the manifest they describe.
+			if !strings.HasPrefix(draft.YAML, "apiVersion: nines.dev/v1beta1\n") || model.DefinitionDigest(d) != draft.ManifestDigest {
+				t.Fatal("draft YAML is not the v1beta1 form of its manifest", draft.YAML)
 			}
 			if draft.TelemetryVerified || d.Spec.Lifecycle != v1.LifecycleExperimental || d.Spec.MeasurementBinding != nil || d.Spec.Measurement == nil || len(draft.Warnings) < 4 {
 				t.Fatal(draft)
