@@ -1449,6 +1449,13 @@ function TenantWorkspace({
                             enabledFeatures,
                             "reliability-reviews",
                           )}
+                          onDefineSLO={() =>
+                            navigate(
+                              featureOn(enabledFeatures, "create-from-goal")
+                                ? "intents"
+                                : "objectives",
+                            )
+                          }
                           onSLO={(id) => {
                             setSLO(id);
                           }}

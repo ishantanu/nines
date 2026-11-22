@@ -122,6 +122,7 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 	api.HandleFunc("GET /api/visual-evaluations/capabilities", a.visualCapabilities)
 	api.HandleFunc("GET /api/incidents", a.incidentList)
 	api.HandleFunc("POST /api/incidents", a.incidentDeclare)
+	api.HandleFunc("POST /api/incidents/alerts", a.incidentAlerts)
 	api.HandleFunc("GET /api/incidents/{id}", a.incidentGet)
 	api.HandleFunc("POST /api/incidents/{id}/transition", a.incidentTransition)
 	api.HandleFunc("GET /api/journeys/{id}/visual-evaluations", a.visualList)

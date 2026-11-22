@@ -10,6 +10,15 @@ export type IncidentSLO = {
   clearedAt?: string;
   firing: boolean;
 };
+export type IncidentSignal = {
+  source: string;
+  key: string;
+  title: string;
+  url?: string;
+  firingSince?: string;
+  clearedAt?: string;
+  firing: boolean;
+};
 export type IncidentEvent = {
   time: string;
   kind: string;
@@ -32,13 +41,15 @@ export type Incident = {
   id: string;
   revision: number;
   title: string;
-  source: "alert" | "manual";
+  source: "alert" | "manual" | "external";
   state: IncidentState;
   declaredBy?: string;
   openedAt: string;
   mitigatedAt?: string;
   resolvedAt?: string;
   slos: IncidentSLO[];
+  signals?: IncidentSignal[];
+  detectedBySLO: boolean;
   journeys: { id: string; revision: number }[];
   timeline: IncidentEvent[];
   impact: IncidentImpact[];
@@ -137,6 +148,25 @@ export function detectionLag(
   const m = Math.floor(seconds / 60);
   const s = Math.round(seconds % 60);
   return m ? `${m} min ${s ? `${s} s` : ""}`.trim() : `${s} s`;
+}
+
+const toolNames: Record<string, string> = {
+  alertmanager: "Alertmanager",
+  pagerduty: "PagerDuty",
+  "incident.io": "incident.io",
+  rootly: "Rootly",
+  opsgenie: "Opsgenie",
+  grafana: "Grafana",
+};
+export function toolName(source: string): string {
+  return toolNames[source.toLowerCase()] ?? source;
+}
+
+export function openedBy(incident: Incident): string {
+  if (incident.source === "alert") return "Opened by a critical burn alert";
+  if (incident.source === "external")
+    return `Opened by an alert from ${toolName(incident.signals?.[0]?.source ?? "another tool")}`;
+  return `Declared by ${incident.declaredBy}`;
 }
 
 export function formatTime(value?: string): string {

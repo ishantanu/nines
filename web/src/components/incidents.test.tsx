@@ -30,6 +30,7 @@ const incident: Incident = {
   revision: 2,
   title: "Checkout success is burning its error budget",
   source: "alert",
+  detectedBySLO: true,
   state: "monitoring",
   openedAt: "2026-11-22T13:41:00Z",
   slos: [
@@ -165,4 +166,48 @@ test("Start review opens a review scoped to the incident", async () => {
 test("Start review is hidden when reviews are turned off", async () => {
   await show("editor", false);
   expect(button("Start review")).toBeUndefined();
+});
+
+test("an incident no SLO detected says so and offers to define one", async () => {
+  const external: Incident = {
+    ...incident,
+    source: "external",
+    detectedBySLO: false,
+    slos: [],
+    impact: [],
+    signals: [
+      {
+        source: "alertmanager",
+        key: "g",
+        title: "Postgres primary is down",
+        url: "https://alertmanager.example",
+        firing: true,
+        firingSince: "2026-11-22T12:00:00Z",
+      },
+    ],
+  };
+  calls.list.mockResolvedValue([external]);
+  const define = vi.fn();
+  const scope = createTenantSession("", "alpha", "editor", "csrf");
+  await act(async () =>
+    root.render(
+      <Incidents
+        scope={scope}
+        objectives={[]}
+        reviewsOn
+        onDefineSLO={define}
+        onSLO={() => {}}
+        onJourney={() => {}}
+      />,
+    ),
+  );
+  const text = host.textContent ?? "";
+  expect(text).toContain("Not detected by any SLO");
+  expect(text).toContain("Opened by an alert from Alertmanager");
+  expect(text).toContain("Postgres primary is down");
+  expect(
+    host.querySelector('a[href="https://alertmanager.example"]'),
+  ).not.toBeNull();
+  await act(async () => button("Define an SLO")!.click());
+  expect(define).toHaveBeenCalled();
 });

@@ -24,15 +24,18 @@ type Incident struct {
 	Title    string `json:"title"`
 	// Source is "alert" when a critical burn alert opened it, "manual" when a
 	// person declared it.
-	Source      string            `json:"source"`
-	State       string            `json:"state"`
-	DeclaredBy  string            `json:"declaredBy,omitempty"`
-	OpenedAt    time.Time         `json:"openedAt"`
-	MitigatedAt *time.Time        `json:"mitigatedAt,omitempty"`
-	ResolvedAt  *time.Time        `json:"resolvedAt,omitempty"`
-	SLOs        []IncidentSLO     `json:"slos"`
-	Journeys    []IncidentJourney `json:"journeys"`
-	Timeline    []IncidentEvent   `json:"timeline"`
+	Source      string        `json:"source"`
+	State       string        `json:"state"`
+	DeclaredBy  string        `json:"declaredBy,omitempty"`
+	OpenedAt    time.Time     `json:"openedAt"`
+	MitigatedAt *time.Time    `json:"mitigatedAt,omitempty"`
+	ResolvedAt  *time.Time    `json:"resolvedAt,omitempty"`
+	SLOs        []IncidentSLO `json:"slos"`
+	// Signals are alerts from other tools, such as Alertmanager, that opened
+	// or joined the incident.
+	Signals  []IncidentSignal  `json:"signals,omitempty"`
+	Journeys []IncidentJourney `json:"journeys"`
+	Timeline []IncidentEvent   `json:"timeline"`
 }
 
 // IncidentSLO is an affected SLO with the definition revision in force when
@@ -44,6 +47,18 @@ type IncidentSLO struct {
 	FiringSince    *time.Time `json:"firingSince,omitempty"`
 	ClearedAt      *time.Time `json:"clearedAt,omitempty"`
 	Firing         bool       `json:"firing"`
+}
+
+// IncidentSignal is an alert from another tool. Key identifies it across
+// repeated notifications (an Alertmanager group key, or the sender's key).
+type IncidentSignal struct {
+	Source      string     `json:"source"`
+	Key         string     `json:"key"`
+	Title       string     `json:"title"`
+	URL         string     `json:"url,omitempty"`
+	FiringSince *time.Time `json:"firingSince,omitempty"`
+	ClearedAt   *time.Time `json:"clearedAt,omitempty"`
+	Firing      bool       `json:"firing"`
 }
 
 // IncidentJourney is an affected critical user journey at its revision then.
@@ -74,10 +89,30 @@ func (i Incident) HasSLO(id string) bool {
 	return false
 }
 
-// Firing reports whether any affected SLO's critical alert is firing.
+// Firing reports whether any affected SLO's critical alert, or any signal
+// from another tool, is firing.
 func (i Incident) Firing() bool {
 	for _, s := range i.SLOs {
 		if s.Firing {
+			return true
+		}
+	}
+	for _, s := range i.Signals {
+		if s.Firing {
+			return true
+		}
+	}
+	return false
+}
+
+// DetectedBySLO reports whether any SLO's alert fired for the incident. When
+// none did, Nines could not see it coming and cannot measure its impact.
+func (i Incident) DetectedBySLO() bool {
+	if i.Source == "alert" {
+		return true
+	}
+	for _, s := range i.SLOs {
+		if s.FiringSince != nil {
 			return true
 		}
 	}

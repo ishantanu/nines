@@ -345,3 +345,72 @@ func TestIncidentsNeedTheGate(t *testing.T) {
 		t.Fatal("incident opened with the feature off")
 	}
 }
+
+func page(key string, firing bool) service.Signal {
+	return service.Signal{Source: "alertmanager", Key: key, Firing: firing, Title: "Database primary unreachable", Severity: "critical", URL: "https://user:secret@alerts.example/x"}
+}
+
+// An alert from another tool opens an incident no SLO detected; repeats are
+// no-ops, and resolution moves it to monitoring like an SLO alert.
+func TestExternalAlertOpensAnIncidentNoSLODetected(t *testing.T) {
+	f := newIncidentFixture(t)
+	ctx := context.Background()
+	results, err := f.svc.IngestSignals(ctx, "alertmanager-bot", []service.Signal{page("group-1", true)})
+	if err != nil || results[0].Outcome != "opened" {
+		t.Fatal(results, err)
+	}
+	v := f.incidents()[0]
+	if v.Source != "external" || v.DetectedBySLO || v.State != model.IncidentDetected || len(v.Impact) != 0 {
+		t.Fatalf("%+v", v)
+	}
+	if v.Signals[0].URL != "" {
+		t.Fatal("a link with embedded credentials was kept", v.Signals[0].URL)
+	}
+	for range 3 {
+		if results, _ = f.svc.IngestSignals(ctx, "alertmanager-bot", []service.Signal{page("group-1", true)}); results[0].Outcome != "unchanged" {
+			t.Fatal("a repeated notification changed the incident", results)
+		}
+	}
+	if results, _ = f.svc.IngestSignals(ctx, "alertmanager-bot", []service.Signal{page("group-1", false)}); results[0].Outcome != "updated" {
+		t.Fatal(results)
+	}
+	if v = f.incidents()[0]; v.State != model.IncidentMonitoring || v.Revision != 2 || len(f.incidents()) != 1 {
+		t.Fatalf("%s at revision %d", v.State, v.Revision)
+	}
+	warning := page("group-2", true)
+	warning.Severity = "warning"
+	if results, _ = f.svc.IngestSignals(ctx, "alertmanager-bot", []service.Signal{warning, page("group-3", false)}); results[0].Outcome == "opened" || results[1].Outcome == "opened" {
+		t.Fatal("a warning or a resolved alert opened an incident", results)
+	}
+	if len(f.incidents()) != 1 {
+		t.Fatal("unexpected incidents")
+	}
+}
+
+// An external alert naming a journey groups with SLO burns on that journey.
+func TestExternalAlertJoinsWithSLOBurnsOnItsJourney(t *testing.T) {
+	f := newIncidentFixture(t)
+	f.slo("checkout")
+	f.journey("purchase", "checkout")
+	sig := page("db", true)
+	sig.Journeys = []string{"purchase"}
+	if _, err := f.svc.IngestSignals(context.Background(), "alertmanager-bot", []service.Signal{sig}); err != nil {
+		t.Fatal(err)
+	}
+	f.alert("checkout", "fast-burn", true)
+	list := f.incidents()
+	if len(list) != 1 || !list[0].HasSLO("checkout") || len(list[0].Signals) != 1 || len(list[0].Impact) != 1 {
+		t.Fatalf("SLO burn did not join the external incident: %d incidents", len(list))
+	}
+	// It started from another tool, but an SLO now sees it too.
+	if !list[0].DetectedBySLO {
+		t.Fatal("an SLO alert fired, so the incident is detected by an SLO")
+	}
+	// It stays detected while either the SLO or the external alert fires.
+	if _, err := f.svc.IngestSignals(context.Background(), "alertmanager-bot", []service.Signal{page("db", false)}); err != nil {
+		t.Fatal(err)
+	}
+	if v := f.incidents()[0]; v.State != model.IncidentDetected {
+		t.Fatal("moved to monitoring while an SLO alert still fires", v.State)
+	}
+}

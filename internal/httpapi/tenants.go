@@ -486,7 +486,7 @@ func allowed(role string, r *http.Request) bool {
 	if role == "editor" {
 		// Declaring an incident and moving it through the lifecycle are
 		// responders' decisions, not an agent's.
-		if r.URL.Path == "/api/incidents" || strings.HasPrefix(r.URL.Path, "/api/incidents/") && strings.HasSuffix(r.URL.Path, "/transition") {
+		if r.URL.Path == "/api/incidents" || r.URL.Path == "/api/incidents/alerts" || strings.HasPrefix(r.URL.Path, "/api/incidents/") && strings.HasSuffix(r.URL.Path, "/transition") {
 			return true
 		}
 		if r.URL.Path == "/api/resources/apply" || r.URL.Path == "/api/slos" || r.URL.Path == "/api/journeys/apply" || r.URL.Path == "/api/gitops/proposals" {

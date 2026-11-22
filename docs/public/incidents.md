@@ -14,6 +14,7 @@ Nines does not page anyone or run incident command. Keep your paging and respons
 ## How incidents open
 
 - **From a critical burn alert.** When a policy with `severity: critical` fires, or the single unnamed policy of an SLO that has only one, Nines opens an incident starting when the alert fired.
+- **From another alerting tool.** Alertmanager, PagerDuty, cloud alerts or a script can send alerts that open or join incidents; see below.
 - **By declaration.** An editor can declare an incident at any time, for chosen SLOs or none. Declaring early carries no penalty: alerts on those SLOs join the declared incident instead of opening another.
 
 One incident groups related alerts:
@@ -23,6 +24,43 @@ One incident groups related alerts:
 - Otherwise it opens a new incident.
 
 Nines checks after every evaluation, so incidents catch up after a restart or a missed evaluation, and concurrent alerts join one incident rather than opening two.
+
+## Alerts from other tools
+
+SLOs catch problems users feel on the journeys you measure. Causes elsewhere, such as an unmeasured service, a certificate or a network path, can still reach users before an SLO covers them. Send your paging alerts to Nines so those incidents are recorded too.
+
+`POST /api/incidents/alerts` accepts:
+
+- **An Alertmanager webhook** as is (one notification group is one alert);
+- **`{"signals": [...]}`** from any other tool, each with:
+  - `source`, such as `pagerduty`;
+  - `key`, the same across repeated notifications;
+  - `status`: `firing` or `resolved`;
+  - `title`, and optionally `severity`, `url`, `startedAt`, `slos` and `journeys`.
+
+How alerts are handled:
+
+- **What opens an incident.** Only firing alerts open incidents. Alerts with severity `warning`, `info` or `none` are ignored, so route only paging alerts here.
+- **Repeats and resolution.** A repeated notification changes nothing. A resolved alert is recorded; when nothing fires any more, the incident moves to monitoring, as with SLO alerts.
+- **Grouping.** Label an alert with `nines_slo` or `nines_journey` (comma-separated IDs) to group it with incidents on those SLOs or journeys. A later burn alert on the same journey joins it.
+- **"Not detected by any SLO".** An incident no SLO alert fired for is marked this way. Nines cannot measure its impact, and the portal offers to define an SLO that would catch the next one.
+- **Credentials.** Sending alerts needs a token with the editor role. Give each tool its own token, granted for exactly one tenant: then the tool needs no `X-Nines-Tenant` header, which Alertmanager cannot always set. Links must be http or https without embedded credentials, or they are dropped.
+
+```yaml
+# alertmanager.yml
+receivers:
+  - name: nines
+    webhook_configs:
+      - url: https://nines.example/api/incidents/alerts
+        http_config:
+          authorization:
+            credentials_file: /etc/alertmanager/nines-token
+route:
+  routes:
+    - matchers: [severity="critical"]
+      receiver: nines
+      continue: true
+```
 
 ## Lifecycle
 

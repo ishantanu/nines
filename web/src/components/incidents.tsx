@@ -21,6 +21,8 @@ import {
   detectionLag,
   formatTime,
   listIncidents,
+  openedBy,
+  toolName,
   nextStates,
   stateLabels,
   transitionIncident,
@@ -56,6 +58,7 @@ export function IncidentDetail({
   onTransition,
   onReview,
   reviewsOn = true,
+  onDefineSLO,
   onSLO,
   onJourney,
 }: {
@@ -66,6 +69,7 @@ export function IncidentDetail({
   onTransition: (state: IncidentState) => void;
   onReview: () => void;
   reviewsOn?: boolean;
+  onDefineSLO?: () => void;
   onSLO: (id: string) => void;
   onJourney: (id: string) => void;
 }) {
@@ -80,10 +84,8 @@ export function IncidentDetail({
             <StateBadge state={incident.state} />
           </div>
           <p className="text-xs text-muted-foreground">
-            {incident.source === "alert"
-              ? "Opened by a critical burn alert"
-              : `Declared by ${incident.declaredBy}`}{" "}
-            · {formatTime(incident.openedAt)} · revision {incident.revision}
+            {openedBy(incident)} · {formatTime(incident.openedAt)} · revision{" "}
+            {incident.revision}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -111,6 +113,61 @@ export function IncidentDetail({
           ) : null}
         </div>
       </div>
+
+      {!incident.detectedBySLO ? (
+        <div
+          role="note"
+          className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+        >
+          <p className="font-medium">Not detected by any SLO</p>
+          <p className="mt-1">
+            No SLO alert fired for this incident, so Nines could not see it
+            coming and cannot measure its impact. Define an SLO for what users
+            experienced so the next one is detected.
+          </p>
+          {onDefineSLO ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2"
+              onClick={onDefineSLO}
+            >
+              Define an SLO
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {incident.signals?.length ? (
+        <section aria-labelledby="incident-signals">
+          <h3 id="incident-signals" className="mb-2 text-sm font-medium">
+            Alerts from other tools
+          </h3>
+          <ul className="space-y-2 text-sm">
+            {incident.signals.map((s) => (
+              <li key={s.source + s.key}>
+                <span className="font-medium">{s.title}</span>{" "}
+                <span className="text-xs text-muted-foreground">
+                  {toolName(s.source)} ·{" "}
+                  {s.firing
+                    ? `firing since ${formatTime(s.firingSince)}`
+                    : `resolved ${formatTime(s.clearedAt)}`}
+                </span>
+                {s.url ? (
+                  <a
+                    href={s.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="ml-2 text-xs underline"
+                  >
+                    Open in {toolName(s.source)}
+                  </a>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <section aria-labelledby="incident-impact">
         <h3 id="incident-impact" className="mb-2 text-sm font-medium">
@@ -248,12 +305,14 @@ export function Incidents({
   scope,
   objectives,
   reviewsOn,
+  onDefineSLO,
   onSLO,
   onJourney,
 }: {
   scope: RequestScope;
   objectives: Objective[];
   reviewsOn: boolean;
+  onDefineSLO?: () => void;
   onSLO: (id: string) => void;
   onJourney: (id: string) => void;
 }) {
@@ -336,8 +395,8 @@ export function Incidents({
     <>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          Critical burn alerts open incidents. Nines does not page anyone; keep
-          your response tools.
+          Critical burn alerts and paging alerts from your other tools open
+          incidents. Nines does not page anyone; keep your response tools.
         </p>
         <div className="flex gap-2">
           <Button
@@ -423,6 +482,7 @@ export function Incidents({
               }}
               onReview={() => void startReview(current)}
               reviewsOn={reviewsOn}
+              onDefineSLO={onDefineSLO}
               onSLO={onSLO}
               onJourney={onJourney}
             />

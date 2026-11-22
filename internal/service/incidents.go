@@ -15,7 +15,10 @@ import (
 // samples with the same arithmetic as SLO status.
 type IncidentView struct {
 	model.Incident
-	Impact []IncidentImpact `json:"impact"`
+	// DetectedBySLO is false when no SLO alert fired for the incident: Nines
+	// could not see it coming, and an SLO that would have is worth defining.
+	DetectedBySLO bool             `json:"detectedBySLO"`
+	Impact        []IncidentImpact `json:"impact"`
 }
 
 // IncidentImpact is the error budget one incident consumed on one SLO.
@@ -310,7 +313,7 @@ func (s *Service) incidentView(ctx context.Context, i model.Incident) IncidentVi
 	if i.ResolvedAt != nil {
 		end = *i.ResolvedAt
 	}
-	view := IncidentView{Incident: i, Impact: []IncidentImpact{}}
+	view := IncidentView{Incident: i, DetectedBySLO: i.DetectedBySLO(), Impact: []IncidentImpact{}}
 	for _, entry := range i.SLOs {
 		view.Impact = append(view.Impact, s.incidentImpact(ctx, entry, i.OpenedAt, end))
 	}
