@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Breaking for operator users:** the Kubernetes SLO, journey and binding CRDs serve `nines.dev/v1beta1` only; intents stay v1alpha1. Upgrading needs a one-time migration (`deploy/operator/crds-transitional.yaml`, then the `deploy/operator/migrate.yaml` Job), which logs every original resource and refuses to finish if any resource can't be converted. `nines operator convert` converts GitOps manifests offline. See [Upgrade to v1beta1](docs/public/deployment/operator.md#upgrade-to-v1beta1).
+- In Kubernetes, SLOs are self-contained: one compiled from a binding holds the binding's queries or window, and one compiled from an intent is linked to it by owner reference. The operator resolves omitted journey link dimensions from the linked SLO resources.
 - Template drafts (`nines templates generate`), native imports (`nines native draft`) and compiled bindings are written as `nines.dev/v1beta1`, each checked to parse back to the same definition. Native drafts say `policies: []`, keeping them alert-free. SLOs compiled from intents stay v1alpha1 to keep their provenance.
 - Fixed: applying a v1beta1 SLO that references a measurement binding was refused because the binding's measurement window was not derived. The server now keeps the stored measurement for the same binding revision, or derives it from the binding.
 - Fixed: `nines plan` and `nines apply` sent v1beta1 files converted to v1alpha1, so a journey link with an omitted dimension was stored as `availability` even when the linked SLO measures latency. Unmodified files are now sent as written.

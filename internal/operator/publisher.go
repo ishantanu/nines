@@ -60,11 +60,15 @@ func (p *Publisher) desired(s model.SLO, target rules.Target) (k.Resource, error
 	resource.Metadata.Annotations[k.PortalPublisher] = target.Publisher
 	resource.Metadata.Annotations[k.PortalTenant] = p.Tenant
 	resource.Metadata.Annotations[k.PortalRevision] = strconv.FormatInt(model.ConfigRevision(s), 10)
-	resource.Metadata.Annotations[k.PortalDefinition] = model.DefinitionDigest(definition)
+	kube, err := Native(resource)
+	if err != nil {
+		return resource, err
+	}
+	resource.Metadata.Annotations[k.PortalDefinition] = model.DefinitionDigest(kube.Manifest())
 	return resource, nil
 }
 func (p *Publisher) owns(r k.Resource, target rules.Target, s model.SLO) bool {
-	return r.APIVersion == v1.APIVersion && r.Kind == v1.SLOKind && r.Metadata.Namespace == target.Namespace && r.Metadata.Name == s.ID && r.Metadata.UID != "" && r.Metadata.Annotations[k.PortalPublisher] == target.Publisher && r.Metadata.Annotations[k.PortalTenant] == p.Tenant && r.Metadata.Annotations[k.ProjectAnnotation] == s.Project && len(r.Metadata.OwnerReferences) == 0
+	return r.APIVersion == Versions[v1.SLOKind] && r.Kind == v1.SLOKind && r.Metadata.Namespace == target.Namespace && r.Metadata.Name == s.ID && r.Metadata.UID != "" && r.Metadata.Annotations[k.PortalPublisher] == target.Publisher && r.Metadata.Annotations[k.PortalTenant] == p.Tenant && r.Metadata.Annotations[k.ProjectAnnotation] == s.Project && len(r.Metadata.OwnerReferences) == 0
 }
 func samePublished(current, desired k.Resource) bool {
 	if CanonicalDigest(current.Spec) != CanonicalDigest(desired.Spec) {

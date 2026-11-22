@@ -1,53 +1,54 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
-  name: checkout-availability
-  namespace: team-commerce
-  annotations:
-    nines.dev/project: commerce
+    annotations:
+        nines.dev/project: commerce
+    name: checkout-availability
+    namespace: team-commerce
 spec:
-  displayName: Checkout availability
-  service: checkout
-  source: primary
-  target: 0.999
-  windowSeconds: 2419200
-  stepSeconds: 60
-  providerWindow:
-    goodSelector: checkout_attempts_total{service="checkout",outcome="success"}
-    totalSelector: checkout_attempts_total{service="checkout"}
-    scrapeIntervalSeconds: 15
-  policies:
-    - name: fast-burn
-      severity: critical
-      shortWindow: 5m
-      longWindow: 1h
-      burnRate: 14.4
-      forSeconds: 120
-      minCoverage: 1
-    - name: sustained-burn
-      severity: warning
-      shortWindow: 30m
-      longWindow: 6h
-      burnRate: 6
-      forSeconds: 300
-      minCoverage: 1
+    connection: primary
+    displayName: Checkout availability
+    policies:
+        - burnRate: 14.4
+          for: 2m
+          longWindow: 1h
+          name: fast-burn
+          severity: critical
+          shortWindow: 5m
+        - burnRate: 6
+          for: 5m
+          longWindow: 6h
+          name: sustained-burn
+          severity: warning
+          shortWindow: 30m
+    queries:
+        window:
+            good: checkout_attempts_total{service="checkout",outcome="success"}
+            total: checkout_attempts_total{service="checkout"}
+    service: checkout
+    step: 1m
+    target: 0.999
+    window: 28d
 ---
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: CriticalUserJourney
 metadata:
-  name: purchase
-  namespace: team-commerce
-  annotations:
-    nines.dev/project: commerce
+    annotations:
+        nines.dev/project: commerce
+    name: purchase
+    namespace: team-commerce
 spec:
-  displayName: Complete a purchase
-  description: Observe server completion for eligible checkout attempts.
-  owner: team-commerce
-  criticality: high
-  slos:
-    - {id: checkout-availability, dimension: availability, required: true}
-  steps:
-    - id: checkout
-      name: Complete checkout
-      actor: user
-      sloRefs: [checkout-availability]
+    criticality: high
+    description: Observe server completion for eligible checkout attempts.
+    displayName: Complete a purchase
+    owner: team-commerce
+    slos:
+        - dimension: availability
+          id: checkout-availability
+          required: true
+    steps:
+        - actor: user
+          id: checkout
+          name: Complete checkout
+          sloRefs:
+            - checkout-availability

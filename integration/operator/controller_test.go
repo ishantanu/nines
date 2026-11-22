@@ -20,6 +20,7 @@ import (
 
 	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	beta "github.com/ishantanu/nines/api/v1beta1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/operator"
 	"github.com/ishantanu/nines/internal/rules"
@@ -168,12 +169,12 @@ func TestRealOperatorControllerConformance(t *testing.T) {
 	// Admission must retain the shared fields, and reconciliation must replace
 	// the complete rule group when paging is enabled or disabled.
 	lifecycleResource := f.desired("lifecycle-guard", "primary")
-	var lifecycleSpec v1.SLOSpec
-	if err := json.Unmarshal(lifecycleResource.Spec, &lifecycleSpec); err != nil {
-		t.Fatal(err)
+	var lifecycleSpec beta.SLOSpec
+	if err := json.Unmarshal(lifecycleResource.Spec, &lifecycleSpec); err != nil || lifecycleSpec.Policies == nil || len(*lifecycleSpec.Policies) != 1 {
+		t.Fatal(err, lifecycleSpec.Policies)
 	}
-	lifecycleSpec.Policy.MinEvents = 150
-	lifecycleSpec.Quality = &v1.MeasurementQualityPolicy{MinEvents: 100, CohortLabels: []string{"region"}}
+	(*lifecycleSpec.Policies)[0].MinEvents = 150
+	lifecycleSpec.Quality = &beta.QualityPolicy{MinEvents: 100, CohortLabels: []string{"region"}}
 	lifecycleSpec.ErrorBudgetPolicy = &v1.ErrorBudgetPolicy{Owner: "oncall", RunbookURL: "https://example.test/runbook", ReviewBelow: .25}
 	for _, lifecycle := range []v1.SLOLifecycle{v1.LifecycleAspirational, v1.LifecycleCommitted} {
 		lifecycleSpec.Lifecycle = lifecycle

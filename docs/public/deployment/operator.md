@@ -2,7 +2,7 @@
 
 The Kubernetes operator is a first-class Nines deployment mode for GitOps-managed SLOs and critical user journeys.
 
-- It reconciles shared `nines.dev/v1alpha1` definitions into Prometheus Operator `PrometheusRule` resources or a pinned Mimir ruler namespace.
+- It reconciles `nines.dev/v1beta1` SLOs, critical user journeys and measurement bindings, and `nines.dev/v1alpha1` intents, into Prometheus Operator `PrometheusRule` resources or a pinned Mimir ruler namespace.
 - It uses the same deterministic compiler, validation, recording windows, configuration markers and severity policies as the CLI and server.
 - No Nines server, PostgreSQL or LLM is required.
 - Choose the operator when Kubernetes and Git are your configuration source of truth.
@@ -264,6 +264,53 @@ docker build -f deploy/operator/Dockerfile.binary -t YOUR_REGISTRY/nines-operato
   - Reverting configuration cannot restore a consumed error budget or recover deleted provider data.
   - Remove SLOs and wait for Mimir finalizers before uninstalling the controller.
   - Leave shared CRDs installed unless an administrator has verified all namespaces; deleting a CRD deletes all its custom resources.
+
+## Upgrade to v1beta1
+
+Releases after `v0.1.0-alpha.4` serve SLO, journey and binding resources as `nines.dev/v1beta1` only. Kubernetes cannot rename fields between versions without a conversion webhook, so a one-time migration rewrites stored resources. Intents stay `nines.dev/v1alpha1` and are untouched.
+
+1. Convert the manifests in Git and review the diff. Conversion is offline and keeps the stored definitions identical:
+
+   ```sh
+   nines operator convert --offline -f team-commerce.yaml > team-commerce.v1beta1.yaml
+   ```
+
+2. Pause your GitOps sync and scale the operator to zero, so nothing writes these resources during the migration:
+
+   ```sh
+   kubectl -n team-commerce scale deployment/nines-operator --replicas=0
+   ```
+
+3. Apply the transitional CRDs. They store v1beta1 and still serve v1alpha1 for the migration to read:
+
+   ```sh
+   kubectl apply -f deploy/operator/crds-transitional.yaml
+   ```
+
+4. Run the migration Job, with the image set to the release you are upgrading to, and wait for it:
+
+   ```sh
+   kubectl apply -f deploy/operator/migrate.yaml
+   kubectl -n nines-migrate wait --for=condition=Complete --timeout=10m job/nines-migrate
+   kubectl -n nines-migrate logs job/nines-migrate > nines-migrate.log
+   ```
+
+   - The log holds each original resource as a JSON line before it was rewritten; keep it as your backup.
+   - A resource that cannot be converted is named in the log, and the Job fails without marking v1alpha1 as unused. Fix it and run the Job again; already-migrated resources are skipped.
+   - A Kubernetes SLO cannot reference a binding. One that references a binding without its queries must be given `measurement` or `queries` first, or compiled through an intent.
+
+5. Apply the final CRDs, delete the migration resources, update the operator image, scale it back up, and commit the converted manifests before resuming GitOps sync:
+
+   ```sh
+   kubectl apply -f deploy/operator/crds.yaml
+   kubectl delete -f deploy/operator/migrate.yaml
+   kubectl -n team-commerce scale deployment/nines-operator --replicas=1
+   ```
+
+- If `kubectl` then reports `the server could not find the requested resource`, its cached API discovery still lists v1alpha1; run `kubectl api-resources --cached=false >/dev/null` or wait about ten minutes.
+- Kubernetes refuses the final CRDs until the migration has run, so the stored v1alpha1 data cannot be lost by skipping a step.
+- After the upgrade, a v1alpha1 SLO, journey or binding manifest is rejected by the API server instead of being read with missing fields.
+- In Kubernetes, SLOs are self-contained: an SLO compiled from a binding holds the binding's queries or window, and an SLO compiled from an intent is linked to it by its owner reference rather than a copy of the intent.
 
 ## Run operator acceptance locally
 

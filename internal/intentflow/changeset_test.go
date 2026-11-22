@@ -12,6 +12,7 @@ import (
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
+	"github.com/ishantanu/nines/internal/operator"
 	"github.com/ishantanu/nines/internal/store"
 	"github.com/ishantanu/nines/internal/tenancy"
 	"github.com/ishantanu/nines/internal/testtelemetry"
@@ -112,7 +113,7 @@ func TestReviewedChangesAtomicApplyRetryAndDrift(t *testing.T) {
 				t.Fatal("invalid Kubernetes export")
 			}
 			for _, item := range list.Items {
-				if item.APIVersion != v1.APIVersion || item.Metadata.Namespace != "team-commerce" {
+				if item.APIVersion != operator.Versions[item.Kind] || item.Metadata.Namespace != "team-commerce" {
 					t.Fatal(item)
 				}
 			}

@@ -24,6 +24,17 @@ func main() {
 	}
 }
 func run() error {
+	// `nines-operator migrate` is a one-shot upgrade step run as a Job; see
+	// deploy/operator/migrate.yaml.
+	if len(os.Args) == 2 && os.Args[1] == "migrate" {
+		api, e := operator.InCluster("")
+		if e != nil {
+			return e
+		}
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return operator.Migrate(ctx, api, os.Stdout)
+	}
 	version := flag.Bool("version", false, "print release version, commit and build date")
 	path := flag.String("config", "", "administrator-owned operator configuration YAML")
 	health := flag.String("health-addr", "127.0.0.1:8081", "health probe address; use :8081 inside a pod")
