@@ -18,6 +18,7 @@ import (
 
 	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	beta "github.com/ishantanu/nines/api/v1beta1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/testtelemetry"
@@ -98,11 +99,11 @@ func (f *kubeFixture) get(kind, name string) k.Resource {
 func (f *kubeFixture) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	prefix := "/apis/nines.dev/v1alpha1/namespaces/team-commerce/"
 	monitoring := "/apis/monitoring.coreos.com/v1/namespaces/team-commerce/"
-	var path string
-	if strings.HasPrefix(r.URL.Path, prefix) {
-		path = strings.TrimPrefix(r.URL.Path, prefix)
+	var path, version string
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/apis/nines.dev/"); ok {
+		v, after, _ := strings.Cut(rest, "/namespaces/team-commerce/")
+		version, path = "nines.dev/"+v, after
 	} else if strings.HasPrefix(r.URL.Path, monitoring) {
 		path = strings.TrimPrefix(r.URL.Path, monitoring)
 	} else {
@@ -118,6 +119,10 @@ func (f *kubeFixture) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if parts[0] == "prometheusrules" {
 		kind = "PrometheusRule"
+	}
+	// Each kind is served only at its own version, as the CRDs declare.
+	if kind != "PrometheusRule" && version != Versions[kind] {
+		kind = ""
 	}
 	if kind == "" {
 		http.NotFound(w, r)
@@ -405,15 +410,22 @@ func TestIntentCompilesUpdatedBindingGenerationWithLiveEvidence(t *testing.T) {
 	}
 	child := f.get(v1.SLOKind, r.Metadata.Name)
 	d, e := Native(child)
-	if e != nil || d.SLO.Spec.MeasurementBinding.Revision != 3 || !owned(child, "intent-uid") {
+	// The child is self-contained: the binding's window instead of a
+	// reference, which the intent's status records.
+	if e != nil || child.APIVersion != "nines.dev/v1beta1" || d.SLO.Spec.MeasurementBinding != nil || d.SLO.Spec.ProviderWindow == nil || !owned(child, "intent-uid") {
 		t.Fatal(child, e)
 	}
 	if model.DefinitionDigest(d.SLO.Spec.Policies) != model.DefinitionDigest(policies) {
 		t.Fatal("intent compilation dropped named severity policies", d.SLO.Spec.Policies)
 	}
 	r = f.get(r.Kind, r.Metadata.Name)
-	if r.Status.Conditions[0].Reason != "IntentCompiled" {
+	if r.Status.Conditions[0].Reason != "IntentCompiled" || r.Status.BindingGeneration != 3 {
 		t.Fatal(r.Status)
+	}
+	// Reconciling again reads the child back as compiled and changes nothing.
+	before := f.get(v1.SLOKind, "intent-slo").Metadata.ResourceVersion
+	if e = c.Reconcile(context.Background(), r); e != nil || f.get(v1.SLOKind, "intent-slo").Metadata.ResourceVersion != before {
+		t.Fatal("recompiled an unchanged intent", e)
 	}
 	// A later generation requires another explicit selection.
 	br.Metadata.Generation = 4
@@ -529,7 +541,7 @@ func TestMeasurementEditsUseNewRuleRevisionAndAlertIdentity(t *testing.T) {
 		t.Fatal(e)
 	}
 	r = f.get(r.Kind, r.Metadata.Name)
-	var spec v1.SLOSpec
+	var spec beta.SLOSpec
 	if e := json.Unmarshal(r.Spec, &spec); e != nil {
 		t.Fatal(e)
 	}
@@ -559,7 +571,7 @@ func TestMeasurementEditsUseNewRuleRevisionAndAlertIdentity(t *testing.T) {
 		t.Fatal("missing burn alert")
 	}
 	before := CanonicalDigest(rule.Spec)
-	spec.GoodQuery = "sum(increase(other_requests_total[1m]))"
+	spec.Queries.Good = "sum(increase(other_requests_total[1m]))"
 	r.Spec, _ = json.Marshal(spec)
 	r.Metadata.Generation = 3
 	// A lost status write still uses the new generation's revision labels.
@@ -624,23 +636,25 @@ func TestRenderRejectsKindsWithoutOperatorCRD(t *testing.T) {
 
 // Keep Kubernetes admission from silently pruning fields supported by the API.
 func TestCheckedInCRDsMatchSharedSchema(t *testing.T) {
-	var want bytes.Buffer
-	for i, crd := range CRDs() {
-		if i > 0 {
-			want.WriteString("---\n")
+	for file, crds := range map[string][]any{"crds.yaml": CRDs(), "crds-transitional.yaml": TransitionalCRDs()} {
+		var want bytes.Buffer
+		for i, crd := range crds {
+			if i > 0 {
+				want.WriteString("---\n")
+			}
+			body, err := YAML(crd)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want.Write(body)
 		}
-		body, err := YAML(crd)
+		got, err := os.ReadFile("../../deploy/operator/" + file)
 		if err != nil {
 			t.Fatal(err)
 		}
-		want.Write(body)
-	}
-	got, err := os.ReadFile("../../deploy/operator/crds.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, want.Bytes()) {
-		t.Fatal("checked-in CRDs differ from shared API types; regenerate with nines operator crds --offline")
+		if !bytes.Equal(got, want.Bytes()) {
+			t.Fatalf("checked-in %s differs from shared API types; regenerate with nines operator crds --offline", file)
+		}
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 
 	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
 	domain "github.com/ishantanu/nines/api/v1alpha1"
+	beta "github.com/ishantanu/nines/api/v1beta1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
@@ -40,21 +41,44 @@ func FromDefinition(d model.Definition, namespace string) (k.Resource, error) {
 	if !tenancy.ValidID(namespace) {
 		return k.Resource{}, model.Invalid("namespace must be a DNS label")
 	}
-	b, e := domain.CanonicalDefinitionJSON(d.Manifest())
+	var spec any
+	switch {
+	case d.SLO != nil:
+		spec = beta.FromHub(kubeSLO(domain.ServiceLevelObjective(*d.SLO))).Spec
+	case d.Journey != nil:
+		spec = beta.JourneyFromHub(domain.CriticalUserJourney(*d.Journey), nil).Spec
+	case d.Binding != nil:
+		spec = beta.BindingFromHub(domain.MeasurementBinding(*d.Binding)).Spec
+	}
+	b, e := json.Marshal(spec)
 	if e != nil {
 		return k.Resource{}, e
 	}
-	var obj struct {
-		Spec json.RawMessage `json:"spec"`
+	return k.Resource{APIVersion: Versions[d.Kind()], Kind: d.Kind(), Metadata: k.Metadata{Name: d.Metadata().Name, Namespace: namespace, Annotations: map[string]string{k.ProjectAnnotation: d.Metadata().Project}}, Spec: b}, nil
+}
+
+// kubeSLO is the self-contained form of an SLO for Kubernetes. A binding
+// reference is replaced by the queries or window derived from it, which is
+// what rules are generated from, because the binding may live only on the
+// server. Intent provenance is carried by the owning intent resource.
+func kubeSLO(slo domain.ServiceLevelObjective) domain.ServiceLevelObjective {
+	slo.Spec.Intent = nil
+	if slo.Spec.MeasurementBinding != nil && (slo.Spec.ProviderWindow != nil || slo.Spec.GoodQuery != "") {
+		slo.Spec.MeasurementBinding = nil
 	}
-	if e = json.Unmarshal(b, &obj); e != nil {
-		return k.Resource{}, e
-	}
-	return k.Resource{APIVersion: domain.APIVersion, Kind: d.Kind(), Metadata: k.Metadata{Name: d.Metadata().Name, Namespace: namespace, Annotations: map[string]string{k.ProjectAnnotation: d.Metadata().Project}}, Spec: obj.Spec}, nil
+	return slo
 }
 func Native(r k.Resource) (model.Definition, error) {
-	if r.APIVersion != domain.APIVersion || Plurals[r.Kind] == "" {
-		return model.Definition{}, model.Invalid("unsupported Kubernetes resource version or kind")
+	if Plurals[r.Kind] == "" || r.APIVersion != Versions[r.Kind] {
+		return model.Definition{}, model.Invalid("unsupported Kubernetes resource version or kind; run nines operator migrate after upgrading")
+	}
+	if r.Kind == domain.SLOKind {
+		var spec struct {
+			Binding json.RawMessage `json:"binding"`
+		}
+		if json.Unmarshal(r.Spec, &spec) == nil && len(spec.Binding) > 0 && string(spec.Binding) != "null" {
+			return model.Definition{}, model.Invalid("a Kubernetes SLO cannot reference a binding; use measurement or queries, or compile the binding through an intent")
+		}
 	}
 	b, e := json.Marshal(map[string]any{"apiVersion": r.APIVersion, "kind": r.Kind, "metadata": domain.Metadata{Name: r.Metadata.Name, Project: r.Metadata.Annotations[k.ProjectAnnotation]}, "spec": r.Spec})
 	if e != nil {
@@ -98,7 +122,7 @@ func PrometheusRule(d model.SLODefinition, tenant, namespace, ownerUID string, l
 		r.Metadata.Labels[key] = v
 	}
 	if ownerUID != "" {
-		r.Metadata.OwnerReferences = []k.OwnerReference{{APIVersion: domain.APIVersion, Kind: domain.SLOKind, Name: d.Metadata.Name, UID: ownerUID, Controller: true, BlockOwnerDeletion: func() *bool { value := true; return &value }()}}
+		r.Metadata.OwnerReferences = []k.OwnerReference{{APIVersion: Versions[domain.SLOKind], Kind: domain.SLOKind, Name: d.Metadata.Name, UID: ownerUID, Controller: true, BlockOwnerDeletion: func() *bool { value := true; return &value }()}}
 	}
 	return r, nil
 }
@@ -125,6 +149,9 @@ func DecodeResource(body []byte) (k.Resource, error) {
 	return r, e
 }
 func schemaFor(t reflect.Type) map[string]any {
+	if t == reflect.TypeOf(beta.Duration{}) {
+		return map[string]any{"type": "string", "maxLength": 32, "pattern": `^([0-9]+(d|h|m|s|ms))+$`}
+	}
 	if t == reflect.TypeOf(domain.SLOLifecycle("")) {
 		return map[string]any{"type": "string", "enum": []string{"experimental", "aspirational", "committed", "deprecated"}}
 	}
@@ -168,6 +195,14 @@ func schemaFor(t reflect.Type) map[string]any {
 				name = f.Name
 			}
 			properties[name] = schemaFor(f.Type)
+			if t == reflect.TypeOf(beta.QualityPolicy{}) {
+				switch name {
+				case "minEvents":
+					properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 1e18}
+				case "cohortLabels":
+					properties[name] = map[string]any{"type": "array", "maxItems": 3, "x-kubernetes-list-type": "set", "items": map[string]any{"type": "string", "pattern": model.LabelName.String()}}
+				}
+			}
 			if t == reflect.TypeOf(domain.MeasurementQualityPolicy{}) {
 				switch name {
 				case "minEvents":
@@ -186,13 +221,13 @@ func schemaFor(t reflect.Type) map[string]any {
 					properties[name] = map[string]any{"type": "string", "enum": []string{"blocked", "review_required"}}
 				}
 			}
-			if t == reflect.TypeOf(domain.BurnRatePolicy{}) && name == "minEvents" {
+			if (t == reflect.TypeOf(domain.BurnRatePolicy{}) || t == reflect.TypeOf(beta.BurnRatePolicy{})) && name == "minEvents" {
 				properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 1e18}
 			}
-			if t == reflect.TypeOf(domain.SLOSpec{}) && name == "labels" {
+			if (t == reflect.TypeOf(domain.SLOSpec{}) || t == reflect.TypeOf(beta.SLOSpec{})) && name == "labels" {
 				properties[name] = map[string]any{"type": "object", "maxProperties": model.MaxSLOLabels, "additionalProperties": map[string]any{"type": "string", "minLength": 1, "maxLength": model.MaxLabelValueLen}}
 			}
-			if t == reflect.TypeOf(domain.BurnRatePolicy{}) && name == "confidence" {
+			if (t == reflect.TypeOf(domain.BurnRatePolicy{}) || t == reflect.TypeOf(beta.BurnRatePolicy{})) && name == "confidence" {
 				// Zero turns it off; the server rejects values between 0 and 0.5.
 				properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 0.9999}
 			}
@@ -220,28 +255,50 @@ func schemaFor(t reflect.Type) map[string]any {
 		panic(fmt.Sprintf("unsupported CRD schema type %s", t))
 	}
 }
-func CRDs() []any {
+
+// Versions is the API version each kind is served and stored as. Intents
+// have no v1beta1 form and stay v1alpha1.
+var Versions = map[string]string{domain.SLOKind: beta.APIVersion, domain.JourneyKind: beta.APIVersion, domain.BindingKind: beta.APIVersion, domain.IntentKind: domain.APIVersion}
+
+// CRDs are the custom resource definitions to install.
+func CRDs() []any { return crds(false) }
+
+// TransitionalCRDs also serve the v1alpha1 schema, not stored, for
+// `nines operator migrate` to read objects stored before v1beta1.
+func TransitionalCRDs() []any { return crds(true) }
+
+func crds(transitional bool) []any {
 	kinds := []struct {
-		Kind  string
-		Spec  any
-		Short string
-	}{{domain.SLOKind, domain.SLOSpec{}, "slo"}, {domain.JourneyKind, domain.JourneySpec{}, "cuj"}, {domain.BindingKind, domain.BindingSpec{}, "mb"}, {domain.IntentKind, k.IntentSpec{}, "sloi"}}
+		Kind      string
+		Spec, Old any
+		Short     string
+	}{{domain.SLOKind, beta.SLOSpec{}, domain.SLOSpec{}, "slo"}, {domain.JourneyKind, beta.JourneySpec{}, domain.JourneySpec{}, "cuj"}, {domain.BindingKind, beta.BindingSpec{}, domain.BindingSpec{}, "mb"}, {domain.IntentKind, k.IntentSpec{}, nil, "sloi"}}
 	out := []any{}
 	for _, item := range kinds {
 		specSchema := schemaFor(reflect.TypeOf(item.Spec))
-		if item.Kind == domain.IntentKind {
+		switch item.Kind {
+		case domain.IntentKind:
 			specSchema["x-kubernetes-validations"] = []any{
 				map[string]string{"rule": "has(self.measurement) != has(self.measurementSelection)", "message": "define spec.measurement; a legacy measurementSelection is an alternative, never an additional input"},
 				map[string]string{"rule": "!has(self.measurement) || (has(self.stepSeconds) && self.stepSeconds >= 1 && self.stepSeconds <= 3600)", "message": "inline measurement requires stepSeconds from 1 to 3600"},
 			}
+		case domain.SLOKind:
+			specSchema["x-kubernetes-validations"] = []any{map[string]string{"rule": "[has(self.measurement), has(self.queries), has(self.binding)].filter(x, x).size() <= 1", "message": "use at most one of measurement, queries or binding"}}
 		}
-		if item.Kind == domain.SLOKind {
-			specSchema["x-kubernetes-validations"] = []any{map[string]string{"rule": "!has(self.measurement) || (!has(self.measurementBinding) && !has(self.providerWindow) && !has(self.goodQuery) && !has(self.totalQuery))", "message": "inline measurement cannot be combined with binding references or explicit queries"}}
+		versions := []any{version(Versions[item.Kind], specSchema, true)}
+		if transitional && item.Old != nil {
+			old := schemaFor(reflect.TypeOf(item.Old))
+			versions = append(versions, version(domain.APIVersion, old, false))
 		}
-		schema := map[string]any{"type": "object", "required": []string{"spec"}, "properties": map[string]any{"apiVersion": map[string]any{"type": "string"}, "kind": map[string]any{"type": "string"}, "metadata": map[string]any{"type": "object"}, "spec": specSchema, "status": map[string]any{"type": "object", "x-kubernetes-preserve-unknown-fields": true}}}
-		out = append(out, map[string]any{"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition", "metadata": map[string]string{"name": Plurals[item.Kind] + ".nines.dev"}, "spec": map[string]any{"group": "nines.dev", "scope": "Namespaced", "names": map[string]any{"kind": item.Kind, "plural": Plurals[item.Kind], "singular": strings.ToLower(item.Kind), "shortNames": []string{item.Short}}, "versions": []any{map[string]any{"name": "v1alpha1", "served": true, "storage": true, "schema": map[string]any{"openAPIV3Schema": schema}, "subresources": map[string]any{"status": map[string]any{}}, "additionalPrinterColumns": []any{map[string]any{"name": "Ready", "type": "string", "jsonPath": ".status.conditions[?(@.type=='Ready')].status"}, map[string]any{"name": "Reason", "type": "string", "jsonPath": ".status.conditions[?(@.type=='Ready')].reason"}}}}}})
+		out = append(out, map[string]any{"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition", "metadata": map[string]string{"name": Plurals[item.Kind] + ".nines.dev"}, "spec": map[string]any{"group": "nines.dev", "scope": "Namespaced", "names": map[string]any{"kind": item.Kind, "plural": Plurals[item.Kind], "singular": strings.ToLower(item.Kind), "shortNames": []string{item.Short}}, "versions": versions}})
 	}
 	return out
+}
+
+func version(apiVersion string, spec map[string]any, storage bool) map[string]any {
+	_, name, _ := strings.Cut(apiVersion, "/")
+	schema := map[string]any{"type": "object", "required": []string{"spec"}, "properties": map[string]any{"apiVersion": map[string]any{"type": "string"}, "kind": map[string]any{"type": "string"}, "metadata": map[string]any{"type": "object"}, "spec": spec, "status": map[string]any{"type": "object", "x-kubernetes-preserve-unknown-fields": true}}}
+	return map[string]any{"name": name, "served": true, "storage": storage, "schema": map[string]any{"openAPIV3Schema": schema}, "subresources": map[string]any{"status": map[string]any{}}, "additionalPrinterColumns": []any{map[string]any{"name": "Ready", "type": "string", "jsonPath": ".status.conditions[?(@.type=='Ready')].status"}, map[string]any{"name": "Reason", "type": "string", "jsonPath": ".status.conditions[?(@.type=='Ready')].reason"}}}
 }
 
 func FromIntent(goal domain.SLOIntent, namespace string, selection k.MeasurementSelection) (k.Resource, error) {

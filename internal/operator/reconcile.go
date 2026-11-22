@@ -110,13 +110,13 @@ func (c *Controller) reconcile(ctx context.Context, r k.Resource) (k.Status, err
 	status.Deployment = nil
 	status.Evaluation = nil
 	status.RuleOutput = nil
-	if r.APIVersion != v1.APIVersion {
-		return status, model.Invalid("unsupported API version")
+	if r.APIVersion != Versions[r.Kind] {
+		return status, model.Invalid("unsupported API version; run nines operator migrate after upgrading")
 	}
 	if r.Kind == v1.IntentKind {
 		return c.intent(ctx, r, status)
 	}
-	d, e := Native(r)
+	d, e := c.native(ctx, r)
 	if e != nil {
 		return status, e
 	}
@@ -292,7 +292,7 @@ func (c *Controller) intent(ctx context.Context, r k.Resource, status k.Status) 
 		if j.Metadata.Generation != ref.ExpectedRevision {
 			return status, model.Invalid("critical user journey generation changed")
 		}
-		jd, e := Native(j)
+		jd, e := c.native(ctx, j)
 		if e != nil {
 			return status, e
 		}
@@ -382,7 +382,13 @@ func (c *Controller) intent(ctx context.Context, r k.Resource, status k.Status) 
 		status.ValidatedAt = &now
 		status.BindingGeneration = binding.Metadata.Generation
 		status.InputDigest = input
-		status.DefinitionDigest = model.DefinitionDigest(definition)
+		// Record the digest of the resource as the cluster holds it, which is
+		// what later reads of the child compare against.
+		kube, e := Native(desired)
+		if e != nil {
+			return status, e
+		}
+		status.DefinitionDigest = model.DefinitionDigest(kube.Manifest())
 	}
 	return ready(r, status, true, "IntentCompiled", "Verified measurement compiled to an owned SLO. Critical user journey links remain GitOps-owned; child SLO status reports rule deployment."), nil
 }
@@ -435,4 +441,31 @@ func (c *Controller) observe(ctx context.Context, slo model.SLO, source Source, 
 		status.RuleOutput = &stage
 	})
 	checks.Wait()
+}
+
+// native reads a resource as its stored-form definition. A v1beta1 journey's
+// omitted link dimensions follow the linked SLO resources' types, exactly as
+// the server derives them from stored SLOs.
+func (c *Controller) native(ctx context.Context, r k.Resource) (model.Definition, error) {
+	d, err := Native(r)
+	if err != nil || d.BetaJourney == nil {
+		return d, err
+	}
+	hub, _, err := d.BetaJourney.ToHub(func(id string) (v1.SLOSpec, bool) {
+		linked, err := c.API.Get(ctx, v1.SLOKind, id)
+		if err != nil {
+			return v1.SLOSpec{}, false
+		}
+		ld, err := Native(linked)
+		if err != nil || ld.SLO == nil {
+			return v1.SLOSpec{}, false
+		}
+		return ld.SLO.Spec, true
+	})
+	if err != nil {
+		return d, model.Invalid("%s", err.Error())
+	}
+	journey := model.Journey(hub)
+	d.Journey = &journey
+	return d, nil
 }

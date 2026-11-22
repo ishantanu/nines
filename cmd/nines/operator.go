@@ -22,9 +22,16 @@ func runOperator(args []string, out io.Writer) error {
 }
 func operatorCommand(o *options) *cobra.Command {
 	root := &cobra.Command{Use: "operator", Short: "Render Kubernetes resources offline"}
-	root.AddCommand(mark(&cobra.Command{Use: "crds", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+	crds := mark(&cobra.Command{Use: "crds", Args: cobra.NoArgs}, "offline", "read", "Print CRD schemas")
+	transitional := crds.Flags().Bool("transitional", false, "print the upgrade CRDs that also serve v1alpha1 for nines-operator migrate")
+	root.AddCommand(crds)
+	crds.RunE = func(cmd *cobra.Command, args []string) error {
 		var out bytes.Buffer
-		for i, crd := range operator.CRDs() {
+		list := operator.CRDs()
+		if *transitional {
+			list = operator.TransitionalCRDs()
+		}
+		for i, crd := range list {
 			if i > 0 {
 				fmt.Fprintln(&out, "---")
 			}
@@ -36,7 +43,30 @@ func operatorCommand(o *options) *cobra.Command {
 		}
 		_, e := cmd.OutOrStdout().Write(out.Bytes())
 		return e
-	}}, "offline", "read", "Print CRD schemas"))
+	}
+	convert := mark(&cobra.Command{Use: "convert", Args: cobra.NoArgs}, "offline", "read", "Convert v1alpha1 SLO, journey and binding resources to v1beta1")
+	convertFile := convert.Flags().StringP("file", "f", "", "Kubernetes YAML with one or more resources")
+	root.AddCommand(convert)
+	convert.RunE = func(cmd *cobra.Command, args []string) error {
+		if *convertFile == "" {
+			return fmt.Errorf("provide -f resources.yaml")
+		}
+		f, err := openInput(*convertFile)
+		if err != nil {
+			return err
+		}
+		body, err := io.ReadAll(io.LimitReader(f, (8<<20)+1))
+		_ = f.Close()
+		if err != nil {
+			return err
+		}
+		converted, err := operator.ConvertDocuments(body)
+		if err != nil {
+			return err
+		}
+		_, err = cmd.OutOrStdout().Write(converted)
+		return err
+	}
 	cmd := mark(&cobra.Command{Use: "render", Args: cobra.NoArgs}, "offline", "local-write", "Render local YAML for GitOps review")
 	root.AddCommand(cmd)
 	flags := cmd.Flags()

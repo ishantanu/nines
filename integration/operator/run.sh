@@ -80,8 +80,64 @@ docker run -d --name "$controller" --network "$network" --user 0:0 \
   --namespaces=nines-prometheus,nines-rules,nines-unselected,team-commerce \
   --disable-unmanaged-prometheus-configuration >/dev/null
 # Install the shipped namespace Role/ServiceAccount and generated domain CRDs.
+# Build the released container entrypoint once; the upgrade and runtime checks use it.
+cd "$root"
+arch=$(docker version --format '{{.Server.Arch}}')
+case "$arch" in amd64|arm64) ;; *) echo 'Unsupported fixture architecture'; exit 1 ;; esac
+mkdir -p "$work/image" "$work/serviceaccount" "$work/config"
+CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false \
+  -ldflags='-s -w -X github.com/ishantanu/nines/internal/buildinfo.Version=operator-acceptance' \
+  -o "$work/image/nines-operator" ./cmd/operator
+GOOS=linux GOARCH="$arch" python3 scripts/release/licenses.py --go-only --package ./cmd/operator --out "$work/image/LICENSES" > "$work/notices.json"
+cp LICENSE NOTICE THIRD_PARTY_NOTICES.md "$work/image/"
+cp deploy/operator/Dockerfile.binary "$work/image/Dockerfile"
+docker build --quiet --tag "$name-runtime-image" "$work/image" > "$work/image-id"
+
+# Upgrade from v0.1.0-alpha.4: v1alpha1 CRDs and resources, the transitional
+# CRDs, the shipped migration RBAC and entrypoint, then the final CRDs.
+docker exec -i "$server" kubectl apply -f - < "$root/integration/operator/testdata/crds-v1alpha1.yaml" >/dev/null
+wait_crds
+docker exec "$server" kubectl create namespace team-commerce >/dev/null
+docker exec -i "$server" kubectl apply -f - < "$root/integration/operator/testdata/compiled-v1alpha1.yaml" >/dev/null
+if docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/crds.yaml" >/dev/null 2>&1; then
+  echo 'Final CRDs were accepted over stored v1alpha1 resources'; exit 1
+fi
+docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/crds-transitional.yaml" >/dev/null
+wait_crds
+# The Job itself cannot run here (no nodes); run its entrypoint with its account.
+python3 -c 'import sys; print("---".join(d for d in open(sys.argv[1]).read().split("---") if "kind: Job" not in d))' \
+  "$root/deploy/operator/migrate.yaml" | docker exec -i "$server" kubectl apply -f - >/dev/null
+mkdir -p "$work/migrate-sa"
+docker exec "$server" kubectl -n nines-migrate create token nines-migrate --duration=10m > "$work/migrate-sa/token"
+cp "$work/ca.pem" "$work/migrate-sa/ca.crt"
+chmod 755 "$work/migrate-sa"; chmod 444 "$work/migrate-sa/token" "$work/migrate-sa/ca.crt"
+migrate() {
+  docker run --rm --network "$network" --read-only --cap-drop ALL --security-opt no-new-privileges \
+    --env KUBERNETES_SERVICE_HOST=api --env KUBERNETES_SERVICE_PORT_HTTPS=6443 \
+    --mount "type=bind,src=$work/migrate-sa,dst=/var/run/secrets/kubernetes.io/serviceaccount,readonly" \
+    "$name-runtime-image" migrate
+}
+migrate > "$work/migrate.log"
+grep -q '"name":"checkout-availability"' "$work/migrate.log" || { echo 'Migration did not log the original resources'; exit 1; }
+migrate | grep -q 'already migrated' || { echo 'Second migration was not a no-op'; exit 1; }
 docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/crds.yaml" >/dev/null
 wait_crds
+docker exec "$server" kubectl -n team-commerce get slo checkout-availability -o json > "$work/migrated.json"
+python3 - "$work/migrated.json" <<'CHECK'
+import json, sys
+r = json.load(open(sys.argv[1]))
+spec = r["spec"]
+assert r["apiVersion"] == "nines.dev/v1beta1", r["apiVersion"]
+assert spec["window"] == "28d" and spec["step"] == "1m", spec
+assert spec["queries"]["window"]["good"].startswith("checkout_attempts_total"), spec
+assert [p["name"] for p in spec["policies"]] == ["fast-burn", "sustained-burn"], spec
+assert not any(k.endswith("Seconds") for k in spec), spec
+CHECK
+docker exec "$server" kubectl -n team-commerce get cuj purchase -o jsonpath='{.spec.slos[0].dimension}' | grep -qx availability
+docker exec "$server" kubectl -n team-commerce delete slo,cuj --all >/dev/null
+python3 -c 'import sys; print("---".join(d for d in open(sys.argv[1]).read().split("---") if "kind: Job" not in d))' \
+  "$root/deploy/operator/migrate.yaml" | docker exec -i "$server" kubectl delete -f - >/dev/null
+printf '%s\n' '{"status":"passed","from":"v0.1.0-alpha.4","finalCRDsRefusedBeforeMigration":true,"backupLogged":true,"rerunNoOp":true,"definitionsPreserved":true}' > operator-upgrade-test-results.json
 docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/operator.yaml" >/dev/null
 docker exec "$server" kubectl -n team-commerce scale deployment nines-operator --replicas=0 >/dev/null
 docker exec "$server" kubectl -n team-commerce create token nines-operator --duration=15m > "$work/token"
@@ -129,16 +185,6 @@ python3 scripts/release/check-tests.py "$work/go-results.json" --required operat
 
 # Exercise the released container entrypoint with the actual service-account
 # mount layout, verified API TLS, nonroot UID, probes and clean termination.
-arch=$(docker version --format '{{.Server.Arch}}')
-case "$arch" in amd64|arm64) ;; *) echo 'Unsupported fixture architecture'; exit 1 ;; esac
-mkdir -p "$work/image" "$work/serviceaccount" "$work/config"
-CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false \
-  -ldflags='-s -w -X github.com/ishantanu/nines/internal/buildinfo.Version=operator-acceptance' \
-  -o "$work/image/nines-operator" ./cmd/operator
-GOOS=linux GOARCH="$arch" python3 scripts/release/licenses.py --go-only --package ./cmd/operator --out "$work/image/LICENSES" > "$work/notices.json"
-cp LICENSE NOTICE THIRD_PARTY_NOTICES.md "$work/image/"
-cp deploy/operator/Dockerfile.binary "$work/image/Dockerfile"
-docker build --quiet --tag "$name-runtime-image" "$work/image" > "$work/image-id"
 cp "$work/token" "$work/serviceaccount/token"
 cp "$work/ca.pem" "$work/serviceaccount/ca.crt"
 cat > "$work/config/operator.yaml" <<'CONFIG'

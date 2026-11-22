@@ -19,7 +19,7 @@ spec:
             - jsonPath: .status.conditions[?(@.type=='Ready')].reason
               name: Reason
               type: string
-          name: v1alpha1
+          name: v1beta1
           schema:
             openAPIV3Schema:
                 properties:
@@ -31,17 +31,23 @@ spec:
                         type: object
                     spec:
                         properties:
-                            badInterval:
+                            binding:
                                 nullable: true
                                 properties:
-                                    errorRate:
-                                        type: number
-                                    minEvents:
-                                        type: number
-                                    minGoodEvents:
-                                        type: number
-                                required: []
+                                    digest:
+                                        type: string
+                                    name:
+                                        type: string
+                                    revision:
+                                        format: int64
+                                        type: integer
+                                required:
+                                    - name
+                                    - revision
+                                    - digest
                                 type: object
+                            connection:
+                                type: string
                             customers:
                                 nullable: true
                                 properties:
@@ -105,271 +111,16 @@ spec:
                                     - runbookURL
                                     - reviewBelow
                                 type: object
-                            goodQuery:
-                                type: string
-                            intent:
+                            intervals:
                                 nullable: true
                                 properties:
-                                    description:
-                                        type: string
-                                    errorBudgetPolicy:
-                                        nullable: true
-                                        properties:
-                                            bands:
-                                                items:
-                                                    properties:
-                                                        below:
-                                                            type: number
-                                                        name:
-                                                            type: string
-                                                        response:
-                                                            type: string
-                                                    required:
-                                                        - name
-                                                        - below
-                                                        - response
-                                                    type: object
-                                                maxItems: 1000
-                                                type: array
-                                            onExhausted:
-                                                enum:
-                                                    - blocked
-                                                    - review_required
-                                                type: string
-                                            owner:
-                                                type: string
-                                            reviewBelow:
-                                                maximum: 1
-                                                minimum: 0
-                                                type: number
-                                            runbookURL:
-                                                type: string
-                                        required:
-                                            - owner
-                                            - runbookURL
-                                            - reviewBelow
-                                        type: object
-                                    exclusions:
-                                        nullable: true
-                                        properties:
-                                            none:
-                                                type: boolean
-                                            observationBoundaries:
-                                                items:
-                                                    type: string
-                                                maxItems: 1000
-                                                type: array
-                                        required: []
-                                        type: object
-                                    journey:
-                                        nullable: true
-                                        properties:
-                                            expectedRevision:
-                                                format: int64
-                                                type: integer
-                                            name:
-                                                type: string
-                                            required:
-                                                type: boolean
-                                            step:
-                                                type: string
-                                        required:
-                                            - name
-                                            - step
-                                            - expectedRevision
-                                            - required
-                                        type: object
-                                    lifecycle:
-                                        enum:
-                                            - experimental
-                                            - aspirational
-                                            - committed
-                                            - deprecated
-                                        type: string
-                                    measurement:
-                                        nullable: true
-                                        properties:
-                                            countFrom:
-                                                type: string
-                                            eventMetric:
-                                                type: string
-                                            labels:
-                                                additionalProperties:
-                                                    type: string
-                                                maxProperties: 1000
-                                                type: object
-                                            metric:
-                                                type: string
-                                            observationPoint:
-                                                type: string
-                                            scrapeIntervalSeconds:
-                                                format: int64
-                                                type: integer
-                                            successLabels:
-                                                additionalProperties:
-                                                    type: string
-                                                maxProperties: 1000
-                                                type: object
-                                            thresholdSeconds:
-                                                nullable: true
-                                                type: number
-                                            type:
-                                                type: string
-                                        required:
-                                            - type
-                                            - metric
-                                            - labels
-                                            - scrapeIntervalSeconds
-                                            - observationPoint
-                                        type: object
-                                    noDataPolicy:
-                                        type: string
-                                    outcome:
-                                        type: string
-                                    policies:
-                                        items:
-                                            properties:
-                                                burnRate:
-                                                    type: number
-                                                confidence:
-                                                    maximum: 0.9999
-                                                    minimum: 0
-                                                    type: number
-                                                forSeconds:
-                                                    format: int64
-                                                    type: integer
-                                                longWindow:
-                                                    maxLength: 64
-                                                    pattern: ^([0-9]+[hms])+$
-                                                    type: string
-                                                longWindowSeconds:
-                                                    format: int64
-                                                    type: integer
-                                                minCoverage:
-                                                    type: number
-                                                minEvents:
-                                                    maximum: 1e+18
-                                                    minimum: 0
-                                                    type: number
-                                                name:
-                                                    type: string
-                                                severity:
-                                                    type: string
-                                                shortWindow:
-                                                    maxLength: 64
-                                                    pattern: ^([0-9]+[hms])+$
-                                                    type: string
-                                                shortWindowSeconds:
-                                                    format: int64
-                                                    type: integer
-                                            required:
-                                                - burnRate
-                                                - forSeconds
-                                                - minCoverage
-                                            type: object
-                                            x-kubernetes-validations:
-                                                - message: Specify exactly one of shortWindow or shortWindowSeconds.
-                                                  rule: has(self.shortWindow) != has(self.shortWindowSeconds)
-                                                - message: Specify exactly one of longWindow or longWindowSeconds.
-                                                  rule: has(self.longWindow) != has(self.longWindowSeconds)
-                                        maxItems: 1000
-                                        type: array
-                                    policy:
-                                        nullable: true
-                                        properties:
-                                            burnRate:
-                                                type: number
-                                            confidence:
-                                                maximum: 0.9999
-                                                minimum: 0
-                                                type: number
-                                            forSeconds:
-                                                format: int64
-                                                type: integer
-                                            longWindow:
-                                                maxLength: 64
-                                                pattern: ^([0-9]+[hms])+$
-                                                type: string
-                                            longWindowSeconds:
-                                                format: int64
-                                                type: integer
-                                            minCoverage:
-                                                type: number
-                                            minEvents:
-                                                maximum: 1e+18
-                                                minimum: 0
-                                                type: number
-                                            name:
-                                                type: string
-                                            severity:
-                                                type: string
-                                            shortWindow:
-                                                maxLength: 64
-                                                pattern: ^([0-9]+[hms])+$
-                                                type: string
-                                            shortWindowSeconds:
-                                                format: int64
-                                                type: integer
-                                        required:
-                                            - burnRate
-                                            - forSeconds
-                                            - minCoverage
-                                        type: object
-                                        x-kubernetes-validations:
-                                            - message: Specify exactly one of shortWindow or shortWindowSeconds.
-                                              rule: has(self.shortWindow) != has(self.shortWindowSeconds)
-                                            - message: Specify exactly one of longWindow or longWindowSeconds.
-                                              rule: has(self.longWindow) != has(self.longWindowSeconds)
-                                    population:
-                                        additionalProperties:
-                                            type: string
-                                        maxProperties: 1000
-                                        type: object
-                                    quality:
-                                        nullable: true
-                                        properties:
-                                            cohortLabels:
-                                                items:
-                                                    pattern: ^[a-zA-Z_][a-zA-Z0-9_]{0,99}$
-                                                    type: string
-                                                maxItems: 3
-                                                type: array
-                                                x-kubernetes-list-type: set
-                                            maxSampleAgeSeconds:
-                                                format: int64
-                                                maximum: 2.6784e+06
-                                                minimum: 0
-                                                type: integer
-                                            minEvents:
-                                                maximum: 1e+18
-                                                minimum: 0
-                                                type: number
-                                        required: []
-                                        type: object
-                                    service:
-                                        type: string
-                                    source:
-                                        type: string
-                                    stepSeconds:
-                                        format: int64
-                                        type: integer
-                                    target:
+                                    errorRate:
                                         type: number
-                                    thresholdSeconds:
-                                        nullable: true
+                                    minEvents:
                                         type: number
-                                    windowSeconds:
-                                        format: int64
-                                        type: integer
-                                required:
-                                    - description
-                                    - service
-                                    - source
-                                    - outcome
-                                    - population
-                                    - target
-                                    - windowSeconds
-                                    - noDataPolicy
+                                    minGoodEvents:
+                                        type: number
+                                required: []
                                 type: object
                             labels:
                                 additionalProperties:
@@ -401,40 +152,27 @@ spec:
                                         type: string
                                     observationPoint:
                                         type: string
-                                    scrapeIntervalSeconds:
-                                        format: int64
-                                        type: integer
+                                    scrapeInterval:
+                                        maxLength: 32
+                                        nullable: true
+                                        pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                        type: string
                                     successLabels:
                                         additionalProperties:
                                             type: string
                                         maxProperties: 1000
                                         type: object
-                                    thresholdSeconds:
+                                    threshold:
+                                        maxLength: 32
                                         nullable: true
-                                        type: number
+                                        pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                        type: string
                                     type:
                                         type: string
                                 required:
                                     - type
                                     - metric
-                                    - labels
-                                    - scrapeIntervalSeconds
                                     - observationPoint
-                                type: object
-                            measurementBinding:
-                                nullable: true
-                                properties:
-                                    digest:
-                                        type: string
-                                    name:
-                                        type: string
-                                    revision:
-                                        format: int64
-                                        type: integer
-                                required:
-                                    - name
-                                    - revision
-                                    - digest
                                 type: object
                             policies:
                                 items:
@@ -445,17 +183,17 @@ spec:
                                             maximum: 0.9999
                                             minimum: 0
                                             type: number
-                                        forSeconds:
-                                            format: int64
-                                            type: integer
-                                        longWindow:
-                                            maxLength: 64
-                                            pattern: ^([0-9]+[hms])+$
+                                        for:
+                                            maxLength: 32
+                                            nullable: true
+                                            pattern: ^([0-9]+(d|h|m|s|ms))+$
                                             type: string
-                                        longWindowSeconds:
-                                            format: int64
-                                            type: integer
+                                        longWindow:
+                                            maxLength: 32
+                                            pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                            type: string
                                         minCoverage:
+                                            nullable: true
                                             type: number
                                         minEvents:
                                             maximum: 1e+18
@@ -466,87 +204,17 @@ spec:
                                         severity:
                                             type: string
                                         shortWindow:
-                                            maxLength: 64
-                                            pattern: ^([0-9]+[hms])+$
+                                            maxLength: 32
+                                            pattern: ^([0-9]+(d|h|m|s|ms))+$
                                             type: string
-                                        shortWindowSeconds:
-                                            format: int64
-                                            type: integer
                                     required:
+                                        - shortWindow
+                                        - longWindow
                                         - burnRate
-                                        - forSeconds
-                                        - minCoverage
                                     type: object
-                                    x-kubernetes-validations:
-                                        - message: Specify exactly one of shortWindow or shortWindowSeconds.
-                                          rule: has(self.shortWindow) != has(self.shortWindowSeconds)
-                                        - message: Specify exactly one of longWindow or longWindowSeconds.
-                                          rule: has(self.longWindow) != has(self.longWindowSeconds)
                                 maxItems: 1000
+                                nullable: true
                                 type: array
-                            policy:
-                                nullable: true
-                                properties:
-                                    burnRate:
-                                        type: number
-                                    confidence:
-                                        maximum: 0.9999
-                                        minimum: 0
-                                        type: number
-                                    forSeconds:
-                                        format: int64
-                                        type: integer
-                                    longWindow:
-                                        maxLength: 64
-                                        pattern: ^([0-9]+[hms])+$
-                                        type: string
-                                    longWindowSeconds:
-                                        format: int64
-                                        type: integer
-                                    minCoverage:
-                                        type: number
-                                    minEvents:
-                                        maximum: 1e+18
-                                        minimum: 0
-                                        type: number
-                                    name:
-                                        type: string
-                                    severity:
-                                        type: string
-                                    shortWindow:
-                                        maxLength: 64
-                                        pattern: ^([0-9]+[hms])+$
-                                        type: string
-                                    shortWindowSeconds:
-                                        format: int64
-                                        type: integer
-                                required:
-                                    - burnRate
-                                    - forSeconds
-                                    - minCoverage
-                                type: object
-                                x-kubernetes-validations:
-                                    - message: Specify exactly one of shortWindow or shortWindowSeconds.
-                                      rule: has(self.shortWindow) != has(self.shortWindowSeconds)
-                                    - message: Specify exactly one of longWindow or longWindowSeconds.
-                                      rule: has(self.longWindow) != has(self.longWindowSeconds)
-                            providerWindow:
-                                nullable: true
-                                properties:
-                                    badSelector:
-                                        type: string
-                                    goodSelector:
-                                        type: string
-                                    scrapeIntervalSeconds:
-                                        format: int64
-                                        type: integer
-                                    totalSelector:
-                                        type: string
-                                required:
-                                    - goodSelector
-                                    - totalSelector
-                                    - scrapeIntervalSeconds
-                                type: object
                             quality:
                                 nullable: true
                                 properties:
@@ -557,43 +225,67 @@ spec:
                                         maxItems: 3
                                         type: array
                                         x-kubernetes-list-type: set
-                                    maxSampleAgeSeconds:
-                                        format: int64
-                                        maximum: 2.6784e+06
-                                        minimum: 0
-                                        type: integer
+                                    maxSampleAge:
+                                        maxLength: 32
+                                        nullable: true
+                                        pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                        type: string
                                     minEvents:
                                         maximum: 1e+18
                                         minimum: 0
                                         type: number
                                 required: []
                                 type: object
-                            queryLanguage:
-                                type: string
+                            queries:
+                                nullable: true
+                                properties:
+                                    good:
+                                        type: string
+                                    language:
+                                        type: string
+                                    total:
+                                        type: string
+                                    window:
+                                        nullable: true
+                                        properties:
+                                            bad:
+                                                type: string
+                                            good:
+                                                type: string
+                                            scrapeInterval:
+                                                maxLength: 32
+                                                nullable: true
+                                                pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                                type: string
+                                            total:
+                                                type: string
+                                        required:
+                                            - total
+                                        type: object
+                                required: []
+                                type: object
                             service:
                                 type: string
-                            source:
+                            step:
+                                maxLength: 32
+                                nullable: true
+                                pattern: ^([0-9]+(d|h|m|s|ms))+$
                                 type: string
-                            stepSeconds:
-                                format: int64
-                                type: integer
                             target:
                                 type: number
-                            totalQuery:
+                            window:
+                                maxLength: 32
+                                nullable: true
+                                pattern: ^([0-9]+(d|h|m|s|ms))+$
                                 type: string
-                            windowSeconds:
-                                format: int64
-                                type: integer
                         required:
                             - displayName
                             - service
                             - target
-                            - windowSeconds
-                            - stepSeconds
                         type: object
                         x-kubernetes-validations:
-                            - message: inline measurement cannot be combined with binding references or explicit queries
-                              rule: '!has(self.measurement) || (!has(self.measurementBinding) && !has(self.providerWindow) && !has(self.goodQuery) && !has(self.totalQuery))'
+                            - message: use at most one of measurement, queries or binding
+                              rule: '[has(self.measurement), has(self.queries), has(self.binding)].filter(x, x).size() <= 1'
                     status:
                         type: object
                         x-kubernetes-preserve-unknown-fields: true
@@ -626,7 +318,7 @@ spec:
             - jsonPath: .status.conditions[?(@.type=='Ready')].reason
               name: Reason
               type: string
-          name: v1alpha1
+          name: v1beta1
           schema:
             openAPIV3Schema:
                 properties:
@@ -646,9 +338,11 @@ spec:
                                     maxCostUSD:
                                         nullable: true
                                         type: number
-                                    maxDurationSeconds:
-                                        format: int64
-                                        type: integer
+                                    maxDuration:
+                                        maxLength: 32
+                                        nullable: true
+                                        pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                        type: string
                                     maxSteps:
                                         format: int64
                                         type: integer
@@ -656,7 +350,6 @@ spec:
                                         type: string
                                 required:
                                     - successDefinition
-                                    - approvalRequired
                                 type: object
                             criticality:
                                 type: string
@@ -674,12 +367,13 @@ spec:
                                         type: integer
                                     target:
                                         type: number
-                                    windowSeconds:
-                                        format: int64
-                                        type: integer
+                                    window:
+                                        maxLength: 32
+                                        pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                        type: string
                                 required:
                                     - target
-                                    - windowSeconds
+                                    - window
                                     - minRuns
                                 type: object
                             slos:
@@ -693,8 +387,6 @@ spec:
                                             type: boolean
                                     required:
                                         - id
-                                        - dimension
-                                        - required
                                     type: object
                                 maxItems: 1000
                                 type: array
@@ -765,7 +457,7 @@ spec:
             - jsonPath: .status.conditions[?(@.type=='Ready')].reason
               name: Reason
               type: string
-          name: v1alpha1
+          name: v1beta1
           schema:
             openAPIV3Schema:
                 properties:
@@ -777,6 +469,8 @@ spec:
                         type: object
                     spec:
                         properties:
+                            connection:
+                                type: string
                             countFrom:
                                 type: string
                             displayName:
@@ -788,38 +482,39 @@ spec:
                                     type: string
                                 maxProperties: 1000
                                 type: object
-                            measurement:
-                                type: string
                             metric:
                                 type: string
                             observationPoint:
                                 type: string
-                            scrapeIntervalSeconds:
-                                format: int64
-                                type: integer
+                            scrapeInterval:
+                                maxLength: 32
+                                nullable: true
+                                pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                type: string
                             service:
                                 type: string
-                            source:
+                            step:
+                                maxLength: 32
+                                nullable: true
+                                pattern: ^([0-9]+(d|h|m|s|ms))+$
                                 type: string
-                            stepSeconds:
-                                format: int64
-                                type: integer
                             successLabels:
                                 additionalProperties:
                                     type: string
                                 maxProperties: 1000
                                 type: object
-                            thresholdSeconds:
+                            threshold:
+                                maxLength: 32
                                 nullable: true
-                                type: number
+                                pattern: ^([0-9]+(d|h|m|s|ms))+$
+                                type: string
+                            type:
+                                type: string
                         required:
                             - displayName
                             - service
-                            - source
-                            - measurement
+                            - type
                             - metric
-                            - labels
-                            - stepSeconds
                             - observationPoint
                         type: object
                     status:

@@ -119,7 +119,7 @@ func (a *API) path(kind string) string {
 	if kind == "PrometheusRule" {
 		return "/apis/monitoring.coreos.com/v1/namespaces/" + url.PathEscape(a.Namespace) + "/prometheusrules"
 	}
-	return "/apis/nines.dev/v1alpha1/namespaces/" + url.PathEscape(a.Namespace) + "/" + Plurals[kind]
+	return "/apis/" + Versions[kind] + "/namespaces/" + url.PathEscape(a.Namespace) + "/" + Plurals[kind]
 }
 func (a *API) Get(ctx context.Context, kind, name string) (k.Resource, error) {
 	var r k.Resource
