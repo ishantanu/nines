@@ -17,6 +17,7 @@ The release goal is one reproducible path from a clean clone to a working local 
 - [ ] Verify clean install/demo, persistent container startup, auth configuration, source queries, reviewed rule deployment and restore on the candidate.
 - [ ] Enable branch protections, secret scanning and private vulnerability reporting; confirm maintainer contact.
 - [ ] Review candidate assets, checksums, dependency inventory and release notes, then explicitly publish the prerelease.
+- [ ] List every new deprecation and removal under **Deprecations** in the release notes, matching the [compatibility policy](compatibility.md) table; the notes script refuses notes without that section.
 - The [local verification record](verification.md) records completed checks and limitations.
   - These checkboxes track implemented release preparation, not GitHub execution results. The public source repository is `ishantanu/nines`.
   - The manual candidate workflow never creates tags or releases.

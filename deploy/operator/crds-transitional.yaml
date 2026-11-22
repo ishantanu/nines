@@ -303,6 +303,8 @@ spec:
             - jsonPath: .status.conditions[?(@.type=='Ready')].reason
               name: Reason
               type: string
+          deprecated: true
+          deprecationWarning: nines.dev/v1alpha1 ServiceLevelObjective, CriticalUserJourney, MeasurementBinding and ServiceDependencyMap documents are deprecated and may be removed in v2.0.0 or later; write nines.dev/v1beta1; nines export prints any stored definition in it
           name: v1alpha1
           schema:
             openAPIV3Schema:
@@ -1031,6 +1033,8 @@ spec:
             - jsonPath: .status.conditions[?(@.type=='Ready')].reason
               name: Reason
               type: string
+          deprecated: true
+          deprecationWarning: nines.dev/v1alpha1 ServiceLevelObjective, CriticalUserJourney, MeasurementBinding and ServiceDependencyMap documents are deprecated and may be removed in v2.0.0 or later; write nines.dev/v1beta1; nines export prints any stored definition in it
           name: v1alpha1
           schema:
             openAPIV3Schema:
@@ -1247,6 +1251,8 @@ spec:
             - jsonPath: .status.conditions[?(@.type=='Ready')].reason
               name: Reason
               type: string
+          deprecated: true
+          deprecationWarning: nines.dev/v1alpha1 ServiceLevelObjective, CriticalUserJourney, MeasurementBinding and ServiceDependencyMap documents are deprecated and may be removed in v2.0.0 or later; write nines.dev/v1beta1; nines export prints any stored definition in it
           name: v1alpha1
           schema:
             openAPIV3Schema:

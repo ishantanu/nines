@@ -84,7 +84,7 @@ Each workflow operation has version, digest and authorization requirements. See 
 
 The [contract source](https://github.com/ishantanu/nines/blob/main/api/openapi/v1alpha1.yaml) is versioned separately from the YAML resource API version `nines.dev/v1alpha1`. Existing HTTP routes are not URL-versioned. The specification documents the bearer-token integration profile; browser sessions have separate CSRF requirements. Read the spec's path list rather than assuming it covers every server endpoint. Some response and manifest objects deliberately remain open until their full schemas are specified; server validation remains authoritative.
 
-Contract tests check documented routes, references and key request and response fields against the server's Go types. Expand the specification and those tests together when adding coverage or changing a documented contract. A future stable release needs a published compatibility and deprecation policy and complete schema/endpoint coverage.
+Contract tests check documented routes, references and key request and response fields against the server's Go types. Expand the specification and those tests together when adding coverage or changing a documented contract. The [compatibility and deprecation policy](compatibility.md) states what may change between releases; deprecated inputs return an HTTP `Warning: 299` header. A stable release also needs complete schema and endpoint coverage.
 
 ## Native provider SLOs
 

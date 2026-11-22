@@ -9,6 +9,7 @@ import (
 
 	v1alpha1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/api/v1beta1"
+	"github.com/ishantanu/nines/internal/deprecation"
 
 	"gopkg.in/yaml.v3"
 )
@@ -160,7 +161,10 @@ func ParseDefinition(body []byte) (Definition, error) {
 }
 
 // V1alpha1Deprecation is reported whenever a v1alpha1 definition is read.
-const V1alpha1Deprecation = "nines.dev/v1alpha1 is deprecated; write nines.dev/v1beta1 (nines export prints any stored definition in it)"
+var V1alpha1Deprecation = func() string {
+	d, _ := deprecation.Get(deprecation.ResourceV1alpha1)
+	return d.Message()
+}()
 
 func parseV1alpha1(body []byte, kind string) (Definition, error) {
 	switch kind {

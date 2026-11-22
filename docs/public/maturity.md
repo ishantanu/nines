@@ -6,11 +6,11 @@ Each Nines capability has one maturity level. The level is a compatibility promi
 
 | Level        | Promise                                                                                                                                                                   |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Stable       | Covered by the compatibility and deprecation policy. Definitions, API fields, CLI flags and behavior change only through announced deprecation.                           |
+| Stable       | Covered by the [compatibility and deprecation policy](compatibility.md). Definitions, API fields, CLI flags and behavior change only through announced deprecation.                           |
 | Beta         | Feature complete and tested end to end. From the first beta release, breaking changes go through deprecation; these features become stable with the first stable release. |
 | Experimental | Opt-in and may change or be removed in any release without deprecation. Use it to evaluate, not to depend on.                                                             |
 
-Nines has not had a stable release, so no capability is stable yet. The beta features below form the stable core: they become stable together with the first stable release, under the [compatibility and deprecation policy](https://github.com/ishantanu/nines/issues/70).
+Nines has not had a stable release, so no capability is stable yet. The beta features below form the stable core: they become stable together with the first stable release, under the [compatibility and deprecation policy](compatibility.md).
 
 ## The stable core (beta)
 

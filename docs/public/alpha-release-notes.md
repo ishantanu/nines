@@ -29,6 +29,10 @@ An early-access release of the self-hosted SLO and critical user journey platfor
 - Git delivery is off unless a tenant configures `gitOps` with a credential environment variable. Nothing changes for existing tenants.
 - Review current CRDs and the operator deployment guide before replacing a Kubernetes controller. Recorded rule output is revision-scoped; retained older series do not establish current-definition evaluation.
 
+## Deprecations
+
+None in this release. Deprecations are announced here, warned about where they are used, and listed in the [compatibility and deprecation policy](compatibility.md).
+
 ## Experimental boundaries
 
 - Git delivery and Sloth/Pyrra migration are new in this alpha. The GitHub and GitLab adapters are tested against in-memory fakes of their APIs, not live services, and the importers are checked against the projects' published examples, not every real-world file. Review each proposal and each converted definition before relying on it. Converted alert thresholds are standard burn-rate policies, not a copy of your current alerts.

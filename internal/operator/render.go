@@ -15,6 +15,7 @@ import (
 	k "github.com/ishantanu/nines/api/kubernetes/v1alpha1"
 	domain "github.com/ishantanu/nines/api/v1alpha1"
 	beta "github.com/ishantanu/nines/api/v1beta1"
+	"github.com/ishantanu/nines/internal/deprecation"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
@@ -261,13 +262,13 @@ func schemaFor(t reflect.Type) map[string]any {
 var Versions = map[string]string{domain.SLOKind: beta.APIVersion, domain.JourneyKind: beta.APIVersion, domain.BindingKind: beta.APIVersion, domain.IntentKind: domain.APIVersion}
 
 // CRDs are the custom resource definitions to install.
-func CRDs() []any { return crds(false) }
+func CRDs() []any { return crds(false, deprecation.ForCRDVersion) }
 
 // TransitionalCRDs also serve the v1alpha1 schema, not stored, for
 // `nines operator migrate` to read objects stored before v1beta1.
-func TransitionalCRDs() []any { return crds(true) }
+func TransitionalCRDs() []any { return crds(true, deprecation.ForCRDVersion) }
 
-func crds(transitional bool) []any {
+func crds(transitional bool, deprecated func(crd, version string) (deprecation.Deprecation, bool)) []any {
 	kinds := []struct {
 		Kind      string
 		Spec, Old any
@@ -285,10 +286,16 @@ func crds(transitional bool) []any {
 		case domain.SLOKind:
 			specSchema["x-kubernetes-validations"] = []any{map[string]string{"rule": "[has(self.measurement), has(self.queries), has(self.binding)].filter(x, x).size() <= 1", "message": "use at most one of measurement, queries or binding"}}
 		}
-		versions := []any{version(Versions[item.Kind], specSchema, true)}
+		versions := []map[string]any{version(Versions[item.Kind], specSchema, true)}
 		if transitional && item.Old != nil {
 			old := schemaFor(reflect.TypeOf(item.Old))
 			versions = append(versions, version(domain.APIVersion, old, false))
+		}
+		for _, v := range versions {
+			if d, ok := deprecated(Plurals[item.Kind]+".nines.dev", v["name"].(string)); ok {
+				v["deprecated"] = true
+				v["deprecationWarning"] = d.Message()
+			}
 		}
 		out = append(out, map[string]any{"apiVersion": "apiextensions.k8s.io/v1", "kind": "CustomResourceDefinition", "metadata": map[string]string{"name": Plurals[item.Kind] + ".nines.dev"}, "spec": map[string]any{"group": "nines.dev", "scope": "Namespaced", "names": map[string]any{"kind": item.Kind, "plural": Plurals[item.Kind], "singular": strings.ToLower(item.Kind), "shortNames": []string{item.Short}}, "versions": versions}})
 	}

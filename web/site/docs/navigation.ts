@@ -134,6 +134,11 @@ export const docGroups: DocGroup[] = [
         "Review references, archive retained evidence and verify owned-rule cleanup before deletion.",
       ),
       page(
+        "compatibility",
+        "Compatibility and deprecation",
+        "What you can rely on across releases, what counts as breaking, and how deprecations are announced and warned about.",
+      ),
+      page(
         "resource-format",
         "Resource format (v1beta1)",
         "Write SLOs, journeys, bindings and maps as v1beta1 YAML, with standard defaults and the changes from v1alpha1.",

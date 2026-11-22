@@ -18,7 +18,7 @@ func (a *Server) journeyPlan(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	j, err := a.parseJourney(r, req.Manifest)
+	j, err := a.parseJourney(w, r, req.Manifest)
 	if err != nil {
 		a.fail(w, r, err)
 		return
@@ -40,7 +40,7 @@ func (a *Server) journeyApply(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, model.Invalid("expectedRevision is required: use 0 to create or the current revision to update"))
 		return
 	}
-	j, err := a.parseJourney(r, req.Manifest)
+	j, err := a.parseJourney(w, r, req.Manifest)
 	if err != nil {
 		a.fail(w, r, err)
 		return
@@ -151,8 +151,9 @@ func (a *Server) sloJourneys(w http.ResponseWriter, r *http.Request) {
 
 // parseJourney reads a v1alpha1 or v1beta1 journey, resolving v1beta1 link
 // dimensions from the tenant's SLOs.
-func (a *Server) parseJourney(r *http.Request, manifest string) (model.Journey, error) {
+func (a *Server) parseJourney(w http.ResponseWriter, r *http.Request, manifest string) (model.Journey, error) {
 	d, err := model.ParseDefinition([]byte(manifest))
+	warnDeprecated(w, d)
 	if err != nil {
 		return model.Journey{}, err
 	}

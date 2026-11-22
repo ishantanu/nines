@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ishantanu/nines/internal/deprecation"
 	"github.com/ishantanu/nines/internal/model"
 )
 
@@ -23,7 +24,17 @@ func definitionBody(w http.ResponseWriter, r *http.Request) (model.Definition, e
 	if err != nil {
 		return model.Definition{}, model.Invalid("manifest exceeds size limit or cannot be read")
 	}
-	return model.ParseDefinition(b)
+	d, err := model.ParseDefinition(b)
+	warnDeprecated(w, d)
+	return d, err
+}
+
+// warnDeprecated adds a Warning header when the request used a deprecated
+// resource version, so every HTTP client can surface it.
+func warnDeprecated(w http.ResponseWriter, d model.Definition) {
+	if d.SourceAPIVersion == model.APIVersion && (d.SLO != nil || d.Journey != nil || d.Binding != nil || d.DependencyMap != nil) {
+		deprecation.Warn(w, deprecation.ResourceV1alpha1)
+	}
 }
 func (a *Server) definitionValidate(w http.ResponseWriter, r *http.Request) {
 	d, err := definitionBody(w, r)
