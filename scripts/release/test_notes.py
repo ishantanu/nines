@@ -36,6 +36,16 @@ class ReleaseNotesLinkTests(unittest.TestCase):
         ]:
             self.assertEqual(notes.rewrite(text), text)
 
+    def test_notes_must_state_deprecations(self):
+        notes.check((ROOT / "docs/public/alpha-release-notes.md").read_text())
+        for text in [
+            "# v1\n\n## Changes\n\nStuff.\n",
+            "# v1\n\n## Deprecations\n\n## Downloads\n",
+            "# v1\n\n## Deprecations\n\nNone.\n",
+        ]:
+            with self.assertRaises(ValueError):
+                notes.check(text)
+
     def test_links_leaving_the_docs_are_refused(self):
         with self.assertRaises(ValueError):
             notes.rewrite("[readme](../../README.md)")

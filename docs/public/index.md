@@ -31,6 +31,7 @@ docker compose -p nines-playground -f compose.playground.yaml up --build -d
 - **Choose what an SLO counts**: [SLO types](slo-types.md), including which providers support each
 - **Define what successful requests look like**: [SLOs and measurements](measurements.md)
 - **Write resource YAML and its defaults**: [Resource format (v1beta1)](resource-format.md)
+- **Know what can change between releases**: [Compatibility and deprecation policy](compatibility.md)
 - **Set a latency objective and understand its ratios**: [Latency SLOs](latency-slos.md)
 - **Discover Kubernetes links and edit service maps**: [Service dependencies](service-dependencies.md)
 - **Connect reliability to a user outcome**: [Critical user journeys](critical-user-journeys.md)

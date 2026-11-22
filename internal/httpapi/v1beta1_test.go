@@ -80,7 +80,7 @@ func TestManifestsExportV1beta1AndPlansReportDefaults(t *testing.T) {
 
 	// Planning the v1alpha1 form says it is deprecated.
 	old := call("POST", "/api/resources/plan", legacy.Body.String(), "application/yaml")
-	if !strings.Contains(old.Body.String(), "nines.dev/v1alpha1 is deprecated") {
-		t.Fatal(old.Body.String())
+	if !strings.Contains(old.Body.String(), model.V1alpha1Deprecation) || len(old.Header().Values("Warning")) != 1 {
+		t.Fatal(old.Body.String(), old.Header())
 	}
 }

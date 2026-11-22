@@ -34,13 +34,24 @@ def rewrite(text: str, site: str = SITE) -> str:
     return LINK.sub(lambda m: f"]({page_url(m.group(1), m.group(2), site)})", text)
 
 
+def check(text: str) -> None:
+    """Every release states its deprecations, even when there are none."""
+    section = re.search(r"^## Deprecations\n(.*?)(?=^## |\Z)", text, re.S | re.M)
+    if not section or not section.group(1).strip():
+        raise ValueError("release notes need a non-empty '## Deprecations' section")
+    if "compatibility.md" not in section.group(1):
+        raise ValueError("the Deprecations section must link the compatibility policy")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source")
     parser.add_argument("--site", default=SITE)
     args = parser.parse_args()
     with open(args.source, encoding="utf-8") as f:
-        sys.stdout.write(rewrite(f.read(), args.site))
+        text = f.read()
+    check(text)
+    sys.stdout.write(rewrite(text, args.site))
     return 0
 
 

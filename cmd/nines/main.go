@@ -159,6 +159,7 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			warnDefinition(definition)
 			original = body
 		}
 		if definition.Manifest() != nil && definition.SLO == nil {

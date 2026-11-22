@@ -229,3 +229,26 @@ func TestMigrationJobUsesTheOperatorImage(t *testing.T) {
 		t.Fatal("migrate.yaml and operator.yaml use different images")
 	}
 }
+
+// Deprecated CRD versions are marked so the API server warns kubectl users.
+func TestDeprecatedCRDVersionsAreMarked(t *testing.T) {
+	check := func(crds []any, want int) {
+		t.Helper()
+		marked := 0
+		for _, crd := range crds {
+			for _, v := range crd.(map[string]any)["spec"].(map[string]any)["versions"].([]map[string]any) {
+				if v["deprecated"] == true {
+					marked++
+					if v["name"] != "v1alpha1" || v["deprecationWarning"] != model.V1alpha1Deprecation {
+						t.Fatal("unexpected deprecation", v["name"], v["deprecationWarning"])
+					}
+				}
+			}
+		}
+		if marked != want {
+			t.Fatalf("%d deprecated versions, want %d", marked, want)
+		}
+	}
+	check(CRDs(), 0)
+	check(TransitionalCRDs(), 3)
+}

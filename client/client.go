@@ -26,6 +26,9 @@ type Config struct {
 	Token  string
 	// HTTPClient optionally supplies a transport. Redirects are always blocked.
 	HTTPClient *http.Client
+	// OnWarning, when set, receives each warning the server sends, such as
+	// the use of a deprecated resource version. See the compatibility policy.
+	OnWarning func(message string)
 }
 type Client struct {
 	origin, tenant, token string
@@ -84,6 +87,9 @@ func New(c Config) (*Client, error) {
 		}
 	}
 	h.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	if c.OnWarning != nil {
+		h.Transport = WarningTransport(h.Transport, c.OnWarning)
+	}
 	return &Client{origin: strings.TrimRight(c.URL, "/"), tenant: c.Tenant, token: c.Token, http: &h, customTimeout: c.HTTPClient != nil && c.HTTPClient.Timeout > 0}, nil
 }
 func (c *Client) Validate(ctx context.Context, r v1.Resource) (Validation, error) {
