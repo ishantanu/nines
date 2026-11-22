@@ -307,6 +307,7 @@ Releases after `v0.1.0-alpha.4` serve SLO, journey and binding resources as `nin
    kubectl -n team-commerce scale deployment/nines-operator --replicas=1
    ```
 
+- If `kubectl` then reports `the server could not find the requested resource`, its cached API discovery still lists v1alpha1; run `kubectl api-resources --cached=false >/dev/null` or wait about ten minutes.
 - Kubernetes refuses the final CRDs until the migration has run, so the stored v1alpha1 data cannot be lost by skipping a step.
 - After the upgrade, a v1alpha1 SLO, journey or binding manifest is rejected by the API server instead of being read with missing fields.
 - In Kubernetes, SLOs are self-contained: an SLO compiled from a binding holds the binding's queries or window, and an SLO compiled from an intent is linked to it by its owner reference rather than a copy of the intent.

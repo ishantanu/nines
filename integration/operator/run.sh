@@ -48,6 +48,8 @@ done
 # kubectl wait fails at once, instead of waiting, while a new CRD has no
 # status conditions yet, so retry until every CRD reports Established.
 wait_crds() {
+  # CRD versions change in the upgrade; drop kubectl's cached discovery.
+  docker exec "$server" sh -c 'rm -rf "$HOME/.kube/cache"' >/dev/null 2>&1 || true
   for _ in $(seq 1 60); do
     if docker exec "$server" kubectl wait --for=condition=Established --timeout=5s crd --all >/dev/null 2>&1; then return 0; fi
     sleep 1
@@ -97,7 +99,7 @@ docker build --quiet --tag "$name-runtime-image" "$work/image" > "$work/image-id
 # CRDs, the shipped migration RBAC and entrypoint, then the final CRDs.
 docker exec -i "$server" kubectl apply -f - < "$root/integration/operator/testdata/crds-v1alpha1.yaml" >/dev/null
 wait_crds
-docker exec "$server" kubectl create namespace team-commerce >/dev/null
+docker exec "$server" sh -c 'kubectl create namespace team-commerce --dry-run=client -o yaml | kubectl apply -f -' >/dev/null
 docker exec -i "$server" kubectl apply -f - < "$root/integration/operator/testdata/compiled-v1alpha1.yaml" >/dev/null
 if docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/crds.yaml" >/dev/null 2>&1; then
   echo 'Final CRDs were accepted over stored v1alpha1 resources'; exit 1
@@ -119,10 +121,11 @@ migrate() {
 }
 migrate > "$work/migrate.log"
 grep -q '"name":"checkout-availability"' "$work/migrate.log" || { echo 'Migration did not log the original resources'; exit 1; }
-migrate | grep -q 'already migrated' || { echo 'Second migration was not a no-op'; exit 1; }
+migrate > "$work/migrate-again.log"
+grep -q 'already migrated' "$work/migrate-again.log" || { echo 'Second migration was not a no-op'; exit 1; }
 docker exec -i "$server" kubectl apply -f - < "$root/deploy/operator/crds.yaml" >/dev/null
 wait_crds
-docker exec "$server" kubectl -n team-commerce get slo checkout-availability -o json > "$work/migrated.json"
+docker exec "$server" kubectl -n team-commerce get servicelevelobjectives.v1beta1.nines.dev checkout-availability -o json > "$work/migrated.json"
 python3 - "$work/migrated.json" <<'CHECK'
 import json, sys
 r = json.load(open(sys.argv[1]))
@@ -133,7 +136,7 @@ assert spec["queries"]["window"]["good"].startswith("checkout_attempts_total"), 
 assert [p["name"] for p in spec["policies"]] == ["fast-burn", "sustained-burn"], spec
 assert not any(k.endswith("Seconds") for k in spec), spec
 CHECK
-docker exec "$server" kubectl -n team-commerce get cuj purchase -o jsonpath='{.spec.slos[0].dimension}' | grep -qx availability
+docker exec "$server" kubectl -n team-commerce get criticaluserjourneys.v1beta1.nines.dev purchase -o jsonpath='{.spec.slos[0].dimension}' | grep -qx availability
 docker exec "$server" kubectl -n team-commerce delete slo,cuj --all >/dev/null
 python3 -c 'import sys; print("---".join(d for d in open(sys.argv[1]).read().split("---") if "kind: Job" not in d))' \
   "$root/deploy/operator/migrate.yaml" | docker exec -i "$server" kubectl delete -f - >/dev/null
