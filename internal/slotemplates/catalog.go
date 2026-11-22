@@ -3,8 +3,6 @@
 package slotemplates
 
 import (
-	"gopkg.in/yaml.v3"
-
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 )
@@ -110,7 +108,7 @@ func renderTemplate(t v1.SLOTemplate, values v1.TemplateValues) (v1.SLOTemplateD
 	if err = model.SLODefinition(d).Validate(); err != nil {
 		return v1.SLOTemplateDraft{}, err
 	}
-	body, err := yaml.Marshal(d)
+	body, err := model.SLOYAML(d)
 	if err != nil {
 		return v1.SLOTemplateDraft{}, err
 	}
