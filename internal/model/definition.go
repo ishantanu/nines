@@ -46,6 +46,13 @@ func (d SLODefinition) Validate() error {
 	return d.SLO().Validate()
 }
 func ParseSLODefinition(body []byte) (SLODefinition, error) {
+	if isV1beta1(body) {
+		def, err := ParseDefinition(body)
+		if def.SLO == nil {
+			return SLODefinition{}, firstError(err, Invalid("expected kind %s", SLOKind))
+		}
+		return *def.SLO, err
+	}
 	var d SLODefinition
 	if err := decodeDefinition(body, &d); err != nil {
 		return d, err
@@ -146,7 +153,17 @@ func ParseDefinition(body []byte) (Definition, error) {
 	if header.APIVersion != APIVersion {
 		return Definition{}, Invalid("unsupported apiVersion %q; expected %s or %s", header.APIVersion, v1beta1.APIVersion, APIVersion)
 	}
-	switch header.Kind {
+	d, err := parseV1alpha1(body, header.Kind)
+	d.SourceAPIVersion = APIVersion
+	d.Notes = append(d.Notes, V1alpha1Deprecation)
+	return d, err
+}
+
+// V1alpha1Deprecation is reported whenever a v1alpha1 definition is read.
+const V1alpha1Deprecation = "nines.dev/v1alpha1 is deprecated; write nines.dev/v1beta1 (nines export prints any stored definition in it)"
+
+func parseV1alpha1(body []byte, kind string) (Definition, error) {
+	switch kind {
 	case v1alpha1.BindingKind:
 		var b MeasurementBinding
 		if err := decodeDefinition(body, &b); err != nil {
@@ -166,7 +183,7 @@ func ParseDefinition(body []byte) (Definition, error) {
 		j, err := ParseJourney(body)
 		return Definition{Journey: &j}, err
 	default:
-		return Definition{}, Invalid("unsupported kind %q", header.Kind)
+		return Definition{}, Invalid("unsupported kind %q", kind)
 	}
 }
 
@@ -226,4 +243,21 @@ func parseV1beta1(body []byte, kind string) (Definition, error) {
 	default:
 		return out, Invalid("unsupported kind %q", kind)
 	}
+}
+
+// isV1beta1 reports whether a manifest declares nines.dev/v1beta1.
+func isV1beta1(body []byte) bool {
+	var header struct {
+		APIVersion string `yaml:"apiVersion"`
+	}
+	return yaml.Unmarshal(body, &header) == nil && header.APIVersion == v1beta1.APIVersion
+}
+
+func firstError(errs ...error) error {
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

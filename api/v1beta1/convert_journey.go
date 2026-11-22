@@ -10,21 +10,21 @@ import (
 // SLOLookup returns a linked SLO's stored spec, or false when it is unknown.
 type SLOLookup func(id string) (v1alpha1.SLOSpec, bool)
 
-// Dimension is the journey dimension an SLO measures, from its type.
-func Dimension(s v1alpha1.SLOSpec) string {
-	kind := ""
-	if s.Measurement != nil {
-		kind = s.Measurement.Type
+// Dimension is the journey dimension an SLO measures. typed is false when the
+// SLO has no measurement type (custom queries or a binding), so its dimension
+// is only a default and any explicit dimension is accepted.
+func Dimension(s v1alpha1.SLOSpec) (dimension string, typed bool) {
+	if s.Measurement == nil {
+		return "availability", false
 	}
-	switch kind {
+	switch s.Measurement.Type {
 	case "latency", "freshness":
-		return "latency"
+		return "latency", true
 	case "correctness", "durability", "coverage":
-		return "correctness"
+		return "correctness", true
 	default:
-		// Availability, sessions, good-minute, throughput and custom queries
-		// all count good events or intervals.
-		return "availability"
+		// Availability and sessions count good events.
+		return "availability", true
 	}
 }
 
@@ -49,12 +49,13 @@ func (j CriticalUserJourney) ToHub(lookup SLOLookup) (v1alpha1.CriticalUserJourn
 		if lookup != nil {
 			spec, known = lookup(l.ID)
 		}
+		derived, typed := Dimension(spec)
 		switch {
 		case explicitOnly[l.Dimension]:
 		case known && l.Dimension == "":
-			link.Dimension = Dimension(spec)
-		case known && l.Dimension != Dimension(spec):
-			return v1alpha1.CriticalUserJourney{}, nil, fmt.Errorf("slos %s: dimension %s contradicts the SLO, which measures %s; omit dimension to use the SLO's", l.ID, l.Dimension, Dimension(spec))
+			link.Dimension = derived
+		case known && typed && l.Dimension != derived:
+			return v1alpha1.CriticalUserJourney{}, nil, fmt.Errorf("slos %s: dimension %s contradicts the SLO, which measures %s; omit dimension to use the SLO's", l.ID, l.Dimension, derived)
 		case l.Dimension == "":
 			link.Dimension = "availability"
 			notes = append(notes, fmt.Sprintf("slos %s: dimension assumed to be availability; the server sets it from the SLO's type", l.ID))
@@ -93,16 +94,18 @@ func (j CriticalUserJourney) ToHub(lookup SLOLookup) (v1alpha1.CriticalUserJourn
 }
 
 // JourneyFromHub converts a stored journey for export. A dimension equal to
-// its SLO's type is left out; any other dimension is kept, so a link that
-// disagrees with its SLO is visible rather than silently changed.
+// the one its SLO implies is left out; any other is kept, so nothing changes
+// meaning on the way through.
 func JourneyFromHub(h v1alpha1.CriticalUserJourney, lookup SLOLookup) CriticalUserJourney {
 	in := h.Spec
 	out := JourneySpec{DisplayName: in.DisplayName, Description: in.Description, Owner: in.Owner, Criticality: in.Criticality, Steps: in.Steps}
 	for _, l := range in.SLOs {
 		link := JourneySLO{ID: l.ID, Dimension: l.Dimension, Required: l.Required}
 		if lookup != nil {
-			if spec, ok := lookup(l.ID); ok && Dimension(spec) == l.Dimension {
-				link.Dimension = ""
+			if spec, ok := lookup(l.ID); ok {
+				if derived, _ := Dimension(spec); derived == l.Dimension {
+					link.Dimension = ""
+				}
 			}
 		}
 		out.SLOs = append(out.SLOs, link)

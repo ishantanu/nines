@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/ishantanu/nines/internal/model"
 )
 
@@ -20,7 +18,7 @@ func (a *Server) journeyPlan(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	j, err := model.ParseJourney([]byte(req.Manifest))
+	j, err := a.parseJourney(r, req.Manifest)
 	if err != nil {
 		a.fail(w, r, err)
 		return
@@ -42,7 +40,7 @@ func (a *Server) journeyApply(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, model.Invalid("expectedRevision is required: use 0 to create or the current revision to update"))
 		return
 	}
-	j, err := model.ParseJourney([]byte(req.Manifest))
+	j, err := a.parseJourney(r, req.Manifest)
 	if err != nil {
 		a.fail(w, r, err)
 		return
@@ -99,7 +97,8 @@ func (a *Server) journeyManifest(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	b, err := yaml.Marshal(x.Manifest)
+	journey := x.Manifest
+	b, err := a.Service.ExportYAML(r.Context(), model.Definition{Journey: &journey}, r.URL.Query().Get("apiVersion"))
 	if err != nil {
 		a.fail(w, r, err)
 		return
@@ -148,4 +147,20 @@ func (a *Server) sloJourneys(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	write(w, 200, out)
+}
+
+// parseJourney reads a v1alpha1 or v1beta1 journey, resolving v1beta1 link
+// dimensions from the tenant's SLOs.
+func (a *Server) parseJourney(r *http.Request, manifest string) (model.Journey, error) {
+	d, err := model.ParseDefinition([]byte(manifest))
+	if err != nil {
+		return model.Journey{}, err
+	}
+	if d.Journey == nil {
+		return model.Journey{}, model.Invalid("expected kind CriticalUserJourney")
+	}
+	if d, err = a.Service.ResolveJourney(r.Context(), d); err != nil {
+		return model.Journey{}, err
+	}
+	return *d.Journey, nil
 }

@@ -25,7 +25,17 @@ type JourneyRevision struct {
 
 // ParseJourney accepts one strict YAML or JSON document. KnownFields prevents
 // silently accepting misspelled contract fields. yaml.v3 rejects duplicate keys.
+// ParseJourney reads a v1alpha1 or v1beta1 journey. Offline, a v1beta1 link
+// without a dimension is assumed to be availability; servers resolve it from
+// the linked SLO through ParseDefinition and the service.
 func ParseJourney(body []byte) (Journey, error) {
+	if isV1beta1(body) {
+		def, err := ParseDefinition(body)
+		if def.Journey == nil {
+			return Journey{}, firstError(err, Invalid("expected kind CriticalUserJourney"))
+		}
+		return *def.Journey, err
+	}
 	var j Journey
 	if err := decodeDefinition(body, &j); err != nil {
 		return j, err

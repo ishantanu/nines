@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
@@ -86,7 +84,7 @@ func (a *Server) topologyList(w http.ResponseWriter, r *http.Request) {
 }
 func (a *Server) topologyRead(kind string, manifest bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		q, err := parseContextQuery(r, "revision")
+		q, err := parseContextQuery(r, "revision", "apiVersion")
 		if err != nil {
 			telemetryError(w, err)
 			return
@@ -111,12 +109,12 @@ func (a *Server) topologyRead(kind string, manifest bool) http.HandlerFunc {
 			write(w, 200, map[string]any{"apiVersion": v1.APIVersion, "tenant": a.Service.TenantID, "resource": out})
 			return
 		}
-		var d any
-		if err = json.Unmarshal(out.Manifest, &d); err != nil {
+		definition, err := model.ParseDefinition(out.Manifest)
+		if err != nil {
 			telemetryError(w, err)
 			return
 		}
-		b, err := yaml.Marshal(d)
+		b, err := a.Service.ExportYAML(ctx, definition, q["apiVersion"])
 		if err != nil {
 			telemetryError(w, err)
 			return

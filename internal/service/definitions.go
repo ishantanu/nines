@@ -5,7 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"gopkg.in/yaml.v3"
+
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/api/v1beta1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 )
@@ -25,13 +28,22 @@ type ResourcePlan struct {
 	Digest             string   `json:"digest"`
 	Manifest           any      `json:"manifest"`
 	Previous           any      `json:"previous,omitempty"`
+	// Notes report defaults applied while converting the definition and
+	// deprecations, so nothing is filled in silently.
+	Notes []string `json:"notes,omitempty"`
 }
 
 func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (ResourcePlan, error) {
-	d, err := s.resolveJourney(ctx, d)
+	d, err := s.ResolveJourney(ctx, d)
 	if err != nil {
 		return ResourcePlan{}, err
 	}
+	p, err := s.planDefinition(ctx, d)
+	p.Notes = d.Notes
+	return p, err
+}
+
+func (s *Service) planDefinition(ctx context.Context, d model.Definition) (ResourcePlan, error) {
 	if d.Binding != nil || d.DependencyMap != nil {
 		return s.planTopology(ctx, d)
 	}
@@ -121,7 +133,7 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	return p, nil
 }
 func (s *Service) ApplyDefinition(ctx context.Context, d model.Definition, expected int64) (ResourceRevision, error) {
-	d, err := s.resolveJourney(ctx, d)
+	d, err := s.ResolveJourney(ctx, d)
 	if err != nil {
 		return ResourceRevision{}, err
 	}
@@ -249,21 +261,14 @@ func MeasurementDigest(s model.SLO) string {
 	}{s.Measurement, s.ProviderWindow, s.MeasurementBinding, s.Service, sourceID(s.Source), s.GoodQuery, s.TotalQuery, language, s.StepSeconds})
 }
 
-// resolveJourney re-converts a v1beta1 journey with the tenant's SLOs, so an
+// ResolveJourney re-converts a v1beta1 journey with the tenant's SLOs, so an
 // omitted link dimension follows the linked SLO's type and a contradicting one
 // is refused. Offline parsing cannot see the SLOs and assumes availability.
-func (s *Service) resolveJourney(ctx context.Context, d model.Definition) (model.Definition, error) {
+func (s *Service) ResolveJourney(ctx context.Context, d model.Definition) (model.Definition, error) {
 	if d.BetaJourney == nil {
 		return d, nil
 	}
-	lookup := func(id string) (v1.SLOSpec, bool) {
-		r, err := s.Store.Read(ctx, id)
-		if err != nil {
-			return v1.SLOSpec{}, false
-		}
-		return model.DefinitionFromSLO(r.SLO).Spec, true
-	}
-	hub, notes, err := d.BetaJourney.ToHub(lookup)
+	hub, notes, err := d.BetaJourney.ToHub(s.sloLookup(ctx))
 	if err != nil {
 		return d, model.Invalid("%v", err)
 	}
@@ -273,4 +278,42 @@ func (s *Service) resolveJourney(ctx context.Context, d model.Definition) (model
 	}
 	d.Journey, d.Notes = &j, notes
 	return d, nil
+}
+
+// ExportYAML renders a stored definition in the requested apiVersion:
+// v1beta1 by default, or v1alpha1 while it remains supported. Digests and
+// revision checks always use the stored form, so the choice never changes
+// them.
+func (s *Service) ExportYAML(ctx context.Context, d model.Definition, apiVersion string) ([]byte, error) {
+	switch apiVersion {
+	case "", v1beta1.APIVersion:
+	case model.APIVersion:
+		return yaml.Marshal(d.Manifest())
+	default:
+		return nil, model.Invalid("unsupported apiVersion %q; use %s or %s", apiVersion, v1beta1.APIVersion, model.APIVersion)
+	}
+	var out any
+	switch {
+	case d.SLO != nil:
+		out = v1beta1.FromHub(v1.ServiceLevelObjective(*d.SLO))
+	case d.Journey != nil:
+		out = v1beta1.JourneyFromHub(v1.CriticalUserJourney(*d.Journey), s.sloLookup(ctx))
+	case d.Binding != nil:
+		out = v1beta1.BindingFromHub(v1.MeasurementBinding(*d.Binding))
+	case d.DependencyMap != nil:
+		out = v1beta1.DependencyMapFromHub(v1.ServiceDependencyMap(*d.DependencyMap))
+	default:
+		return nil, model.Invalid("resource definition is required")
+	}
+	return yaml.Marshal(out)
+}
+
+func (s *Service) sloLookup(ctx context.Context) v1beta1.SLOLookup {
+	return func(id string) (v1.SLOSpec, bool) {
+		r, err := s.Store.Read(ctx, id)
+		if err != nil {
+			return v1.SLOSpec{}, false
+		}
+		return model.DefinitionFromSLO(r.SLO).Spec, true
+	}
 }
