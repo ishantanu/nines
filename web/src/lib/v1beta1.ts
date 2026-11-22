@@ -490,3 +490,314 @@ export function sloFromBeta(beta: unknown): {
     notes,
   };
 }
+
+// --- journeys ----------------------------------------------------------------
+
+/** A linked SLO's measurement type: "" when it has none, undefined if unknown. */
+export type SLOTypeLookup = (id: string) => string | undefined;
+
+const explicitOnly = new Set(["cost", "safety"]);
+
+/** Mirror of Go Dimension: the journey dimension an SLO's type implies. */
+export function dimensionFor(measurementType: string): {
+  dimension: string;
+  typed: boolean;
+} {
+  if (!measurementType) return { dimension: "availability", typed: false };
+  if (["latency", "freshness"].includes(measurementType))
+    return { dimension: "latency", typed: true };
+  if (["correctness", "durability", "coverage"].includes(measurementType))
+    return { dimension: "correctness", typed: true };
+  return { dimension: "availability", typed: true };
+}
+
+/** Mirror of Go JourneyFromHub. */
+export function journeyToBeta(hub: Obj, lookup?: SLOTypeLookup): Obj {
+  const s = hub.spec as Obj;
+  const links = (s.slos as Obj[]).map((l) => {
+    let dimension = l.dimension as string;
+    const kind = lookup?.(String(l.id));
+    if (kind !== undefined && dimensionFor(kind).dimension === dimension)
+      dimension = "";
+    return omitEmpty({ id: l.id, dimension, required: l.required }, [
+      "dimension",
+      "required",
+    ]);
+  });
+  const spec: Obj = {
+    displayName: s.displayName,
+    description: s.description,
+    owner: s.owner,
+    criticality: s.criticality,
+    slos: links,
+    steps: s.steps,
+  };
+  const a = s.agentic as Obj | undefined;
+  if (a)
+    spec.agentic = omitEmpty(
+      {
+        successDefinition: a.successDefinition,
+        maxDuration:
+          num(a.maxDurationSeconds) > 0
+            ? seconds(num(a.maxDurationSeconds))
+            : undefined,
+        maxCostUSD: a.maxCostUSD,
+        maxSteps: a.maxSteps,
+        approvalRequired: a.approvalRequired,
+      },
+      ["maxSteps", "approvalRequired"],
+    );
+  const r = s.runObjective as Obj | undefined;
+  if (r)
+    spec.runObjective = {
+      target: r.target,
+      window: seconds(num(r.windowSeconds)),
+      minRuns: r.minRuns,
+    };
+  return {
+    apiVersion: V1BETA1,
+    kind: "CriticalUserJourney",
+    metadata: hub.metadata,
+    spec,
+  };
+}
+
+/** Mirror of Go CriticalUserJourney.ToHub. */
+export function journeyFromBeta(
+  beta: unknown,
+  lookup?: SLOTypeLookup,
+): { journey: Obj; notes: string[] } {
+  if (
+    !isObj(beta) ||
+    beta.apiVersion !== V1BETA1 ||
+    beta.kind !== "CriticalUserJourney" ||
+    !isObj(beta.spec)
+  )
+    throw Error(`expected apiVersion ${V1BETA1} and kind CriticalUserJourney`);
+  const s = beta.spec;
+  const notes: string[] = [];
+  const links = ((s.slos as Obj[] | undefined) ?? []).map((l) => {
+    let dimension = str(l.dimension);
+    const kind = lookup?.(String(l.id));
+    const known = kind !== undefined;
+    const { dimension: derived, typed } = dimensionFor(kind ?? "");
+    if (explicitOnly.has(dimension)) {
+      // kept
+    } else if (known && dimension === "") dimension = derived;
+    else if (known && typed && dimension !== derived)
+      throw Error(
+        `slos ${String(l.id)}: dimension ${dimension} contradicts the SLO, which measures ${derived}; omit dimension to use the SLO's`,
+      );
+    else if (dimension === "") {
+      dimension = "availability";
+      notes.push(
+        `slos ${String(l.id)}: dimension assumed to be availability; the server sets it from the SLO's type`,
+      );
+    }
+    return { id: l.id, dimension, required: l.required === true };
+  });
+  const linked = new Set(links.map((l) => String(l.id)));
+  for (const step of (s.steps as Obj[] | undefined) ?? [])
+    for (const ref of (step.sloRefs as string[] | undefined) ?? [])
+      if (!linked.has(ref))
+        throw Error(
+          `step ${String(step.id)} refers to SLO ${ref}, which is not in slos; link it there first`,
+        );
+  const spec: Obj = {
+    displayName: s.displayName,
+    description: s.description,
+    owner: s.owner,
+    criticality: s.criticality,
+    slos: links,
+    steps: s.steps,
+  };
+  if (isObj(s.agentic)) {
+    const a = s.agentic;
+    spec.agentic = omitEmpty(
+      {
+        successDefinition: a.successDefinition,
+        maxDurationSeconds:
+          a.maxDuration !== undefined
+            ? wholeSeconds(a.maxDuration, "agentic.maxDuration")
+            : undefined,
+        maxCostUSD: a.maxCostUSD,
+        maxSteps: a.maxSteps,
+        approvalRequired: a.approvalRequired === true,
+      },
+      ["maxDurationSeconds", "maxSteps"],
+    );
+  }
+  if (isObj(s.runObjective)) {
+    const r = s.runObjective;
+    spec.runObjective = {
+      target: r.target,
+      windowSeconds: wholeSeconds(r.window, "runObjective.window"),
+      minRuns: r.minRuns,
+    };
+  }
+  return {
+    journey: {
+      apiVersion: V1ALPHA1,
+      kind: "CriticalUserJourney",
+      metadata: beta.metadata,
+      spec,
+    },
+    notes,
+  };
+}
+
+// --- measurement bindings and dependency maps ---------------------------------
+
+/** Mirror of Go BindingFromHub. */
+export function bindingToBeta(hub: Obj): Obj {
+  const s = hub.spec as Obj;
+  return {
+    apiVersion: V1BETA1,
+    kind: "MeasurementBinding",
+    metadata: hub.metadata,
+    spec: omitEmpty(
+      {
+        displayName: s.displayName,
+        service: s.service,
+        connection: s.source === "primary" ? "" : s.source,
+        type: s.measurement,
+        metric: s.metric,
+        eventMetric: s.eventMetric,
+        labels: s.labels,
+        successLabels: s.successLabels,
+        countFrom: s.countFrom,
+        threshold:
+          typeof s.thresholdSeconds === "number"
+            ? formatDuration(s.thresholdSeconds * 1000)
+            : undefined,
+        scrapeInterval:
+          num(s.scrapeIntervalSeconds) > 0
+            ? seconds(num(s.scrapeIntervalSeconds))
+            : undefined,
+        step:
+          num(s.stepSeconds) > 0 && num(s.stepSeconds) !== DEFAULT_STEP_SECONDS
+            ? seconds(num(s.stepSeconds))
+            : undefined,
+        observationPoint: str(s.observationPoint),
+      },
+      ["connection", "eventMetric", "labels", "successLabels", "countFrom"],
+    ),
+  };
+}
+
+/** Mirror of Go MeasurementBinding.ToHub. */
+export function bindingFromBeta(beta: unknown): Obj {
+  if (
+    !isObj(beta) ||
+    beta.apiVersion !== V1BETA1 ||
+    beta.kind !== "MeasurementBinding" ||
+    !isObj(beta.spec)
+  )
+    throw Error(`expected apiVersion ${V1BETA1} and kind MeasurementBinding`);
+  const s = beta.spec;
+  return {
+    apiVersion: V1ALPHA1,
+    kind: "MeasurementBinding",
+    metadata: beta.metadata,
+    spec: omitEmpty(
+      {
+        scrapeIntervalSeconds:
+          s.scrapeInterval !== undefined
+            ? wholeSeconds(s.scrapeInterval, "scrapeInterval")
+            : undefined,
+        countFrom: s.countFrom,
+        displayName: s.displayName,
+        service: s.service,
+        source: str(s.connection) || "primary",
+        measurement: s.type,
+        metric: s.metric,
+        eventMetric: s.eventMetric,
+        labels: isObj(s.labels) ? s.labels : {},
+        successLabels: s.successLabels,
+        thresholdSeconds:
+          s.threshold !== undefined
+            ? parseDuration(s.threshold, "threshold") / 1000
+            : undefined,
+        stepSeconds: optionalSeconds(s.step, DEFAULT_STEP_SECONDS, "step"),
+        observationPoint: str(s.observationPoint),
+      },
+      ["scrapeIntervalSeconds", "countFrom", "eventMetric", "successLabels"],
+    ),
+  };
+}
+
+/** Mirror of Go DependencyMapFromHub. */
+export function dependencyMapToBeta(hub: Obj): Obj {
+  const s = hub.spec as Obj;
+  const spec: Obj = {
+    displayName: s.displayName,
+    services: s.services,
+    dependencies: s.dependencies,
+  };
+  const o = s.observed as Obj | undefined;
+  if (o)
+    spec.observed = omitEmpty(
+      {
+        connection: o.source === "primary" ? "" : o.source,
+        labels: o.labels,
+        window: seconds(num(o.windowSeconds)),
+        scrapeInterval:
+          num(o.scrapeIntervalSeconds) > 0
+            ? seconds(num(o.scrapeIntervalSeconds))
+            : undefined,
+        maxSampleAge:
+          num(o.maxSampleAgeSeconds) > 0
+            ? seconds(num(o.maxSampleAgeSeconds))
+            : undefined,
+      },
+      ["connection", "labels"],
+    );
+  return {
+    apiVersion: V1BETA1,
+    kind: "ServiceDependencyMap",
+    metadata: hub.metadata,
+    spec,
+  };
+}
+
+/** Mirror of Go ServiceDependencyMap.ToHub. */
+export function dependencyMapFromBeta(beta: unknown): Obj {
+  if (
+    !isObj(beta) ||
+    beta.apiVersion !== V1BETA1 ||
+    beta.kind !== "ServiceDependencyMap" ||
+    !isObj(beta.spec)
+  )
+    throw Error(`expected apiVersion ${V1BETA1} and kind ServiceDependencyMap`);
+  const s = beta.spec;
+  const spec: Obj = {
+    displayName: s.displayName,
+    services: s.services,
+    dependencies: s.dependencies,
+  };
+  if (isObj(s.observed)) {
+    const o = s.observed;
+    spec.observed = omitEmpty(
+      {
+        scrapeIntervalSeconds:
+          o.scrapeInterval !== undefined
+            ? wholeSeconds(o.scrapeInterval, "observed.scrapeInterval")
+            : undefined,
+        maxSampleAgeSeconds:
+          o.maxSampleAge !== undefined
+            ? wholeSeconds(o.maxSampleAge, "observed.maxSampleAge")
+            : undefined,
+        source: str(o.connection) || "primary",
+        labels: isObj(o.labels) ? o.labels : {},
+        windowSeconds: wholeSeconds(o.window, "observed.window"),
+      },
+      ["scrapeIntervalSeconds", "maxSampleAgeSeconds"],
+    );
+  }
+  return {
+    apiVersion: V1ALPHA1,
+    kind: "ServiceDependencyMap",
+    metadata: beta.metadata,
+    spec,
+  };
+}
