@@ -150,8 +150,10 @@ for version in $versions; do
       exit 1
     fi
   done
-  recorded=$(psql -d "$database" -c "SELECT count(*) FROM nines_schema_migrations WHERE component='store'")
-  [ "$recorded" = 1 ] || { echo "$version: store migrations recorded $recorded times"; exit 1; }
+  # Every store migration this release knows is recorded exactly once.
+  expected=$(grep -c '^store ' "$root/internal/schema/released.txt")
+  recorded=$(psql -d "$database" -c "SELECT count(*) || ' ' || count(DISTINCT id) FROM nines_schema_migrations WHERE component='store'")
+  [ "$recorded" = "$expected $expected" ] || { echo "$version: store migrations recorded (total, distinct) $recorded, want $expected each"; exit 1; }
   results="$results\"$version\": $after, "
 done
 printf '{"status": "passed", "os": "%s", "arch": "%s", "upgraded": {%s}}\n' "$os" "$arch" "${results%, }"
