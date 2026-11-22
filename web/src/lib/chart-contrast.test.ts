@@ -88,3 +88,25 @@ for (const theme of [":root", ".dark"]) {
     ).toBeGreaterThanOrEqual(4.5);
   });
 }
+
+// Amber notices in dark mode use Astryx warning tokens (index.css). The
+// muted fill is translucent, so blend it over the card before measuring.
+test("dark amber notices meet WCAG AA contrast", () => {
+  expect(css).toContain('.dark [class~="bg-amber-50"]');
+  const tokens = resolveThemeTokens(ninesTheme, { mode: "dark" });
+  const rgba = (name: string) => {
+    const hex = tokens[name].replace("#", "");
+    const alpha = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) / 255 : 1;
+    return {
+      rgb: [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)),
+      alpha,
+    };
+  };
+  const card = rgba("--color-background-card").rgb;
+  const fill = rgba("--color-warning-muted");
+  const blended = card.map((c, i) =>
+    Math.round(fill.rgb[i] * fill.alpha + c * (1 - fill.alpha)),
+  );
+  const text = rgba("--color-text-warning").rgb;
+  expect(contrast(text, blended)).toBeGreaterThanOrEqual(4.5);
+});
