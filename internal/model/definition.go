@@ -8,6 +8,7 @@ import (
 	"io"
 
 	v1alpha1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/api/v1beta1"
 
 	"gopkg.in/yaml.v3"
 )
@@ -81,6 +82,13 @@ type Definition struct {
 	Journey       *Journey
 	Binding       *MeasurementBinding
 	DependencyMap *ServiceDependencyMap
+	// SourceAPIVersion is the apiVersion the definition was written in.
+	SourceAPIVersion string
+	// Notes describe defaults applied while converting a v1beta1 definition.
+	Notes []string
+	// BetaJourney keeps a v1beta1 journey so the server can derive omitted
+	// link dimensions from the linked SLOs, which offline parsing cannot see.
+	BetaJourney *v1beta1.CriticalUserJourney
 }
 
 func (d Definition) Manifest() any {
@@ -132,8 +140,11 @@ func ParseDefinition(body []byte) (Definition, error) {
 	if err := decodeDefinition(body, &header); err != nil {
 		return Definition{}, err
 	}
+	if header.APIVersion == v1beta1.APIVersion {
+		return parseV1beta1(body, header.Kind)
+	}
 	if header.APIVersion != APIVersion {
-		return Definition{}, Invalid("unsupported apiVersion %q; expected %s", header.APIVersion, APIVersion)
+		return Definition{}, Invalid("unsupported apiVersion %q; expected %s or %s", header.APIVersion, v1beta1.APIVersion, APIVersion)
 	}
 	switch header.Kind {
 	case v1alpha1.BindingKind:
@@ -156,5 +167,63 @@ func ParseDefinition(body []byte) (Definition, error) {
 		return Definition{Journey: &j}, err
 	default:
 		return Definition{}, Invalid("unsupported kind %q", header.Kind)
+	}
+}
+
+// parseV1beta1 decodes a v1beta1 definition, converts it to the stored form
+// and validates it exactly as a v1alpha1 definition is validated.
+func parseV1beta1(body []byte, kind string) (Definition, error) {
+	out := Definition{SourceAPIVersion: v1beta1.APIVersion}
+	switch kind {
+	case v1beta1.SLOKind:
+		var in v1beta1.ServiceLevelObjective
+		if err := decodeDefinition(body, &in); err != nil {
+			return out, err
+		}
+		hub, notes, err := in.ToHub()
+		if err != nil {
+			return out, Invalid("%v", err)
+		}
+		d := SLODefinition(hub)
+		out.SLO, out.Notes = &d, notes
+		return out, d.Validate()
+	case v1beta1.JourneyKind:
+		var in v1beta1.CriticalUserJourney
+		if err := decodeDefinition(body, &in); err != nil {
+			return out, err
+		}
+		hub, notes, err := in.ToHub(nil)
+		if err != nil {
+			return out, Invalid("%v", err)
+		}
+		j := Journey(hub)
+		out.Journey, out.Notes, out.BetaJourney = &j, notes, &in
+		return out, j.Validate()
+	case v1beta1.BindingKind:
+		var in v1beta1.MeasurementBinding
+		if err := decodeDefinition(body, &in); err != nil {
+			return out, err
+		}
+		hub, err := in.ToHub()
+		if err != nil {
+			return out, Invalid("%v", err)
+		}
+		b := MeasurementBinding(hub)
+		out.Binding = &b
+		return out, b.Validate()
+	case v1beta1.DependencyMapKind:
+		var in v1beta1.ServiceDependencyMap
+		if err := decodeDefinition(body, &in); err != nil {
+			return out, err
+		}
+		hub, err := in.ToHub()
+		if err != nil {
+			return out, Invalid("%v", err)
+		}
+		g := ServiceDependencyMap(hub)
+		out.DependencyMap = &g
+		return out, g.Validate()
+	default:
+		return out, Invalid("unsupported kind %q", kind)
 	}
 }

@@ -28,6 +28,10 @@ type ResourcePlan struct {
 }
 
 func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (ResourcePlan, error) {
+	d, err := s.resolveJourney(ctx, d)
+	if err != nil {
+		return ResourcePlan{}, err
+	}
 	if d.Binding != nil || d.DependencyMap != nil {
 		return s.planTopology(ctx, d)
 	}
@@ -117,6 +121,10 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	return p, nil
 }
 func (s *Service) ApplyDefinition(ctx context.Context, d model.Definition, expected int64) (ResourceRevision, error) {
+	d, err := s.resolveJourney(ctx, d)
+	if err != nil {
+		return ResourceRevision{}, err
+	}
 	if d.SLO != nil {
 		s.DefinitionMu.Lock()
 		defer s.DefinitionMu.Unlock()
@@ -239,4 +247,30 @@ func MeasurementDigest(s model.SLO) string {
 		Service, Source, Good, Total, Language string
 		Step                                   int64
 	}{s.Measurement, s.ProviderWindow, s.MeasurementBinding, s.Service, sourceID(s.Source), s.GoodQuery, s.TotalQuery, language, s.StepSeconds})
+}
+
+// resolveJourney re-converts a v1beta1 journey with the tenant's SLOs, so an
+// omitted link dimension follows the linked SLO's type and a contradicting one
+// is refused. Offline parsing cannot see the SLOs and assumes availability.
+func (s *Service) resolveJourney(ctx context.Context, d model.Definition) (model.Definition, error) {
+	if d.BetaJourney == nil {
+		return d, nil
+	}
+	lookup := func(id string) (v1.SLOSpec, bool) {
+		r, err := s.Store.Read(ctx, id)
+		if err != nil {
+			return v1.SLOSpec{}, false
+		}
+		return model.DefinitionFromSLO(r.SLO).Spec, true
+	}
+	hub, notes, err := d.BetaJourney.ToHub(lookup)
+	if err != nil {
+		return d, model.Invalid("%v", err)
+	}
+	j := model.Journey(hub)
+	if err = j.Validate(); err != nil {
+		return d, err
+	}
+	d.Journey, d.Notes = &j, notes
+	return d, nil
 }
