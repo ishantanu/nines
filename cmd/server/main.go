@@ -119,6 +119,7 @@ func run(log *slog.Logger) error {
 	for _, runtime := range runtimes {
 		workspace := runtime.Workspace
 		workspace.Features = gates
+		workspace.Service.IncidentsEnabled = gates.Enabled("incidents")
 		if sharedTemplates != nil {
 			if workspace.Templates != nil {
 				return fmt.Errorf("configure shared or tenant-local extension locks, not both")

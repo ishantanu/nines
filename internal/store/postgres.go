@@ -18,11 +18,15 @@ import (
 //go:embed migrations/0001_alpha_baseline.sql
 var alphaBaseline string
 
+//go:embed migrations/0002_incidents.sql
+var incidentsTable string
+
 // Migrations is the SLO store's schema history, applied in order and recorded
 // per tenant schema. Never edit or remove a released migration: append a new
 // one. TestReleasedMigrationsAreUnchanged enforces this.
 var Migrations = []schema.Migration{
 	{ID: 1, Name: "alpha baseline", SQL: alphaBaseline},
+	{ID: 2, Name: "incidents", SQL: incidentsTable},
 }
 
 type Postgres struct{ pool postgresDB }

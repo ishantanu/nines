@@ -98,6 +98,7 @@ var routes = []struct{ prefix, id string }{
 	{"/api/intent-conversations", "create-from-goal"},
 	{"/api/intent-context", "create-from-goal"},
 	{"/api/investigations", "reliability-reviews"},
+	{"/api/incidents", "incidents"},
 	{"/api/review-skills", "reliability-reviews"},
 	{"/api/workflows", "workflows"},
 	{"/api/visual-evaluations", "agent-evidence"},
