@@ -18,25 +18,9 @@ import (
 // server-owned, and "primary" is the default connection.
 func normalize(h v1alpha1.ServiceLevelObjective) v1alpha1.ServiceLevelObjective {
 	s := &h.Spec
-	if len(s.Policies) == 0 && s.Policy != nil {
-		p := *s.Policy
-		if p.Name == "" {
-			p.Name = "burn"
-		}
-		if p.Severity == "" {
-			p.Severity = "critical"
-		}
-		s.Policies = []v1alpha1.BurnRatePolicy{p}
-	}
-	s.Policy, s.Intent = nil, nil
+	s.Intent = nil
 	if s.Measurement != nil || s.MeasurementBinding != nil {
 		s.ProviderWindow = nil
-	}
-	if s.Source == "primary" {
-		s.Source = ""
-	}
-	if s.Policies == nil {
-		s.Policies = []v1alpha1.BurnRatePolicy{}
 	}
 	return h
 }

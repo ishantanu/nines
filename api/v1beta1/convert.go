@@ -169,7 +169,12 @@ func (s ServiceLevelObjective) ToHub() (v1alpha1.ServiceLevelObjective, []string
 			}
 			out.Policies = append(out.Policies, hp)
 		}
-		if len(out.Policies) == 0 {
+		// A lone unnamed policy is the legacy single policy; keep it so,
+		// so a definition round-trips exactly.
+		switch {
+		case len(out.Policies) == 1 && out.Policies[0].Name == "":
+			out.Policy, out.Policies = &out.Policies[0], nil
+		case len(out.Policies) == 0:
 			notes = append(notes, "alerting is off: policies is an empty list")
 		}
 	}
@@ -183,9 +188,6 @@ func (s ServiceLevelObjective) ToHub() (v1alpha1.ServiceLevelObjective, []string
 func FromHub(h v1alpha1.ServiceLevelObjective) ServiceLevelObjective {
 	in := h.Spec
 	out := SLOSpec{DisplayName: in.DisplayName, Service: in.Service, Target: in.Target, Window: dur(in.WindowSeconds), Step: dur(in.StepSeconds), Connection: in.Source, Labels: in.Labels, Lifecycle: in.Lifecycle, ErrorBudgetPolicy: in.ErrorBudgetPolicy, Customers: in.Customers}
-	if out.Connection == "primary" {
-		out.Connection = ""
-	}
 	switch {
 	case in.Measurement != nil:
 		m := in.Measurement
@@ -233,12 +235,6 @@ func FromHub(h v1alpha1.ServiceLevelObjective) ServiceLevelObjective {
 		if p.MinCoverage != 1 {
 			c := p.MinCoverage
 			bp.MinCoverage = &c
-		}
-		if bp.Name == "" {
-			bp.Name = "burn"
-		}
-		if bp.Severity == "" {
-			bp.Severity = "critical"
 		}
 		policies = append(policies, bp)
 	}

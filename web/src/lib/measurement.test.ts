@@ -1,3 +1,4 @@
+import { V1BETA1, sloFromBeta, sloToBeta } from "./v1beta1";
 import { afterEach, expect, test, vi } from "vitest";
 import { parse } from "yaml";
 import { createTenantSession } from "./api";
@@ -137,7 +138,8 @@ test("measurement preview checks telemetry then plans with the pinned revision a
     policies,
   });
   const plan = fetcher.mock.calls[1][1] as RequestInit;
-  expect(parse(plan.body as string)).toEqual(manifest);
+  // Plans are sent as v1beta1; read back, they are the same SLO.
+  expect(parse(plan.body as string)).toEqual(sloToBeta(manifest));
   for (const [, options] of fetcher.mock.calls) {
     expect(new Headers(options.headers).get("X-Nines-Tenant")).toBe("alpha");
   }
@@ -240,9 +242,10 @@ test("inline preview verifies and plans a single SLO without writing a binding",
     "/api/resources/plan",
   ]);
   for (const [, request] of fetcher.mock.calls) {
-    expect(parse(request.body).spec.measurement).toEqual(
-      inline.spec.measurement,
-    );
+    const body = parse(request.body);
+    const stored =
+      body.apiVersion === V1BETA1 ? sloFromBeta(body).definition : body;
+    expect(stored.spec.measurement).toEqual(inline.spec.measurement);
     expect(new Headers(request.headers).get("X-Nines-Tenant")).toBe("alpha");
   }
 });

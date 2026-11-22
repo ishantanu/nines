@@ -111,8 +111,9 @@ type Intervals struct {
 }
 
 type BurnRatePolicy struct {
-	Name        string    `json:"name" yaml:"name"`
-	Severity    string    `json:"severity" yaml:"severity"`
+	// Name and severity are required when there is more than one policy.
+	Name        string    `json:"name,omitempty" yaml:"name,omitempty"`
+	Severity    string    `json:"severity,omitempty" yaml:"severity,omitempty"`
 	ShortWindow Duration  `json:"shortWindow" yaml:"shortWindow"`
 	LongWindow  Duration  `json:"longWindow" yaml:"longWindow"`
 	BurnRate    float64   `json:"burnRate" yaml:"burnRate"`

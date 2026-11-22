@@ -68,8 +68,7 @@ func TestCLIInitDurationsRuleGenerationAndReadCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err := model.ParseSLODefinition(definition.Bytes())
-	// init writes v1beta1, where policies is always a list.
-	if err != nil || d.Spec.WindowSeconds != 28*86400 || len(d.Spec.Policies) != 1 || d.Spec.Policies[0].ForSeconds != 120 || d.Spec.Source != "production" {
+	if err != nil || d.Spec.WindowSeconds != 28*86400 || d.Spec.Policy == nil || d.Spec.Policy.ForSeconds != 120 || d.Spec.Source != "production" {
 		t.Fatal(d, err)
 	}
 	file := filepath.Join(t.TempDir(), "slo.yaml")
@@ -152,7 +151,7 @@ func TestOfflineLifecycleAndTrafficGuardCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err := model.ParseSLODefinition(out.Bytes())
-	if err != nil || d.Spec.Lifecycle != "experimental" || len(d.Spec.Policies) != 1 || d.Spec.Policies[0].MinEvents != 100 {
+	if err != nil || d.Spec.Lifecycle != "experimental" || d.Spec.Policy == nil || d.Spec.Policy.MinEvents != 100 {
 		t.Fatal(out.String(), err)
 	}
 	out.Reset()

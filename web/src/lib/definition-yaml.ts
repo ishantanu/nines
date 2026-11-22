@@ -1,4 +1,6 @@
 import { stringify } from "yaml";
+import type { SLODefinition } from "./definitions";
+import { sloToBeta } from "./v1beta1";
 
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -10,7 +12,15 @@ const format = (seconds: number) =>
       : `${seconds}s`;
 
 // Runtime API objects retain seconds; declarative YAML uses readable durations.
+// Stored SLO definitions are shown as nines.dev/v1beta1, the form users write.
 export function stringifyDefinition(value: unknown): string {
+  if (
+    object(value) &&
+    value.apiVersion === "nines.dev/v1alpha1" &&
+    value.kind === "ServiceLevelObjective" &&
+    object(value.spec)
+  )
+    return stringify(sloToBeta(value as unknown as SLODefinition));
   return stringify(value, (_key, item: unknown) => {
     if (!object(item) || typeof item.burnRate !== "number") return item;
     const entries = Object.entries(item).map(([key, value]) => {

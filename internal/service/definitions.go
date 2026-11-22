@@ -38,6 +38,7 @@ func (s *Service) PlanDefinition(ctx context.Context, d model.Definition) (Resou
 	if err != nil {
 		return ResourcePlan{}, err
 	}
+	d = s.keepProvenance(ctx, d)
 	p, err := s.planDefinition(ctx, d)
 	p.Notes = d.Notes
 	return p, err
@@ -137,6 +138,7 @@ func (s *Service) ApplyDefinition(ctx context.Context, d model.Definition, expec
 	if err != nil {
 		return ResourceRevision{}, err
 	}
+	d = s.keepProvenance(ctx, d)
 	if d.SLO != nil {
 		s.DefinitionMu.Lock()
 		defer s.DefinitionMu.Unlock()
@@ -316,4 +318,22 @@ func (s *Service) sloLookup(ctx context.Context) v1beta1.SLOLookup {
 		}
 		return model.DefinitionFromSLO(r.SLO).Spec, true
 	}
+}
+
+// keepProvenance carries an SLO's server-owned provenance (spec.intent, set
+// when it was created from a goal) into a v1beta1 update, which cannot
+// express it. Without this, editing such an SLO as v1beta1 would erase how it
+// was made, including its recorded exclusions.
+func (s *Service) keepProvenance(ctx context.Context, d model.Definition) model.Definition {
+	if d.SLO == nil || d.SourceAPIVersion != v1beta1.APIVersion || d.SLO.Spec.Intent != nil {
+		return d
+	}
+	r, err := s.Store.Read(ctx, d.SLO.Metadata.Name)
+	if err != nil || r.SLO.Intent == nil {
+		return d
+	}
+	slo := *d.SLO
+	slo.Spec.Intent = r.SLO.Intent
+	d.SLO = &slo
+	return d
 }
