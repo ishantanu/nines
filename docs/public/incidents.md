@@ -40,9 +40,12 @@ Nines checks after every evaluation, so incidents catch up after a restart or a 
 
 ## Impact
 
-For each affected SLO, the impact is the bad events from the incident's start to its resolution (or now), divided by the error budget the SLO's window allowed at that moment. These are the same quantities the SLO's status uses.
+For each affected SLO, the impact is the bad events from when users started to be affected until the incident's resolution (or now), divided by the error budget the SLO's window allowed at that moment. These are the same quantities the SLO's status uses.
 
-The impact is computed when you read the incident, never stored. It is **unknown**, with the reason given, when:
+- **When impact started.** A burn alert fires after its windows and pending time have passed, so users are affected before it fires. Nines walks back from the alert through consecutive intervals that burned budget faster than the SLO allows, up to the alert's long window, and reports where that run began. A gap in the data stops the walk, so the start is never earlier than the evidence shows.
+- **Missing data.** When some intervals during the incident have no data, the observed bad events are reported as a floor ("at least"), because the missing intervals can only add more. The budget consumed stays unknown: the missing traffic would also have changed the budget.
+
+The impact is computed when you read the incident, never stored. The budget consumed is **unknown**, with the reason given, when:
 
 - any interval during the incident has no data;
 - the SLO's window had no traffic, so it allowed no budget;
@@ -67,6 +70,10 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "X-Nines-Tenant: $TENANT" \
   -d '{"state":"mitigated","expectedRevision":1,"note":"Rolled back."}' \
   "$NINES_URL/api/incidents/INCIDENT_ID/transition"
 ```
+
+## Review an incident
+
+A [reliability review](architecture.md) can be scoped to an incident. It pins the incident revision it started from, and each evidence capture saves the incident record as it is at that moment, with its timeline and impact, under a digest. The review keeps them even as the incident moves on.
 
 ## Coming next
 

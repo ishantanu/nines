@@ -22,14 +22,25 @@ type IncidentView struct {
 // BudgetConsumedFraction is nil, with Reason, whenever it cannot be known:
 // missing data stays unknown, never zero.
 type IncidentImpact struct {
-	SLOID                  string    `json:"sloId"`
-	From                   time.Time `json:"from"`
-	To                     time.Time `json:"to"`
-	BadEvents              *float64  `json:"badEvents"`
-	BudgetConsumedFraction *float64  `json:"budgetConsumedFraction"`
-	Coverage               float64   `json:"coverage"`
-	Reason                 string    `json:"reason,omitempty"`
+	SLOID string `json:"sloId"`
+	// ImpactStartedAt is when users started to be affected: the start of the
+	// run of intervals burning budget faster than the SLO allows that led to
+	// the alert. It is usually before the alert fired.
+	ImpactStartedAt *time.Time `json:"impactStartedAt,omitempty"`
+	From            time.Time  `json:"from"`
+	To              time.Time  `json:"to"`
+	BadEvents       *float64   `json:"badEvents"`
+	// BadEventsAtLeast marks BadEvents as a lower bound: some intervals have
+	// no data, and they can only add bad events.
+	BadEventsAtLeast       bool     `json:"badEventsAtLeast,omitempty"`
+	BudgetConsumedFraction *float64 `json:"budgetConsumedFraction"`
+	Coverage               float64  `json:"coverage"`
+	Reason                 string   `json:"reason,omitempty"`
 }
+
+// incidentNow is the clock for incident records, in whole seconds like the
+// rest of Nines' timestamps.
+func (s *Service) incidentNow() time.Time { return s.Now().UTC().Truncate(time.Second) }
 
 func (s *Service) incidents() (store.IncidentStore, error) {
 	st, ok := s.Store.(store.IncidentStore)
@@ -126,7 +137,7 @@ func (s *Service) ReconcileIncidents(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	now := s.Now().UTC()
+	now := s.incidentNow()
 	return st.UpdateIncidents(ctx, func(open []model.Incident) ([]model.Incident, error) {
 		for _, i := range open {
 			if !i.HasSLO(id) {
@@ -201,7 +212,7 @@ func (s *Service) DeclareIncident(ctx context.Context, actor, title string, sloI
 	if actor == "" || len(sloIDs) > 50 {
 		return model.Incident{}, model.Invalid("declare an incident as a known person, for at most 50 SLOs")
 	}
-	now := s.Now().UTC()
+	now := s.incidentNow()
 	i := model.Incident{ID: model.NewID(), Revision: 1, Title: title, Source: "manual", State: model.IncidentDetected, DeclaredBy: actor, OpenedAt: now, SLOs: []model.IncidentSLO{}, Journeys: []model.IncidentJourney{}}
 	for _, id := range sloIDs {
 		if i.HasSLO(id) {
@@ -241,7 +252,7 @@ func (s *Service) TransitionIncident(ctx context.Context, id string, expected in
 			if i.Revision != expected {
 				return nil, model.ErrRevisionConflict
 			}
-			if err := i.Transition(state, actor, note, s.Now().UTC()); err != nil {
+			if err := i.Transition(state, actor, note, s.incidentNow()); err != nil {
 				return nil, err
 			}
 			i.Revision++
@@ -295,7 +306,7 @@ func (s *Service) ListIncidents(ctx context.Context, limit int) ([]IncidentView,
 }
 
 func (s *Service) incidentView(ctx context.Context, i model.Incident) IncidentView {
-	end := s.Now().UTC()
+	end := s.incidentNow()
 	if i.ResolvedAt != nil {
 		end = *i.ResolvedAt
 	}
@@ -327,6 +338,12 @@ func (s *Service) incidentImpact(ctx context.Context, entry model.IncidentSLO, f
 	step := time.Duration(r.SLO.StepSeconds) * time.Second
 	at := to.Truncate(step)
 	start := from.Truncate(step)
+	if began := impactStart(r, entry); began != nil {
+		out.ImpactStartedAt = began
+		if began.Before(start) {
+			start = *began
+		}
+	}
 	span := int64(at.Sub(start) / time.Second)
 	if span < r.SLO.StepSeconds {
 		span = r.SLO.StepSeconds
@@ -334,11 +351,17 @@ func (s *Service) incidentImpact(ctx context.Context, entry model.IncidentSLO, f
 	incident := engine.Evaluate(r.SLO, r.Points, at, span)
 	window := engine.Evaluate(r.SLO, r.Points, at, r.SLO.WindowSeconds)
 	out.From, out.To, out.Coverage = incident.From, incident.At, incident.Coverage
+	bad := incident.Bad
 	if incident.ObservedIntervals < incident.ExpectedIntervals {
+		// Missing intervals can only add bad events, so the observed count is
+		// a floor. The budget fraction is not: missing traffic also shrinks
+		// the budget, so it stays unknown.
+		if incident.ObservedIntervals > 0 {
+			out.BadEvents, out.BadEventsAtLeast = &bad, true
+		}
 		out.Reason = fmt.Sprintf("%d of %d intervals during the incident have no data", incident.ExpectedIntervals-incident.ObservedIntervals, incident.ExpectedIntervals)
 		return out
 	}
-	bad := incident.Bad
 	out.BadEvents = &bad
 	if window.BudgetAllowed == nil || *window.BudgetAllowed <= 0 {
 		out.Reason = "the SLO's window had no traffic, so it allowed no error budget"
@@ -357,4 +380,47 @@ func (s *Service) incidentAfterEvaluation(ctx context.Context, id string) {
 		return
 	}
 	_ = s.ReconcileIncidents(ctx, id)
+}
+
+// impactStart walks back from when the critical alert fired through
+// consecutive intervals whose error ratio exceeded the SLO's allowance,
+// at most the alert's long window. A gap in the data stops the walk, so the
+// start is never earlier than the evidence shows.
+func impactStart(r model.Record, entry model.IncidentSLO) *time.Time {
+	if entry.FiringSince == nil || r.SLO.StepSeconds <= 0 {
+		return nil
+	}
+	lookback := int64(0)
+	for _, p := range r.SLO.AlertPolicies() {
+		if p.Name == entry.Policy && p.LongWindowSeconds > lookback {
+			lookback = p.LongWindowSeconds
+		}
+	}
+	if lookback == 0 {
+		return nil
+	}
+	allowed := 1 - r.SLO.Target
+	step := r.SLO.StepSeconds
+	end := entry.FiringSince.Unix() - entry.FiringSince.Unix()%step
+	var earliest int64
+	for t := end; t > end-lookback; t -= step {
+		p, ok := r.Points[t]
+		if !ok || p.Total <= 0 {
+			break
+		}
+		good, total := p.Good, p.Total
+		if r.SLO.BadInterval != nil {
+			good, total = model.ClassifyInterval(good, total, *r.SLO.BadInterval)
+		}
+		if total <= 0 || (total-good)/total <= allowed {
+			break
+		}
+		earliest = t
+	}
+	if earliest == 0 {
+		return nil
+	}
+	// A point at t covers the interval ending at t.
+	began := time.Unix(earliest-step, 0).UTC()
+	return &began
 }

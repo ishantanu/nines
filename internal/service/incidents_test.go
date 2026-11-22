@@ -270,8 +270,60 @@ func TestIncidentImpactMatchesStatusArithmetic(t *testing.T) {
 		t.Fatal(err)
 	}
 	v, _ = f.svc.Incident(context.Background(), declared.ID)
-	if v.Impact[0].BudgetConsumedFraction != nil || v.Impact[0].Reason != "1 of 10 intervals during the incident have no data" {
-		t.Fatalf("%+v", v.Impact[0])
+	// Bad events become a floor (missing minutes can only add more); the
+	// budget fraction stays unknown because missing traffic shrinks the
+	// budget too.
+	if got := v.Impact[0]; got.BudgetConsumedFraction != nil || got.Reason != "1 of 10 intervals during the incident have no data" || !got.BadEventsAtLeast || got.BadEvents == nil || *got.BadEvents != 180 {
+		t.Fatalf("%+v", got)
+	}
+}
+
+// Impact starts when the bad intervals that led to the alert began, not when
+// the alert fired, and timestamps are whole seconds.
+func TestIncidentImpactStartsBeforeTheAlert(t *testing.T) {
+	f := newIncidentFixture(t)
+	f.now = f.now.Add(123456789 * time.Nanosecond)
+	f.slo("checkout")
+	start := f.now.Truncate(time.Minute).Add(-time.Hour)
+	var points []model.Point
+	for m := 1; m <= 60; m++ {
+		good := 1000.0
+		if m > 45 {
+			good = 950 // 5% errors: well over the 1% the SLO allows.
+		}
+		points = append(points, model.Point{Time: start.Add(time.Duration(m) * time.Minute), Good: good, Total: 1000})
+	}
+	if err := f.svc.Ingest(context.Background(), "checkout", points); err != nil {
+		t.Fatal(err)
+	}
+	fired := start.Add(52 * time.Minute)
+	if err := f.svc.Store.Update(context.Background(), "checkout", func(r *model.Record) error {
+		r.Alert.Policies = map[string]model.AlertState{"fast-burn": {Phase: "firing", Severity: "critical", FiringSince: &fired}}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.ReconcileIncidents(context.Background(), "checkout"); err != nil {
+		t.Fatal(err)
+	}
+	v := f.incidents()[0]
+	got := v.Impact[0]
+	// Minutes 46-52 burned before the alert; minute 45 was healthy.
+	if got.ImpactStartedAt == nil || !got.ImpactStartedAt.Equal(start.Add(45*time.Minute)) || !got.From.Equal(start.Add(45*time.Minute)) {
+		t.Fatalf("impact start %v from %v", got.ImpactStartedAt, got.From)
+	}
+	if got.BadEvents == nil || *got.BadEvents != 15*50 {
+		t.Fatalf("bad events %v", got.BadEvents)
+	}
+	f.alert("checkout", "fast-burn", false)
+	v = f.incidents()[0]
+	for _, e := range v.Timeline {
+		if e.Time.Nanosecond() != 0 {
+			t.Fatal("timeline time has sub-second precision", e.Time)
+		}
+	}
+	if v.SLOs[0].ClearedAt == nil || v.SLOs[0].ClearedAt.Nanosecond() != 0 {
+		t.Fatal("cleared time has sub-second precision")
 	}
 }
 

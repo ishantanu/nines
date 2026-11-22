@@ -244,3 +244,50 @@ func TestScopePaginationAndEntryLimits(t *testing.T) {
 		t.Fatal("failed update mutated stored state", string(b))
 	}
 }
+
+// A review can be written about an incident. It pins the incident revision it
+// started from; each capture snapshots the incident as it is then, timeline
+// and impact included.
+func TestReviewScopedToAnIncident(t *testing.T) {
+	s, ctx, _ := fixture(t, false)
+	scope := func(revision int64) v1.CreateInvestigation {
+		in := input()
+		in.Scope = v1.InvestigationScope{Kind: v1.IncidentScope, ResourceID: "", ExpectedRevision: revision, At: in.Scope.At}
+		return in
+	}
+	in := scope(1)
+	in.Scope.ResourceID = "missing-incident"
+	if _, err := s.Create(ctx, in); err == nil {
+		t.Fatal("review created with the incidents feature off")
+	}
+	s.Platform.IncidentsEnabled = true
+	if _, err := s.Create(ctx, in); err == nil {
+		t.Fatal("review created for a missing incident")
+	}
+	declared, err := s.Platform.DeclareIncident(ctx, "ana", "Checkout errors", []string{"checkout"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in = scope(2)
+	in.Scope.ResourceID = declared.ID
+	if _, err = s.Create(ctx, in); err == nil {
+		t.Fatal("review accepted a revision the incident has not reached")
+	}
+	in = scope(1)
+	in.Scope.ResourceID = declared.ID
+	v, err := s.Create(ctx, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = s.Platform.TransitionIncident(ctx, declared.ID, 1, model.IncidentMitigated, "ana", "Rolled back."); err != nil {
+		t.Fatal(err)
+	}
+	v, err = s.Capture(ctx, v.ID, v1.CaptureInvestigationEvidence{ID: "evidence-1", ExpectedVersion: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	snapshot := string(v.Entries[0].Evidence.Context)
+	if !strings.Contains(snapshot, `"state":"mitigated"`) || !strings.Contains(snapshot, `"impact":[`) || !strings.Contains(snapshot, "Rolled back.") {
+		t.Fatal("capture is not the current incident record", snapshot)
+	}
+}

@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+// IncidentScope is the scope kind of a review written about an incident.
+const IncidentScope = "Incident"
+
 // Investigation is operational state, independent of declarative SLO/CUJ schemas.
 // The scope is immutable; evidence captures never revise resource definitions.
 type InvestigationScope struct {
