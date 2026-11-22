@@ -8,6 +8,10 @@ func cloneAlertPolicies(source map[string]model.AlertState) map[string]model.Ale
 	}
 	out := make(map[string]model.AlertState, len(source))
 	for id, state := range source {
+		if state.FiringSince != nil {
+			at := *state.FiringSince
+			state.FiringSince = &at
+		}
 		if state.PendingSince != nil {
 			at := *state.PendingSince
 			state.PendingSince = &at

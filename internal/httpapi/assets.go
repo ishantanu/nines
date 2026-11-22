@@ -93,7 +93,7 @@ func portalPath(path string) bool {
 		return false
 	}
 	switch parts[3] {
-	case "slos", "critical-user-journeys", "agent-evidence", "reviews", "investigations", "intents", "replays":
+	case "slos", "critical-user-journeys", "agent-evidence", "reviews", "investigations", "incidents", "intents", "replays":
 		return true
 	case "audit", "home", "service-dependencies", "measurements", "alerts", "workflows", "telemetry-connections", "data-sources", "access-control", "clients":
 		return !detail

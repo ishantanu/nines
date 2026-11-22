@@ -77,6 +77,7 @@ func Catalog() []Feature {
 		// Experimental.
 		{ID: "create-from-goal", Name: "Create from a goal", Level: Experimental, Docs: "intents", Page: "intents", Remaining: "Freeze the intent schema and pass real-provider acceptance for model drafting (#34).", Gated: true},
 		{ID: "reliability-reviews", Name: "Reliability reviews", Level: Experimental, Docs: "architecture", Page: "investigations", Remaining: "Settle the review schema and its link to incidents and postmortems.", Gated: true},
+		{ID: "incidents", Name: "Incident records", Level: Experimental, Docs: "incidents", Page: "incidents", Remaining: "Portal pages, postmortems and links to incident tools (#86-#90), and acceptance with a real incident workflow.", Gated: true},
 		{ID: "workflows", Name: "Workflows and webhooks", Level: Experimental, Docs: "workflow-webhooks", Page: "workflows", Remaining: "Freeze the workflow event contract and accept it with a real webhook consumer.", Gated: true},
 		{ID: "agent-evidence", Name: "Agent evidence and visual evaluations", Level: Experimental, Docs: "visual-evaluations", Page: "agents", Remaining: "Freeze the run evidence schema and accept it with real agent workloads.", Gated: true},
 		{ID: "session-replay", Name: "Session replay", Level: Experimental, Docs: "session-replay", Page: "replays", Remaining: "Browser and platform compatibility, a masking and privacy review, and offline-player acceptance.", Gated: true},

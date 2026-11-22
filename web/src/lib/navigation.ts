@@ -6,6 +6,7 @@ export const pagePaths = {
   objectives: "slos",
   journeys: "critical-user-journeys",
   investigations: "reviews",
+  incidents: "incidents",
   intents: "intents",
   replays: "replays",
   maps: "service-dependencies",
@@ -37,6 +38,7 @@ const detailPages: Page[] = [
   "journeys",
   "agents",
   "investigations",
+  "incidents",
   "intents",
   "replays",
 ];

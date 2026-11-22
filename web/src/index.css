@@ -301,6 +301,18 @@
 .dark [class~="border-slate-200"] {
   border-color: var(--border);
 }
+/* Amber notices (warnings, coverage gaps, refused actions) use Astryx's
+   warning tokens in dark mode, so their text stays readable. */
+.dark [class~="bg-amber-50"] {
+  background-color: var(--color-warning-muted);
+}
+.dark [class~="border-amber-200"] {
+  border-color: var(--color-border-warning);
+}
+.dark [class~="text-amber-800"],
+.dark [class~="text-amber-900"] {
+  color: var(--color-text-warning);
+}
 .dark [class~="hover:bg-slate-50"]:hover,
 .dark [class~="hover:bg-slate-100"]:hover {
   background-color: var(--secondary);

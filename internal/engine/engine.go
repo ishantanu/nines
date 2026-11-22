@@ -106,6 +106,7 @@ func advanceWith(s model.SLO, previous model.AlertState, at time.Time, evaluate 
 	if !breach {
 		next.Phase = "inactive"
 		next.PendingSince = nil
+		next.FiringSince = nil
 		if previous.Phase == "firing" {
 			return next, event(s, "resolved", at, *short.BurnRate, *long.BurnRate)
 		}
@@ -122,6 +123,7 @@ func advanceWith(s model.SLO, previous model.AlertState, at time.Time, evaluate 
 	if at.Sub(*next.PendingSince) >= time.Duration(p.ForSeconds)*time.Second {
 		next.Phase = "firing"
 		next.PendingSince = nil
+		next.FiringSince = &at
 		return next, event(s, "firing", at, *short.BurnRate, *long.BurnRate)
 	}
 	return next, nil

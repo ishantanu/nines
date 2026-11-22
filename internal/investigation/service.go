@@ -100,8 +100,22 @@ func (s *Service) context(ctx context.Context, scope v1.InvestigationScope) (jso
 			return nil, err
 		}
 		value = v
+	case v1.IncidentScope:
+		// Incidents keep moving after a review starts, so a capture snapshots
+		// the record as it is then, at or after the revision reviewed.
+		if !s.Platform.IncidentsEnabled {
+			return nil, model.Invalid("incident reviews need the incidents feature")
+		}
+		v, err := s.Platform.Incident(ctx, scope.ResourceID)
+		if err != nil {
+			return nil, err
+		}
+		if v.Revision < scope.ExpectedRevision {
+			return nil, model.Invalid("the incident has not reached the reviewed revision")
+		}
+		value = v
 	default:
-		return nil, model.Invalid("scope kind must be ServiceLevelObjective or CriticalUserJourney")
+		return nil, model.Invalid("scope kind must be ServiceLevelObjective, CriticalUserJourney or Incident")
 	}
 	b, err := json.Marshal(value)
 	if err != nil {

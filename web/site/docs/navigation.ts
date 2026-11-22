@@ -129,6 +129,11 @@ export const docGroups: DocGroup[] = [
         "Discover Kubernetes relationships and review visual service maps linked to SLOs.",
       ),
       page(
+        "incidents",
+        "Incident records",
+        "Open incidents from critical burn alerts with their error budget impact, affected journeys and revisions.",
+      ),
+      page(
         "slo-retirement",
         "Retire SLOs",
         "Review references, archive retained evidence and verify owned-rule cleanup before deletion.",

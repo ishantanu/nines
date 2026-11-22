@@ -73,6 +73,10 @@ func clone(r model.Record) model.Record {
 		p := *r.SLO.Policy
 		c.SLO.Policy = &p
 	}
+	if r.Alert.FiringSince != nil {
+		t := *r.Alert.FiringSince
+		c.Alert.FiringSince = &t
+	}
 	if r.Alert.PendingSince != nil {
 		t := *r.Alert.PendingSince
 		c.Alert.PendingSince = &t

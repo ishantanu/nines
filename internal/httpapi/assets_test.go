@@ -26,7 +26,7 @@ func TestBrowserTelemetryCSPOrigin(t *testing.T) {
 }
 func TestPortalDeepLinksAndAssetMisses(t *testing.T) {
 	handler := frontend()
-	for _, path := range []string{"/", "/login", "/login/?returnTo=%2Ftenants%2Falpha%2Fslos", "/tenants/alpha/home", "/tenants/alpha/slos/api-latency", "/tenants/alpha/critical-user-journeys/checkout", "/tenants/alpha/reviews/incident-1", "/tenants/alpha/intents/chat-1", "/tenants/alpha/replays/session-1", "/tenants/alpha/data-sources/", "/tenants/alpha/telemetry-connections", "/tenants/alpha/telemetry-connections/", "/tenants/alpha/access-control", "/tenants/alpha/clients"} {
+	for _, path := range []string{"/", "/login", "/login/?returnTo=%2Ftenants%2Falpha%2Fslos", "/tenants/alpha/home", "/tenants/alpha/slos/api-latency", "/tenants/alpha/critical-user-journeys/checkout", "/tenants/alpha/reviews/incident-1", "/tenants/alpha/incidents", "/tenants/alpha/incidents/6292a3c0-6b63-4891-add3-367b74e49e9a", "/tenants/alpha/intents/chat-1", "/tenants/alpha/replays/session-1", "/tenants/alpha/data-sources/", "/tenants/alpha/telemetry-connections", "/tenants/alpha/telemetry-connections/", "/tenants/alpha/access-control", "/tenants/alpha/clients"} {
 		for _, method := range []string{"GET", "HEAD"} {
 			t.Run(method+path, func(t *testing.T) {
 				response := httptest.NewRecorder()

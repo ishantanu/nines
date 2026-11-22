@@ -191,7 +191,9 @@ type AlertState struct {
 	PolicyDigest     string                `json:"policyDigest,omitempty"`
 	Phase            string                `json:"phase"`
 	PendingSince     *time.Time            `json:"pendingSince,omitempty"`
-	LastEvaluated    *time.Time            `json:"lastEvaluated,omitempty"`
+	// FiringSince is when the alert started firing, while it fires.
+	FiringSince   *time.Time `json:"firingSince,omitempty"`
+	LastEvaluated *time.Time `json:"lastEvaluated,omitempty"`
 }
 type Snapshot struct {
 	SLOID                   string     `json:"sloId"`

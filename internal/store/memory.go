@@ -23,6 +23,7 @@ type Memory struct {
 	runs           map[string]map[string]model.JourneyRun
 	records        map[string]model.Record
 	deliveries     map[string]model.Delivery
+	incidents      map[string]model.Incident
 }
 
 func NewMemory() *Memory {

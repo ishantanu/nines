@@ -42,8 +42,10 @@ type Service struct {
 	TenantName          string
 	SourceKind          string
 	Collector           Collector
-	Now                 func() time.Time
-	collectionMu        sync.Mutex
+	// IncidentsEnabled turns on incident records (the incidents feature gate).
+	IncidentsEnabled bool
+	Now              func() time.Time
+	collectionMu     sync.Mutex
 }
 
 func New(st store.Store, c Collector) *Service {
@@ -203,7 +205,7 @@ func (s *Service) Ingest(ctx context.Context, id string, points []model.Point) e
 	if len(points) == 0 || len(points) > 10000 {
 		return model.Invalid("provide 1–10000 samples")
 	}
-	return s.Store.Update(ctx, id, func(r *model.Record) error {
+	err := s.Store.Update(ctx, id, func(r *model.Record) error {
 		if r.SLO.ProviderWindow != nil {
 			return model.Invalid("provider-window SLOs require collection, not interval ingestion")
 		}
@@ -214,6 +216,10 @@ func (s *Service) Ingest(ctx context.Context, id string, points []model.Point) e
 		}
 		return s.apply(r, points, nil)
 	})
+	if err == nil {
+		s.incidentAfterEvaluation(ctx, id)
+	}
+	return err
 }
 func (s *Service) apply(r *model.Record, points []model.Point, replace *[2]time.Time) error {
 	if r.SLO.Retired() {
@@ -268,13 +274,17 @@ func (s *Service) advance(r *model.Record, at time.Time) {
 	r.Events = append(r.Events, events...)
 }
 func (s *Service) Evaluate(ctx context.Context, id string) error {
-	return s.Store.Update(ctx, id, func(r *model.Record) error {
+	err := s.Store.Update(ctx, id, func(r *model.Record) error {
 		if r.SLO.Retired() {
 			return model.Invalid("SLO is archived")
 		}
 		s.advance(r, s.recordEvaluationAt(*r, s.Now()))
 		return nil
 	})
+	if err == nil {
+		s.incidentAfterEvaluation(ctx, id)
+	}
+	return err
 }
 
 // CollectRecent reads a bounded recent range using the saved SLO and configured
@@ -424,6 +434,7 @@ func (s *Service) Collect(ctx context.Context, id string, from, to time.Time) (c
 		}
 		return failure("collection_commit_failed", err)
 	}
+	s.incidentAfterEvaluation(ctx, id)
 	return len(points) + len(windows), nil
 }
 

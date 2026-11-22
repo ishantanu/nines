@@ -1,4 +1,11 @@
-import { useResourceRoute } from "@/lib/navigation";
+import { navigateTo, useResourceRoute, workspacePath } from "@/lib/navigation";
+import {
+  badEventsText,
+  budgetText,
+  formatTime,
+  stateLabels,
+  type Incident,
+} from "@/lib/incidents";
 import { useEffect, useRef, useState } from "react";
 import {
   MessageSquare,
@@ -69,8 +76,12 @@ function ScopeLine({ value }: { value: InvestigationSummary }) {
   return (
     <div className="space-y-1 text-xs text-muted-foreground">
       <p className="break-words">
-        {value.scope.kind === "ServiceLevelObjective" ? "SLO" : "CUJ"}:{" "}
-        {value.scope.resourceId} · revision {value.scope.expectedRevision}
+        {value.scope.kind === "ServiceLevelObjective"
+          ? "SLO"
+          : value.scope.kind === "Incident"
+            ? "Incident"
+            : "CUJ"}
+        : {value.scope.resourceId} · revision {value.scope.expectedRevision}
       </p>
       <p>Evidence cutoff: {new Date(value.scope.at).toLocaleString()}</p>
     </div>
@@ -201,6 +212,45 @@ function ContextEvidence({ context }: { context: EvidenceContext }) {
     </div>
   );
 }
+// An incident review's evidence is the incident record as it was captured.
+function incidentSnapshot(context: unknown): Incident | null {
+  const c = context as Partial<Incident> | null;
+  return c && Array.isArray(c.timeline) && Array.isArray(c.impact) && c.state
+    ? (c as Incident)
+    : null;
+}
+function IncidentEvidence({ incident }: { incident: Incident }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-medium">{incident.title}</p>
+      <p className="text-xs text-muted-foreground">
+        {stateLabels[incident.state]} at revision {incident.revision} · opened{" "}
+        {formatTime(incident.openedAt)}
+      </p>
+      <dl className="space-y-2 text-sm">
+        {incident.impact.map((i) => (
+          <div key={i.sloId}>
+            <dt className="text-xs text-muted-foreground">{i.sloId}</dt>
+            <dd>
+              {budgetText(i)} · {badEventsText(i)} bad events
+              {i.impactStartedAt
+                ? ` · impact from ${formatTime(i.impactStartedAt)}`
+                : ""}
+              {i.reason ? (
+                <span className="block text-xs text-muted-foreground">
+                  {i.reason}
+                </span>
+              ) : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <p className="text-xs text-muted-foreground">
+        {incident.timeline.length} timeline entries captured.
+      </p>
+    </div>
+  );
+}
 export function InvestigationEvidenceView({
   entry,
 }: {
@@ -214,9 +264,14 @@ export function InvestigationEvidenceView({
       </p>
     );
   const e = entry.evidence;
+  const incident = incidentSnapshot(e.context);
   return (
     <div className="space-y-5 p-4">
-      <ContextEvidence context={e.context} />
+      {incident ? (
+        <IncidentEvidence incident={incident} />
+      ) : (
+        <ContextEvidence context={e.context} />
+      )}
       <div className="space-y-1 border-t pt-3 text-xs text-muted-foreground">
         <p>Captured {new Date(e.capturedAt).toLocaleString()}</p>
         <p className="break-all">SHA-256: {e.digest}</p>
@@ -604,7 +659,15 @@ export function Investigations({
                   onClick={() =>
                     doc.scope.kind === "ServiceLevelObjective"
                       ? onSLO(doc.scope.resourceId)
-                      : onJourney(doc.scope.resourceId)
+                      : doc.scope.kind === "Incident"
+                        ? navigateTo(
+                            workspacePath(
+                              scope.tenant,
+                              "incidents",
+                              doc.scope.resourceId,
+                            ),
+                          )
+                        : onJourney(doc.scope.resourceId)
                   }
                 >
                   <ArrowUpRight className="size-4" />
