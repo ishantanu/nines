@@ -1,6 +1,6 @@
 # OpenSLO interoperability
 
-Nines uses OpenSLO v1 for a bounded export format and native Dash0 SLO publication. Nines resources continue to use `nines.dev/v1alpha1` YAML.
+Nines uses OpenSLO v1 for a bounded export format and native Dash0 SLO publication. Nines resources use `nines.dev/v1beta1` YAML ([resource format](resource-format.md)).
 
 ## Why keep both formats?
 

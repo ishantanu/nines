@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
   name: api-availability
@@ -7,22 +7,20 @@ spec:
   displayName: API availability
   service: gateway
   target: 0.999
-  windowSeconds: 86400
-  stepSeconds: 60
-  goodQuery: sum(increase(http_requests_total{code!~"5.."}[1m]))
-  totalQuery: sum(increase(http_requests_total[1m]))
+  window: 1d
+  queries:
+    good: sum(increase(http_requests_total{code!~"5.."}[1m]))
+    total: sum(increase(http_requests_total[1m]))
   policies:
     - name: fast-burn
       severity: critical
       shortWindow: 5m
       longWindow: 1h
       burnRate: 14.4
-      forSeconds: 120
-      minCoverage: 1
+      for: 2m
     - name: sustained-burn
       severity: warning
       shortWindow: 30m
       longWindow: 6h
       burnRate: 6
-      forSeconds: 300
-      minCoverage: 1
+      for: 5m

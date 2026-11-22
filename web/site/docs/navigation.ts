@@ -134,6 +134,11 @@ export const docGroups: DocGroup[] = [
         "Review references, archive retained evidence and verify owned-rule cleanup before deletion.",
       ),
       page(
+        "resource-format",
+        "Resource format (v1beta1)",
+        "Write SLOs, journeys, bindings and maps as v1beta1 YAML, with standard defaults and the changes from v1alpha1.",
+      ),
+      page(
         "migration",
         "Migrate from Sloth or Pyrra",
         "Convert Sloth and Pyrra definitions into reviewed Nines SLOs and run them beside your current rules.",

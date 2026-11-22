@@ -1,0 +1,31 @@
+apiVersion: nines.dev/v1alpha1
+kind: ServiceDependencyMap
+metadata:
+  name: commerce
+  project: production
+spec:
+  displayName: Commerce services
+  services:
+    - name: gateway
+      displayName: API gateway
+      sloRefs: [api-availability]
+    - name: checkout
+      displayName: Checkout
+      sloRefs: [checkout-success]
+    - name: payments
+      displayName: Payment provider
+      sloRefs: []
+  dependencies:
+    - caller: gateway
+      callee: checkout
+      critical: true
+      description: Checkout requests
+    - caller: checkout
+      callee: payments
+      critical: true
+      description: Payment authorization
+  observed:
+    source: primary
+    labels:
+      environment: production
+    windowSeconds: 900

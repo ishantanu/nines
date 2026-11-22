@@ -12,7 +12,7 @@ A latency SLO counts requests that completed within a duration threshold. The ex
 
 ## How the queries are derived
 
-- `measurement` deterministically supplies the good and total populations. Explicit `goodQuery` and `totalQuery` are unnecessary and cannot be combined with this inline contract.
+- `measurement` deterministically supplies the good and total populations. Explicit `queries` are unnecessary and cannot be combined with this inline contract.
 
 | Population     | Derived selector                                                                        |
 | -------------- | --------------------------------------------------------------------------------------- |
@@ -37,7 +37,7 @@ sum(increase(http_request_duration_seconds_count{
   - Generated rules additionally align the completed cutoff, validate the populations and require nonzero traffic.
   - Increases are calculated per series before summing, so counter resets and instance identity are retained.
   - Nines evaluates each long and short window independently; it does not average overlapping window ratios into the 28-day result.
-- `stepSeconds: 60` controls evaluation resolution. It does not replace the rolling 28-day measurement window or the configured burn-alert windows.
+- `step` (default `1m`) controls evaluation resolution. It does not replace the rolling 28-day measurement window or the configured burn-alert windows.
 
 ## Read the recording metrics
 

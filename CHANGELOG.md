@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Examples, the playground sample and the guides now use `nines.dev/v1beta1`. Each converted example stores exactly the same definition as before (identical digests), so re-applying one plans as unchanged. A new [resource format](docs/public/resource-format.md) page lists the defaults and every field change from v1alpha1. The v1alpha1 originals are kept as conversion test fixtures.
 - The portal shows critical user journeys, measurement bindings and dependency maps as `nines.dev/v1beta1` too, and the journey and dependency map editors accept v1beta1. The journey editor sets omitted link dimensions from the SLOs it has loaded, as the server does. Fixtures generated from the Go conversion now cover all four kinds.
 - The portal's YAML views show SLOs as `nines.dev/v1beta1` and the SLO editor accepts v1beta1 or v1alpha1. The browser conversion is checked against fixtures generated from the Go conversion, so the two cannot disagree. Exporting and re-applying a definition is exact: a single unnamed policy stays the legacy single policy, the connection is written as stored, and an SLO created from a goal keeps its provenance when edited as v1beta1, so its export plans as unchanged.
 - Fixed a demo seeding race: when seeding crossed a minute boundary, the backfill fell one step outside the retained history and startup failed.

@@ -49,7 +49,7 @@ All SLO creation and editing paths use the same installed query validators: offl
 | `metricsql`         | Official VictoriaMetrics parser plus a restricted counter-count AST             | Complete query responses, one aggregate series and matched interval counts                       |
 
 - Datadog and NRQL validation cover the supported SLO query subsets, not the vendors' complete query languages.
-- MetricsQL validation requires `sum(increase(metric[STEP]))`, `sum(increase_pure(metric[STEP]))` or `sum(increase_prometheus(metric[STEP]))`. Lookbehind must be explicit, fixed and equal to `stepSeconds`. Implicit windows, interval-relative durations, `WITH`, grouping, limits, offsets, timestamp overrides, subqueries, arithmetic and other functions are refused in this initial subset.
+- MetricsQL validation requires `sum(increase(metric[STEP]))`, `sum(increase_pure(metric[STEP]))` or `sum(increase_prometheus(metric[STEP]))`. Lookbehind must be explicit, fixed and equal to the SLO `step`. Implicit windows, interval-relative durations, `WITH`, grouping, limits, offsets, timestamp overrides, subqueries, arithmetic and other functions are refused in this initial subset.
 - Syntax validation cannot establish that a metric is a counter, that filters describe the correct population, or that instrumentation is complete. Query permissions, retained data and measurement semantics still require provider evidence and engineering review.
 
 ## Manage connections in the portal
@@ -98,7 +98,7 @@ tenants:
 5. Use [the Datadog SLO example](../../examples/datadog/api-availability.slo.yaml). Replace its metrics and exact tags with your reviewed population and successful-event definitions. The total must include successful and unsuccessful eligible events.
 
 ```yaml
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
   name: datadog-api-availability
@@ -106,13 +106,13 @@ metadata:
 spec:
   displayName: API availability
   service: api
-  source: datadog-prod
-  queryLanguage: datadog
   target: 0.999
-  windowSeconds: 86400
-  stepSeconds: 60
-  goodQuery: sum:api.requests.good{service:api,env:production}.as_count().rollup(sum,60)
-  totalQuery: sum:api.requests.total{service:api,env:production}.as_count().rollup(sum,60)
+  window: 1d
+  connection: datadog-prod
+  queries:
+    good: sum:api.requests.good{service:api,env:production}.as_count().rollup(sum,60)
+    total: sum:api.requests.total{service:api,env:production}.as_count().rollup(sum,60)
+    language: datadog
 ```
 
 6. Validate locally, plan against the intended tenant, review and apply:
@@ -130,8 +130,8 @@ bin/nines collect datadog-api-availability --recent --context production --agent
 
 ## Datadog count semantics
 
-- Queries must be `sum:metric{exact:tags}.as_count().rollup(sum,STEP)`, with `STEP` equal to `stepSeconds`. A whole-population `{*}` filter is supported. Grouping, arithmetic, wildcard tag values, percentiles, interpolation and arbitrary functions are refused.
-- Metric metadata must identify COUNT or RATE. RATE requires a positive sampling interval in metadata; a supplied interval must divide `stepSeconds`. Gauges, distribution percentiles and vendor SLO attainment percentages are not event counts and are refused. Nines computes attainment from the summed good and total events.
+- Queries must be `sum:metric{exact:tags}.as_count().rollup(sum,STEP)`, with `STEP` equal to the SLO `step` in seconds. A whole-population `{*}` filter is supported. Grouping, arithmetic, wildcard tag values, percentiles, interpolation and arbitrary functions are refused.
+- Metric metadata must identify COUNT or RATE. RATE requires a positive sampling interval in metadata; a supplied interval must divide the step. Gauges, distribution percentiles and vendor SLO attainment percentages are not event counts and are refused. Nines computes attainment from the summed good and total events.
 - The adapter uses the documented v1 timeseries query API, requesting bounded chunks of at most 500 buckets. Datadog recommends v2 for new general-purpose timeseries clients; this narrow adapter uses v1's explicit returned rollup metadata to reject coarser aggregation. See [query API](https://docs.datadoghq.com/api/latest/metrics/query-timeseries-points/) and [type modifiers](https://docs.datadoghq.com/metrics/custom_metrics/type_modifiers/).
 - Bucket start timestamps are converted to Nines interval-end timestamps. Alignment, range, duplicate timestamps and the returned interval are checked. A changed rollup is refused rather than interpolated.
 - Missing paired buckets stay missing. A present denominator without a matching numerator fails collection rather than becoming zero errors. Explicit zero/zero traffic is retained as zero traffic. Coverage reflects observed intervals, not a synthetic full window.
@@ -197,7 +197,7 @@ tenants:
 5. Start with [availability](../../examples/newrelic/api-availability.slo.yaml) or [latency](../../examples/newrelic/api-latency.slo.yaml). These examples assume you already send unsampled `NinesRequest` events with the shown attributes. The adapter does not ingest events or install a New Relic agent.
 
 ```yaml
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
   name: newrelic-api-availability
@@ -205,13 +205,13 @@ metadata:
 spec:
   displayName: API availability
   service: api
-  source: newrelic-prod
-  queryLanguage: nrql
   target: 0.999
-  windowSeconds: 86400
-  stepSeconds: 60
-  goodQuery: SELECT count(*) FROM NinesRequest WHERE service = 'api' AND success = true
-  totalQuery: SELECT count(*) FROM NinesRequest WHERE service = 'api'
+  window: 1d
+  connection: newrelic-prod
+  queries:
+    good: SELECT count(*) FROM NinesRequest WHERE service = 'api' AND success = true
+    total: SELECT count(*) FROM NinesRequest WHERE service = 'api'
+    language: nrql
 ```
 
 6. Validate, plan, review and apply through the normal CLI workflow. The example files include critical and warning burn policies evaluated by Nines:
@@ -258,7 +258,7 @@ connections:
 6. Use the [availability example](../../examples/victoriametrics/api-availability.slo.yaml) with your metric name and reviewed labels:
 
 ```yaml
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
   name: vm-api-availability
@@ -266,13 +266,13 @@ metadata:
 spec:
   displayName: API availability
   service: api
-  source: vm-prod
-  queryLanguage: metricsql
   target: 0.999
-  windowSeconds: 86400
-  stepSeconds: 60
-  goodQuery: sum(increase_prometheus(http_requests_total{service="api",code="200"}[1m]))
-  totalQuery: sum(increase_prometheus(http_requests_total{service="api"}[1m]))
+  window: 1d
+  connection: vm-prod
+  queries:
+    good: sum(increase_prometheus(http_requests_total{service="api",code="200"}[1m]))
+    total: sum(increase_prometheus(http_requests_total{service="api"}[1m]))
+    language: metricsql
 ```
 
 ```sh
@@ -283,7 +283,7 @@ bin/nines collect vm-api-availability --recent --context production --agent
 ```
 
 - The example file includes critical and warning burn policies. Nines evaluates those policies and can deliver its configured notifications. Initial VictoriaMetrics support does not deploy rules or manage `vmalert`; external deployment status is `unsupported`.
-- `queryLanguage: promql` (or omitted) is also accepted and uses the existing Prometheus syntax/type checker. These queries still execute on VictoriaMetrics, so backend counter behavior can differ. Custom PromQL must return disjoint interval counts, not raw counters, rates or percentiles.
+- `queries.language: promql` (or omitted) is also accepted and uses the existing Prometheus syntax/type checker. These queries still execute on VictoriaMetrics, so backend counter behavior can differ. Custom PromQL must return disjoint interval counts, not raw counters, rates or percentiles.
 - The example uses `increase_prometheus` deliberately. VictoriaMetrics' `increase`, `increase_pure` and `increase_prometheus` have different boundary/initial-sample behavior. Choose deliberately and compare the returned estimates with known traffic. Validation does not establish equivalent values across engines.
 - Every query requests `deny_partial_response=1`. Responses marked `isPartial: true`, warnings, multiple series, non-finite values, duplicate/out-of-range timestamps or unmatched good/total buckets fail collection. Missing data is not converted to zero. Returned points are sorted by timestamp.
 - The connection probe runs only constant-vector queries against the configured route; it does not establish real metric coverage. Endpoint/tenant/authentication changes alter the source fingerprint. Counter and coverage limitations appear in measurement-quality reports.
@@ -407,7 +407,7 @@ This opt-in Compose fixture sends real synthetic telemetry to hosted trials. It 
 The public Go entry point is `github.com/ishantanu/nines/provider`; the current contract is `nines.dev/provider/v1alpha1`.
 
 1. Implement `provider.Collector`: deterministic `ValidateSLO`, an opaque `SourceFingerprint`, and context-bounded `Collect` returning interval good/total `provider.Point` values.
-2. For a new query language, register a pure bounded validator with `provider.RegisterQueryLanguage` before registering the adapter. Omitted `spec.queryLanguage` continues to mean PromQL. A non-PromQL language requires explicit interval queries and cannot use Prometheus measurements or bindings.
+2. For a new query language, register a pure bounded validator with `provider.RegisterQueryLanguage` before registering the adapter. Omitted `queries.language` (v1alpha1 `queryLanguage`) means PromQL. A non-PromQL language requires explicit interval queries and cannot use Prometheus measurements or bindings.
 3. Register a unique provider kind, supported query languages, truthful capability descriptor and factory with `provider.Register` during host startup. Link the extension into your custom server build. The factory receives only trusted connection routing, bounded non-secret `options` and resolved credentials.
 4. Optional collection-window, preview, discovery, dependency, cohort, probe and measurement-limitation interfaces remain separate. Return the actual adapter so the registry preserves these interfaces. Adapters without external rule deployment should implement `SupportsRuleDeployment() bool` returning false.
 5. Configure its `kind`, `url`, optional `options` and `credentialsEnv` in server-owned tenant configuration. An uninstalled kind fails server startup. Duplicate registrations cannot replace built-ins.

@@ -1,0 +1,38 @@
+apiVersion: nines.dev/v1alpha1
+kind: CriticalUserJourney
+metadata:
+  name: assisted-resolution
+  project: demo
+spec:
+  displayName: Resolve a support request
+  description: An agent investigates a request and a human approves the proposed resolution.
+  owner: team-customer-platform
+  criticality: high
+  slos:
+    - id: api-availability
+      dimension: availability
+      required: true
+    - id: background-jobs
+      dimension: correctness
+      required: true
+  steps:
+    - id: receive-request
+      name: Receive request
+      actor: user
+      sloRefs: [api-availability]
+    - id: investigate
+      name: Investigate and propose
+      actor: agent
+      dependsOn: [receive-request]
+      sloRefs: [background-jobs]
+    - id: approve
+      name: Approve resolution
+      actor: human
+      dependsOn: [investigate]
+      sloRefs: [api-availability]
+  agentic:
+    successDefinition: Customer issue resolved with a verified answer and recorded human approval.
+    maxDurationSeconds: 120
+    maxCostUSD: 0.25
+    maxSteps: 12
+    approvalRequired: true

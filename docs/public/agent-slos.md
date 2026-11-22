@@ -37,7 +37,6 @@ measurement:
   successLabels:
     verdict: pass
   countFrom: counter
-  scrapeIntervalSeconds: 15
   observationPoint: Terminal verdict for every task in the selected evaluation cohort; unknown verdicts stay in the population. Evaluation completion coverage is measured separately.
 ```
 

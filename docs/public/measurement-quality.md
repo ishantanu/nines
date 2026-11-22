@@ -42,7 +42,7 @@ Add this optional section alongside `measurement`, `target` and `policies` in an
 spec:
   quality:
     minEvents: 100
-    maxSampleAgeSeconds: 180
+    maxSampleAge: 3m
     cohortLabels: [region, customer_tier]
 ```
 
@@ -50,7 +50,7 @@ spec:
   - It is separate from a burn policy's `minEvents`, which gates both alert windows.
   - Choose counts for the service; these example values are not universal defaults.
 - An omitted or zero sample age uses twice the measurement interval plus the collector scheduling allowance when applicable.
-  - An explicit age must be at least `stepSeconds` and no more than 31 days.
+  - An explicit age must be at least the SLO `step` and no more than 31 days.
   - These requirements create a reviewed configuration revision without reinterpreting or discarding existing samples.
   - They also pass through intent compilation and Kubernetes CRDs.
 

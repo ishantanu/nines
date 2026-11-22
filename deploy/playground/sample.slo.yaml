@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
   name: checkout-success
@@ -7,22 +7,23 @@ spec:
   displayName: Checkout success
   service: checkout
   target: 0.99
-  windowSeconds: 600
-  stepSeconds: 10
-  goodQuery: sum(increase(playground_requests_total{code="200"}[10s]))
-  totalQuery: sum(increase(playground_requests_total[10s]))
+  window: 10m
+  step: 10s
+  queries:
+    good: sum(increase(playground_requests_total{code="200"}[10s]))
+    total: sum(increase(playground_requests_total[10s]))
   policies:
     - name: fast-burn
       severity: critical
       shortWindow: 1m
       longWindow: 2m
       burnRate: 6
-      forSeconds: 10
+      for: 10s
       minCoverage: 0.8
     - name: sustained-burn
       severity: warning
       shortWindow: 2m
       longWindow: 5m
       burnRate: 2
-      forSeconds: 10
+      for: 10s
       minCoverage: 0.8

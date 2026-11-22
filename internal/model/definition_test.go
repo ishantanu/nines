@@ -2,6 +2,7 @@ package model_test
 
 import (
 	"encoding/json"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -13,8 +14,21 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 )
 
+// The v1alpha1 forms of the shipped examples, frozen when the examples moved to
+// v1beta1. These tests pin v1alpha1 parsing and digest identity.
+var alphaAPIAvailability, alphaCheckout = func() (string, string) {
+	read := func(name string) string {
+		raw, err := os.ReadFile("../../api/v1beta1/testdata/v1alpha1/" + name)
+		if err != nil {
+			panic(err)
+		}
+		return string(raw)
+	}
+	return read("api-availability.slo.yaml"), read("checkout.journey.yaml")
+}()
+
 func TestSharedDefinitionSchemaAndCanonicalDigest(t *testing.T) {
-	for _, body := range []string{examples.APIAvailability, examples.Checkout} {
+	for _, body := range []string{alphaAPIAvailability, alphaCheckout} {
 		d, err := model.ParseDefinition([]byte(body))
 		if err != nil {
 			t.Fatal(err)
@@ -35,7 +49,7 @@ func TestSharedDefinitionSchemaAndCanonicalDigest(t *testing.T) {
 			t.Fatal("formatting changed digest", err)
 		}
 	}
-	d, err := model.ParseSLODefinition([]byte(examples.APIAvailability))
+	d, err := model.ParseSLODefinition([]byte(alphaAPIAvailability))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,17 +62,41 @@ func TestSharedDefinitionSchemaAndCanonicalDigest(t *testing.T) {
 
 func TestStrictDefinitionRejection(t *testing.T) {
 	for name, body := range map[string]string{
-		"version":               strings.Replace(examples.APIAvailability, model.APIVersion, "reliability.platform/v2", 1),
-		"kind":                  strings.Replace(examples.APIAvailability, model.SLOKind, "Objective", 1),
-		"unknown-spec":          examples.APIAvailability + "  typo: 1\n",
-		"unknown-metadata":      strings.Replace(examples.APIAvailability, "  project:", "  typo: value\n  project:", 1),
-		"duplicate":             examples.APIAvailability + "  target: 0.8\n",
-		"multiple-documents":    examples.APIAvailability + "\n---\n" + examples.Checkout,
+		"version":               strings.Replace(alphaAPIAvailability, model.APIVersion, "reliability.platform/v2", 1),
+		"kind":                  strings.Replace(alphaAPIAvailability, model.SLOKind, "Objective", 1),
+		"unknown-spec":          alphaAPIAvailability + "  typo: 1\n",
+		"unknown-metadata":      strings.Replace(alphaAPIAvailability, "  project:", "  typo: value\n  project:", 1),
+		"duplicate":             alphaAPIAvailability + "  target: 0.8\n",
+		"multiple-documents":    alphaAPIAvailability + "\n---\n" + alphaCheckout,
 		"flat-runtime-json":     `{"id":"old","project":"p","name":"old","target":0.99}`,
 		"size":                  strings.Repeat(" ", (1<<20)+1),
 		"empty":                 "",
-		"invalid-policy":        strings.Replace(examples.APIAvailability, "minCoverage: 1", "minCoverage: 0", 1),
-		"unknown-journey-field": examples.Checkout + "  typo: 1\n",
+		"invalid-policy":        strings.Replace(alphaAPIAvailability, "minCoverage: 1", "minCoverage: 0", 1),
+		"unknown-journey-field": alphaCheckout + "  typo: 1\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := model.ParseDefinition([]byte(body)); err == nil {
+				t.Fatal("invalid definition accepted")
+			}
+		})
+	}
+}
+
+// The shipped v1beta1 examples parse, and v1beta1 parsing is as strict as
+// v1alpha1's.
+func TestShippedV1beta1ExamplesParseStrictly(t *testing.T) {
+	for _, body := range []string{examples.APIAvailability, examples.Checkout, examples.AgentResolution} {
+		d, err := model.ParseDefinition([]byte(body))
+		if err != nil || d.SourceAPIVersion != "nines.dev/v1beta1" {
+			t.Fatal(d.SourceAPIVersion, err)
+		}
+	}
+	for name, body := range map[string]string{
+		"unknown-spec":       examples.APIAvailability + "  typo: 1\n",
+		"duplicate":          examples.APIAvailability + "  target: 0.8\n",
+		"multiple-documents": examples.APIAvailability + "\n---\n" + examples.Checkout,
+		"alpha-field":        examples.APIAvailability + "  windowSeconds: 86400\n",
+		"journey-typo":       examples.Checkout + "  typo: 1\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := model.ParseDefinition([]byte(body)); err == nil {
@@ -69,7 +107,7 @@ func TestStrictDefinitionRejection(t *testing.T) {
 }
 
 func TestDurationYAMLRetainsNumericDefinitionDigest(t *testing.T) {
-	readable, err := model.ParseDefinition([]byte(examples.APIAvailability))
+	readable, err := model.ParseDefinition([]byte(alphaAPIAvailability))
 	if err != nil {
 		t.Fatal(err)
 	}

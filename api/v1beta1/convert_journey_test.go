@@ -50,7 +50,7 @@ func TestJourneyDimensionFollowsTheSLO(t *testing.T) {
 }
 
 func TestShippedJourneysRoundTrip(t *testing.T) {
-	files, _ := filepath.Glob("../../examples/*.journey.yaml")
+	files, _ := filepath.Glob("testdata/v1alpha1/*.journey.yaml")
 	if len(files) < 2 {
 		t.Fatal("examples not found")
 	}
