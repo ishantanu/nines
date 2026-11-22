@@ -114,3 +114,47 @@ test("viewer UI cannot create investigations and states the actual execution cap
   expect(html).toContain("Runs are read-only");
   expect(html).toContain("Shared with authorized members of this tenant");
 });
+test("an incident review's evidence shows the captured incident, unknowns included", () => {
+  const entry: InvestigationEntry = {
+    id: "evidence-incident",
+    kind: "evidence",
+    createdAt: "2026-11-22T13:50:00Z",
+    actor,
+    evidence: {
+      capturedAt: "2026-11-22T13:50:00Z",
+      digest: "incident-digest",
+      context: {
+        id: "incident-1",
+        revision: 2,
+        title: "Checkout errors",
+        source: "alert",
+        state: "monitoring",
+        openedAt: "2026-11-22T13:41:00Z",
+        slos: [],
+        journeys: [],
+        timeline: [
+          { time: "2026-11-22T13:41:00Z", kind: "opened", message: "Opened." },
+        ],
+        impact: [
+          {
+            sloId: "checkout",
+            from: "2026-11-22T13:39:00Z",
+            to: "2026-11-22T13:45:00Z",
+            badEvents: 412,
+            badEventsAtLeast: true,
+            budgetConsumedFraction: null,
+            coverage: 0.96,
+            reason: "1 of 26 intervals during the incident have no data",
+          },
+        ],
+      } as never,
+    },
+  };
+  const html = renderToStaticMarkup(
+    <InvestigationEvidenceView entry={entry} />,
+  );
+  expect(html).toContain("Checkout errors");
+  expect(html).toContain("Monitoring at revision 2");
+  expect(html).toContain("At least 412");
+  expect(html).toContain("1 of 26 intervals during the incident have no data");
+});

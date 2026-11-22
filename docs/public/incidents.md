@@ -52,6 +52,22 @@ The impact is computed when you read the incident, never stored. The budget cons
 - the SLO's definition changed after the incident, so its samples are not comparable;
 - the telemetry provider evaluates the SLO's windows itself, so per-interval samples are not stored.
 
+## In the portal
+
+Open **Incidents** under Reliability. The list shows each incident's state and its largest known budget impact.
+
+- **Detail.** For each affected SLO, the detail shows:
+  - when impact started, and how long before the alert that was;
+  - the alert's firing or cleared time;
+  - bad events, where "At least" means some data is missing;
+  - the budget consumed, or **Unknown** with the reason;
+  - data coverage and the definition revision in force.
+
+  Below that are the affected journeys and the timeline.
+- **Lifecycle.** Each button asks for a note, which goes on the timeline with your name. Viewers and agents see the incident but cannot change it.
+- **Declare incident** opens one for chosen SLOs.
+- **Start review** opens a [reliability review](architecture.md) scoped to the incident, when reliability reviews are turned on.
+
 ## Using the API
 
 Reading incidents needs any role. Declaring and changing state needs the editor or owner role; agents can read but not declare or resolve.
@@ -83,5 +99,3 @@ The incident learning work continues in these issues:
 - blameless postmortems (#87);
 - CAST (#88) and STPA (#89) analyses;
 - links to runbooks, logs, traces, changes and incident tools (#90).
-
-Until then, incidents are available through the API only.

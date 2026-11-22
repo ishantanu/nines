@@ -2,7 +2,7 @@ import { workspacePath, parseRoute } from "./navigation";
 import type { RequestScope } from "./api";
 import { api } from "./api";
 export type InvestigationScope = {
-  kind: "ServiceLevelObjective" | "CriticalUserJourney";
+  kind: "ServiceLevelObjective" | "CriticalUserJourney" | "Incident";
   resourceId: string;
   expectedRevision: number;
   at: string;

@@ -158,6 +158,7 @@
       "name": "Incident records",
       "level": "experimental",
       "docs": "incidents",
+      "page": "incidents",
       "remaining": "Portal pages, postmortems and links to incident tools (#86-#90), and acceptance with a real incident workflow.",
       "gated": true
     },

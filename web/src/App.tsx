@@ -43,6 +43,7 @@ import {
   Waypoints,
   Workflow,
   Network,
+  Siren,
   Sun,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -178,6 +179,11 @@ const Investigations = lazy(() =>
     default: m.Investigations,
   })),
 );
+const Incidents = lazy(() =>
+  import("./components/incidents").then((m) => ({
+    default: m.Incidents,
+  })),
+);
 const IntentAuthoring = lazy(() =>
   import("@/components/intent-workspace").then((m) => ({
     default: m.IntentWorkspace,
@@ -199,6 +205,7 @@ const navigation = [
     icon: MessageSquare,
   },
   { id: "journeys" as const, label: "Critical user journeys", icon: Waypoints },
+  { id: "incidents" as const, label: "Incidents", icon: Siren },
   {
     id: "objectives" as const,
     label: "Service level objectives",
@@ -225,7 +232,10 @@ const navigation = [
   { id: "clients" as const, label: "API and clients", icon: Terminal },
 ];
 const navigationGroups = [
-  { label: "Reliability", pages: ["objectives", "journeys", "maps", "alerts"] },
+  {
+    label: "Reliability",
+    pages: ["objectives", "journeys", "maps", "alerts", "incidents"],
+  },
   {
     label: "Agent workflows",
     pages: ["intents", "investigations", "workflows"],
@@ -241,6 +251,10 @@ const copy = {
   replays: [
     "Session replay",
     "Play masked sessions and link observed behavior to journeys, objectives and violations.",
+  ],
+  incidents: [
+    "Incidents",
+    "Reliability loss users felt, filled in from alerts, measurements and journeys.",
   ],
   investigations: [
     "Reliability reviews",
@@ -1423,7 +1437,25 @@ function TenantWorkspace({
                         </span>
                       </div>
                     ) : null}
-                    {page === "investigations" ? (
+                    {page === "incidents" ? (
+                      <Suspense
+                        fallback={<p role="status">Loading incidents…</p>}
+                      >
+                        <Incidents
+                          key={scope.tenant}
+                          scope={scope}
+                          objectives={objectives}
+                          reviewsOn={featureOn(
+                            enabledFeatures,
+                            "reliability-reviews",
+                          )}
+                          onSLO={(id) => {
+                            setSLO(id);
+                          }}
+                          onJourney={openJourney}
+                        />
+                      </Suspense>
+                    ) : page === "investigations" ? (
                       <Suspense
                         fallback={<p role="status">Loading reviews…</p>}
                       >

@@ -50,6 +50,7 @@ describe("feature maturity", () => {
       .sort();
     expect(experimentalPages).toEqual([
       "agents",
+      "incidents",
       "intents",
       "investigations",
       "replays",
