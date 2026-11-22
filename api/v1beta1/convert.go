@@ -116,8 +116,11 @@ func (s ServiceLevelObjective) ToHub() (v1alpha1.ServiceLevelObjective, []string
 	if in.Binding != nil {
 		sources++
 	}
-	if sources != 1 {
-		return v1alpha1.ServiceLevelObjective{}, nil, fmt.Errorf("an SLO is measured by exactly one of measurement, queries or binding; found %d", sources)
+	if sources > 1 {
+		return v1alpha1.ServiceLevelObjective{}, nil, fmt.Errorf("an SLO is measured by at most one of measurement, queries or binding; found %d", sources)
+	}
+	if sources == 0 {
+		notes = append(notes, "no measurement, queries or binding: the SLO is measured from samples pushed to the API")
 	}
 	if iv := in.Intervals; iv != nil {
 		if iv.MinGoodEvents > 0 && (iv.ErrorRate > 0 || iv.MinEvents > 0) {
@@ -166,7 +169,12 @@ func (s ServiceLevelObjective) ToHub() (v1alpha1.ServiceLevelObjective, []string
 			}
 			out.Policies = append(out.Policies, hp)
 		}
-		if len(out.Policies) == 0 {
+		// A lone unnamed policy is the legacy single policy; keep it so,
+		// so a definition round-trips exactly.
+		switch {
+		case len(out.Policies) == 1 && out.Policies[0].Name == "":
+			out.Policy, out.Policies = &out.Policies[0], nil
+		case len(out.Policies) == 0:
 			notes = append(notes, "alerting is off: policies is an empty list")
 		}
 	}
@@ -180,9 +188,6 @@ func (s ServiceLevelObjective) ToHub() (v1alpha1.ServiceLevelObjective, []string
 func FromHub(h v1alpha1.ServiceLevelObjective) ServiceLevelObjective {
 	in := h.Spec
 	out := SLOSpec{DisplayName: in.DisplayName, Service: in.Service, Target: in.Target, Window: dur(in.WindowSeconds), Step: dur(in.StepSeconds), Connection: in.Source, Labels: in.Labels, Lifecycle: in.Lifecycle, ErrorBudgetPolicy: in.ErrorBudgetPolicy, Customers: in.Customers}
-	if out.Connection == "primary" {
-		out.Connection = ""
-	}
 	switch {
 	case in.Measurement != nil:
 		m := in.Measurement
@@ -196,6 +201,8 @@ func FromHub(h v1alpha1.ServiceLevelObjective) ServiceLevelObjective {
 		}
 	case in.MeasurementBinding != nil:
 		out.Binding = in.MeasurementBinding
+	case in.GoodQuery == "" && in.TotalQuery == "" && in.ProviderWindow == nil:
+		// Measured from samples pushed to the API.
 	default:
 		q := &Queries{Good: in.GoodQuery, Total: in.TotalQuery, Language: in.QueryLanguage}
 		if w := in.ProviderWindow; w != nil {
@@ -228,12 +235,6 @@ func FromHub(h v1alpha1.ServiceLevelObjective) ServiceLevelObjective {
 		if p.MinCoverage != 1 {
 			c := p.MinCoverage
 			bp.MinCoverage = &c
-		}
-		if bp.Name == "" {
-			bp.Name = "burn"
-		}
-		if bp.Severity == "" {
-			bp.Severity = "critical"
 		}
 		policies = append(policies, bp)
 	}

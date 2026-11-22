@@ -143,7 +143,7 @@ test("guided edits reach YAML and settings edits survive returning to measuremen
     spec: {
       displayName: "Checkout availability",
       target: 0.995,
-      windowSeconds: 604800,
+      window: "7d",
       measurement: { metric: "checkout_requests_total" },
     },
   });
@@ -176,10 +176,18 @@ test("YAML can change measurement type and rehydrates the matching guided fields
   expect(input("Good events complete within").value).toBe("300ms");
   expect(input("Target (%)").value).toBe("99");
   await tab("YAML");
+  // The YAML tab shows v1beta1: durations are strings.
   expect(
     parse(input("ServiceLevelObjective manifest (YAML)").value).spec
       .measurement,
-  ).toMatchObject(d.spec.measurement);
+  ).toMatchObject({
+    type: "latency",
+    metric: "duration_seconds",
+    labels: { service: "api" },
+    threshold: "300ms",
+    scrapeInterval: "10s",
+    observationPoint: "Completed response duration.",
+  });
 });
 test("invalid YAML stays in YAML and custom queries cannot silently be replaced by the form", async () => {
   await render();

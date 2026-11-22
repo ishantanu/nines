@@ -18,25 +18,9 @@ import (
 // server-owned, and "primary" is the default connection.
 func normalize(h v1alpha1.ServiceLevelObjective) v1alpha1.ServiceLevelObjective {
 	s := &h.Spec
-	if len(s.Policies) == 0 && s.Policy != nil {
-		p := *s.Policy
-		if p.Name == "" {
-			p.Name = "burn"
-		}
-		if p.Severity == "" {
-			p.Severity = "critical"
-		}
-		s.Policies = []v1alpha1.BurnRatePolicy{p}
-	}
-	s.Policy, s.Intent = nil, nil
+	s.Intent = nil
 	if s.Measurement != nil || s.MeasurementBinding != nil {
 		s.ProviderWindow = nil
-	}
-	if s.Source == "primary" {
-		s.Source = ""
-	}
-	if s.Policies == nil {
-		s.Policies = []v1alpha1.BurnRatePolicy{}
 	}
 	return h
 }
@@ -131,16 +115,21 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
-func TestExactlyOneMeasurement(t *testing.T) {
-	none := minimal()
-	none.Spec.Queries = nil
-	if _, _, err := none.ToHub(); err == nil || !strings.Contains(err.Error(), "exactly one of measurement, queries or binding") {
-		t.Fatal(err)
+func TestAtMostOneMeasurement(t *testing.T) {
+	// No source is an SLO measured from samples pushed to the API.
+	pushed := minimal()
+	pushed.Spec.Queries = nil
+	hub, notes, err := pushed.ToHub()
+	if err != nil || hub.Spec.GoodQuery != "" || !strings.Contains(strings.Join(notes, " "), "samples pushed to the API") {
+		t.Fatal(notes, err)
+	}
+	if again := FromHub(hub); again.Spec.Queries != nil || again.Spec.Measurement != nil || again.Spec.Binding != nil {
+		t.Fatal("an SLO measured from pushed samples exported a measurement source")
 	}
 	two := minimal()
 	two.Spec.Binding = &BindingReference{Name: "b", Revision: 1, Digest: "d"}
-	if _, _, err := two.ToHub(); err == nil {
-		t.Fatal("two measurement sources accepted")
+	if _, _, err := two.ToHub(); err == nil || !strings.Contains(err.Error(), "at most one of measurement, queries or binding") {
+		t.Fatal("two measurement sources accepted", err)
 	}
 	both := minimal()
 	both.Spec.Intervals = &Intervals{ErrorRate: 0.05, MinGoodEvents: 10}

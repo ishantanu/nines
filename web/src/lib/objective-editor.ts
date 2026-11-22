@@ -1,3 +1,4 @@
+import { V1BETA1, sloFromBeta } from "./v1beta1";
 import { normalizeBurnWindows } from "./definition-yaml";
 import { parse } from "yaml";
 import { RESOURCE_API_VERSION, type SLODefinition } from "./definitions";
@@ -262,7 +263,12 @@ const policy = (v: unknown) =>
     ["critical", "warning", "info"].includes(String(x)),
   );
 export function parseObjectiveDefinition(text: string): SLODefinition {
-  const v: unknown = normalizeBurnWindows(parse(text));
+  const raw: unknown = parse(text);
+  // v1beta1 is converted to the stored form the editor works on.
+  const v: unknown =
+    record(raw) && raw.apiVersion === V1BETA1
+      ? sloFromBeta(raw).definition
+      : normalizeBurnWindows(raw);
   if (
     !record(v) ||
     v.apiVersion !== RESOURCE_API_VERSION ||

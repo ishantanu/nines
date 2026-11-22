@@ -14,7 +14,7 @@ func TestProviderOfflineValidationDoesNotGeneratePrometheusRules(t *testing.T) {
 			if err := run([]string{"validate", "--offline", "-f", file, "--agent"}, &out); err != nil {
 				t.Fatal(err)
 			}
-			var result map[string]string
+			var result map[string]any
 			if err := json.Unmarshal(out.Bytes(), &result); err != nil {
 				t.Fatal(err)
 			}

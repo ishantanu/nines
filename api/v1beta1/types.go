@@ -1,7 +1,7 @@
 // Package v1beta1 is the nines.dev/v1beta1 definition schema users write.
 //
 // Compared with v1alpha1 it has one way to write each thing: durations are
-// strings (window: 28d), an SLO is measured by exactly one of measurement,
+// strings (window: 28d), an SLO is measured by at most one of measurement,
 // queries or binding, telemetry connections are called connection, and
 // omitted settings take documented defaults that plan output shows. The
 // server stores definitions in the v1alpha1 form; ToHub and FromHub convert.
@@ -54,7 +54,8 @@ type SLOSpec struct {
 	Labels     map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Lifecycle  SLOLifecycle      `json:"lifecycle,omitempty" yaml:"lifecycle,omitempty"`
 
-	// Exactly one of Measurement, Queries or Binding says what is counted.
+	// At most one of Measurement, Queries or Binding says what is counted;
+	// with none, the SLO is measured from samples pushed to the API.
 	Measurement *MeasurementSpec  `json:"measurement,omitempty" yaml:"measurement,omitempty"`
 	Queries     *Queries          `json:"queries,omitempty" yaml:"queries,omitempty"`
 	Binding     *BindingReference `json:"binding,omitempty" yaml:"binding,omitempty"`
@@ -110,8 +111,9 @@ type Intervals struct {
 }
 
 type BurnRatePolicy struct {
-	Name        string    `json:"name" yaml:"name"`
-	Severity    string    `json:"severity" yaml:"severity"`
+	// Name and severity are required when there is more than one policy.
+	Name        string    `json:"name,omitempty" yaml:"name,omitempty"`
+	Severity    string    `json:"severity,omitempty" yaml:"severity,omitempty"`
 	ShortWindow Duration  `json:"shortWindow" yaml:"shortWindow"`
 	LongWindow  Duration  `json:"longWindow" yaml:"longWindow"`
 	BurnRate    float64   `json:"burnRate" yaml:"burnRate"`

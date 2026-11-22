@@ -37,6 +37,10 @@ func TestJourneyDimensionFollowsTheSLO(t *testing.T) {
 	if _, _, err := journey([]JourneySLO{{ID: "search", Dimension: "availability"}}, "search").ToHub(slos); err == nil || !strings.Contains(err.Error(), "contradicts the SLO, which measures latency") {
 		t.Fatal(err)
 	}
+	// An SLO without a measurement type (custom queries) accepts any dimension.
+	if hub, _, err := journey([]JourneySLO{{ID: "api", Dimension: "correctness"}}, "api").ToHub(slos); err != nil || hub.Spec.SLOs[0].Dimension != "correctness" {
+		t.Fatal(hub.Spec.SLOs, err)
+	}
 	if _, notes, err := journey([]JourneySLO{{ID: "unknown"}}, "unknown").ToHub(nil); err != nil || !strings.Contains(strings.Join(notes, " "), "assumed to be availability") {
 		t.Fatal(notes, err)
 	}

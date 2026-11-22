@@ -110,3 +110,21 @@ func TestDemoJourneyRunObjectiveIsEvaluated(t *testing.T) {
 		t.Fatal("no agentic demo journey")
 	}
 }
+
+// Seeding can cross a minute boundary on a slow machine; the backfill must
+// stay inside the retained history when the clock moves on.
+func TestDemoSeedSurvivesAMinuteBoundary(t *testing.T) {
+	svc := service.New(store.NewMemory(), nil)
+	start := time.Date(2026, 11, 21, 12, 0, 59, 0, time.UTC)
+	calls := 0
+	svc.Now = func() time.Time {
+		calls++
+		if calls > 1 {
+			return start.Add(2 * time.Second)
+		}
+		return start
+	}
+	if err := seed(context.Background(), svc); err != nil {
+		t.Fatal(err)
+	}
+}

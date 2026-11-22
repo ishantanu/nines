@@ -8,8 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/gitops"
 	"github.com/ishantanu/nines/internal/model"
@@ -80,7 +78,14 @@ func (a *Server) gitopsPropose(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, model.ErrRevisionConflict)
 		return
 	}
-	manifest, err := yaml.Marshal(plan.Manifest)
+	// Propose the definition as v1beta1. The pull request records the stored
+	// form's digest, so drift and applied-state checks are unaffected.
+	resolved, err := a.Service.ResolveJourney(r.Context(), d)
+	if err != nil {
+		a.fail(w, r, err)
+		return
+	}
+	manifest, err := a.Service.ExportYAML(r.Context(), resolved, "")
 	if err != nil {
 		a.fail(w, r, err)
 		return

@@ -68,7 +68,7 @@ func TestCLIInitDurationsRuleGenerationAndReadCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	d, err := model.ParseSLODefinition(definition.Bytes())
-	if err != nil || d.Spec.WindowSeconds != 28*86400 || d.Spec.Policy.ForSeconds != 120 || d.Spec.Source != "production" {
+	if err != nil || d.Spec.WindowSeconds != 28*86400 || d.Spec.Policy == nil || d.Spec.Policy.ForSeconds != 120 || d.Spec.Source != "production" {
 		t.Fatal(d, err)
 	}
 	file := filepath.Join(t.TempDir(), "slo.yaml")

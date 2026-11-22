@@ -7,8 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/ishantanu/nines/internal/model"
 )
 
@@ -74,7 +72,8 @@ func (a *Server) sloManifest(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	b, err := yaml.Marshal(model.DefinitionFromSLO(rec.SLO))
+	definition := model.DefinitionFromSLO(rec.SLO)
+	b, err := a.Service.ExportYAML(r.Context(), model.Definition{SLO: &definition}, r.URL.Query().Get("apiVersion"))
 	if err != nil {
 		a.fail(w, r, err)
 		return

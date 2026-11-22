@@ -2,9 +2,13 @@ package service_test
 
 import (
 	"context"
+	"os"
 	"strings"
 	"testing"
 
+	"gopkg.in/yaml.v3"
+
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
@@ -134,5 +138,78 @@ spec:
 	}
 	if _, err := model.ParseDefinition([]byte(strings.Replace(betaSLO, "target: 0.99", "target: 0.99\n  windowSeconds: 86400", 1))); err == nil {
 		t.Fatal("a v1alpha1 field was accepted in a v1beta1 definition")
+	}
+}
+
+// Editing an SLO created from a goal as v1beta1 keeps its provenance, which
+// v1beta1 cannot express, instead of erasing how it was made.
+func TestV1beta1UpdateKeepsIntentProvenance(t *testing.T) {
+	ctx := context.Background()
+	svc := service.New(store.NewMemory(), nil)
+	measured := `apiVersion: nines.dev/v1beta1
+kind: ServiceLevelObjective
+metadata:
+  name: search-latency
+  project: production
+spec:
+  displayName: API success
+  service: api
+  connection: primary
+  target: 0.999
+  policies:
+    - shortWindow: 5m
+      longWindow: 1h
+      burnRate: 14.4
+      for: 2m
+  measurement:
+    type: availability
+    metric: http_requests_total
+    labels: {service: api, environment: production}
+    successLabels: {status: "200"}
+    observationPoint: Completed API requests, including failures. Requests never reaching the server are excluded.
+`
+	if _, err := apply(t, svc, measured); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.Store.Update(ctx, "search-latency", func(r *model.Record) error {
+		var example struct{ Spec v1.IntentSpec }
+		raw, err := os.ReadFile("../../examples/api-success.intent.yaml")
+		if err != nil {
+			return err
+		}
+		if err = yaml.Unmarshal(raw, &example); err != nil {
+			return err
+		}
+		example.Spec.Exclusions = &v1.IntentExclusions{ObservationBoundaries: []string{"bots excluded at the edge"}}
+		r.SLO.Intent = &example.Spec
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	r, _ := svc.Store.Read(ctx, "search-latency")
+	d, err := model.ParseDefinition([]byte(strings.Replace(measured, "displayName: API success", "displayName: API requests succeed", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = svc.ApplyDefinition(ctx, d, model.ConfigRevision(r.SLO)); err != nil {
+		t.Fatal(err)
+	}
+	r, _ = svc.Store.Read(ctx, "search-latency")
+	if r.SLO.Name != "API requests succeed" || r.SLO.Intent == nil || r.SLO.Intent.Exclusions == nil || r.SLO.Intent.Exclusions.ObservationBoundaries[0] != "bots excluded at the edge" {
+		t.Fatal("provenance lost on a v1beta1 update", r.SLO.Name, r.SLO.Intent)
+	}
+	// Exporting it as v1beta1 and planning the export changes nothing.
+	stored := model.DefinitionFromSLO(r.SLO)
+	text, err := svc.ExportYAML(ctx, model.Definition{SLO: &stored}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	exported, err := model.ParseDefinition(text)
+	if err != nil {
+		t.Fatal(err, string(text))
+	}
+	plan, err := svc.PlanDefinition(ctx, exported)
+	if err != nil || plan.Action != "unchanged" {
+		t.Fatalf("re-planning the v1beta1 export: %s %v\n%s", plan.Action, err, text)
 	}
 }

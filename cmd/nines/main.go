@@ -21,6 +21,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/api/v1beta1"
 	"github.com/ishantanu/nines/client"
 	"github.com/ishantanu/nines/internal/engine"
 	"github.com/ishantanu/nines/internal/model"
@@ -100,6 +101,7 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			return fmt.Errorf("invalid resource identifier")
 		}
 		visited := map[string]bool{}
+		standardAlerts := false
 		flags.VisitAll(func(f *pflag.Flag) {
 			if f.Changed {
 				visited[f.Name] = true
@@ -116,6 +118,8 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			}
 			d := model.SLODefinition(v1.NewSLO(*name, *project, v1.SLOSpec{Source: *source, DisplayName: *display, Service: *serviceName, Target: *target, GoodQuery: *good, TotalQuery: *total}))
 			definition.SLO = &d
+			// Without explicit burn flags the SLO keeps the standard alerts.
+			standardAlerts = !visited["short-window"] && !visited["long-window"] && !visited["burn-rate"] && !visited["for"] && !visited["min-coverage"] && !visited["min-events"] && !visited["confidence"] && !visited["no-policy"]
 			for _, key := range []string{"window", "step", "short-window", "long-window", "burn-rate", "for", "min-coverage"} {
 				visited[key] = true
 			}
@@ -248,7 +252,11 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 			}
 		}
 		if action == "init" {
-			body, _ := yaml.Marshal(definition.Manifest())
+			slo := v1beta1.FromHub(v1.ServiceLevelObjective(*definition.SLO))
+			if standardAlerts {
+				slo.Spec.Policies = nil
+			}
+			body, _ := yaml.Marshal(slo)
 			return o.generated(out, *pathOut, body)
 		}
 		if action == "rules-generate" {
@@ -272,7 +280,14 @@ func coreCommand(action, kind string, o *options) *cobra.Command {
 				}
 				note = "schema, PromQL types and generated expressions validated offline; metric availability, cardinality and data semantics require provider evidence"
 			}
-			return render(out, map[string]string{"status": "valid", "apiVersion": model.APIVersion, "kind": definition.Kind(), "name": definition.Metadata().Name, "digest": model.DefinitionDigest(definition.Manifest()), "note": note}, *output, "validation")
+			result := map[string]any{"status": "valid", "apiVersion": definition.SourceAPIVersion, "kind": definition.Kind(), "name": definition.Metadata().Name, "digest": model.DefinitionDigest(definition.Manifest()), "note": note}
+			if definition.SourceAPIVersion == "" {
+				result["apiVersion"] = model.APIVersion
+			}
+			if len(definition.Notes) > 0 {
+				result["notes"] = definition.Notes
+			}
+			return render(out, result, *output, "validation")
 		}
 		u, err := url.Parse(*server)
 		if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Path != "" && u.Path != "/" {

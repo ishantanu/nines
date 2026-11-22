@@ -275,8 +275,10 @@ func seed(ctx context.Context, svc *service.Service) error {
 		if err := svc.Create(ctx, c); err != nil {
 			return err
 		}
-		// Backfill the same chart history the ingested demo SLOs have.
-		history := min(2880*c.StepSeconds, c.RetentionSeconds())
+		// Backfill the same chart history the ingested demo SLOs have, one
+		// step inside the retained range: seeding can cross a minute
+		// boundary, which moves the retention cutoff forward by one step.
+		history := min(2880*c.StepSeconds, c.RetentionSeconds()-c.StepSeconds)
 		if _, err := svc.Collect(ctx, c.ID, now.Add(-time.Duration(history)*time.Second), now); err != nil {
 			return err
 		}
@@ -327,7 +329,9 @@ func refreshDemoSLO(ctx context.Context, svc *service.Service, id string, n int,
 	}
 	// Refresh the retained history horizon, including the minimum chart history
 	// for short-window objectives. Objective evaluation still uses its own window.
-	count := min(2880, int(record.SLO.RetentionSeconds()/record.SLO.StepSeconds))
+	// One step inside the retained range, in case the clock crosses a step
+	// boundary before the samples are stored.
+	count := min(2880, int(record.SLO.RetentionSeconds()/record.SLO.StepSeconds)-1)
 	points := make([]model.Point, 0, count)
 	for i := count - 1; i >= 0; i-- {
 		total := float64(10000 + (i%17)*100)
