@@ -67,7 +67,6 @@ spec:
       pipeline: billing
     successLabels:
       verdict: pass
-    scrapeIntervalSeconds: 15
     observationPoint: Every record receiving a validation verdict; invalid and unevaluable records are counted.
 ```
 
@@ -87,12 +86,11 @@ spec:
     metric: pipeline_record_age_seconds
     labels:
       pipeline: search-index
-    thresholdSeconds: 300
-    scrapeIntervalSeconds: 15
+    threshold: 5m
     observationPoint: Age of each record when served, relative to its event time.
 ```
 
-- Use a classic histogram in seconds with a bucket at exactly `thresholdSeconds`. Quantiles and native histograms are not supported.
+- Use a classic histogram in seconds with a bucket at exactly `threshold`. Quantiles and native histograms are not supported.
 - Data that never arrives produces no age observation. Pair freshness with coverage so missing data is counted.
 
 ## Throughput
@@ -101,17 +99,17 @@ Throughput judges each measurement interval by volume: an interval is good when 
 
 ```yaml
 spec:
-  stepSeconds: 60
   target: 0.99
-  windowSeconds: 2592000
-  goodQuery: sum(increase(pipeline_records_processed_total[1m]))
-  totalQuery: sum(increase(pipeline_records_received_total[1m]))
-  badInterval:
+  window: 30d
+  queries:
+    good: sum(increase(pipeline_records_processed_total[1m]))
+    total: sum(increase(pipeline_records_received_total[1m]))
+  intervals:
     minGoodEvents: 500
 ```
 
 - The good-events query counts the work done in each interval. An observed interval below the minimum is bad, including one where nothing was processed. An interval with no data is not judged and stays unknown.
-- `badInterval` takes either `minGoodEvents` (throughput) or `errorRate` with an optional `minEvents` (good-minute), not both.
+- `intervals` takes either `minGoodEvents` (throughput) or `errorRate` with an optional `minEvents` (good-minute), not both.
 - Every interval weighs the same. If your normal volume varies, for example overnight, choose a minimum that a healthy quiet interval still meets, or use separate SLOs.
 - Nines' engine and its generated recording rules judge intervals the same way; a test evaluates both against the same series with the real PromQL engine.
 
@@ -168,5 +166,5 @@ Few, user-focused objectives give clearer signals than many. See [keep objective
 
 ## Limits
 
-- Every kind has a guided form, and the YAML equivalent stays available. Some combinations are refused with a reason instead of partly working, such as per-customer reports on sessions, good-minute or throughput on provider-evaluated windows, and both judging rules in one `badInterval`. Each guide lists what it does not support.
+- Every kind has a guided form, and the YAML equivalent stays available. Some combinations are refused with a reason instead of partly working, such as per-customer reports on sessions, good-minute or throughput on provider-evaluated windows, and both judging rules in one `intervals`. Each guide lists what it does not support.
 - The type shown in the portal is derived from the saved definition. It never infers a type from metric names.

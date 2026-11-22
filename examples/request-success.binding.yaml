@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: MeasurementBinding
 metadata:
   name: api-success
@@ -6,14 +6,12 @@ metadata:
 spec:
   displayName: API request success
   service: api
-  source: primary
-  measurement: availability
+  type: availability
   metric: http_requests_total
   labels:
-    service: api
     environment: production
+    service: api
   successLabels:
     status: "200"
-  scrapeIntervalSeconds: 15 # Match your telemetry source configuration
-  stepSeconds: 60
+  scrapeInterval: 15s
   observationPoint: Completed server requests at the API boundary; request attempts, not unique users

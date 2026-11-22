@@ -66,13 +66,12 @@ Use [the complete availability example](../../examples/googlecloud/api-availabil
 
 ```yaml
 spec:
-  source: google-checkout
-  queryLanguage: googlecloud
   target: 0.999
-  windowSeconds: 2419200
-  stepSeconds: 60
-  goodQuery: 'metric.type = "custom.googleapis.com/nines/requests" AND resource.type = "global" AND metric.labels.result = "good"'
-  totalQuery: 'metric.type = "custom.googleapis.com/nines/requests" AND resource.type = "global"'
+  connection: google-checkout
+  queries:
+    good: metric.type = "custom.googleapis.com/nines/requests" AND resource.type = "global" AND metric.labels.result = "good"
+    total: metric.type = "custom.googleapis.com/nines/requests" AND resource.type = "global"
+    language: googlecloud
 ```
 
 - The initial filter grammar requires exact `metric.type` and `resource.type` predicates with optional exact metric/resource label predicates, joined by `AND`. The good filter must refine the total population. Project selectors, OR, regex/functions, duplicate predicates and query-language expressions are refused.

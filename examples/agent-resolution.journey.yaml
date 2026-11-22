@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: CriticalUserJourney
 metadata:
   name: assisted-resolution
@@ -10,7 +10,6 @@ spec:
   criticality: high
   slos:
     - id: api-availability
-      dimension: availability
       required: true
     - id: background-jobs
       dimension: correctness
@@ -32,7 +31,7 @@ spec:
       sloRefs: [api-availability]
   agentic:
     successDefinition: Customer issue resolved with a verified answer and recorded human approval.
-    maxDurationSeconds: 120
+    maxDuration: 2m
     maxCostUSD: 0.25
     maxSteps: 12
     approvalRequired: true

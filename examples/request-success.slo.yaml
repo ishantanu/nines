@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
   name: request-success
@@ -6,19 +6,16 @@ metadata:
 spec:
   displayName: API request success
   service: api
-  source: primary
   target: 0.999
-  windowSeconds: 2419200 # Rolling 28 days
-  stepSeconds: 60
+  connection: primary
   measurement:
     type: availability
     metric: http_requests_total
     labels:
-      service: api
       environment: production
+      service: api
     successLabels:
       status: "200"
-    scrapeIntervalSeconds: 15
     observationPoint: Completed API requests, including failures. Requests that never reach the server are not observed.
   policies:
     - name: fast-burn
@@ -26,12 +23,10 @@ spec:
       shortWindow: 5m
       longWindow: 1h
       burnRate: 14.4
-      forSeconds: 120
-      minCoverage: 1
+      for: 2m
     - name: sustained-burn
       severity: warning
       shortWindow: 30m
       longWindow: 6h
       burnRate: 6
-      forSeconds: 300
-      minCoverage: 1
+      for: 5m

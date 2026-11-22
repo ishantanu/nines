@@ -166,7 +166,7 @@ nines dependencies discover --namespace commerce \
 ### Read observed evidence
 
 - Each observed link records the configured telemetry connection, a nonsecret connection fingerprint, the counter name, query window and read time. **Fresh sample** refers to the latest actual counter sample inspected inside that window, rather than the timestamp of an instant query result. **Stale sample**, **Sample age unverified**, **Source unavailable** and **Not seen in window** describe different gaps and remain visible in the evidence table. Expand **Evidence details** to inspect the timestamps and limits.
-- Configure `scrapeIntervalSeconds` to match the exporter scrape cadence and `maxSampleAgeSeconds` to set the tolerated sample age.
+- Configure `observed.scrapeInterval` to match the exporter scrape cadence and `observed.maxSampleAge` to set the tolerated sample age.
   - Defaults are 15 seconds and three scrape intervals (at least 30 seconds).
   - Sample continuity compares observed samples with the expected samples of the series present in the window.
   - It does not measure instrumentation or trace-sampling coverage.

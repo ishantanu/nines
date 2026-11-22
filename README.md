@@ -17,7 +17,7 @@ Service level objectives and critical user journeys as versioned YAML, with a po
 - **Work with agents:** use provider-configurable models, deterministic CLI skills and tenant-scoped MCP tools over stdio or opt-in [remote OAuth HTTP](docs/public/remote-mcp.md).
 - **Run it yourself:** use native binaries for Linux, macOS and Windows, [signed container images](docs/public/deployment/container-images.md), Docker Compose or Kubernetes.
 
-**Pre-release MVP, under active development.** APIs use `nines.dev/v1alpha1` and may change. Model-assisted workflows, visual evaluations and session replay are experimental; production-scale readiness has not been established.
+**Pre-release MVP, under active development.** Resources use `nines.dev/v1beta1` YAML; `nines.dev/v1alpha1` is still accepted. APIs may change before the stable release. Model-assisted workflows, visual evaluations and session replay are experimental; production-scale readiness has not been established.
 
 <a href="docs/public/brand/nines-overview.jpg">
   <img src="docs/public/brand/nines-overview.jpg" alt="Nines overview with synthetic SLO attainment, error budgets and linked critical user journeys" width="760">

@@ -166,7 +166,7 @@ nines apply --context production -f reviewed.yaml --expected-revision 0 --agent
   - After an ambiguous timeout, read back current revisions or the intent apply receipt before deciding whether to retry the exact reviewed request.
 - Deterministic here means typed inputs, the shared compiler, stable ordering, explicit side-effect classes and revision/digest checks.
   - It does not mean byte-reproducible live telemetry, timestamps or optional model output.
-  - Native resource types retain the shared `nines.dev/v1alpha1` YAML contract.
+  - Native resources are written as `nines.dev/v1beta1` YAML; `nines.dev/v1alpha1` is accepted with a deprecation note. See [resource format](public/resource-format.md).
 - Generate shell completion with `nines completion bash|zsh|fish|powershell`. Install the generated script in the shell's completion directory according to that shell's instructions; running generation does not modify shell configuration.
 - See [testing and verification limits](public/testing.md) for required clean-checkout and external-provider checks.
 - For the controller image, CRD installation, provider prerequisites and ownership boundaries, see the [operator guide](public/deployment/operator.md). Offline rendering does not install a controller or synchronize resources into the portal.

@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceDependencyMap
 metadata:
   name: checkout-services
@@ -6,15 +6,26 @@ metadata:
 spec:
   displayName: Checkout HTTP dependencies
   services:
-    - {name: gateway, displayName: Gateway, sloRefs: [graph-gateway-availability]}
-    - {name: checkout, displayName: Checkout, sloRefs: [graph-checkout-availability]}
-    - {name: payments, displayName: Payments, sloRefs: [graph-payments-availability]}
+    - name: gateway
+      displayName: Gateway
+      sloRefs: [graph-gateway-availability]
+    - name: checkout
+      displayName: Checkout
+      sloRefs: [graph-checkout-availability]
+    - name: payments
+      displayName: Payments
+      sloRefs: [graph-payments-availability]
   dependencies:
-    - {caller: gateway, callee: checkout, critical: true}
-    - {caller: checkout, callee: payments, critical: true}
+    - caller: gateway
+      callee: checkout
+      critical: true
+    - caller: checkout
+      callee: payments
+      critical: true
   observed:
-    source: primary
-    labels: {environment: playground, job: playground-service-graph}
-    windowSeconds: 60
-    scrapeIntervalSeconds: 5
-    maxSampleAgeSeconds: 15
+    labels:
+      environment: playground
+      job: playground-service-graph
+    window: 1m
+    scrapeInterval: 5s
+    maxSampleAge: 15s

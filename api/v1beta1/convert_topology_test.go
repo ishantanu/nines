@@ -15,7 +15,7 @@ import (
 func shipped(t *testing.T, kind string) map[string][]byte {
 	t.Helper()
 	out := map[string][]byte{}
-	files, _ := filepath.Glob("../../examples/*.yaml")
+	files, _ := filepath.Glob("testdata/v1alpha1/*.yaml")
 	for _, f := range files {
 		raw, err := os.ReadFile(f)
 		if err != nil {

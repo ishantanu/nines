@@ -576,7 +576,7 @@ export function App() {
                 <div>
                   <dt>Versioned YAML</dt>
                   <dd>
-                    A shared <code>nines.dev/v1alpha1</code> contract.
+                    A shared <code>nines.dev/v1beta1</code> contract.
                   </dd>
                 </div>
                 <div>

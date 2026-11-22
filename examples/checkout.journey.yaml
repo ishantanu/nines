@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: CriticalUserJourney
 metadata:
   name: complete-checkout
@@ -10,14 +10,12 @@ spec:
   criticality: critical
   slos:
     - id: api-availability
-      dimension: availability
       required: true
     - id: checkout-success
       dimension: correctness
       required: true
     - id: background-jobs
       dimension: latency
-      required: false
   steps:
     - id: submit-cart
       name: Submit cart

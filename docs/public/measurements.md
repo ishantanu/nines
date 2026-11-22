@@ -62,8 +62,7 @@ spec:
       shortWindow: 5m
       longWindow: 1h
       burnRate: 14.4
-      forSeconds: 120
-      minCoverage: 1
+      for: 2m
       minEvents: 100
       confidence: 0.99
 ```
@@ -107,7 +106,7 @@ spec:
     eventMetric: app_sessions_crashed_total
     labels:
       app: ios
-    scrapeIntervalSeconds: 15
+    scrapeInterval: 15s
     observationPoint: One increment per app session; the event counter increments once per crashed session.
   target: 0.995
 ```
@@ -122,19 +121,19 @@ spec:
 
 Some signals have a steady noise floor you cannot remove, such as client-side errors from poor networks or old devices. A plain event ratio then needs a very loose target, and a real incident can hide inside it. A good-interval SLO counts intervals instead.
 
-- In the portal, choose **Good-minute** under **SLO type** in **Define objective**. It opens **Settings** with custom queries and the **Good-minute** section enabled, where you enter the error rate and the optional minimum events. In YAML, add `spec.badInterval` to an SLO that uses `goodQuery` and `totalQuery` interval counts on a PromQL source.
+- In the portal, choose **Good-minute** under **SLO type** in **Define objective**. It opens **Settings** with custom queries and the **Good-minute** section enabled, where you enter the error rate and the optional minimum events. In YAML, add `spec.intervals` to an SLO that uses `queries` interval counts on a PromQL source.
   - `errorRate` (above 0 and below 1) is the line an interval must stay under. An interval is **bad** when its error ratio exceeds it.
   - `minEvents` is optional. An interval with fewer events is not judged, and an interval with no events is never judged.
   - With a 60 second step each interval is a minute, so a target of 99.9% means 99.9% of judged minutes must be good.
 
 ```yaml
 spec:
-  stepSeconds: 60
   target: 0.999
-  windowSeconds: 2592000
-  goodQuery: sum(increase(client_requests_ok_total[1m]))
-  totalQuery: sum(increase(client_requests_total[1m]))
-  badInterval:
+  window: 30d
+  queries:
+    good: sum(increase(client_requests_ok_total[1m]))
+    total: sum(increase(client_requests_total[1m]))
+  intervals:
     errorRate: 0.06
     minEvents: 20
 ```
@@ -150,7 +149,7 @@ spec:
 See the complete [availability SLO](../../examples/request-success.slo.yaml) and [latency SLO](../../examples/request-latency.slo.yaml), including two severity-based burn policies. For example:
 
 ```yaml
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
   name: request-success
@@ -158,19 +157,16 @@ metadata:
 spec:
   displayName: API request success
   service: api
-  source: primary
   target: 0.999
-  windowSeconds: 2419200 # Rolling 28 days
-  stepSeconds: 60
+  connection: primary
   measurement:
     type: availability
     metric: http_requests_total
     labels:
-      service: api
       environment: production
+      service: api
     successLabels:
       status: "200"
-    scrapeIntervalSeconds: 15
     observationPoint: Completed API requests, including failures. Requests that never reach the server are not observed.
   policies:
     - name: fast-burn
@@ -178,27 +174,26 @@ spec:
       shortWindow: 5m
       longWindow: 1h
       burnRate: 14.4
-      forSeconds: 120
-      minCoverage: 1
+      for: 2m
     - name: sustained-burn
       severity: warning
       shortWindow: 30m
       longWindow: 6h
       burnRate: 6
-      forSeconds: 300
-      minCoverage: 1
+      for: 5m
 ```
 
-- `source` identifies a tenant-configured connection, not a provider URL or credential.
+- The window (28 days), step (one minute) and scrape interval (15 seconds) are the defaults, so the file leaves them out. See [resource format](resource-format.md) for every default.
+- `connection` names a tenant-configured connection, not a provider URL or credential; omitted, it is `primary`.
   - Label filters are exact string matches. `labels` selects all eligible events; `successLabels` adds the matches for good events.
   - Availability currently supports positive equality success criteria, not regex/negation.
   - Use custom queries when the measurement requires more expressive logic. `countFrom: histogram` selects a classic histogram's `_count` for event counting.
-  - Latency uses the exact `thresholdSeconds` bucket and `_count` total; missing buckets, quantiles and native histograms are rejected.
-- `stepSeconds` must be 1–3600 and divide the rolling window.
+  - Latency uses the exact `threshold` bucket and `_count` total; missing buckets, quantiles and native histograms are rejected.
+- `step` must be 1s–1h and divide the rolling window.
   - A rolling window may be at most 31 days and contain at most 100,000 intervals; 28 days with 60-second intervals is 40,320 intervals.
   - The positive scrape interval must satisfy the provider-window constraints.
   - Short/long burn windows must align with the measurement interval.
-  - PromQL selectors and window calculations are generated deterministically; do not supply `providerWindow`, custom queries or `measurementBinding` alongside `measurement`.
+  - PromQL selectors and window calculations are generated deterministically; `measurement`, `queries` and `binding` are mutually exclusive.
 
 ## CLI, API and agents
 
@@ -230,7 +225,7 @@ nines apply -f examples/request-success.slo.yaml --expected-revision 0 --context
 
 ## Advanced and existing definitions
 
-- Direct `goodQuery`/`totalQuery` and `providerWindow` definitions remain available through Settings/YAML for advanced queries.
+- Direct `queries` (and `queries.window` for whole-window selectors) remain available through Settings/YAML for advanced queries.
   - An explicitly authored legacy `MeasurementBinding` and revision-pinned reference remain accepted for existing shared contracts, but they are not a prerequisite and have no primary navigation entry.
   - Nothing silently creates or updates one during the default flow.
 - Telemetry metadata and observed series verify instrument compatibility.
@@ -312,10 +307,9 @@ Synthetic demo workspace. The donut counts objectives by reported coverage, not 
 
 ## Burn alert window durations
 
-- Prefer `shortWindow: 5m` and `longWindow: 1h` in policies. `300s` and `1h30m` are also accepted.
-- Use positive whole-number `h`, `m` and `s` components. Day units, datetime strings, fractional components and subsecond units are not accepted for these windows.
-- Existing `shortWindowSeconds` and `longWindowSeconds` inputs remain supported. Specify exactly one representation per window; supplying both is an error.
-- YAML exports use readable duration fields. Runtime JSON responses, stored policy values and deterministic calculations retain numeric seconds. `forSeconds`, `windowSeconds` and other existing fields keep their current names and units.
+- In v1beta1 every duration uses positive whole-number `d`, `h`, `m`, `s` and `ms` components, such as `5m`, `1h30m` or `3d`. Fields other than `measurement.threshold` must come to whole seconds. Datetime strings, fractions and week units are rejected.
+- In v1alpha1, policy `shortWindow` and `longWindow` take `h`, `m` and `s` components or `shortWindowSeconds` and `longWindowSeconds`, never both; other v1alpha1 durations are numeric seconds.
+- Runtime JSON responses, stored policy values and deterministic calculations use numeric seconds.
 - The CLI, API, MCP resource apply and Kubernetes operator use the same parser and policy constraints. Duration syntax does not change burn-rate thresholds, alignment requirements or evaluation behavior.
 
 ## Delayed scheduled collection

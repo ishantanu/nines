@@ -45,11 +45,11 @@ spec:
     approvalRequired: true
   runObjective:
     target: 0.9
-    windowSeconds: 604800
+    window: 7d
     minRuns: 20
 ```
 
-- `target` is the share of judged runs that must pass. `windowSeconds` is how far back runs count, from one hour to 31 days. `minRuns` is the fewest judged runs before the objective is read.
+- `target` is the share of judged runs that must pass. `window` is how far back runs count, from one hour to 31 days. `minRuns` is the fewest judged runs before the objective is read.
 - A **passed** run is good, and **failed** and **violated** runs are bad. **Incomplete** and **inconclusive** runs are unjudged and are never counted as success, so they cannot rescue a result.
 - Only runs recorded against the journey's current contract count. After a revision, older runs are listed as another contract and excluded, so evidence is always bound to the definition it was judged against.
 - With too few judged runs the objective is not scored and the journey's health is **unknown**, not healthy. When the objective is met health is unaffected, and when it is missed health becomes **degraded** with the reason stated. A journey without `runObjective` behaves exactly as before.

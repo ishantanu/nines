@@ -145,7 +145,7 @@ func ptr[T any](v T) *T { return &v }
 func buildFixtures(t *testing.T) fixtures {
 	t.Helper()
 	var out fixtures
-	files, _ := filepath.Glob("../../examples/*.slo.yaml")
+	files, _ := filepath.Glob("testdata/v1alpha1/*.slo.yaml")
 	sort.Strings(files)
 	for _, f := range files {
 		raw, _ := os.ReadFile(f)

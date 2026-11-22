@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: MeasurementBinding
 metadata:
   name: api-latency
@@ -6,13 +6,11 @@ metadata:
 spec:
   displayName: API requests under 300 milliseconds
   service: api
-  source: primary
-  measurement: latency
+  type: latency
   metric: http_request_duration_seconds
   labels:
-    service: api
     environment: production
-  thresholdSeconds: 0.3
-  scrapeIntervalSeconds: 15 # Match your telemetry source configuration
-  stepSeconds: 60
+    service: api
+  threshold: 300ms
+  scrapeInterval: 15s
   observationPoint: Completed request durations at the API server; includes all status codes

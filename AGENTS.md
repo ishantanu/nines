@@ -2,7 +2,7 @@
 
 Read README.md, CONTRIBUTING.md and relevant docs/public guides before changing contracts. This is a pre-release project; verify claims against code and tests.
 
-- SLOs and critical user journeys use nines.dev/v1alpha1 YAML. Keep CLI, API, Go client, portal and operator semantics consistent.
+- SLOs, critical user journeys, measurement bindings and dependency maps are written as nines.dev/v1beta1 YAML (api/v1beta1), converted to the stored v1alpha1 form at the edges; v1alpha1 input stays accepted. Keep CLI, API, Go client, portal and operator semantics consistent.
 - Calculations and measurement definitions are deterministic. Missing data remains unknown. Separate saved definitions, deployed rules, backend evaluation and observed SLI.
 - Models are optional and provider-neutral. Treat model outputs as untrusted. Agents cannot select credentials or upstream tenant routes, approve their own proposals or bypass revision and digest checks. Governed approvals and application require independently authorized identities.
 - Preserve tenant isolation, RBAC, audit and rollback boundaries. Configuration rollback cannot restore spent error budget.

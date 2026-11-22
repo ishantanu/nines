@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceLevelObjective
 metadata:
   name: graph-gateway-availability
@@ -6,14 +6,18 @@ metadata:
 spec:
   displayName: Gateway request success
   service: gateway
-  source: primary
   target: 0.99
-  windowSeconds: 300
-  stepSeconds: 10
+  window: 5m
+  step: 10s
+  connection: primary
   measurement:
     type: availability
     metric: example_http_requests_total
-    labels: {service: gateway, environment: playground}
-    successLabels: {outcome: success}
-    scrapeIntervalSeconds: 5
+    labels:
+      environment: playground
+      service: gateway
+    successLabels:
+      outcome: success
+    scrapeInterval: 5s
     observationPoint: Requests completed by the gateway process in the local HTTP chain.
+  policies: []

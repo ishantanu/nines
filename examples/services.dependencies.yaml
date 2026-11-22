@@ -1,4 +1,4 @@
-apiVersion: nines.dev/v1alpha1
+apiVersion: nines.dev/v1beta1
 kind: ServiceDependencyMap
 metadata:
   name: commerce
@@ -25,7 +25,6 @@ spec:
       critical: true
       description: Payment authorization
   observed:
-    source: primary
     labels:
       environment: production
-    windowSeconds: 900
+    window: 15m
