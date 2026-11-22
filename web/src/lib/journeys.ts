@@ -1,3 +1,4 @@
+import { V1BETA1, journeyFromBeta, type SLOTypeLookup } from "./v1beta1";
 import { parse } from "yaml";
 import { RESOURCE_API_VERSION } from "./definitions";
 import type { Manifest } from "./api";
@@ -25,8 +26,15 @@ export function newJourney(): Manifest {
   };
 }
 // Reject shapes the form cannot represent. Semantic validation stays server-owned.
-export function parseJourney(text: string): Manifest {
-  const m = parse(text) as Manifest;
+export function parseJourney(text: string, lookup?: SLOTypeLookup): Manifest {
+  const raw: unknown = parse(text);
+  // v1beta1 is converted to the stored form the editor works on; omitted link
+  // dimensions follow the linked SLOs' types when the lookup knows them.
+  const m = (
+    raw && (raw as { apiVersion?: string }).apiVersion === V1BETA1
+      ? journeyFromBeta(raw, lookup).journey
+      : raw
+  ) as Manifest;
   if (
     !m ||
     m.apiVersion !== RESOURCE_API_VERSION ||

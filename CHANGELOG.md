@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The portal shows critical user journeys, measurement bindings and dependency maps as `nines.dev/v1beta1` too, and the journey and dependency map editors accept v1beta1. The journey editor sets omitted link dimensions from the SLOs it has loaded, as the server does. Fixtures generated from the Go conversion now cover all four kinds.
 - The portal's YAML views show SLOs as `nines.dev/v1beta1` and the SLO editor accepts v1beta1 or v1alpha1. The browser conversion is checked against fixtures generated from the Go conversion, so the two cannot disagree. Exporting and re-applying a definition is exact: a single unnamed policy stays the legacy single policy, the connection is written as stored, and an SLO created from a goal keeps its provenance when edited as v1beta1, so its export plans as unchanged.
 - Fixed a demo seeding race: when seeding crossed a minute boundary, the backfill fell one step outside the retained history and startup failed.
 - Stored definitions export as `nines.dev/v1beta1`: manifest endpoints (and so `nines export`, MCP export and Git delivery proposals) return v1beta1 unless `?apiVersion=nines.dev/v1alpha1` is asked for; digests and revision checks are unchanged. `nines init` writes v1beta1 and, without burn flags, leaves `policies` out so the SLO gets the standard alerts. `plan` and `nines validate` report the defaults applied as `notes`, and reading v1alpha1 adds a deprecation note. Every endpoint and tool that reads a definition accepts both versions.

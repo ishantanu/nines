@@ -1,3 +1,4 @@
+import { V1BETA1, dependencyMapFromBeta } from "./v1beta1";
 import { parse } from "yaml";
 import { RESOURCE_API_VERSION } from "./definitions";
 import { mapKind, type GraphPosition } from "./topology";
@@ -30,7 +31,12 @@ export interface DependencyManifest {
   };
 }
 export function dependencyManifest(text: string): DependencyManifest {
-  const d = parse(text, { maxAliasCount: 0 }) as DependencyManifest;
+  const raw: unknown = parse(text, { maxAliasCount: 0 });
+  const d = (
+    raw && (raw as { apiVersion?: string }).apiVersion === V1BETA1
+      ? dependencyMapFromBeta(raw)
+      : raw
+  ) as DependencyManifest;
   if (
     d?.apiVersion !== RESOURCE_API_VERSION ||
     d.kind !== mapKind ||

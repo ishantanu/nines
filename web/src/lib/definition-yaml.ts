@@ -1,6 +1,11 @@
 import { stringify } from "yaml";
 import type { SLODefinition } from "./definitions";
-import { sloToBeta } from "./v1beta1";
+import {
+  bindingToBeta,
+  dependencyMapToBeta,
+  journeyToBeta,
+  sloToBeta,
+} from "./v1beta1";
 
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -21,6 +26,18 @@ export function stringifyDefinition(value: unknown): string {
     object(value.spec)
   )
     return stringify(sloToBeta(value as unknown as SLODefinition));
+  if (
+    object(value) &&
+    value.apiVersion === "nines.dev/v1alpha1" &&
+    object(value.spec)
+  ) {
+    if (value.kind === "CriticalUserJourney")
+      return stringify(journeyToBeta(value));
+    if (value.kind === "MeasurementBinding")
+      return stringify(bindingToBeta(value));
+    if (value.kind === "ServiceDependencyMap")
+      return stringify(dependencyMapToBeta(value));
+  }
   return stringify(value, (_key, item: unknown) => {
     if (!object(item) || typeof item.burnRate !== "number") return item;
     const entries = Object.entries(item).map(([key, value]) => {

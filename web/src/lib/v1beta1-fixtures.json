@@ -1121,5 +1121,926 @@
       "notes": [],
       "error": "an SLO is measured by at most one of measurement, queries or binding; found 2"
     }
+  ],
+  "journeyExport": [
+    {
+      "name": "agent-resolution.journey.yaml",
+      "slos": {
+        "api-availability": "",
+        "background-jobs": ""
+      },
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "assisted-resolution",
+          "project": "demo"
+        },
+        "spec": {
+          "displayName": "Resolve a support request",
+          "description": "An agent investigates a request and a human approves the proposed resolution.",
+          "owner": "team-customer-platform",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "api-availability",
+              "dimension": "availability",
+              "required": true
+            },
+            {
+              "id": "background-jobs",
+              "dimension": "correctness",
+              "required": true
+            }
+          ],
+          "steps": [
+            {
+              "id": "receive-request",
+              "name": "Receive request",
+              "actor": "user",
+              "sloRefs": [
+                "api-availability"
+              ]
+            },
+            {
+              "id": "investigate",
+              "name": "Investigate and propose",
+              "actor": "agent",
+              "dependsOn": [
+                "receive-request"
+              ],
+              "sloRefs": [
+                "background-jobs"
+              ]
+            },
+            {
+              "id": "approve",
+              "name": "Approve resolution",
+              "actor": "human",
+              "dependsOn": [
+                "investigate"
+              ],
+              "sloRefs": [
+                "api-availability"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Customer issue resolved with a verified answer and recorded human approval.",
+            "maxDurationSeconds": 120,
+            "maxCostUSD": 0.25,
+            "maxSteps": 12,
+            "approvalRequired": true
+          }
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "assisted-resolution",
+          "project": "demo"
+        },
+        "spec": {
+          "displayName": "Resolve a support request",
+          "description": "An agent investigates a request and a human approves the proposed resolution.",
+          "owner": "team-customer-platform",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "api-availability",
+              "required": true
+            },
+            {
+              "id": "background-jobs",
+              "dimension": "correctness",
+              "required": true
+            }
+          ],
+          "steps": [
+            {
+              "id": "receive-request",
+              "name": "Receive request",
+              "actor": "user",
+              "sloRefs": [
+                "api-availability"
+              ]
+            },
+            {
+              "id": "investigate",
+              "name": "Investigate and propose",
+              "actor": "agent",
+              "dependsOn": [
+                "receive-request"
+              ],
+              "sloRefs": [
+                "background-jobs"
+              ]
+            },
+            {
+              "id": "approve",
+              "name": "Approve resolution",
+              "actor": "human",
+              "dependsOn": [
+                "investigate"
+              ],
+              "sloRefs": [
+                "api-availability"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Customer issue resolved with a verified answer and recorded human approval.",
+            "maxDuration": "2m",
+            "maxCostUSD": 0.25,
+            "maxSteps": 12,
+            "approvalRequired": true
+          }
+        }
+      },
+      "notes": []
+    },
+    {
+      "name": "checkout.journey.yaml",
+      "slos": {
+        "api-availability": "",
+        "background-jobs": "latency",
+        "checkout-success": ""
+      },
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "complete-checkout",
+          "project": "demo"
+        },
+        "spec": {
+          "displayName": "Complete checkout",
+          "description": "A customer can submit a cart, pay, and receive confirmation.",
+          "owner": "team-commerce",
+          "criticality": "critical",
+          "slos": [
+            {
+              "id": "api-availability",
+              "dimension": "availability",
+              "required": true
+            },
+            {
+              "id": "checkout-success",
+              "dimension": "correctness",
+              "required": true
+            },
+            {
+              "id": "background-jobs",
+              "dimension": "latency",
+              "required": false
+            }
+          ],
+          "steps": [
+            {
+              "id": "submit-cart",
+              "name": "Submit cart",
+              "actor": "user",
+              "sloRefs": [
+                "api-availability"
+              ]
+            },
+            {
+              "id": "authorize-payment",
+              "name": "Authorize payment",
+              "actor": "service",
+              "dependsOn": [
+                "submit-cart"
+              ],
+              "sloRefs": [
+                "checkout-success"
+              ]
+            },
+            {
+              "id": "send-confirmation",
+              "name": "Send confirmation",
+              "actor": "service",
+              "dependsOn": [
+                "authorize-payment"
+              ],
+              "sloRefs": [
+                "background-jobs"
+              ]
+            }
+          ]
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "complete-checkout",
+          "project": "demo"
+        },
+        "spec": {
+          "displayName": "Complete checkout",
+          "description": "A customer can submit a cart, pay, and receive confirmation.",
+          "owner": "team-commerce",
+          "criticality": "critical",
+          "slos": [
+            {
+              "id": "api-availability",
+              "required": true
+            },
+            {
+              "id": "checkout-success",
+              "dimension": "correctness",
+              "required": true
+            },
+            {
+              "id": "background-jobs"
+            }
+          ],
+          "steps": [
+            {
+              "id": "submit-cart",
+              "name": "Submit cart",
+              "actor": "user",
+              "sloRefs": [
+                "api-availability"
+              ]
+            },
+            {
+              "id": "authorize-payment",
+              "name": "Authorize payment",
+              "actor": "service",
+              "dependsOn": [
+                "submit-cart"
+              ],
+              "sloRefs": [
+                "checkout-success"
+              ]
+            },
+            {
+              "id": "send-confirmation",
+              "name": "Send confirmation",
+              "actor": "service",
+              "dependsOn": [
+                "authorize-payment"
+              ],
+              "sloRefs": [
+                "background-jobs"
+              ]
+            }
+          ]
+        }
+      },
+      "notes": []
+    }
+  ],
+  "journeyImport": [
+    {
+      "name": "derived dimensions",
+      "slos": {
+        "api": "",
+        "search": "latency",
+        "store": "durability"
+      },
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "checkout",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Checkout",
+          "description": "Buy.",
+          "owner": "team",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "api",
+              "dimension": "availability",
+              "required": true
+            },
+            {
+              "id": "search",
+              "dimension": "latency",
+              "required": false
+            },
+            {
+              "id": "store",
+              "dimension": "correctness",
+              "required": false
+            },
+            {
+              "id": "spend",
+              "dimension": "cost",
+              "required": false
+            }
+          ],
+          "steps": [
+            {
+              "id": "pay",
+              "name": "Pay",
+              "actor": "user",
+              "sloRefs": [
+                "api",
+                "search",
+                "store",
+                "spend"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Paid.",
+            "maxDurationSeconds": 120,
+            "maxSteps": 4,
+            "approvalRequired": false
+          },
+          "runObjective": {
+            "target": 0.9,
+            "windowSeconds": 86400,
+            "minRuns": 5
+          }
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "checkout",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Checkout",
+          "description": "Buy.",
+          "owner": "team",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "api",
+              "required": true
+            },
+            {
+              "id": "search"
+            },
+            {
+              "id": "store"
+            },
+            {
+              "id": "spend",
+              "dimension": "cost"
+            }
+          ],
+          "steps": [
+            {
+              "id": "pay",
+              "name": "Pay",
+              "actor": "user",
+              "sloRefs": [
+                "api",
+                "search",
+                "store",
+                "spend"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Paid.",
+            "maxDuration": "2m",
+            "maxSteps": 4
+          },
+          "runObjective": {
+            "target": 0.9,
+            "window": "1d",
+            "minRuns": 5
+          }
+        }
+      },
+      "notes": []
+    },
+    {
+      "name": "contradiction",
+      "slos": {
+        "api": "",
+        "search": "latency",
+        "store": "durability"
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "checkout",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Checkout",
+          "description": "Buy.",
+          "owner": "team",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "search",
+              "dimension": "availability"
+            }
+          ],
+          "steps": [
+            {
+              "id": "pay",
+              "name": "Pay",
+              "actor": "user",
+              "sloRefs": [
+                "search"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Paid.",
+            "maxDuration": "2m",
+            "maxSteps": 4
+          },
+          "runObjective": {
+            "target": 0.9,
+            "window": "1d",
+            "minRuns": 5
+          }
+        }
+      },
+      "notes": [],
+      "error": "slos search: dimension availability contradicts the SLO, which measures latency; omit dimension to use the SLO's"
+    },
+    {
+      "name": "untyped explicit",
+      "slos": {
+        "api": "",
+        "search": "latency",
+        "store": "durability"
+      },
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "checkout",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Checkout",
+          "description": "Buy.",
+          "owner": "team",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "api",
+              "dimension": "correctness",
+              "required": false
+            }
+          ],
+          "steps": [
+            {
+              "id": "pay",
+              "name": "Pay",
+              "actor": "user",
+              "sloRefs": [
+                "api"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Paid.",
+            "maxDurationSeconds": 120,
+            "maxSteps": 4,
+            "approvalRequired": false
+          },
+          "runObjective": {
+            "target": 0.9,
+            "windowSeconds": 86400,
+            "minRuns": 5
+          }
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "checkout",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Checkout",
+          "description": "Buy.",
+          "owner": "team",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "api",
+              "dimension": "correctness"
+            }
+          ],
+          "steps": [
+            {
+              "id": "pay",
+              "name": "Pay",
+              "actor": "user",
+              "sloRefs": [
+                "api"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Paid.",
+            "maxDuration": "2m",
+            "maxSteps": 4
+          },
+          "runObjective": {
+            "target": 0.9,
+            "window": "1d",
+            "minRuns": 5
+          }
+        }
+      },
+      "notes": []
+    },
+    {
+      "name": "unknown SLO",
+      "slos": {
+        "api": "",
+        "search": "latency",
+        "store": "durability"
+      },
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "checkout",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Checkout",
+          "description": "Buy.",
+          "owner": "team",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "missing",
+              "dimension": "availability",
+              "required": false
+            }
+          ],
+          "steps": [
+            {
+              "id": "pay",
+              "name": "Pay",
+              "actor": "user",
+              "sloRefs": [
+                "missing"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Paid.",
+            "maxDurationSeconds": 120,
+            "maxSteps": 4,
+            "approvalRequired": false
+          },
+          "runObjective": {
+            "target": 0.9,
+            "windowSeconds": 86400,
+            "minRuns": 5
+          }
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "CriticalUserJourney",
+        "metadata": {
+          "name": "checkout",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Checkout",
+          "description": "Buy.",
+          "owner": "team",
+          "criticality": "high",
+          "slos": [
+            {
+              "id": "missing"
+            }
+          ],
+          "steps": [
+            {
+              "id": "pay",
+              "name": "Pay",
+              "actor": "user",
+              "sloRefs": [
+                "missing"
+              ]
+            }
+          ],
+          "agentic": {
+            "successDefinition": "Paid.",
+            "maxDuration": "2m",
+            "maxSteps": 4
+          },
+          "runObjective": {
+            "target": 0.9,
+            "window": "1d",
+            "minRuns": 5
+          }
+        }
+      },
+      "notes": [
+        "slos missing: dimension assumed to be availability; the server sets it from the SLO's type"
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "name": "request-latency.binding.yaml",
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "MeasurementBinding",
+        "metadata": {
+          "name": "api-latency",
+          "project": "production"
+        },
+        "spec": {
+          "scrapeIntervalSeconds": 15,
+          "displayName": "API requests under 300 milliseconds",
+          "service": "api",
+          "source": "primary",
+          "measurement": "latency",
+          "metric": "http_request_duration_seconds",
+          "labels": {
+            "environment": "production",
+            "service": "api"
+          },
+          "thresholdSeconds": 0.3,
+          "stepSeconds": 60,
+          "observationPoint": "Completed request durations at the API server; includes all status codes"
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "MeasurementBinding",
+        "metadata": {
+          "name": "api-latency",
+          "project": "production"
+        },
+        "spec": {
+          "displayName": "API requests under 300 milliseconds",
+          "service": "api",
+          "type": "latency",
+          "metric": "http_request_duration_seconds",
+          "labels": {
+            "environment": "production",
+            "service": "api"
+          },
+          "threshold": "300ms",
+          "scrapeInterval": "15s",
+          "observationPoint": "Completed request durations at the API server; includes all status codes"
+        }
+      }
+    },
+    {
+      "name": "request-success.binding.yaml",
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "MeasurementBinding",
+        "metadata": {
+          "name": "api-success",
+          "project": "production"
+        },
+        "spec": {
+          "scrapeIntervalSeconds": 15,
+          "displayName": "API request success",
+          "service": "api",
+          "source": "primary",
+          "measurement": "availability",
+          "metric": "http_requests_total",
+          "labels": {
+            "environment": "production",
+            "service": "api"
+          },
+          "successLabels": {
+            "status": "200"
+          },
+          "stepSeconds": 60,
+          "observationPoint": "Completed server requests at the API boundary; request attempts, not unique users"
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "MeasurementBinding",
+        "metadata": {
+          "name": "api-success",
+          "project": "production"
+        },
+        "spec": {
+          "displayName": "API request success",
+          "service": "api",
+          "type": "availability",
+          "metric": "http_requests_total",
+          "labels": {
+            "environment": "production",
+            "service": "api"
+          },
+          "successLabels": {
+            "status": "200"
+          },
+          "scrapeInterval": "15s",
+          "observationPoint": "Completed server requests at the API boundary; request attempts, not unique users"
+        }
+      }
+    }
+  ],
+  "dependencyMaps": [
+    {
+      "name": "observed",
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "ServiceDependencyMap",
+        "metadata": {
+          "name": "commerce",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Commerce",
+          "services": [
+            {
+              "position": {
+                "x": 10,
+                "y": 20
+              },
+              "name": "api",
+              "displayName": "API",
+              "sloRefs": [
+                "api"
+              ]
+            }
+          ],
+          "dependencies": [
+            {
+              "caller": "api",
+              "callee": "db",
+              "critical": true
+            }
+          ],
+          "observed": {
+            "scrapeIntervalSeconds": 30,
+            "maxSampleAgeSeconds": 120,
+            "source": "mimir",
+            "labels": {
+              "cluster": "a"
+            },
+            "windowSeconds": 3600
+          }
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "ServiceDependencyMap",
+        "metadata": {
+          "name": "commerce",
+          "project": "p"
+        },
+        "spec": {
+          "displayName": "Commerce",
+          "services": [
+            {
+              "position": {
+                "x": 10,
+                "y": 20
+              },
+              "name": "api",
+              "displayName": "API",
+              "sloRefs": [
+                "api"
+              ]
+            }
+          ],
+          "dependencies": [
+            {
+              "caller": "api",
+              "callee": "db",
+              "critical": true
+            }
+          ],
+          "observed": {
+            "connection": "mimir",
+            "labels": {
+              "cluster": "a"
+            },
+            "window": "1h",
+            "scrapeInterval": "30s",
+            "maxSampleAge": "2m"
+          }
+        }
+      }
+    },
+    {
+      "name": "services.dependencies.yaml",
+      "hub": {
+        "apiVersion": "nines.dev/v1alpha1",
+        "kind": "ServiceDependencyMap",
+        "metadata": {
+          "name": "commerce",
+          "project": "production"
+        },
+        "spec": {
+          "displayName": "Commerce services",
+          "services": [
+            {
+              "name": "gateway",
+              "displayName": "API gateway",
+              "sloRefs": [
+                "api-availability"
+              ]
+            },
+            {
+              "name": "checkout",
+              "displayName": "Checkout",
+              "sloRefs": [
+                "checkout-success"
+              ]
+            },
+            {
+              "name": "payments",
+              "displayName": "Payment provider",
+              "sloRefs": []
+            }
+          ],
+          "dependencies": [
+            {
+              "caller": "gateway",
+              "callee": "checkout",
+              "critical": true,
+              "description": "Checkout requests"
+            },
+            {
+              "caller": "checkout",
+              "callee": "payments",
+              "critical": true,
+              "description": "Payment authorization"
+            }
+          ],
+          "observed": {
+            "source": "primary",
+            "labels": {
+              "environment": "production"
+            },
+            "windowSeconds": 900
+          }
+        }
+      },
+      "beta": {
+        "apiVersion": "nines.dev/v1beta1",
+        "kind": "ServiceDependencyMap",
+        "metadata": {
+          "name": "commerce",
+          "project": "production"
+        },
+        "spec": {
+          "displayName": "Commerce services",
+          "services": [
+            {
+              "name": "gateway",
+              "displayName": "API gateway",
+              "sloRefs": [
+                "api-availability"
+              ]
+            },
+            {
+              "name": "checkout",
+              "displayName": "Checkout",
+              "sloRefs": [
+                "checkout-success"
+              ]
+            },
+            {
+              "name": "payments",
+              "displayName": "Payment provider",
+              "sloRefs": []
+            }
+          ],
+          "dependencies": [
+            {
+              "caller": "gateway",
+              "callee": "checkout",
+              "critical": true,
+              "description": "Checkout requests"
+            },
+            {
+              "caller": "checkout",
+              "callee": "payments",
+              "critical": true,
+              "description": "Payment authorization"
+            }
+          ],
+          "observed": {
+            "labels": {
+              "environment": "production"
+            },
+            "window": "15m"
+          }
+        }
+      }
+    }
   ]
 }

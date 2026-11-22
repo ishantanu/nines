@@ -29,9 +29,115 @@ type importCase struct {
 	Notes []string                        `json:"notes"`
 	Error string                          `json:"error,omitempty"`
 }
+
+// Journey cases record the linked SLOs' measurement types ("" for an SLO
+// without one) so the TypeScript side can build the same lookup.
+type journeyCase struct {
+	Name  string                        `json:"name"`
+	SLOs  map[string]string             `json:"slos"`
+	Hub   *v1alpha1.CriticalUserJourney `json:"hub,omitempty"`
+	Beta  CriticalUserJourney           `json:"beta"`
+	Notes []string                      `json:"notes"`
+	Error string                        `json:"error,omitempty"`
+}
+type bindingCase struct {
+	Name string                      `json:"name"`
+	Hub  v1alpha1.MeasurementBinding `json:"hub"`
+	Beta MeasurementBinding          `json:"beta"`
+}
+type mapCase struct {
+	Name string                        `json:"name"`
+	Hub  v1alpha1.ServiceDependencyMap `json:"hub"`
+	Beta ServiceDependencyMap          `json:"beta"`
+}
 type fixtures struct {
-	Export []exportCase `json:"export"`
-	Import []importCase `json:"import"`
+	Export         []exportCase  `json:"export"`
+	Import         []importCase  `json:"import"`
+	JourneyExport  []journeyCase `json:"journeyExport"`
+	JourneyImport  []journeyCase `json:"journeyImport"`
+	Bindings       []bindingCase `json:"bindings"`
+	DependencyMaps []mapCase     `json:"dependencyMaps"`
+}
+
+func typedLookup(slos map[string]string) SLOLookup {
+	return func(id string) (v1alpha1.SLOSpec, bool) {
+		kind, ok := slos[id]
+		if !ok {
+			return v1alpha1.SLOSpec{}, false
+		}
+		if kind == "" {
+			return v1alpha1.SLOSpec{}, true
+		}
+		return v1alpha1.SLOSpec{Measurement: &v1alpha1.MeasurementSpec{Type: kind}}, true
+	}
+}
+
+func addTopologyFixtures(t *testing.T, out *fixtures) {
+	t.Helper()
+	for name, raw := range shipped(t, JourneyKind) {
+		var hub v1alpha1.CriticalUserJourney
+		if err := yaml.Unmarshal(raw, &hub); err != nil {
+			t.Fatal(err)
+		}
+		slos := map[string]string{}
+		for _, l := range hub.Spec.SLOs {
+			slos[l.ID] = ""
+			if l.Dimension == "latency" {
+				slos[l.ID] = "latency"
+			}
+		}
+		h := hub
+		out.JourneyExport = append(out.JourneyExport, journeyCase{Name: name, SLOs: slos, Hub: &h, Beta: JourneyFromHub(hub, typedLookup(slos)), Notes: []string{}})
+	}
+	links := func(l ...JourneySLO) CriticalUserJourney {
+		refs := []string{}
+		for _, x := range l {
+			refs = append(refs, x.ID)
+		}
+		return CriticalUserJourney{APIVersion: APIVersion, Kind: JourneyKind, Metadata: Metadata{Name: "checkout", Project: "p"}, Spec: JourneySpec{DisplayName: "Checkout", Description: "Buy.", Owner: "team", Criticality: "high", SLOs: l, Steps: []JourneyStep{{ID: "pay", Name: "Pay", Actor: "user", SLORefs: refs}}, RunObjective: &RunObjective{Target: 0.9, Window: D(86400e9), MinRuns: 5}, Agentic: &AgenticContract{SuccessDefinition: "Paid.", MaxDuration: ptr(D(120e9)), MaxSteps: 4}}}
+	}
+	slos := map[string]string{"api": "", "search": "latency", "store": "durability"}
+	for _, c := range []struct {
+		name string
+		beta CriticalUserJourney
+		slos map[string]string
+	}{
+		{"derived dimensions", links(JourneySLO{ID: "api", Required: true}, JourneySLO{ID: "search"}, JourneySLO{ID: "store"}, JourneySLO{ID: "spend", Dimension: "cost"}), slos},
+		{"contradiction", links(JourneySLO{ID: "search", Dimension: "availability"}), slos},
+		{"untyped explicit", links(JourneySLO{ID: "api", Dimension: "correctness"}), slos},
+		{"unknown SLO", links(JourneySLO{ID: "missing"}), slos},
+	} {
+		hub, notes, err := c.beta.ToHub(typedLookup(c.slos))
+		jc := journeyCase{Name: c.name, SLOs: c.slos, Beta: c.beta, Notes: notes}
+		if notes == nil {
+			jc.Notes = []string{}
+		}
+		if err != nil {
+			jc.Error = err.Error()
+		} else {
+			jc.Hub = &hub
+		}
+		out.JourneyImport = append(out.JourneyImport, jc)
+	}
+	for name, raw := range shipped(t, BindingKind) {
+		var hub v1alpha1.MeasurementBinding
+		if err := yaml.Unmarshal(raw, &hub); err != nil {
+			t.Fatal(err)
+		}
+		out.Bindings = append(out.Bindings, bindingCase{name, hub, BindingFromHub(hub)})
+	}
+	observed := v1alpha1.ServiceDependencyMap{APIVersion: v1alpha1.APIVersion, Kind: DependencyMapKind, Metadata: Metadata{Name: "commerce", Project: "p"}, Spec: v1alpha1.DependencyMapSpec{DisplayName: "Commerce", Services: []v1alpha1.MapService{{Name: "api", DisplayName: "API", SLORefs: []string{"api"}, Position: &v1alpha1.GraphPosition{X: 10, Y: 20}}}, Dependencies: []v1alpha1.DeclaredDependency{{Caller: "api", Callee: "db", Critical: true}}, Observed: &v1alpha1.GraphObservation{Source: "mimir", Labels: map[string]string{"cluster": "a"}, WindowSeconds: 3600, ScrapeIntervalSeconds: 30, MaxSampleAgeSeconds: 120}}}
+	out.DependencyMaps = append(out.DependencyMaps, mapCase{"observed", observed, DependencyMapFromHub(observed)})
+	for name, raw := range shipped(t, DependencyMapKind) {
+		var hub v1alpha1.ServiceDependencyMap
+		if err := yaml.Unmarshal(raw, &hub); err != nil {
+			t.Fatal(err)
+		}
+		out.DependencyMaps = append(out.DependencyMaps, mapCase{name, hub, DependencyMapFromHub(hub)})
+	}
+	sort.Slice(out.JourneyExport, func(i, j int) bool { return out.JourneyExport[i].Name < out.JourneyExport[j].Name })
+	sort.Slice(out.Bindings, func(i, j int) bool { return out.Bindings[i].Name < out.Bindings[j].Name })
+	sort.Slice(out.DependencyMaps, func(i, j int) bool { return out.DependencyMaps[i].Name < out.DependencyMaps[j].Name })
 }
 
 func ptr[T any](v T) *T { return &v }
@@ -99,6 +205,7 @@ func buildFixtures(t *testing.T) fixtures {
 		}
 		out.Import = append(out.Import, c)
 	}
+	addTopologyFixtures(t, &out)
 	return out
 }
 

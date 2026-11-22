@@ -108,7 +108,13 @@ export function ManifestEditor({
   function changeMode(value: string) {
     try {
       if (value === "yaml") setText(stringify(draft));
-      else setDraft(parseJourney(text));
+      else
+        setDraft(
+          parseJourney(text, (id) => {
+            const slo = objectives.find((o) => o.id === id);
+            return slo ? (slo.measurement?.type ?? "") : undefined;
+          }),
+        );
       setMode(value);
       setPlan(null);
       setError("");
