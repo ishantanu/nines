@@ -21,6 +21,9 @@ func validateBudgetPolicy(p *v1.ErrorBudgetPolicy) error {
 	if !Finite(p.ReviewBelow) || p.ReviewBelow < 0 || p.ReviewBelow > 1 {
 		return Invalid("errorBudgetPolicy.reviewBelow must be a remaining-budget fraction between 0 and 1")
 	}
+	if !Finite(p.PostmortemAbove) || p.PostmortemAbove < 0 || p.PostmortemAbove > 1 {
+		return Invalid("errorBudgetPolicy.postmortemAbove must be a budget fraction between 0 and 1; 0 turns it off")
+	}
 	if p.OnExhausted != "" && p.OnExhausted != "blocked" && p.OnExhausted != "review_required" {
 		return Invalid("errorBudgetPolicy.onExhausted must be blocked or review_required")
 	}

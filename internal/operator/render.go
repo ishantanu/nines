@@ -216,7 +216,7 @@ func schemaFor(t reflect.Type) map[string]any {
 			}
 			if t == reflect.TypeOf(domain.ErrorBudgetPolicy{}) {
 				switch name {
-				case "reviewBelow":
+				case "reviewBelow", "postmortemAbove":
 					properties[name] = map[string]any{"type": "number", "minimum": 0, "maximum": 1}
 				case "onExhausted":
 					properties[name] = map[string]any{"type": "string", "enum": []string{"blocked", "review_required"}}

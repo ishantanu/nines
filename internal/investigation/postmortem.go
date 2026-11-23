@@ -216,7 +216,15 @@ func (s *Service) SavePostmortem(ctx context.Context, id string, in v1.SavePostm
 	sum := sha256.Sum256(b)
 	digest := "sha256:" + hex.EncodeToString(sum[:])
 	saved, err := s.append(ctx, id, in.ExpectedVersion, v1.InvestigationEntry{ID: in.ID, Kind: "postmortem", Actor: actor, CreatedAt: s.Platform.Now().UTC(), Text: digest, Postmortem: &p})
-	return saved, Findings(p), err
+	if err != nil {
+		return saved, nil, err
+	}
+	// Record it on the incident, so a required postmortem counts as written
+	// once published. A retried save is a no-op above and repeats this.
+	if err = s.Platform.RecordPostmortem(ctx, v.Scope.ResourceID, v.ID, p.Published); err != nil {
+		return saved, nil, fmt.Errorf("postmortem saved, but linking it to the incident failed; save again: %w", err)
+	}
+	return saved, Findings(p), nil
 }
 
 // OpenActionItems lists open action items from the latest postmortem of each

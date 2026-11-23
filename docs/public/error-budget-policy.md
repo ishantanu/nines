@@ -68,6 +68,26 @@ errorBudgetPolicy:
 - Rolling back a definition cannot restore budget that has been spent. A band reflects the budget actually consumed in the current window.
 - Windows are rolling. A calendar-aligned refresh is not supported.
 
+## Require a postmortem
+
+Set `postmortemAbove` to the share of the error budget a single incident may consume before a postmortem is required. The SRE workbook suggests 0.2: one incident spending more than a fifth of the budget deserves one.
+
+```yaml
+spec:
+  errorBudgetPolicy:
+    owner: team-commerce
+    runbookURL: https://runbooks.example/checkout
+    reviewBelow: 0.25
+    postmortemAbove: 0.2
+```
+
+- **The rule.** A postmortem is required when an [incident](incidents.md) consumed **more** than this share of the SLO's budget. At exactly the threshold, none is required. Zero, or leaving the field out, turns the rule off.
+- **How consumption is measured.** It is the incident's impact: bad events from when impact started until the alert cleared or the incident was mitigated, over the budget the SLO's window allowed. An incident longer than the window can consume more than the whole budget.
+- **Unknown stays unknown.** When the impact is unknown, because data is missing or the SLO's definition changed after the incident, the requirement is reported as unknown, never as not required.
+- **Where it shows.** The incident says a postmortem is required and why. The SLO's budget decision lists incidents still awaiting a published postmortem. Publishing one on the incident's review clears it.
+- **Advice, not enforcement.** Like response bands, the requirement never changes the decision state or blocks anything.
+- **Availability.** It needs incidents and reliability reviews turned on (`NINES_FEATURES=incidents,reliability-reviews`).
+
 ## Enforce in CI
 
 ```sh

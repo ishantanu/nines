@@ -67,3 +67,65 @@ test("the decision shows the agreed response level and says it changes nothing",
   expect(text).toContain("Prioritize reliability bugs.");
   expect(text).toContain("Within budget policy");
 });
+
+test("the policy sets a postmortem threshold, and 0 turns it off", async () => {
+  const base: ErrorBudgetPolicy = {
+    owner: "o",
+    runbookURL: "https://example.test/r",
+    reviewBelow: 0.25,
+  };
+  const seen: (ErrorBudgetPolicy | undefined)[] = [];
+  await act(async () =>
+    root.render(
+      <BudgetPolicyEditor value={base} onChange={(n) => seen.push(n)} />,
+    ),
+  );
+  const input = [...host.querySelectorAll("input")].find((el) =>
+    el.id.endsWith("-postmortem"),
+  )!;
+  const set = (v: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value",
+      )!.set!.call(input, v);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  await set("0.2");
+  expect(seen.at(-1)?.postmortemAbove).toBe(0.2);
+  await act(async () =>
+    root.render(
+      <BudgetPolicyEditor
+        value={{ ...base, postmortemAbove: 0.2 }}
+        onChange={(n) => seen.push(n)}
+      />,
+    ),
+  );
+  await set("0");
+  expect(seen.at(-1)?.postmortemAbove).toBeUndefined();
+});
+
+test("the decision lists incidents whose postmortem the policy requires", async () => {
+  const decision = {
+    state: "proceed",
+    message: "ok",
+    revision: 1,
+    evaluatedAt: "2026-11-18T00:00:00Z",
+    budgetRemainingFraction: 0.4,
+    requiredPostmortems: [
+      {
+        incidentId: "i1",
+        title: "Checkout errors",
+        consumed: 0.34,
+        threshold: 0.2,
+      },
+    ],
+  } as unknown as ErrorBudgetDecision;
+  await act(async () =>
+    root.render(<BudgetDecisionPanel decision={decision} />),
+  );
+  const text = host.textContent ?? "";
+  expect(text).toContain("Postmortems required by this policy");
+  expect(text).toContain("Checkout errors");
+  expect(text).toContain("No postmortem published yet");
+});

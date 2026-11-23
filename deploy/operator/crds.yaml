@@ -100,6 +100,10 @@ spec:
                                         type: string
                                     owner:
                                         type: string
+                                    postmortemAbove:
+                                        maximum: 1
+                                        minimum: 0
+                                        type: number
                                     reviewBelow:
                                         maximum: 1
                                         minimum: 0
@@ -589,6 +593,10 @@ spec:
                                         type: string
                                     owner:
                                         type: string
+                                    postmortemAbove:
+                                        maximum: 1
+                                        minimum: 0
+                                        type: number
                                     reviewBelow:
                                         maximum: 1
                                         minimum: 0

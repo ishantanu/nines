@@ -143,6 +143,7 @@ func (s *Service) ReadSLO(ctx context.Context, id string) (SLOView, error) {
 	}
 	quality := s.qualityFromRecord(r, status, s.Now(), false)
 	decision := s.budgetFromEvidence(r.SLO, status, quality, false)
+	s.withRequiredPostmortems(ctx, r.SLO, &decision)
 	view := SLOView{SLO: r.SLO, Status: status, Quality: &quality, BudgetDecision: &decision}
 	if r.Collection.State != "" {
 		collection := r.Collection

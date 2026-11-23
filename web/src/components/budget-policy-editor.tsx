@@ -94,6 +94,28 @@ export function BudgetPolicyEditor({
         </div>
         <div>
           <FormField
+            htmlFor={`${id}-postmortem`}
+            label="Require a postmortem above budget share (0 to 1; 0 is off)"
+          >
+            <Input
+              id={`${id}-postmortem`}
+              type="number"
+              min="0"
+              max="1"
+              step="any"
+              value={value.postmortemAbove ?? 0}
+              onChange={(e) => {
+                const share = Number(e.target.value);
+                onChange({
+                  ...value,
+                  postmortemAbove: share > 0 ? share : undefined,
+                });
+              }}
+            />
+          </FormField>
+        </div>
+        <div>
+          <FormField
             htmlFor={`${id}-exhausted`}
             label="When the budget is exhausted"
           >

@@ -141,6 +141,12 @@ export function IncidentDetail({
         </div>
       ) : null}
 
+      {incident.postmortemRequirement ? (
+        <PostmortemRequirementNote
+          requirement={incident.postmortemRequirement}
+        />
+      ) : null}
+
       {incident.signals?.length ? (
         <section aria-labelledby="incident-signals">
           <h3 id="incident-signals" className="mb-2 text-sm font-medium">
@@ -628,4 +634,43 @@ export function Incidents({
       </Dialog>
     </>
   );
+}
+
+function PostmortemRequirementNote({
+  requirement: r,
+}: {
+  requirement: NonNullable<Incident["postmortemRequirement"]>;
+}) {
+  const pct = (v: number) => `${(v * 100).toFixed(v < 0.1 ? 1 : 0)}%`;
+  if (r.published && r.required)
+    return (
+      <p className="text-sm text-muted-foreground">
+        The error budget policy required a postmortem, and one is published.
+      </p>
+    );
+  if (r.required)
+    return (
+      <div
+        role="note"
+        className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"
+      >
+        <p className="font-medium">Postmortem required</p>
+        <ul className="mt-1">
+          {r.reasons.map((x) => (
+            <li key={x.sloId}>
+              {x.sloId} consumed {pct(x.consumed)} of its error budget; its
+              policy requires a postmortem above {pct(x.threshold)}.
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  if (r.unknown?.length)
+    return (
+      <p className="text-sm text-muted-foreground">
+        Whether the error budget policy requires a postmortem is unknown:{" "}
+        {r.unknown.join(", ")} has missing data during the incident.
+      </p>
+    );
+  return null;
 }

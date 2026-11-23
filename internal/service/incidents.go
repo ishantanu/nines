@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/engine"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/store"
@@ -19,6 +20,27 @@ type IncidentView struct {
 	// could not see it coming, and an SLO that would have is worth defining.
 	DetectedBySLO bool             `json:"detectedBySLO"`
 	Impact        []IncidentImpact `json:"impact"`
+	// PostmortemRequirement is set when an affected SLO's error budget policy
+	// requires a postmortem above some budget share.
+	PostmortemRequirement *PostmortemRequirement `json:"postmortemRequirement,omitempty"`
+}
+
+// PostmortemRequirement says whether the error budget policy requires a
+// postmortem for an incident, and why. Required means some SLO consumed more
+// than its policy's postmortemAbove; at exactly the threshold none is
+// required. SLOs whose consumption is unknown are listed, never assumed.
+type PostmortemRequirement struct {
+	Required  bool               `json:"required"`
+	Reasons   []PostmortemReason `json:"reasons"`
+	Unknown   []string           `json:"unknown,omitempty"`
+	Published bool               `json:"published"`
+}
+
+// PostmortemReason is one SLO whose budget consumption crossed its policy.
+type PostmortemReason struct {
+	SLOID     string  `json:"sloId"`
+	Consumed  float64 `json:"consumed"`
+	Threshold float64 `json:"threshold"`
 }
 
 // IncidentImpact is the error budget one incident consumed on one SLO.
@@ -309,14 +331,11 @@ func (s *Service) ListIncidents(ctx context.Context, limit int) ([]IncidentView,
 }
 
 func (s *Service) incidentView(ctx context.Context, i model.Incident) IncidentView {
-	end := s.incidentNow()
-	if i.ResolvedAt != nil {
-		end = *i.ResolvedAt
-	}
 	view := IncidentView{Incident: i, DetectedBySLO: i.DetectedBySLO(), Impact: []IncidentImpact{}}
 	for _, entry := range i.SLOs {
-		view.Impact = append(view.Impact, s.incidentImpact(ctx, entry, i.OpenedAt, end))
+		view.Impact = append(view.Impact, s.incidentImpact(ctx, entry, i.OpenedAt, impactEnd(i, entry, s.incidentNow())))
 	}
+	view.PostmortemRequirement = s.postmortemRequirement(ctx, i, view.Impact)
 	return view
 }
 
@@ -426,4 +445,114 @@ func impactStart(r model.Record, entry model.IncidentSLO) *time.Time {
 	// A point at t covers the interval ending at t.
 	began := time.Unix(earliest-step, 0).UTC()
 	return &began
+}
+
+// postmortemRequirement applies each affected SLO's error budget policy, at
+// the definition revision in force during the incident, to its impact.
+func (s *Service) postmortemRequirement(ctx context.Context, i model.Incident, impacts []IncidentImpact) *PostmortemRequirement {
+	var req *PostmortemRequirement
+	for n, entry := range i.SLOs {
+		r, err := s.Store.Read(ctx, entry.ID)
+		if err != nil {
+			continue
+		}
+		policy := r.SLO.ErrorBudgetPolicy
+		if policy == nil || policy.PostmortemAbove <= 0 {
+			continue
+		}
+		if req == nil {
+			req = &PostmortemRequirement{Reasons: []PostmortemReason{}}
+			if i.Postmortem != nil {
+				req.Published = i.Postmortem.Published
+			}
+		}
+		consumed := impacts[n].BudgetConsumedFraction
+		switch {
+		// The definition, and perhaps its policy, changed after the incident:
+		// whether a postmortem was required is unknown, not "not required".
+		case model.ConfigRevision(r.SLO) != entry.ConfigRevision, consumed == nil:
+			req.Unknown = append(req.Unknown, entry.ID)
+		// A relative tolerance keeps "exactly at the threshold" from flipping
+		// on floating-point error in the budget arithmetic.
+		case *consumed > policy.PostmortemAbove*(1+1e-9):
+			req.Required = true
+			req.Reasons = append(req.Reasons, PostmortemReason{SLOID: entry.ID, Consumed: *consumed, Threshold: policy.PostmortemAbove})
+		}
+	}
+	return req
+}
+
+// RecordPostmortem links an incident to the review holding its postmortem.
+// Once published it stays published.
+func (s *Service) RecordPostmortem(ctx context.Context, incident, review string, published bool) error {
+	st, err := s.incidents()
+	if err != nil {
+		return err
+	}
+	return st.UpdateIncident(ctx, incident, func(i *model.Incident) error {
+		was := i.Postmortem != nil && i.Postmortem.Published
+		i.Postmortem = &model.IncidentPostmortem{ReviewID: review, Published: published || was, SavedAt: s.incidentNow()}
+		if published && !was {
+			i.Timeline = append(i.Timeline, model.IncidentEvent{Time: s.incidentNow(), Kind: "postmortem_published", Message: "The postmortem was published."})
+		}
+		i.Revision++
+		return nil
+	})
+}
+
+// RequiredPostmortems lists recent incidents on an SLO that need a published
+// postmortem, for the SLO's budget decision.
+func (s *Service) RequiredPostmortems(ctx context.Context, slo string) ([]v1.RequiredPostmortem, error) {
+	st, err := s.incidents()
+	if err != nil || !s.IncidentsEnabled {
+		return nil, err
+	}
+	list, err := st.Incidents(ctx, 200)
+	if err != nil {
+		return nil, err
+	}
+	out := []v1.RequiredPostmortem{}
+	for _, i := range list {
+		if !i.HasSLO(slo) || i.Postmortem != nil && i.Postmortem.Published {
+			continue
+		}
+		v := s.incidentView(ctx, i)
+		if v.PostmortemRequirement == nil {
+			continue
+		}
+		for _, r := range v.PostmortemRequirement.Reasons {
+			if r.SLOID == slo {
+				out = append(out, v1.RequiredPostmortem{IncidentID: i.ID, Title: i.Title, Consumed: r.Consumed, Threshold: r.Threshold})
+			}
+		}
+	}
+	return out, nil
+}
+
+// withRequiredPostmortems adds the incidents awaiting a required postmortem
+// to an SLO's budget decision, when its policy sets postmortemAbove.
+func (s *Service) withRequiredPostmortems(ctx context.Context, c model.SLO, d *v1.ErrorBudgetDecision) {
+	if !s.IncidentsEnabled || c.ErrorBudgetPolicy == nil || c.ErrorBudgetPolicy.PostmortemAbove <= 0 {
+		return
+	}
+	if required, err := s.RequiredPostmortems(ctx, c.ID); err == nil && len(required) > 0 {
+		d.RequiredPostmortems = required
+	}
+}
+
+// impactEnd is when an incident stopped affecting one SLO: the earliest of
+// its alert clearing, the incident being marked mitigated or resolved, and
+// now. An incident left open after recovery therefore does not keep
+// collecting unrelated bad events, or lose its impact to later data gaps.
+func impactEnd(i model.Incident, entry model.IncidentSLO, now time.Time) time.Time {
+	end := now
+	for _, t := range []*time.Time{i.MitigatedAt, i.ResolvedAt} {
+		if t != nil && t.Before(end) {
+			end = *t
+		}
+	}
+	if !entry.Firing && entry.ClearedAt != nil && entry.ClearedAt.Before(end) {
+		end = *entry.ClearedAt
+	}
+	return end
 }

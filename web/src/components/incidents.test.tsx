@@ -261,3 +261,42 @@ test("the incident lists its postmortems: published ones link, drafts say so", a
     "/tenants/alpha/reviews/review-1",
   );
 });
+
+test("the incident says when the policy requires a postmortem, and why", async () => {
+  calls.list.mockResolvedValue([
+    {
+      ...incident,
+      postmortemRequirement: {
+        required: true,
+        reasons: [
+          { sloId: "checkout-success", consumed: 0.34, threshold: 0.2 },
+        ],
+        published: false,
+      },
+    },
+  ]);
+  await show("editor");
+  expect(host.textContent).toContain("Postmortem required");
+  expect(host.textContent).toContain(
+    "checkout-success consumed 34% of its error budget; its policy requires a postmortem above 20%.",
+  );
+});
+
+test("an unknown requirement is stated, never assumed satisfied", async () => {
+  calls.list.mockResolvedValue([
+    {
+      ...incident,
+      postmortemRequirement: {
+        required: false,
+        reasons: [],
+        unknown: ["checkout-success"],
+        published: false,
+      },
+    },
+  ]);
+  await show("editor");
+  expect(host.textContent).toContain(
+    "is unknown: checkout-success has missing data",
+  );
+  expect(host.textContent).not.toContain("Postmortem required");
+});

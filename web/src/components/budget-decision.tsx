@@ -40,6 +40,22 @@ export function BudgetDecisionPanel({
             {decision.band.response}
           </p>
         ) : null}
+        {decision.requiredPostmortems?.length ? (
+          <div
+            className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900"
+            aria-label="Required postmortems"
+          >
+            <p className="font-medium">Postmortems required by this policy</p>
+            <ul className="mt-1 space-y-1">
+              {decision.requiredPostmortems.map((r) => (
+                <li key={r.incidentId}>
+                  {r.title}: consumed {percent(r.consumed, 1)} of the budget,
+                  above {percent(r.threshold, 0)}. No postmortem published yet.
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <dl className="grid gap-3 sm:grid-cols-3">
           <div>
             <dt className="text-muted-foreground">Remaining budget</dt>

@@ -20,6 +20,65 @@ type IncidentStore interface {
 	UpdateIncidents(ctx context.Context, change func(open []model.Incident) ([]model.Incident, error)) error
 	Incident(ctx context.Context, id string) (model.Incident, error)
 	Incidents(ctx context.Context, limit int) ([]model.Incident, error)
+	// UpdateIncident changes one incident, open or resolved, at its current
+	// revision; change must increment Revision.
+	UpdateIncident(ctx context.Context, id string, change func(*model.Incident) error) error
+}
+
+func (m *Memory) UpdateIncident(ctx context.Context, id string, change func(*model.Incident) error) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	current, ok := m.incidents[id]
+	if !ok {
+		return model.ErrNotFound
+	}
+	next := copyJSON(current)
+	if err := change(&next); err != nil {
+		return err
+	}
+	if next.Revision != current.Revision+1 || next.ID != id {
+		return model.ErrRevisionConflict
+	}
+	m.incidents[id] = copyJSON(next)
+	return ctx.Err()
+}
+
+func (p *Postgres) UpdateIncident(ctx context.Context, id string, change func(*model.Incident) error) error {
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(context.Background())
+	}()
+	var b []byte
+	if err = tx.QueryRow(ctx, "SELECT document FROM incidents WHERE incident_id=$1 FOR UPDATE", id).Scan(&b); errors.Is(err, pgx.ErrNoRows) {
+		return model.ErrNotFound
+	} else if err != nil {
+		return err
+	}
+	var current model.Incident
+	if err = json.Unmarshal(b, &current); err != nil {
+		return err
+	}
+	next := copyJSON(current)
+	if err = change(&next); err != nil {
+		return err
+	}
+	if next.Revision != current.Revision+1 || next.ID != id {
+		return model.ErrRevisionConflict
+	}
+	if b, err = json.Marshal(next); err != nil {
+		return err
+	}
+	tag, err := tx.Exec(ctx, "UPDATE incidents SET revision=$2, state=$3, document=$4 WHERE incident_id=$1 AND revision=$5", id, next.Revision, next.State, b, current.Revision)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return model.ErrRevisionConflict
+	}
+	return tx.Commit(ctx)
 }
 
 func (m *Memory) UpdateIncidents(ctx context.Context, change func([]model.Incident) ([]model.Incident, error)) error {
