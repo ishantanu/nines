@@ -76,6 +76,7 @@ func TestResponsesConformToTheContract(t *testing.T) {
 		"/api/slos/checkout/journeys":                       {"type": "array", "items": ref("JourneyRevision")},
 		"/api/slos/checkout/context":                        ref("SLOContext"),
 		"/api/slos/checkout/retirement/plan?action=archive": ref("RetirementPlan"),
+		"/api/access":                                       ref("AccessView"),
 		"/api/journeys":                                     {"type": "array", "items": ref("JourneyView")},
 		"/api/journeys/purchase":                            ref("JourneyView"),
 		"/api/journeys/purchase/history":                    {"type": "array", "items": ref("JourneyRevision")},

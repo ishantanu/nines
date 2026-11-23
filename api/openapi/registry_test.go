@@ -4,6 +4,7 @@ import (
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/engine"
 	"github.com/ishantanu/nines/internal/httpapi"
+	"github.com/ishantanu/nines/internal/identity"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
@@ -54,4 +55,18 @@ var generatedTypes = map[string]any{
 	"CompiledBinding":       v1.CompiledBinding{},
 	"DependencyView":        v1.DependencyView{},
 	"DependencyComposition": v1.DependencyComposition{},
+
+	// Access and team access
+	"AccessView":            httpapi.AccessView{},
+	"TeamDirectory":         identity.TeamDirectory{},
+	"TeamAccessAuditList":   identity.AuditList{},
+	"GrantInput":            identity.GrantInput{},
+	"TeamMember":            identity.Member{},
+	"TeamInput":             identity.TeamInput{},
+	"Team":                  identity.Team{},
+	"ServiceAccountInput":   identity.ServiceAccountInput{},
+	"CreatedServiceAccount": identity.CreatedServiceAccount{},
+	"TeamAccessStatus":      identity.StatusResult{},
+	"LocalUserInput":        identity.LocalUserInput{},
+	"User":                  identity.User{},
 }

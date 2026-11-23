@@ -17,10 +17,6 @@ browser:
   POST /auth/logout-all: browser session
 uncovered:
   - DELETE /api/connections/{connection}
-  - DELETE /api/team-access/members/{id}
-  - DELETE /api/team-access/service-accounts/{id}
-  - DELETE /api/team-access/teams/{id}
-  - GET /api/access
   - GET /api/audit
   - GET /api/audit/archive
   - GET /api/audit/{id}
@@ -33,21 +29,14 @@ uncovered:
   - GET /api/skills/{id}
   - GET /api/slo-templates
   - GET /api/slo-templates/{template}
-  - GET /api/team-access
-  - GET /api/team-access/audit
   - GET /api/topology/resources
   - GET /api/workspace
   - POST /api/connections
   - POST /api/connections/{connection}/test
   - POST /api/slo-templates/{template}/render
-  - POST /api/team-access/members
-  - POST /api/team-access/service-accounts
-  - POST /api/team-access/teams
-  - POST /api/team-access/users
   - POST /auth/cli/exchange
   - POST /auth/cli/ldap
   - POST /auth/cli/logout
   - POST /auth/cli/password
   - POST /auth/cli/start
   - PUT /api/connections/{connection}
-  - PUT /api/team-access/users/{id}
