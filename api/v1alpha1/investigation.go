@@ -33,6 +33,8 @@ type InvestigationEntry struct {
 	Actor     InvestigationActor     `json:"actor"`
 	Text      string                 `json:"text,omitempty"`
 	Evidence  *InvestigationEvidence `json:"evidence,omitempty"`
+	// Postmortem is set on postmortem entries: each is a full revision.
+	Postmortem *Postmortem `json:"postmortem,omitempty"`
 }
 type InvestigationSummary struct {
 	ID        string             `json:"id"`

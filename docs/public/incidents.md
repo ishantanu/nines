@@ -134,6 +134,6 @@ A [reliability review](architecture.md) can be scoped to an incident. It pins th
 The incident learning work continues in these issues:
 
 - a postmortem required by the [error budget policy](error-budget-policy.md) (#86);
-- blameless postmortems (#87);
+- [blameless postmortems](postmortems.md) on incident reviews (#87), now available through the API;
 - CAST (#88) and STPA (#89) analyses;
 - links to runbooks, logs, traces, changes and incident tools (#90).

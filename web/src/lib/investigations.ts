@@ -1,3 +1,4 @@
+import type { Postmortem } from "./postmortems";
 import { workspacePath, parseRoute } from "./navigation";
 import type { RequestScope } from "./api";
 import { api } from "./api";
@@ -39,11 +40,12 @@ export type EvidenceContext = {
 };
 export type InvestigationEntry = {
   id: string;
-  kind: "message" | "evidence";
+  kind: "message" | "evidence" | "postmortem";
   createdAt: string;
   actor: InvestigationActor;
   text?: string;
   evidence?: { capturedAt: string; digest: string; context: EvidenceContext };
+  postmortem?: Postmortem;
 };
 export type InvestigationSummary = {
   id: string;
@@ -84,6 +86,24 @@ export function listInvestigations(scope: RequestScope, cursor = "") {
     `/api/investigations?limit=25${cursor ? "&cursor=" + encodeURIComponent(cursor) : ""}`,
     scope,
   );
+}
+// The review already written about an incident, if any. The first one listed
+// wins, so duplicates made before this check resolve the same way each time.
+export async function findIncidentReview(
+  scope: RequestScope,
+  incident: string,
+): Promise<string | null> {
+  let cursor = "";
+  let found: string | null = null;
+  for (let page = 0; page < 20; page++) {
+    const list = await listInvestigations(scope, cursor);
+    for (const item of list.items)
+      if (item.scope.kind === "Incident" && item.scope.resourceId === incident)
+        found = found ?? item.id;
+    if (!list.nextCursor) break;
+    cursor = list.nextCursor;
+  }
+  return found;
 }
 export function readInvestigation(scope: RequestScope, id: string) {
   return api<Investigation>(

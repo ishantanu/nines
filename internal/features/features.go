@@ -100,6 +100,8 @@ var routes = []struct{ prefix, id string }{
 	{"/api/investigations", "reliability-reviews"},
 	{"/api/incidents", "incidents"},
 	{"/api/review-skills", "reliability-reviews"},
+	{"/api/action-items", "reliability-reviews"},
+	{"/api/postmortems", "reliability-reviews"},
 	{"/api/workflows", "workflows"},
 	{"/api/visual-evaluations", "agent-evidence"},
 	{"/api/session-replays", "session-replay"},

@@ -1,0 +1,62 @@
+[
+  {
+    "phrase": "should have",
+    "suggestion": "Say what was known at the time and why the action made sense then."
+  },
+  {
+    "phrase": "should've",
+    "suggestion": "Say what was known at the time and why the action made sense then."
+  },
+  {
+    "phrase": "could have",
+    "suggestion": "Describe the options visible at the time, not the ones known now."
+  },
+  {
+    "phrase": "failed to",
+    "suggestion": "Say what happened (\"did not\") and what made that reasonable then."
+  },
+  {
+    "phrase": "neglected",
+    "suggestion": "Describe the conditions that made the step easy to miss."
+  },
+  {
+    "phrase": "forgot",
+    "suggestion": "Describe the conditions that made the step easy to miss."
+  },
+  {
+    "phrase": "careless",
+    "suggestion": "Describe the action and its context neutrally."
+  },
+  {
+    "phrase": "negligence",
+    "suggestion": "Describe the action and its context neutrally."
+  },
+  {
+    "phrase": "mistake",
+    "suggestion": "Describe the action and its context neutrally."
+  },
+  {
+    "phrase": "human error",
+    "suggestion": "Name the conditions and missing safeguards that let a normal action cause harm."
+  },
+  {
+    "phrase": "operator error",
+    "suggestion": "Name the conditions and missing safeguards that let a normal action cause harm."
+  },
+  {
+    "phrase": "root cause",
+    "suggestion": "List contributing causes: incidents rarely have just one."
+  },
+  {
+    "phrase": "obviously",
+    "suggestion": "It was not obvious at the time; describe what was visible."
+  },
+  {
+    "phrase": "clearly",
+    "suggestion": "Describe what was visible at the time, not what is clear now."
+  },
+  {
+    "phrase": "blame",
+    "suggestion": "Describe what happened and why, without assigning fault."
+  }
+]

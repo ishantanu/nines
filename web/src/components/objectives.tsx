@@ -1,3 +1,4 @@
+import { OpenActionItems } from "./open-action-items";
 import { SLOCards } from "./slo-cards";
 import { NativeSelect } from "@/components/ui/select";
 import { SLOProvider } from "./provider-identity";
@@ -559,6 +560,9 @@ export function ObjectiveDetail({
       </PageHeader>
       {objective && !objective.slo.retirement ? (
         <GitProposals scope={scope} id={objective.slo.id} />
+      ) : null}
+      {objective ? (
+        <OpenActionItems scope={scope} slo={objective.slo.id} />
       ) : null}
       {objective?.budgetDecision &&
       !objective.slo.retirement &&

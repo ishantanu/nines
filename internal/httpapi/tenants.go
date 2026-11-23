@@ -489,6 +489,10 @@ func allowed(role string, r *http.Request) bool {
 		if r.URL.Path == "/api/incidents" || r.URL.Path == "/api/incidents/alerts" || strings.HasPrefix(r.URL.Path, "/api/incidents/") && strings.HasSuffix(r.URL.Path, "/transition") {
 			return true
 		}
+		// People write postmortems; agents can help in review messages.
+		if strings.HasPrefix(r.URL.Path, "/api/investigations/") && strings.HasSuffix(r.URL.Path, "/postmortem") {
+			return true
+		}
 		if r.URL.Path == "/api/resources/apply" || r.URL.Path == "/api/slos" || r.URL.Path == "/api/journeys/apply" || r.URL.Path == "/api/gitops/proposals" {
 			return true
 		}

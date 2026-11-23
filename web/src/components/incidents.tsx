@@ -30,9 +30,10 @@ import {
   type Incident,
   type IncidentState,
 } from "@/lib/incidents";
-import { createInvestigation } from "@/lib/investigations";
+import { createInvestigation, findIncidentReview } from "@/lib/investigations";
 import { navigateTo, useResourceRoute, workspacePath } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
+import { IncidentPostmortems } from "./incident-postmortems";
 
 function StateBadge({ state }: { state: IncidentState }) {
   return (
@@ -61,6 +62,7 @@ export function IncidentDetail({
   onDefineSLO,
   onSLO,
   onJourney,
+  scope,
 }: {
   incident: Incident;
   objectives: Objective[];
@@ -72,6 +74,7 @@ export function IncidentDetail({
   onDefineSLO?: () => void;
   onSLO: (id: string) => void;
   onJourney: (id: string) => void;
+  scope?: RequestScope;
 }) {
   const name = (id: string) =>
     objectives.find((o) => o.slo.id === id)?.slo.name || id;
@@ -281,6 +284,10 @@ export function IncidentDetail({
         )}
       </section>
 
+      {reviewsOn && scope ? (
+        <IncidentPostmortems scope={scope} incident={incident.id} />
+      ) : null}
+
       <section aria-labelledby="incident-timeline">
         <h3 id="incident-timeline" className="mb-2 text-sm font-medium">
           Timeline
@@ -371,6 +378,13 @@ export function Incidents({
     setBusy(true);
     setError("");
     try {
+      // One review per incident: open the existing one rather than start a
+      // second.
+      const existing = await findIncidentReview(scope, incident.id);
+      if (existing) {
+        navigateTo(workspacePath(scope.tenant, "investigations", existing));
+        return;
+      }
       const review = await createInvestigation(scope, {
         id: crypto.randomUUID(),
         title: `Review: ${incident.title}`.slice(0, 160),
@@ -483,6 +497,7 @@ export function Incidents({
               onReview={() => void startReview(current)}
               reviewsOn={reviewsOn}
               onDefineSLO={onDefineSLO}
+              scope={scope}
               onSLO={onSLO}
               onJourney={onJourney}
             />

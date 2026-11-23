@@ -134,6 +134,11 @@ export const docGroups: DocGroup[] = [
         "Open incidents from critical burn alerts with their error budget impact, affected journeys and revisions.",
       ),
       page(
+        "postmortems",
+        "Blameless postmortems",
+        "Write postmortems from incident records: contributing causes, lessons and tracked action items.",
+      ),
+      page(
         "slo-retirement",
         "Retire SLOs",
         "Review references, archive retained evidence and verify owned-rule cleanup before deletion.",

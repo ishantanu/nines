@@ -69,6 +69,43 @@ func Mount(mux *http.ServeMux, s *Service) {
 		v, err := s.Message(r.Context(), r.PathValue("id"), in)
 		respond(w, v, err, 200)
 	})
+	mux.HandleFunc("GET /api/investigations/{id}/postmortem", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.RawQuery != "" {
+			fail(w, model.Invalid("query fields are not supported"))
+			return
+		}
+		v, err := s.PostmortemTemplate(r.Context(), r.PathValue("id"))
+		respond(w, v, err, 200)
+	})
+	mux.HandleFunc("POST /api/investigations/{id}/postmortem", func(w http.ResponseWriter, r *http.Request) {
+		var in v1.SavePostmortem
+		if err := decode(w, r, &in); err != nil {
+			fail(w, err)
+			return
+		}
+		v, findings, err := s.SavePostmortem(r.Context(), r.PathValue("id"), in)
+		respond(w, map[string]any{"investigation": v, "findings": findings}, err, 200)
+	})
+	mux.HandleFunc("GET /api/postmortems", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		if len(q) != 1 || len(q["incident"]) != 1 {
+			fail(w, model.Invalid("filter by one incident"))
+			return
+		}
+		items, err := s.IncidentPostmortems(r.Context(), q.Get("incident"))
+		respond(w, map[string]any{"postmortems": items}, err, 200)
+	})
+	mux.HandleFunc("GET /api/action-items", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		for k := range q {
+			if (k != "slo" && k != "journey") || len(q[k]) != 1 {
+				fail(w, model.Invalid("filter by one slo or journey"))
+				return
+			}
+		}
+		items, err := s.OpenActionItems(r.Context(), q.Get("slo"), q.Get("journey"))
+		respond(w, map[string]any{"items": items}, err, 200)
+	})
 	mux.HandleFunc("POST /api/investigations/{id}/evidence", func(w http.ResponseWriter, r *http.Request) {
 		var in v1.CaptureInvestigationEvidence
 		if err := decode(w, r, &in); err != nil {
