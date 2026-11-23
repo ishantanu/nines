@@ -2885,6 +2885,372 @@ paths:
           $ref: '#/components/responses/Error'
         '503':
           $ref: '#/components/responses/Error'
+  /api/access:
+    get:
+      operationId: getAccess
+      summary: Read your access
+      description: Your role in the tenant, what each role may do, and (for owners) the configured credentials and their roles.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessView'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access:
+    get:
+      operationId: getTeamDirectory
+      summary: Read the team directory
+      description: Members, teams, service accounts, identity providers and SSO role mappings for the tenant. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamDirectory'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/audit:
+    get:
+      operationId: listTeamAccessAudit
+      summary: List team access changes
+      description: Who changed membership, teams and service accounts, newest first. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: before
+          in: query
+          required: false
+          description: Page before this cursor.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamAccessAuditList'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/members:
+    post:
+      operationId: grantMember
+      summary: Grant a member a role
+      description: Give a provider user a role in the tenant, at the expected version. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantInput'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/members/{id}:
+    delete:
+      operationId: removeMember
+      summary: Remove a member
+      description: At the version in If-Match. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamAccessStatus'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/teams:
+    post:
+      operationId: saveTeam
+      summary: Create or update a team
+      description: A named group of members with one role, at the expected version. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamInput'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/teams/{id}:
+    delete:
+      operationId: removeTeam
+      summary: Remove a team
+      description: At the version in If-Match. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamAccessStatus'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/service-accounts:
+    post:
+      operationId: createServiceAccount
+      summary: Create a service account
+      description: Returns its token once; it is never shown again. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServiceAccountInput'
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreatedServiceAccount'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/service-accounts/{id}:
+    delete:
+      operationId: revokeServiceAccount
+      summary: Revoke a service account
+      description: Its token stops working immediately. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamAccessStatus'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/users:
+    post:
+      operationId: createLocalUser
+      summary: Create a local user
+      description: A user of the local identity provider, with a role in this tenant. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocalUserInput'
+      responses:
+        '201':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/team-access/users/{id}:
+    put:
+      operationId: updateLocalUser
+      summary: Update a local user
+      description: Name, role or password of a local user. Owner only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LocalUserInput'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -2921,6 +3287,88 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    AccessBinding:
+      additionalProperties: false
+      properties:
+        credentialRef:
+          type: string
+        role:
+          type: string
+      required:
+        - credentialRef
+        - role
+      type: object
+    AccessPermission:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        roles:
+          additionalProperties:
+            type: boolean
+          type: object
+      required:
+        - id
+        - label
+        - roles
+      type: object
+    AccessView:
+      additionalProperties: false
+      properties:
+        authentication:
+          type: string
+        bindings:
+          items:
+            $ref: '#/components/schemas/AccessBinding'
+          type: array
+        bindingsVisible:
+          type: boolean
+        currentRole:
+          type: string
+        management:
+          type: string
+        permissions:
+          items:
+            $ref: '#/components/schemas/AccessPermission'
+          type: array
+        tenant:
+          type: string
+        userManagementSupported:
+          type: boolean
+      required:
+        - authentication
+        - bindings
+        - bindingsVisible
+        - currentRole
+        - management
+        - permissions
+        - tenant
+        - userManagementSupported
+      type: object
+    AccountView:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        expiresAt:
+          format: date-time
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+      required:
+        - createdAt
+        - expiresAt
+        - id
+        - name
+        - role
+      type: object
     AgenticContract:
       additionalProperties: false
       properties:
@@ -3021,6 +3469,40 @@ components:
           type: boolean
         goal:
           $ref: '#/components/schemas/Manifest'
+    Audit:
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+        actorId:
+          type: string
+        actorKind:
+          type: string
+        actorName:
+          type: string
+        at:
+          format: date-time
+          type: string
+        id:
+          type: string
+        outcome:
+          type: string
+        requestId:
+          type: string
+        resource:
+          type: string
+        revision:
+          type: string
+      required:
+        - action
+        - actorId
+        - actorKind
+        - actorName
+        - at
+        - id
+        - outcome
+        - resource
+      type: object
     BadIntervalPolicy:
       additionalProperties: false
       properties:
@@ -3737,6 +4219,17 @@ components:
       required:
         - id
       type: object
+    CreatedServiceAccount:
+      additionalProperties: false
+      properties:
+        account:
+          $ref: '#/components/schemas/AccountView'
+        token:
+          type: string
+      required:
+        - account
+        - token
+      type: object
     CustomerPolicy:
       additionalProperties: false
       properties:
@@ -4248,6 +4741,29 @@ components:
         - version
         - sha256
       type: object
+    FederatedMember:
+      additionalProperties: false
+      properties:
+        effectiveRole:
+          type: string
+        expiresAt:
+          format: date-time
+          type: string
+        mappedRole:
+          type: string
+        mappingIds:
+          items:
+            type: string
+          type: array
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - effectiveRole
+        - expiresAt
+        - mappedRole
+        - mappingIds
+        - user
+      type: object
     Freshness:
       additionalProperties: false
       properties:
@@ -4495,6 +5011,23 @@ components:
         - matches
         - origin
         - warnings
+      type: object
+    GrantInput:
+      additionalProperties: false
+      properties:
+        expectedVersion:
+          type: integer
+        provider:
+          type: string
+        role:
+          type: string
+        subject:
+          type: string
+      required:
+        - expectedVersion
+        - provider
+        - role
+        - subject
       type: object
     GraphEdgeEvidence:
       additionalProperties: false
@@ -6299,6 +6832,32 @@ components:
       required:
         - link
       type: object
+    LocalUserInput:
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+        expectedVersion:
+          type: integer
+        name:
+          type: string
+        password:
+          type: string
+        provider:
+          type: string
+        role:
+          type: string
+        username:
+          type: string
+      required:
+        - email
+        - expectedVersion
+        - name
+        - password
+        - provider
+        - role
+        - username
+      type: object
     Manifest:
       type: object
       description: YAML resource. The authoritative semantic validation is performed by Nines. The spec does not yet exhaustively describe all resource fields.
@@ -6381,6 +6940,29 @@ components:
         - reliability
         - revision
         - target
+      type: object
+    MappingView:
+      additionalProperties: false
+      properties:
+        claim:
+          type: string
+        claimsMaxAgeMinutes:
+          type: integer
+        id:
+          type: string
+        provider:
+          type: string
+        role:
+          type: string
+        value:
+          type: string
+      required:
+        - claim
+        - claimsMaxAgeMinutes
+        - id
+        - provider
+        - role
+        - value
       type: object
     Measurement:
       additionalProperties: false
@@ -6584,6 +7166,26 @@ components:
         - observationPoint
         - scrapeIntervalSeconds
         - type
+      type: object
+    MemberView:
+      additionalProperties: false
+      properties:
+        effectiveRole:
+          type: string
+        role:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        userId:
+          type: string
+        version:
+          type: integer
+      required:
+        - effectiveRole
+        - role
+        - user
+        - userId
+        - version
       type: object
     Metadata:
       additionalProperties: false
@@ -7095,6 +7697,20 @@ components:
         - good
         - time
         - total
+      type: object
+    ProviderView:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+      required:
+        - id
+        - name
+        - type
       type: object
     ProviderWindow:
       additionalProperties: false
@@ -8081,6 +8697,24 @@ components:
         - slo
         - status
       type: object
+    ServiceAccountInput:
+      additionalProperties: false
+      properties:
+        expiresAt:
+          format: date-time
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        role:
+          type: string
+      required:
+        - expiresAt
+        - id
+        - name
+        - role
+      type: object
     ServiceLevelObjective:
       additionalProperties: false
       properties:
@@ -8270,6 +8904,126 @@ components:
         - namespace
         - queryURL
       type: object
+    Team:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        members:
+          items:
+            type: string
+          type: array
+        name:
+          type: string
+        role:
+          type: string
+        version:
+          type: integer
+      required:
+        - id
+        - members
+        - name
+        - role
+        - version
+      type: object
+    TeamAccessAuditList:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Audit'
+          type: array
+        nextCursor:
+          type: string
+      required:
+        - items
+        - nextCursor
+      type: object
+    TeamAccessStatus:
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+      required:
+        - status
+      type: object
+    TeamDirectory:
+      additionalProperties: false
+      properties:
+        members:
+          items:
+            $ref: '#/components/schemas/MemberView'
+          type: array
+        providers:
+          items:
+            $ref: '#/components/schemas/ProviderView'
+          type: array
+        serviceAccounts:
+          items:
+            $ref: '#/components/schemas/AccountView'
+          type: array
+        ssoMappings:
+          items:
+            $ref: '#/components/schemas/MappingView'
+          type: array
+        ssoMembers:
+          items:
+            $ref: '#/components/schemas/FederatedMember'
+          type: array
+        ssoMembersTruncated:
+          type: boolean
+        teams:
+          items:
+            $ref: '#/components/schemas/Team'
+          type: array
+      required:
+        - members
+        - providers
+        - serviceAccounts
+        - ssoMappings
+        - ssoMembers
+        - ssoMembersTruncated
+        - teams
+      type: object
+    TeamInput:
+      additionalProperties: false
+      properties:
+        expectedVersion:
+          type: integer
+        id:
+          type: string
+        members:
+          items:
+            type: string
+          type: array
+        name:
+          type: string
+        role:
+          type: string
+      required:
+        - expectedVersion
+        - id
+        - members
+        - name
+        - role
+      type: object
+    TeamMember:
+      additionalProperties: false
+      properties:
+        effectiveRole:
+          type: string
+        role:
+          type: string
+        userId:
+          type: string
+        version:
+          type: integer
+      required:
+        - effectiveRole
+        - role
+        - userId
+        - version
+      type: object
     TelemetryDiscovery:
       additionalProperties: false
       properties:
@@ -8379,6 +9133,31 @@ components:
         - kind
         - manifest
         - revision
+      type: object
+    User:
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+        sessionEpoch:
+          type: integer
+        subject:
+          type: string
+        version:
+          type: integer
+      required:
+        - id
+        - name
+        - provider
+        - sessionEpoch
+        - subject
+        - version
       type: object
     V1alpha1Metadata:
       additionalProperties: false

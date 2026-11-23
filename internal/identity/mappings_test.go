@@ -110,9 +110,8 @@ func TestSSOMappingPolicyChangeProviderBindingAndDirectory(t *testing.T) {
 	if strings.Contains(string(b), "beta-reader") || strings.Contains(string(b), "tokenHash") {
 		t.Fatal("cross-tenant policy or secret leaked", string(b))
 	}
-	view := directory.(map[string]any)
-	if len(view["ssoMappings"].([]mappingView)) != 3 || len(view["ssoMembers"].([]federatedMember)) != 1 {
-		t.Fatal(view)
+	if len(directory.SSOMappings) != 3 || len(directory.SSOMembers) != 1 {
+		t.Fatal(directory)
 	}
 	// Reloaded server policy is applied to an existing claims snapshot immediately.
 	p := s.providers["microsoft"]

@@ -78,7 +78,7 @@ func (g *generator) component(t reflect.Type) string {
 	if name, ok := g.names[t]; ok {
 		return name
 	}
-	name := t.Name()
+	name := strings.ToUpper(t.Name()[:1]) + t.Name()[1:]
 	if other, ok := g.taken[name]; ok && other != t {
 		pkg := t.PkgPath()[strings.LastIndex(t.PkgPath(), "/")+1:]
 		name = strings.ToUpper(pkg[:1]) + pkg[1:] + name

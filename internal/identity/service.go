@@ -628,8 +628,8 @@ func (s *Service) RevokeAccount(ctx context.Context, a Actor, tenant, id string)
 		return tx.Delete("service_token", "global", account.TokenHash)
 	})
 }
-func (s *Service) Directory(ctx context.Context, a Actor, tenant string) (any, error) {
-	var result any
+func (s *Service) Directory(ctx context.Context, a Actor, tenant string) (TeamDirectory, error) {
+	var result TeamDirectory
 	err := s.repo.View(ctx, func(tx Tx) error {
 		if err := s.checkOwner(tx, tenant, a); err != nil {
 			return err
@@ -673,7 +673,7 @@ func (s *Service) Directory(ctx context.Context, a Actor, tenant string) (any, e
 		if err != nil {
 			return err
 		}
-		result = map[string]any{"members": views, "teams": teams, "serviceAccounts": public, "providers": s.Providers(), "ssoMappings": s.mappingViews(tenant), "ssoMembers": federated, "ssoMembersTruncated": more}
+		result = TeamDirectory{Members: views, Teams: teams, ServiceAccounts: public, Providers: s.Providers(), SSOMappings: s.mappingViews(tenant), SSOMembers: federated, SSOMembersTruncated: more}
 		return nil
 	})
 	return result, err

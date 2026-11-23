@@ -63,3 +63,29 @@ type TopologyResource struct {
 	Tenant     string                 `json:"tenant"`
 	Resource   model.TopologyRevision `json:"resource"`
 }
+
+// AccessView is the body of GET /api/access: the caller's role and what each
+// role may do in the tenant.
+type AccessView struct {
+	Tenant                  string             `json:"tenant"`
+	CurrentRole             string             `json:"currentRole"`
+	Management              string             `json:"management"`
+	Authentication          string             `json:"authentication"`
+	Permissions             []AccessPermission `json:"permissions"`
+	Bindings                []AccessBinding    `json:"bindings"`
+	BindingsVisible         bool               `json:"bindingsVisible"`
+	UserManagementSupported bool               `json:"userManagementSupported"`
+}
+
+// AccessPermission is one action and which roles may take it.
+type AccessPermission struct {
+	ID    string          `json:"id"`
+	Label string          `json:"label"`
+	Roles map[string]bool `json:"roles"`
+}
+
+// AccessBinding is a configured credential and its role, shown to owners.
+type AccessBinding struct {
+	CredentialRef string `json:"credentialRef"`
+	Role          string `json:"role"`
+}

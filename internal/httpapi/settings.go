@@ -15,12 +15,7 @@ import (
 // credentials or imply that read-only configuration can be edited through HTTP.
 func (a *Server) access(w http.ResponseWriter, r *http.Request) {
 	principal, _ := tenancy.FromContext(r.Context())
-	type permission struct {
-		ID    string          `json:"id"`
-		Label string          `json:"label"`
-		Roles map[string]bool `json:"roles"`
-	}
-	permissions := []permission{}
+	permissions := []AccessPermission{}
 	for _, action := range []struct{ id, label, method, path string }{
 		{"intentConversationsRead", "View intent conversations", "GET", "/api/intent-conversations"},
 		{"intentConversationsWrite", "Prepare SLO intents", "POST", "/api/intent-conversations"},
@@ -46,16 +41,16 @@ func (a *Server) access(w http.ResponseWriter, r *http.Request) {
 			request, _ := http.NewRequest(action.method, action.path, nil)
 			grants[role] = allowed(role, request)
 		}
-		permissions = append(permissions, permission{action.id, action.label, grants})
+		permissions = append(permissions, AccessPermission{action.id, action.label, grants})
 	}
-	bindings := []map[string]string{}
+	bindings := []AccessBinding{}
 	if principal.Role == "owner" {
 		for i, g := range a.Workspace.Grants {
 			ref := "Server API token"
 			if i < len(a.Workspace.AccessConfig) {
 				ref = a.Workspace.AccessConfig[i].TokenEnv
 			}
-			bindings = append(bindings, map[string]string{"credentialRef": ref, "role": g.Role})
+			bindings = append(bindings, AccessBinding{CredentialRef: ref, Role: g.Role})
 		}
 	}
 	authentication := map[bool]string{true: "anonymous_local", false: "api_token"}[a.Workspace.Anonymous]
@@ -65,7 +60,7 @@ func (a *Server) access(w http.ResponseWriter, r *http.Request) {
 	case "service_account":
 		authentication = "service_account"
 	}
-	write(w, 200, map[string]any{"tenant": principal.TenantID, "currentRole": principal.Role, "management": "server_configuration", "authentication": authentication, "permissions": permissions, "bindings": bindings, "bindingsVisible": principal.Role == "owner", "userManagementSupported": a.Workspace.Identity != nil})
+	write(w, 200, AccessView{Tenant: principal.TenantID, CurrentRole: principal.Role, Management: "server_configuration", Authentication: authentication, Permissions: permissions, Bindings: bindings, BindingsVisible: principal.Role == "owner", UserManagementSupported: a.Workspace.Identity != nil})
 }
 func (a *Server) connections(w http.ResponseWriter, r *http.Request) {
 

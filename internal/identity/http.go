@@ -471,15 +471,10 @@ func (s *Service) TenantHandler() http.Handler {
 		if len(out) == 200 {
 			next = out[len(out)-1].ID
 		}
-		authJSON(w, 200, map[string]any{"items": out, "nextCursor": next})
+		authJSON(w, 200, AuditList{Items: out, NextCursor: next})
 	})
 	mux.HandleFunc("POST /api/team-access/members", func(w http.ResponseWriter, r *http.Request) {
-		var in struct {
-			Provider string `json:"provider"`
-			Subject  string `json:"subject"`
-			Role     string `json:"role"`
-			Expected int64  `json:"expectedVersion"`
-		}
+		var in GrantInput
 		if err := decode(w, r, &in); err != nil {
 			authFailure(w, err)
 			return
@@ -511,16 +506,10 @@ func (s *Service) TenantHandler() http.Handler {
 			authFailure(w, err)
 			return
 		}
-		authJSON(w, 200, map[string]string{"status": "removed"})
+		authJSON(w, 200, StatusResult{Status: "removed"})
 	})
 	mux.HandleFunc("POST /api/team-access/teams", func(w http.ResponseWriter, r *http.Request) {
-		var in struct {
-			ID       string   `json:"id"`
-			Name     string   `json:"name"`
-			Role     string   `json:"role"`
-			Members  []string `json:"members"`
-			Expected int64    `json:"expectedVersion"`
-		}
+		var in TeamInput
 		if err := decode(w, r, &in); err != nil {
 			authFailure(w, err)
 			return
@@ -544,15 +533,10 @@ func (s *Service) TenantHandler() http.Handler {
 			authFailure(w, err)
 			return
 		}
-		authJSON(w, 200, map[string]string{"status": "removed"})
+		authJSON(w, 200, StatusResult{Status: "removed"})
 	})
 	mux.HandleFunc("POST /api/team-access/service-accounts", func(w http.ResponseWriter, r *http.Request) {
-		var in struct {
-			ID      string    `json:"id"`
-			Name    string    `json:"name"`
-			Role    string    `json:"role"`
-			Expires time.Time `json:"expiresAt"`
-		}
+		var in ServiceAccountInput
 		if err := decode(w, r, &in); err != nil {
 			authFailure(w, err)
 			return
@@ -563,7 +547,7 @@ func (s *Service) TenantHandler() http.Handler {
 			authFailure(w, err)
 			return
 		}
-		authJSON(w, 201, map[string]any{"account": out, "token": token})
+		authJSON(w, 201, CreatedServiceAccount{Account: out, Token: token})
 	})
 	mux.HandleFunc("DELETE /api/team-access/service-accounts/{id}", func(w http.ResponseWriter, r *http.Request) {
 		a, t := actor(r)
@@ -571,7 +555,7 @@ func (s *Service) TenantHandler() http.Handler {
 			authFailure(w, err)
 			return
 		}
-		authJSON(w, 200, map[string]string{"status": "revoked"})
+		authJSON(w, 200, StatusResult{Status: "revoked"})
 	})
 	return mux
 }
