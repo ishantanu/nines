@@ -34,7 +34,7 @@ func (a *Server) sloRevisions(w http.ResponseWriter, r *http.Request) {
 	if len(revisions) == limit {
 		next = revisions[len(revisions)-1].Revision
 	}
-	write(w, 200, map[string]any{"apiVersion": model.APIVersion, "sloId": r.PathValue("id"), "revisions": revisions, "nextBeforeRevision": next})
+	write(w, 200, SLORevisionList{APIVersion: model.APIVersion, SLOID: r.PathValue("id"), Revisions: revisions, NextBeforeRevision: next})
 }
 func (a *Server) sloRevision(w http.ResponseWriter, r *http.Request) {
 	revision, err := strconv.ParseInt(r.PathValue("revision"), 10, 64)

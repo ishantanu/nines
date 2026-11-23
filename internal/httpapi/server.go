@@ -294,7 +294,7 @@ func (a *Server) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Location", "/api/slos/"+s.ID+"/status")
-	write(w, 201, map[string]string{"id": s.ID})
+	write(w, 201, CreatedSLO{ID: s.ID})
 }
 func (a *Server) status(w http.ResponseWriter, r *http.Request) {
 	var at time.Time
@@ -322,9 +322,7 @@ func (a *Server) samples(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, x)
 }
 func (a *Server) ingest(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Samples []model.Point `json:"samples"`
-	}
+	var body IngestSamples
 	if err := decode(w, r, &body); err != nil {
 		a.fail(w, r, err)
 		return
@@ -333,14 +331,10 @@ func (a *Server) ingest(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	write(w, 200, map[string]int{"accepted": len(body.Samples)})
+	write(w, 200, IngestResult{Accepted: len(body.Samples)})
 }
 func (a *Server) collect(w http.ResponseWriter, r *http.Request) {
-	var body struct {
-		Recent bool      `json:"recent"`
-		From   time.Time `json:"from"`
-		To     time.Time `json:"to"`
-	}
+	var body CollectRequest
 	if err := decode(w, r, &body); err != nil {
 		a.fail(w, r, err)
 		return
@@ -367,7 +361,7 @@ func (a *Server) collect(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	write(w, 200, map[string]int{"collected": count})
+	write(w, 200, CollectResult{Collected: count})
 }
 func (a *Server) events(w http.ResponseWriter, r *http.Request) {
 	x, err := a.Service.Store.Deliveries(r.Context())

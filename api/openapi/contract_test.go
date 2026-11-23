@@ -2,7 +2,9 @@ package openapi
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
@@ -11,6 +13,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/features"
 )
 
 func TestContractStructureAndRegisteredRoutes(t *testing.T) {
@@ -30,8 +33,10 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 		t.Fatal("unexpected contract version")
 	}
 	paths, ok := spec["paths"].(map[string]any)
-	if !ok || len(paths) != 32 {
-		t.Fatal("unexpected contract scope")
+	// Which routes belong in the contract is checked against the server by
+	// TestContractCoversTheStableSurface.
+	if !ok || len(paths) == 0 {
+		t.Fatal("no paths")
 	}
 	components, ok := spec["components"].(map[string]any)
 	if !ok {
@@ -66,7 +71,7 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 				t.Error("unregistered operation", needle)
 			}
 			responses, ok := operation["responses"].(map[string]any)
-			if !ok || responses["200"] == nil {
+			if !ok || responses["200"] == nil && responses["201"] == nil {
 				t.Error("missing success response", id)
 			}
 			params, ok := operation["parameters"].([]any)
@@ -189,6 +194,102 @@ func TestIfMatchRevisionPattern(t *testing.T) {
 	for _, v := range []string{"0", `"-1"`, `"01"`} {
 		if re.MatchString(v) {
 			t.Fatal("invalid revision accepted", v)
+		}
+	}
+}
+
+var routePattern = regexp.MustCompile(`"(GET|POST|PUT|PATCH|DELETE) (/(?:api|auth)/[^"]*)"`)
+
+// registeredRoutes finds every route the server registers, from the
+// method-and-path patterns in its Go source.
+func registeredRoutes(t *testing.T) map[string]bool {
+	t.Helper()
+	out := map[string]bool{}
+	for _, dir := range []string{"../../internal", "../../cmd"} {
+		err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return err
+			}
+			b, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			for _, m := range routePattern.FindAllStringSubmatch(string(b), -1) {
+				out[m[1]+" "+m[2]] = true
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	return out
+}
+
+func experimentalRoute(path string) bool {
+	_, gated := features.ForPath(strings.NewReplacer("{", "", "}", "").Replace(path))
+	return gated
+}
+
+// Every stable route is in the contract, outside it for a stated reason, or a
+// known gap that may only shrink; experimental operations in the contract
+// are marked as such.
+func TestContractCoversTheStableSurface(t *testing.T) {
+	data, err := os.ReadFile("v1alpha1.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spec struct {
+		Paths map[string]map[string]map[string]any `yaml:"paths"`
+	}
+	if err = yaml.Unmarshal(data, &spec); err != nil {
+		t.Fatal(err)
+	}
+	var scope struct {
+		Browser   map[string]string `yaml:"browser"`
+		Uncovered []string          `yaml:"uncovered"`
+	}
+	raw, err := os.ReadFile("scope.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = yaml.Unmarshal(raw, &scope); err != nil {
+		t.Fatal(err)
+	}
+	documented := map[string]bool{}
+	for path, methods := range spec.Paths {
+		for method, op := range methods {
+			route := strings.ToUpper(method) + " " + path
+			documented[route] = true
+			if experimentalRoute(path) && op["x-nines-maturity"] != "experimental" {
+				t.Errorf("%s is experimental: mark it x-nines-maturity: experimental", route)
+			}
+		}
+	}
+	uncovered := map[string]bool{}
+	for _, r := range scope.Uncovered {
+		uncovered[r] = true
+	}
+	registered := registeredRoutes(t)
+	for route := range registered {
+		_, path, _ := strings.Cut(route, " ")
+		inBrowser := scope.Browser[route] != ""
+		switch {
+		case experimentalRoute(path):
+		case documented[route] && (uncovered[route] || inBrowser):
+			t.Errorf("%s is documented: remove it from scope.yaml", route)
+		case !documented[route] && !uncovered[route] && !inBrowser:
+			t.Errorf("stable route %s is not in the contract: document it in v1alpha1.yaml", route)
+		}
+	}
+	for route := range uncovered {
+		if !registered[route] {
+			t.Errorf("scope.yaml lists %s, which the server no longer registers", route)
+		}
+	}
+	for route := range scope.Browser {
+		if !registered[route] {
+			t.Errorf("scope.yaml lists browser route %s, which the server no longer registers", route)
 		}
 	}
 }
