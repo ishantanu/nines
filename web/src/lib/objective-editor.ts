@@ -361,6 +361,7 @@ export function parseObjectiveDefinition(text: string): SLODefinition {
         typeof x.owner === "string" &&
         typeof x.runbookURL === "string" &&
         finite(x.reviewBelow) &&
+        optional(x.postmortemAbove, finite) &&
         optional(x.onExhausted, (y) =>
           ["blocked", "review_required"].includes(String(y)),
         ) &&

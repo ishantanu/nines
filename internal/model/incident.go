@@ -36,6 +36,16 @@ type Incident struct {
 	Signals  []IncidentSignal  `json:"signals,omitempty"`
 	Journeys []IncidentJourney `json:"journeys"`
 	Timeline []IncidentEvent   `json:"timeline"`
+	// Postmortem is the review holding the incident's postmortem, once one is
+	// saved; Published once it has been published.
+	Postmortem *IncidentPostmortem `json:"postmortem,omitempty"`
+}
+
+// IncidentPostmortem links an incident to the review with its postmortem.
+type IncidentPostmortem struct {
+	ReviewID  string    `json:"reviewId"`
+	Published bool      `json:"published"`
+	SavedAt   time.Time `json:"savedAt"`
 }
 
 // IncidentSLO is an affected SLO with the definition revision in force when

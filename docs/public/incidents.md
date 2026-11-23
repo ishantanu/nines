@@ -125,6 +125,10 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "X-Nines-Tenant: $TENANT" \
   "$NINES_URL/api/incidents/INCIDENT_ID/transition"
 ```
 
+## When a postmortem is required
+
+An SLO's [error budget policy](error-budget-policy.md#require-a-postmortem) can require a postmortem when one incident consumes more than a set share of its budget. The incident then says so and why, and the SLO's budget decision lists it until a postmortem is published.
+
 ## Review an incident
 
 A [reliability review](architecture.md) can be scoped to an incident. It pins the incident revision it started from, and each evidence capture saves the incident record as it is at that moment, with its timeline and impact, under a digest. The review keeps them even as the incident moves on.

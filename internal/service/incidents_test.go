@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/store"
@@ -412,5 +413,162 @@ func TestExternalAlertJoinsWithSLOBurnsOnItsJourney(t *testing.T) {
 	}
 	if v := f.incidents()[0]; v.State != model.IncidentDetected {
 		t.Fatal("moved to monitoring while an SLO alert still fires", v.State)
+	}
+}
+
+// postmortemFixture is an SLO with a 99% target over one hour and a policy
+// requiring a postmortem above a quarter of the budget: 1000 requests a minute
+// allow 600 bad events an hour, so the threshold is 150.
+func postmortemFixture(t *testing.T, badPerMinute []float64) (*incidentFixture, string) {
+	t.Helper()
+	f := newIncidentFixture(t)
+	f.slo("checkout")
+	ctx := context.Background()
+	if err := f.svc.Store.Update(ctx, "checkout", func(r *model.Record) error {
+		r.SLO.ErrorBudgetPolicy = &v1.ErrorBudgetPolicy{Owner: "team", RunbookURL: "https://runbooks.example/checkout", ReviewBelow: 0.5, PostmortemAbove: 0.25}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var points []model.Point
+	start := f.now.Add(-time.Hour)
+	for m := 1; m <= 60; m++ {
+		bad := 0.0
+		if n := m - (60 - len(badPerMinute)) - 1; n >= 0 {
+			bad = badPerMinute[n]
+		}
+		points = append(points, model.Point{Time: start.Add(time.Duration(m) * time.Minute), Good: 1000 - bad, Total: 1000})
+	}
+	if err := f.svc.Ingest(ctx, "checkout", points); err != nil {
+		t.Fatal(err)
+	}
+	declared, err := f.svc.DeclareIncident(ctx, "ana", "Checkout errors", []string{"checkout"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.Store.(store.IncidentStore).UpdateIncidents(ctx, func(open []model.Incident) ([]model.Incident, error) {
+		i := open[0]
+		i.OpenedAt = start.Add(time.Duration(60-len(badPerMinute)) * time.Minute)
+		i.Revision++
+		return []model.Incident{i}, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return f, declared.ID
+}
+
+func TestPostmortemRequiredAboveThePolicyThreshold(t *testing.T) {
+	for name, tc := range map[string]struct {
+		bad      []float64
+		required bool
+	}{
+		"below": {[]float64{50, 50, 49}, false},
+		"at":    {[]float64{50, 50, 50}, false},
+		"above": {[]float64{50, 50, 51}, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			f, id := postmortemFixture(t, tc.bad)
+			v, err := f.svc.Incident(context.Background(), id)
+			if err != nil || v.PostmortemRequirement == nil {
+				t.Fatal(v.PostmortemRequirement, err)
+			}
+			if v.PostmortemRequirement.Required != tc.required {
+				t.Fatalf("required = %v at %v of the budget", v.PostmortemRequirement.Required, *v.Impact[0].BudgetConsumedFraction)
+			}
+			if tc.required && (v.PostmortemRequirement.Reasons[0].Threshold != 0.25 || v.PostmortemRequirement.Reasons[0].SLOID != "checkout") {
+				t.Fatalf("%+v", v.PostmortemRequirement.Reasons)
+			}
+		})
+	}
+}
+
+// An incident longer than the SLO's window can consume more than the window
+// allows; it is measured against the budget at its end, and still required.
+func TestPostmortemRequiredForAnIncidentSpanningTheWindow(t *testing.T) {
+	bad := make([]float64, 60)
+	for n := range bad {
+		bad[n] = 12 // 720 bad in the hour: 1.2 of a 600 budget.
+	}
+	f, id := postmortemFixture(t, bad)
+	v, _ := f.svc.Incident(context.Background(), id)
+	if v.PostmortemRequirement == nil || !v.PostmortemRequirement.Required || *v.Impact[0].BudgetConsumedFraction <= 1 {
+		t.Fatalf("%+v %v", v.PostmortemRequirement, v.Impact[0].BudgetConsumedFraction)
+	}
+}
+
+// Required postmortems show in the SLO's budget decision until published, and
+// missing data leaves the requirement unknown rather than satisfied.
+func TestRequiredPostmortemsInTheBudgetDecision(t *testing.T) {
+	f, id := postmortemFixture(t, []float64{100, 100})
+	ctx := context.Background()
+	d, err := f.svc.ErrorBudgetDecision(ctx, "checkout", 0)
+	if err != nil || len(d.RequiredPostmortems) != 1 || d.RequiredPostmortems[0].IncidentID != id || d.State == "" {
+		t.Fatal(d.RequiredPostmortems, err)
+	}
+	if err = f.svc.RecordPostmortem(ctx, id, "review-1", false); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ = f.svc.ErrorBudgetDecision(ctx, "checkout", 0); len(d.RequiredPostmortems) != 1 {
+		t.Fatal("a draft satisfied the requirement")
+	}
+	if err = f.svc.RecordPostmortem(ctx, id, "review-1", true); err != nil {
+		t.Fatal(err)
+	}
+	if d, _ = f.svc.ErrorBudgetDecision(ctx, "checkout", 0); len(d.RequiredPostmortems) != 0 {
+		t.Fatal("still required after publishing", d.RequiredPostmortems)
+	}
+	v, _ := f.svc.Incident(ctx, id)
+	if !v.PostmortemRequirement.Published || v.Timeline[len(v.Timeline)-1].Kind != "postmortem_published" {
+		t.Fatal(v.PostmortemRequirement, v.Timeline)
+	}
+	// A gap in the data makes the requirement unknown, never satisfied.
+	g, gid := postmortemFixture(t, []float64{100, 100, 100})
+	if err := g.svc.Store.Update(ctx, "checkout", func(r *model.Record) error {
+		delete(r.Points, g.now.Add(-time.Minute).Unix())
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	v, _ = g.svc.Incident(ctx, gid)
+	if v.PostmortemRequirement.Required || len(v.PostmortemRequirement.Unknown) != 1 {
+		t.Fatalf("%+v", v.PostmortemRequirement)
+	}
+}
+
+// Impact ends when the alert cleared or the incident was mitigated, so an
+// incident left open after recovery keeps the impact it had.
+func TestIncidentImpactEndsWhenTheAlertClears(t *testing.T) {
+	f, id := postmortemFixture(t, []float64{100, 100})
+	ctx := context.Background()
+	before, _ := f.svc.Incident(ctx, id)
+	cleared := f.now
+	if err := f.svc.Store.(store.IncidentStore).UpdateIncident(ctx, id, func(i *model.Incident) error {
+		i.SLOs[0].Firing, i.SLOs[0].ClearedAt = false, &cleared
+		i.Revision++
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	// A day later, with no data since, nobody resolved it.
+	f.now = f.now.Add(24 * time.Hour)
+	after, _ := f.svc.Incident(ctx, id)
+	if after.Impact[0].BudgetConsumedFraction == nil || *after.Impact[0].BudgetConsumedFraction != *before.Impact[0].BudgetConsumedFraction || !after.Impact[0].To.Equal(cleared) {
+		t.Fatalf("impact kept growing after the alert cleared: %+v", after.Impact[0])
+	}
+}
+
+// A changed definition makes the requirement unknown rather than dropping it.
+func TestPostmortemRequirementUnknownAfterADefinitionChange(t *testing.T) {
+	f, id := postmortemFixture(t, []float64{100, 100})
+	ctx := context.Background()
+	if err := f.svc.Store.Update(ctx, "checkout", func(r *model.Record) error {
+		r.SLO.Revision++
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	v, _ := f.svc.Incident(ctx, id)
+	if v.PostmortemRequirement == nil || v.PostmortemRequirement.Required || len(v.PostmortemRequirement.Unknown) != 1 {
+		t.Fatalf("%+v", v.PostmortemRequirement)
 	}
 }

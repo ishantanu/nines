@@ -120,10 +120,19 @@ export interface ErrorBudgetPolicy {
   onExhausted?: "blocked" | "review_required";
   /** Agreed responses as the budget falls. They never change the decision. */
   bands?: BudgetBand[];
+  /** Budget share one incident may consume before a postmortem is required. */
+  postmortemAbove?: number;
 }
 export interface ErrorBudgetDecision {
   /** The agreed response level for the remaining budget, when bands apply. */
   band?: { name: string; below: number; response: string };
+  /** Incidents whose postmortem the policy requires, none published yet. */
+  requiredPostmortems?: {
+    incidentId: string;
+    title: string;
+    consumed: number;
+    threshold: number;
+  }[];
   evidence?: {
     coverage: number;
     total: number;

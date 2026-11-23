@@ -53,6 +53,12 @@ export type Incident = {
   journeys: { id: string; revision: number }[];
   timeline: IncidentEvent[];
   impact: IncidentImpact[];
+  postmortemRequirement?: {
+    required: boolean;
+    reasons: { sloId: string; consumed: number; threshold: number }[];
+    unknown?: string[];
+    published: boolean;
+  };
 };
 
 export const stateLabels: Record<IncidentState, string> = {

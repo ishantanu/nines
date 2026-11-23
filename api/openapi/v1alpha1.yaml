@@ -2353,6 +2353,26 @@ components:
           type: string
         qualityState:
           type: string
+        requiredPostmortems:
+          description: Recent incidents whose postmortem the policy requires and that have none published yet.
+          items:
+            additionalProperties: false
+            properties:
+              consumed:
+                type: number
+              incidentId:
+                type: string
+              threshold:
+                type: number
+              title:
+                type: string
+            required:
+            - incidentId
+            - title
+            - consumed
+            - threshold
+            type: object
+          type: array
         reasonCodes:
           items:
             type: string
@@ -2392,6 +2412,11 @@ components:
           type: string
         owner:
           type: string
+        postmortemAbove:
+          description: Share of the error budget one incident may consume before a postmortem is required; 0 turns it off.
+          maximum: 1
+          minimum: 0
+          type: number
         reviewBelow:
           type: number
         runbookURL:

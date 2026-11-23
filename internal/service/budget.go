@@ -83,5 +83,7 @@ func (s *Service) ErrorBudgetDecision(ctx context.Context, id string, expected i
 		return v1.ErrorBudgetDecision{}, err
 	}
 	q := s.qualityFromRecord(r, x, s.Now(), false)
-	return s.budgetFromEvidence(r.SLO, x, q, false), nil
+	d := s.budgetFromEvidence(r.SLO, x, q, false)
+	s.withRequiredPostmortems(ctx, r.SLO, &d)
+	return d, nil
 }
