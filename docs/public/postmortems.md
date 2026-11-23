@@ -6,7 +6,7 @@ A postmortem is written on a [reliability review](architecture.md) of an [incide
 
 ## Start one
 
-On the incident, choose **Start review**, then open the review's **Postmortem** tab. Capture evidence first: the timeline and impact come from the incident record saved in the review, so nobody retypes them.
+On the incident, choose **Start review** (it reopens the incident's review if one exists), then choose **Postmortem** in the review's header. Capture evidence first: the timeline and impact come from the incident record saved in the review, so nobody retypes them.
 
 ## The template
 

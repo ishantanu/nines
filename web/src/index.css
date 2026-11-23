@@ -6,6 +6,17 @@
 @import "@astryxdesign/theme-neutral/theme.css";
 /* Astryx has no theme API for data-visualization tokens, so point its
    categorical series at the contrast-tested chart palette below. */
+/* Wide reviews show conversation and evidence side by side. The tabs mark the
+   inactive pane [hidden], and Tailwind's base layer forces [hidden] to
+   display: none !important. For important declarations the earliest layer
+   wins, so this override lives in the reset layer. */
+@layer reset {
+  @media (min-width: 1280px) {
+    .investigation-pane[hidden] {
+      display: flex !important;
+    }
+  }
+}
 @layer astryx-theme {
   :where(:root) {
     --color-data-categorical-green: var(--chart-sli);

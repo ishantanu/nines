@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ArrowUpRight,
   FileText,
+  NotebookPen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -55,6 +56,7 @@ import {
   type InvestigationScope,
 } from "@/lib/investigations";
 import { ReviewRuns } from "./review-runs";
+import { PostmortemEditor } from "./postmortem-editor";
 import { cn } from "@/lib/utils";
 
 type Resource = {
@@ -118,6 +120,11 @@ export function InvestigationConversation({
             {entry.kind === "message" ? (
               <p className="whitespace-pre-wrap break-words text-sm">
                 {entry.text}
+              </p>
+            ) : entry.kind === "postmortem" ? (
+              <p className="text-sm">
+                Postmortem revision saved
+                {entry.postmortem?.published ? " and published" : ""}.
               </p>
             ) : (
               <p className="text-sm">
@@ -211,6 +218,14 @@ function ContextEvidence({ context }: { context: EvidenceContext }) {
       ) : null}
     </div>
   );
+}
+// The newest incident record captured on a review, for its postmortem.
+function latestIncident(review: Investigation): Incident | null {
+  for (let n = review.entries.length - 1; n >= 0; n--) {
+    const found = incidentSnapshot(review.entries[n].evidence?.context);
+    if (found) return found;
+  }
+  return null;
 }
 // An incident review's evidence is the incident record as it was captured.
 function incidentSnapshot(context: unknown): Incident | null {
@@ -317,6 +332,7 @@ export function Investigations({
   const [resource, setResource] = useState("");
   const [at, setAt] = useState(() => cutoff(60));
   const [captureId, setCaptureId] = useState("");
+  const [postmortemView, setPostmortemView] = useState(false);
   const mounted = useRef(true);
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
@@ -368,6 +384,7 @@ export function Investigations({
     setDoc(null);
     setText("");
     setCaptureId("");
+    setPostmortemView(false);
     setError("");
     pendingMessage.current = null;
     pendingCapture.current = null;
@@ -653,6 +670,17 @@ export function Investigations({
                 >
                   <RefreshCw className="size-4" />
                 </Button>
+                {doc.scope.kind === "Incident" ? (
+                  <Button
+                    variant={postmortemView ? "default" : "outline"}
+                    size="sm"
+                    aria-pressed={postmortemView}
+                    onClick={() => setPostmortemView((v) => !v)}
+                  >
+                    <NotebookPen className="size-4" />
+                    {postmortemView ? "Back to review" : "Postmortem"}
+                  </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   size="sm"
@@ -675,118 +703,135 @@ export function Investigations({
                 </Button>
               </div>
             </div>
-            <Tabs defaultValue="conversation" className="investigation-content">
-              <TabsList className="mx-4 mt-3 xl:hidden">
-                <TabsTrigger value="conversation">Conversation</TabsTrigger>
-                <TabsTrigger value="evidence">Evidence</TabsTrigger>
-              </TabsList>
-              <div className="investigation-panes">
-                <TabsContent
-                  forceMount
-                  value="conversation"
-                  className="investigation-pane"
-                >
-                  <div className="flex min-h-14 items-center gap-2 border-b px-4 text-sm font-medium">
-                    <MessageSquare className="size-4" />
-                    Conversation
-                  </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto">
-                    <InvestigationConversation investigation={doc} />
-                  </div>
-                  <form
-                    className="space-y-2 border-t p-4"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void save();
-                    }}
+            {postmortemView && doc.scope.kind === "Incident" ? (
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <PostmortemEditor
+                  key={doc.id}
+                  scope={scope}
+                  review={doc}
+                  incident={latestIncident(doc)}
+                  objectives={objectives}
+                  journeys={journeys}
+                  onSaved={accept}
+                />
+              </div>
+            ) : (
+              <Tabs
+                defaultValue="conversation"
+                className="investigation-content"
+              >
+                <TabsList className="mx-4 mt-3 xl:hidden">
+                  <TabsTrigger value="conversation">Conversation</TabsTrigger>
+                  <TabsTrigger value="evidence">Evidence</TabsTrigger>
+                </TabsList>
+                <div className="investigation-panes">
+                  <TabsContent
+                    forceMount
+                    value="conversation"
+                    className="investigation-pane"
                   >
-                    <Label htmlFor="investigation-message">Message</Label>
-                    <Textarea
-                      id="investigation-message"
-                      maxLength={4000}
-                      rows={3}
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
-                      disabled={!writable || busy}
-                      placeholder={
-                        writable
-                          ? "Record a question, finding or decision."
-                          : "Your role can read this review."
-                      }
-                    />
-                    <div className="flex justify-end">
+                    <div className="flex min-h-14 items-center gap-2 border-b px-4 text-sm font-medium">
+                      <MessageSquare className="size-4" />
+                      Conversation
+                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                      <InvestigationConversation investigation={doc} />
+                    </div>
+                    <form
+                      className="space-y-2 border-t p-4"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void save();
+                      }}
+                    >
+                      <Label htmlFor="investigation-message">Message</Label>
+                      <Textarea
+                        id="investigation-message"
+                        maxLength={4000}
+                        rows={3}
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        disabled={!writable || busy}
+                        placeholder={
+                          writable
+                            ? "Record a question, finding or decision."
+                            : "Your role can read this review."
+                        }
+                      />
+                      <div className="flex justify-end">
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={!writable || busy || !text.trim()}
+                        >
+                          Save message
+                        </Button>
+                      </div>
+                    </form>
+                  </TabsContent>
+                  <TabsContent
+                    forceMount
+                    value="evidence"
+                    className="investigation-pane"
+                  >
+                    <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
+                      <h3 className="flex items-center gap-2 text-sm font-medium">
+                        <FileText className="size-4" />
+                        Evidence
+                      </h3>
                       <Button
-                        type="submit"
                         size="sm"
-                        disabled={!writable || busy || !text.trim()}
+                        variant="outline"
+                        disabled={!writable || busy || evidence.length >= 20}
+                        onClick={() => void capture()}
                       >
-                        Save message
+                        Capture context
                       </Button>
                     </div>
-                  </form>
-                </TabsContent>
-                <TabsContent
-                  forceMount
-                  value="evidence"
-                  className="investigation-pane"
-                >
-                  <div className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b px-4 py-2">
-                    <h3 className="flex items-center gap-2 text-sm font-medium">
-                      <FileText className="size-4" />
-                      Evidence
-                    </h3>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!writable || busy || evidence.length >= 20}
-                      onClick={() => void capture()}
-                    >
-                      Capture context
-                    </Button>
-                  </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto">
-                    {evidence.length > 1 ? (
-                      <div className="px-4 pt-3">
-                        <Label htmlFor="evidence-snapshot">
-                          Saved snapshot
-                        </Label>
-                        <Select
-                          value={chosenEvidence?.id}
-                          onValueChange={setCaptureId}
-                        >
-                          <SelectTrigger
-                            id="evidence-snapshot"
-                            className="mt-2"
+                    <div className="min-h-0 flex-1 overflow-y-auto">
+                      {evidence.length > 1 ? (
+                        <div className="px-4 pt-3">
+                          <Label htmlFor="evidence-snapshot">
+                            Saved snapshot
+                          </Label>
+                          <Select
+                            value={chosenEvidence?.id}
+                            onValueChange={setCaptureId}
                           >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {evidence.map((e) => (
-                              <SelectItem key={e.id} value={e.id}>
-                                {new Date(e.createdAt).toLocaleString()}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    ) : null}
-                    <ReviewRuns
-                      key={doc.id}
-                      scope={scope}
-                      review={doc}
-                      writable={writable}
-                      onConflict={() => void refresh()}
-                    />
-                    {evidence.length ? (
-                      <h3 className="border-t px-4 pt-4 text-sm font-medium">
-                        Saved snapshots
-                      </h3>
-                    ) : null}
-                    <InvestigationEvidenceView entry={chosenEvidence} />
-                  </div>
-                </TabsContent>
-              </div>
-            </Tabs>
+                            <SelectTrigger
+                              id="evidence-snapshot"
+                              className="mt-2"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {evidence.map((e) => (
+                                <SelectItem key={e.id} value={e.id}>
+                                  {new Date(e.createdAt).toLocaleString()}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : null}
+                      <ReviewRuns
+                        key={doc.id}
+                        scope={scope}
+                        review={doc}
+                        writable={writable}
+                        onConflict={() => void refresh()}
+                      />
+                      {evidence.length ? (
+                        <h3 className="border-t px-4 pt-4 text-sm font-medium">
+                          Saved snapshots
+                        </h3>
+                      ) : null}
+                      <InvestigationEvidenceView entry={chosenEvidence} />
+                    </div>
+                  </TabsContent>
+                </div>
+              </Tabs>
+            )}
           </Card>
         ) : (
           <Card className="flex items-center justify-center p-6 text-sm text-muted-foreground">

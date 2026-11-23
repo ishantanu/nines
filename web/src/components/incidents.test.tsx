@@ -11,6 +11,7 @@ const calls = vi.hoisted(() => ({
   declare: vi.fn(),
   transition: vi.fn(),
   review: vi.fn(),
+  existing: vi.fn(),
   navigate: vi.fn(),
 }));
 vi.mock("@/lib/incidents", async (original) => ({
@@ -19,7 +20,10 @@ vi.mock("@/lib/incidents", async (original) => ({
   declareIncident: calls.declare,
   transitionIncident: calls.transition,
 }));
-vi.mock("@/lib/investigations", () => ({ createInvestigation: calls.review }));
+vi.mock("@/lib/investigations", () => ({
+  createInvestigation: calls.review,
+  findIncidentReview: calls.existing,
+}));
 vi.mock("@/lib/navigation", async (original) => ({
   ...(await original<typeof import("@/lib/navigation")>()),
   navigateTo: calls.navigate,
@@ -74,6 +78,7 @@ beforeEach(() => {
   root = createRoot(host);
   Object.values(calls).forEach((f) => f.mockReset());
   calls.list.mockResolvedValue([incident]);
+  calls.existing.mockResolvedValue(null);
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -210,4 +215,14 @@ test("an incident no SLO detected says so and offers to define one", async () =>
   ).not.toBeNull();
   await act(async () => button("Define an SLO")!.click());
   expect(define).toHaveBeenCalled();
+});
+
+test("Start review opens the incident's existing review instead of a second one", async () => {
+  await show("editor");
+  calls.existing.mockResolvedValue("review-0");
+  await act(async () => button("Start review")!.click());
+  expect(calls.review).not.toHaveBeenCalled();
+  expect(calls.navigate).toHaveBeenCalledWith(
+    "/tenants/alpha/reviews/review-0",
+  );
 });
