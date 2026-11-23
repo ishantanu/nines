@@ -33,6 +33,7 @@ import {
 import { createInvestigation, findIncidentReview } from "@/lib/investigations";
 import { navigateTo, useResourceRoute, workspacePath } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
+import { IncidentPostmortems } from "./incident-postmortems";
 
 function StateBadge({ state }: { state: IncidentState }) {
   return (
@@ -61,6 +62,7 @@ export function IncidentDetail({
   onDefineSLO,
   onSLO,
   onJourney,
+  scope,
 }: {
   incident: Incident;
   objectives: Objective[];
@@ -72,6 +74,7 @@ export function IncidentDetail({
   onDefineSLO?: () => void;
   onSLO: (id: string) => void;
   onJourney: (id: string) => void;
+  scope?: RequestScope;
 }) {
   const name = (id: string) =>
     objectives.find((o) => o.slo.id === id)?.slo.name || id;
@@ -280,6 +283,10 @@ export function IncidentDetail({
           </p>
         )}
       </section>
+
+      {reviewsOn && scope ? (
+        <IncidentPostmortems scope={scope} incident={incident.id} />
+      ) : null}
 
       <section aria-labelledby="incident-timeline">
         <h3 id="incident-timeline" className="mb-2 text-sm font-medium">
@@ -490,6 +497,7 @@ export function Incidents({
               onReview={() => void startReview(current)}
               reviewsOn={reviewsOn}
               onDefineSLO={onDefineSLO}
+              scope={scope}
               onSLO={onSLO}
               onJourney={onJourney}
             />

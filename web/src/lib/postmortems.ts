@@ -126,3 +126,23 @@ export function emptyPostmortem(): Postmortem {
 export function postmortemRevisions(review: Investigation) {
   return review.entries.filter((e) => e.kind === "postmortem");
 }
+
+export type IncidentPostmortem = {
+  reviewId: string;
+  reviewTitle: string;
+  published: boolean;
+  savedAt: string;
+  savedBy: { subject: string; name: string; kind: string };
+  openActions: number;
+};
+export function listIncidentPostmortems(
+  scope: RequestScope,
+  incident: string,
+  signal?: AbortSignal,
+) {
+  return api<{ postmortems: IncidentPostmortem[] }>(
+    `/api/postmortems?incident=${encodeURIComponent(incident)}`,
+    scope,
+    { signal },
+  ).then((r) => r.postmortems);
+}

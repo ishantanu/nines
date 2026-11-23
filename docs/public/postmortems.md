@@ -41,7 +41,7 @@ Flags are advice, never a block: you decide.
 - **History.** Each save adds a revision; earlier ones stay in the review, with who saved them and when.
 - **Conflicts.** A save names the review version it was made against, so two authors cannot overwrite each other.
 - **Who writes.** People write postmortems: saving needs the owner or editor role. Agents can help in review messages.
-- **Publishing.** Mark a postmortem published to make it visible from the incident.
+- **Publishing.** Mark a postmortem published to link it from the incident's **Postmortems** list; an unpublished one shows there as a draft in progress, so people know it is being written.
 
 ## Using the API
 

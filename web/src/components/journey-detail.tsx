@@ -1,3 +1,4 @@
+import { OpenActionItems } from "./open-action-items";
 import { useFeature } from "@/lib/features";
 import { SLOProvider } from "./provider-identity";
 import type { Workspace } from "@/lib/api";
@@ -247,6 +248,7 @@ export function JourneyDetail({
       </div>
       <CardContent className="space-y-4 p-5">
         <GitProposals scope={scope} id={m.metadata.name} kind="journey" />
+        <OpenActionItems scope={scope} journey={m.metadata.name} />
         <Tabs
           defaultValue={evidenceOnly ? "evidence" : "overview"}
           key={`${m.metadata.name}-${evidenceOnly}`}

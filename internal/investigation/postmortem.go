@@ -264,3 +264,56 @@ func contains(list []string, want string) bool {
 	}
 	return false
 }
+
+// IncidentPostmortem summarizes the postmortem on one review of an incident.
+type IncidentPostmortem struct {
+	ReviewID    string                `json:"reviewId"`
+	ReviewTitle string                `json:"reviewTitle"`
+	Published   bool                  `json:"published"`
+	SavedAt     time.Time             `json:"savedAt"`
+	SavedBy     v1.InvestigationActor `json:"savedBy"`
+	OpenActions int                   `json:"openActions"`
+}
+
+// IncidentPostmortems lists the postmortems written about an incident.
+func (s *Service) IncidentPostmortems(ctx context.Context, incident string) ([]IncidentPostmortem, error) {
+	if !identifier.MatchString(incident) {
+		return nil, model.Invalid("invalid incident ID")
+	}
+	out := []IncidentPostmortem{}
+	after := ""
+	for page := 0; page < 20; page++ {
+		rows, err := s.Repository.List(ctx, after, 100)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			if row.Scope.Kind != v1.IncidentScope || row.Scope.ResourceID != incident {
+				continue
+			}
+			v, err := s.Repository.Read(ctx, row.ID)
+			if err != nil {
+				return nil, err
+			}
+			for n := len(v.Entries) - 1; n >= 0; n-- {
+				e := v.Entries[n]
+				if e.Kind != "postmortem" || e.Postmortem == nil {
+					continue
+				}
+				open := 0
+				for _, a := range e.Postmortem.ActionItems {
+					if !a.Done {
+						open++
+					}
+				}
+				out = append(out, IncidentPostmortem{ReviewID: v.ID, ReviewTitle: v.Title, Published: e.Postmortem.Published, SavedAt: e.CreatedAt, SavedBy: e.Actor, OpenActions: open})
+				break
+			}
+		}
+		if len(rows) < 100 {
+			return out, nil
+		}
+		after = rows[len(rows)-1].ID
+	}
+	return out, nil
+}

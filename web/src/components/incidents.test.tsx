@@ -12,6 +12,7 @@ const calls = vi.hoisted(() => ({
   transition: vi.fn(),
   review: vi.fn(),
   existing: vi.fn(),
+  postmortems: vi.fn(),
   navigate: vi.fn(),
 }));
 vi.mock("@/lib/incidents", async (original) => ({
@@ -23,6 +24,10 @@ vi.mock("@/lib/incidents", async (original) => ({
 vi.mock("@/lib/investigations", () => ({
   createInvestigation: calls.review,
   findIncidentReview: calls.existing,
+}));
+vi.mock("@/lib/postmortems", async (original) => ({
+  ...(await original<typeof import("@/lib/postmortems")>()),
+  listIncidentPostmortems: calls.postmortems,
 }));
 vi.mock("@/lib/navigation", async (original) => ({
   ...(await original<typeof import("@/lib/navigation")>()),
@@ -79,6 +84,7 @@ beforeEach(() => {
   Object.values(calls).forEach((f) => f.mockReset());
   calls.list.mockResolvedValue([incident]);
   calls.existing.mockResolvedValue(null);
+  calls.postmortems.mockResolvedValue([]);
 });
 afterEach(async () => {
   await act(async () => root.unmount());
@@ -224,5 +230,34 @@ test("Start review opens the incident's existing review instead of a second one"
   expect(calls.review).not.toHaveBeenCalled();
   expect(calls.navigate).toHaveBeenCalledWith(
     "/tenants/alpha/reviews/review-0",
+  );
+});
+
+test("the incident lists its postmortems: published ones link, drafts say so", async () => {
+  calls.postmortems.mockResolvedValue([
+    {
+      reviewId: "review-1",
+      reviewTitle: "Review: checkout burn",
+      published: true,
+      savedAt: "2026-11-23T09:00:00Z",
+      savedBy: { subject: "u1", name: "Ana", kind: "user" },
+      openActions: 2,
+    },
+    {
+      reviewId: "review-2",
+      reviewTitle: "Second look",
+      published: false,
+      savedAt: "2026-11-23T10:00:00Z",
+      savedBy: { subject: "u2", name: "Ben", kind: "user" },
+      openActions: 0,
+    },
+  ]);
+  await show("editor");
+  const text = host.textContent ?? "";
+  expect(text).toContain("2 open action items");
+  expect(text).toContain("Draft in progress by Ben");
+  await act(async () => button("Review: checkout burn")!.click());
+  expect(calls.navigate).toHaveBeenCalledWith(
+    "/tenants/alpha/reviews/review-1",
   );
 });

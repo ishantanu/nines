@@ -72,6 +72,11 @@ func TestPostmortemOnAnIncidentReview(t *testing.T) {
 	if all, _ := s.OpenActionItems(ctx, "", ""); len(all) != 1 {
 		t.Fatal("the done standing item is still open", all)
 	}
+	// The incident lists its postmortem, with what is still open.
+	listed, err := s.IncidentPostmortems(ctx, declared.ID)
+	if err != nil || len(listed) != 1 || listed[0].ReviewID != review.ID || listed[0].Published || listed[0].OpenActions != 1 {
+		t.Fatal(listed, err)
+	}
 	// Invalid content is refused.
 	for name, bad := range map[string]func(*v1.Postmortem){
 		"cause kind":  func(p *v1.Postmortem) { p.ContributingCauses[0].Kind = "root" },
