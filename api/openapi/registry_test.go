@@ -39,4 +39,19 @@ var generatedTypes = map[string]any{
 	"CollectRequest":       httpapi.CollectRequest{},
 	"CollectResult":        httpapi.CollectResult{},
 	"CreatedSLO":           httpapi.CreatedSLO{},
+
+	// Critical user journeys
+	"JourneyView":    service.JourneyView{},
+	"JourneyPlan":    service.JourneyPlan{},
+	"JourneyRequest": httpapi.JourneyRequest{},
+	"JourneyRun":     model.JourneyRun{},
+	"RunEvidence":    model.RunEvidence{},
+
+	// Measurement bindings and dependency maps
+	"TopologyResource":      httpapi.TopologyResource{},
+	"BindingHealth":         v1.BindingHealth{},
+	"CompileBindingInput":   v1.CompileBindingInput{},
+	"CompiledBinding":       v1.CompiledBinding{},
+	"DependencyView":        v1.DependencyView{},
+	"DependencyComposition": v1.DependencyComposition{},
 }

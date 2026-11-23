@@ -106,7 +106,7 @@ func (a *Server) topologyRead(kind string, manifest bool) http.HandlerFunc {
 		}
 		w.Header().Set("ETag", `"`+strconv.FormatInt(out.Revision, 10)+`"`)
 		if !manifest {
-			write(w, 200, map[string]any{"apiVersion": v1.APIVersion, "tenant": a.Service.TenantID, "resource": out})
+			write(w, 200, TopologyResource{APIVersion: v1.APIVersion, Tenant: a.Service.TenantID, Resource: out})
 			return
 		}
 		definition, err := model.ParseDefinition(out.Manifest)

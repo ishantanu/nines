@@ -7,13 +7,14 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 )
 
-type journeyRequest struct {
+// JourneyRequest is the body of POST /api/journeys/plan and /apply.
+type JourneyRequest struct {
 	Manifest         string `json:"manifest"`
 	ExpectedRevision *int64 `json:"expectedRevision,omitempty"`
 }
 
 func (a *Server) journeyPlan(w http.ResponseWriter, r *http.Request) {
-	var req journeyRequest
+	var req JourneyRequest
 	if err := decode(w, r, &req); err != nil {
 		a.fail(w, r, err)
 		return
@@ -31,7 +32,7 @@ func (a *Server) journeyPlan(w http.ResponseWriter, r *http.Request) {
 	write(w, 200, p)
 }
 func (a *Server) journeyApply(w http.ResponseWriter, r *http.Request) {
-	var req journeyRequest
+	var req JourneyRequest
 	if err := decode(w, r, &req); err != nil {
 		a.fail(w, r, err)
 		return
