@@ -33,8 +33,10 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 		t.Fatal("unexpected contract version")
 	}
 	paths, ok := spec["paths"].(map[string]any)
-	if !ok || len(paths) != 32 {
-		t.Fatal("unexpected contract scope")
+	// Which routes belong in the contract is checked against the server by
+	// TestContractCoversTheStableSurface.
+	if !ok || len(paths) == 0 {
+		t.Fatal("no paths")
 	}
 	components, ok := spec["components"].(map[string]any)
 	if !ok {
@@ -69,7 +71,7 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 				t.Error("unregistered operation", needle)
 			}
 			responses, ok := operation["responses"].(map[string]any)
-			if !ok || responses["200"] == nil {
+			if !ok || responses["200"] == nil && responses["201"] == nil {
 				t.Error("missing success response", id)
 			}
 			params, ok := operation["parameters"].([]any)

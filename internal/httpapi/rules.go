@@ -34,9 +34,7 @@ func (a *Server) ruleMutation(w http.ResponseWriter, r *http.Request, withdraw b
 		a.fail(w, r, model.ErrUnavailable)
 		return
 	}
-	var body struct {
-		ExpectedDigest string `json:"expectedDigest"`
-	}
+	var body RuleChange
 	if err := decode(w, r, &body); err != nil {
 		a.fail(w, r, err)
 		return
@@ -99,10 +97,7 @@ func (a *Server) ruleMutation(w http.ResponseWriter, r *http.Request, withdraw b
 }
 
 func (a *Server) ruleAutomation(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		ExpectedRevision int64 `json:"expectedRevision"`
-		Paused           *bool `json:"paused"`
-	}
+	var in RuleAutomationChange
 	if e := decode(w, r, &in); e != nil {
 		a.fail(w, r, e)
 		return
