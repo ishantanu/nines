@@ -1,0 +1,94 @@
+# Scope of the OpenAPI contract (v1alpha1.yaml), enforced by contract_test.go.
+#
+# browser: routes outside the bearer-token API contract, with the reason.
+# uncovered: stable routes not yet in the contract (#73). This list may only
+# shrink: a new stable route must be documented, and a documented route must
+# be removed from it.
+browser:
+  GET /auth/cli/authorize: page the browser opens during CLI sign-in
+  GET /auth/oidc/{provider}/callback: browser sign-in redirect
+  GET /auth/oidc/{provider}/login: browser sign-in redirect
+  GET /auth/providers: sign-in page
+  GET /auth/session: browser session
+  POST /auth/cli/approve: browser approval during CLI sign-in
+  POST /auth/ldap/{provider}/login: browser sign-in
+  POST /auth/local/{provider}/login: browser sign-in
+  POST /auth/logout: browser session
+  POST /auth/logout-all: browser session
+uncovered:
+  - DELETE /api/connections/{connection}
+  - DELETE /api/team-access/members/{id}
+  - DELETE /api/team-access/service-accounts/{id}
+  - DELETE /api/team-access/teams/{id}
+  - GET /api/access
+  - GET /api/audit
+  - GET /api/audit/archive
+  - GET /api/audit/{id}
+  - GET /api/bindings/{id}
+  - GET /api/bindings/{id}/health
+  - GET /api/bindings/{id}/manifest
+  - GET /api/connections
+  - GET /api/connections/{connection}/metrics
+  - GET /api/connections/{connection}/telemetry
+  - GET /api/dependency-maps/{id}
+  - GET /api/dependency-maps/{id}/composition
+  - GET /api/dependency-maps/{id}/manifest
+  - GET /api/dependency-maps/{id}/view
+  - GET /api/events
+  - GET /api/journeys
+  - GET /api/journeys/{id}
+  - GET /api/journeys/{id}/context
+  - GET /api/journeys/{id}/history
+  - GET /api/journeys/{id}/manifest
+  - GET /api/journeys/{id}/runs
+  - GET /api/resources/search
+  - GET /api/skills
+  - GET /api/skills/{id}
+  - GET /api/slo-templates
+  - GET /api/slo-templates/{template}
+  - GET /api/slos/{id}/budget
+  - GET /api/slos/{id}/context
+  - GET /api/slos/{id}/customers
+  - GET /api/slos/{id}/history
+  - GET /api/slos/{id}/integration
+  - GET /api/slos/{id}/journeys
+  - GET /api/slos/{id}/quality
+  - GET /api/slos/{id}/retirement
+  - GET /api/slos/{id}/retirement/plan
+  - GET /api/slos/{id}/revisions
+  - GET /api/slos/{id}/revisions/{revision}
+  - GET /api/slos/{id}/rules
+  - GET /api/slos/{id}/samples
+  - GET /api/slos/{id}/status
+  - GET /api/team-access
+  - GET /api/team-access/audit
+  - GET /api/topology/resources
+  - GET /api/workspace
+  - POST /api/bindings/{id}/compile
+  - POST /api/connections
+  - POST /api/connections/{connection}/test
+  - POST /api/journeys/apply
+  - POST /api/journeys/plan
+  - POST /api/journeys/{id}/runs
+  - POST /api/slo-templates/{template}/render
+  - POST /api/slos
+  - POST /api/slos/compile
+  - POST /api/slos/{id}/collect
+  - POST /api/slos/{id}/retirement/apply
+  - POST /api/slos/{id}/retirement/retry
+  - POST /api/slos/{id}/rules/apply
+  - POST /api/slos/{id}/rules/automation
+  - POST /api/slos/{id}/rules/plan
+  - POST /api/slos/{id}/rules/withdraw
+  - POST /api/slos/{id}/samples
+  - POST /api/team-access/members
+  - POST /api/team-access/service-accounts
+  - POST /api/team-access/teams
+  - POST /api/team-access/users
+  - POST /auth/cli/exchange
+  - POST /auth/cli/ldap
+  - POST /auth/cli/logout
+  - POST /auth/cli/password
+  - POST /auth/cli/start
+  - PUT /api/connections/{connection}
+  - PUT /api/team-access/users/{id}

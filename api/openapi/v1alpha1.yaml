@@ -2,8 +2,9 @@ openapi: 3.1.1
 info:
   title: 'Nines HTTP API: reviewed SLO workflows'
   version: 0.1.0-alpha.4
-  description: Versioned initial contract for the listed operations only. Other server endpoints and complete
-    resource schemas are not yet covered. Resource manifests use nines.dev/v1alpha1; existing HTTP paths
+  description: The bearer-token HTTP API. Operations marked x-nines-maturity experimental belong to experimental
+    features and may change in any release; see the compatibility policy. Stable routes not yet described here
+    are listed in api/openapi/scope.yaml (#73). Resource manifests use nines.dev/v1beta1 or v1alpha1; HTTP paths
     are not URL-versioned.
 servers:
 - url: /
@@ -14,6 +15,7 @@ paths:
   /api/intents/evidence:
     post:
       operationId: prepareIntentEvidence
+      x-nines-maturity: experimental
       summary: Read measurement evidence and compare explicit SLO choices
       description: Read-only preview for an exact inline intent, measurement, tenant/source/catalog
         provenance and expected saved revision. Baseline plus at most two explicit alternatives.
@@ -125,6 +127,7 @@ paths:
   /api/intents/candidates:
     post:
       operationId: discoverIntentCandidates
+      x-nines-maturity: experimental
       summary: Discover bounded measurement candidates without confirming semantics
       description: Explicit read-only provider inspection. At most one metric-name and
         three series adapter calls, four seconds each within fifteen seconds overall.
@@ -232,6 +235,7 @@ paths:
   /api/intent-context:
     get:
       operationId: getIntentContext
+      x-nines-maturity: experimental
       summary: Read saved service context for intent preparation
       description: Read-only, bounded tenant context. No upstream telemetry queries, model calls, measurement
         confirmation or approval. Follow nextCursor even when the current page is empty. Source capabilities
@@ -717,6 +721,7 @@ paths:
   /api/migrations/convert:
     post:
       operationId: convertMigration
+      x-nines-maturity: experimental
       summary: Convert Sloth or Pyrra definitions into Nines SLO definitions
       description: Stateless and read-only. Converts one or more Sloth or Pyrra definitions into Nines SLO YAML and reports every approximation as a note and every definition that cannot be converted faithfully as skipped, with the reason. Nothing is saved, planned or applied; review each definition, then use plan and apply. Imported SLOs start experimental unless another lifecycle is requested, so Nines does not page while the original rules still run.
       parameters:
@@ -745,6 +750,7 @@ paths:
   /api/intent-conversations/usage:
     get:
       operationId: getIntentUsage
+      x-nines-maturity: experimental
       summary: Read aggregate intent workflow progress
       description: Counts of conversations that reached each workflow stage and median times, computed from this tenant's stored conversations. Read-only; returns no actor, goal text, measurement or telemetry value and sends nothing outside the server. Describes workflow progress, not SLO health or correctness.
       parameters:
@@ -773,6 +779,7 @@ paths:
   /api/intent-conversations/{id}/activation:
     get:
       operationId: inspectIntentActivation
+      x-nines-maturity: experimental
       summary: Inspect current runtime activation of an applied intent
       description: Explicit bounded provider reads (ten seconds overall) against administrator-configured destinations. Returns an as-of receipt fenced to applied resource revisions and source identity. Never publishes rules, collects samples, changes definitions or persists an outcome. Saved verification and workflow status remain provider-free.
       parameters:
@@ -796,6 +803,7 @@ paths:
   /api/intent-conversations/{id}/status:
     get:
       operationId: getIntentWorkflowStatus
+      x-nines-maturity: experimental
       summary: Read saved workflow status
       description: Does not run a model or grant authorization.
       parameters:
@@ -819,6 +827,7 @@ paths:
   /api/intent-conversations/{id}/review-artifact:
     get:
       operationId: getIntentReviewArtifact
+      x-nines-maturity: experimental
       summary: Export an audit-verified review snapshot
       description: Contains sensitive definitions and review notes. Concurrent changes and incomplete
         or invalid audit evidence fail the export.
@@ -843,6 +852,7 @@ paths:
   /api/intent-conversations/{id}/messages:
     post:
       operationId: appendIntentAnswer
+      x-nines-maturity: experimental
       summary: Add clarification context or a replacement typed goal
       description: preserveGoal keeps existing typed commitments and measurement unchanged while adding context. It cannot accompany a replacement goal. Every new answer invalidates prior confirmation and pending proposals; exact retries are idempotent. This operation cannot apply resources.
       parameters:
@@ -872,6 +882,7 @@ paths:
   /api/intent-conversations/{id}/evidence:
     post:
       operationId: recordIntentEvidence
+      x-nines-maturity: experimental
       summary: Collect and attach reviewed intent evidence
       description: Explicit provider reads for a ready, human-confirmed inline measurement.
         Saves a server-generated receipt at an exact conversation version. No client report
@@ -905,6 +916,7 @@ paths:
   /api/intent-conversations/{id}/change-set:
     post:
       operationId: prepareIntentChangeSet
+      x-nines-maturity: experimental
       summary: Freeze a proposal for review
       description: ''
       parameters:
@@ -934,6 +946,7 @@ paths:
   /api/intent-conversations/{id}/change-set/approve:
     post:
       operationId: approveIntentChangeSet
+      x-nines-maturity: experimental
       summary: Approve an exact proposal
       description: Human owner/editor approval and a reason are required.
       parameters:
@@ -963,6 +976,7 @@ paths:
   /api/intent-conversations/{id}/change-set/apply:
     post:
       operationId: applyIntentChangeSet
+      x-nines-maturity: experimental
       summary: Apply an approved proposal
       description: The applying subject must differ from the approver. A matching digest and version are
         required.
