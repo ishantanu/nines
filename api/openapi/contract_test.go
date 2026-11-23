@@ -42,14 +42,7 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 	if !ok {
 		t.Fatal("missing components")
 	}
-	registered := ""
-	for _, f := range []string{"../../internal/httpapi/server.go", "../../internal/intentflow/http.go", "../../internal/intentflow/preparation_evidence_http.go", "../../internal/identity/http.go"} {
-		b, e := os.ReadFile(f)
-		if e != nil {
-			t.Fatal(e)
-		}
-		registered += string(b) + "\n"
-	}
+	registered := registeredRoutes(t)
 	ids := map[string]bool{}
 	for path, item := range paths {
 		methods, ok := item.(map[string]any)
@@ -66,9 +59,8 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 				t.Fatal("missing or duplicate operation ID", id)
 			}
 			ids[id] = true
-			needle := `"` + strings.ToUpper(method) + " " + path + `"`
-			if !strings.Contains(registered, needle) {
-				t.Error("unregistered operation", needle)
+			if route := strings.ToUpper(method) + " " + path; !registered[route] {
+				t.Error("unregistered operation", route)
 			}
 			responses, ok := operation["responses"].(map[string]any)
 			if !ok || responses["200"] == nil && responses["201"] == nil {

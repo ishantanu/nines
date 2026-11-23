@@ -49,6 +49,18 @@ func TestResponsesConformToTheContract(t *testing.T) {
 	if err = svc.Ingest(ctx, "checkout", points); err != nil {
 		t.Fatal(err)
 	}
+	for _, manifest := range []string{
+		"apiVersion: nines.dev/v1beta1\nkind: CriticalUserJourney\nmetadata: {name: purchase, project: shop}\nspec:\n  displayName: Purchase\n  description: Buy.\n  owner: team\n  criticality: high\n  slos: [{id: checkout, required: true}]\n  steps: [{id: pay, name: Pay, actor: user, sloRefs: [checkout]}]\n",
+		"apiVersion: nines.dev/v1beta1\nkind: ServiceDependencyMap\nmetadata: {name: shop, project: shop}\nspec:\n  displayName: Shop\n  services: [{name: api, displayName: API, sloRefs: [checkout]}, {name: db, displayName: DB, sloRefs: []}]\n  dependencies: [{caller: api, callee: db, critical: true}]\n",
+	} {
+		d, err := model.ParseDefinition([]byte(manifest))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = svc.ApplyDefinition(ctx, d, 0); err != nil {
+			t.Fatal(err)
+		}
+	}
 	server := httptest.NewServer(httpapi.New(svc, "owner", slog.New(slog.NewTextHandler(io.Discard, nil))))
 	defer server.Close()
 
@@ -64,6 +76,14 @@ func TestResponsesConformToTheContract(t *testing.T) {
 		"/api/slos/checkout/journeys":                       {"type": "array", "items": ref("JourneyRevision")},
 		"/api/slos/checkout/context":                        ref("SLOContext"),
 		"/api/slos/checkout/retirement/plan?action=archive": ref("RetirementPlan"),
+		"/api/journeys":                                     {"type": "array", "items": ref("JourneyView")},
+		"/api/journeys/purchase":                            ref("JourneyView"),
+		"/api/journeys/purchase/history":                    {"type": "array", "items": ref("JourneyRevision")},
+		"/api/journeys/purchase/runs":                       {"type": "array", "items": ref("JourneyRun")},
+		"/api/journeys/purchase/context":                    ref("JourneyContext"),
+		"/api/dependency-maps/shop":                         ref("TopologyResource"),
+		"/api/dependency-maps/shop/view":                    ref("DependencyView"),
+		"/api/dependency-maps/shop/composition":             ref("DependencyComposition"),
 	} {
 		req, _ := http.NewRequest("GET", server.URL+path, nil)
 		req.Header.Set("Authorization", "Bearer owner")

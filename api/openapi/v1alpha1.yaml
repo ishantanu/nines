@@ -2268,6 +2268,623 @@ paths:
           $ref: '#/components/responses/Error'
         '503':
           $ref: '#/components/responses/Error'
+  /api/journeys:
+    get:
+      operationId: listJourneys
+      summary: List critical user journeys
+      description: Each journey with its health, derived from its linked SLOs. Health describes configuration and SLO state, not measured end-to-end journey success.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JourneyView'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/journeys/{id}:
+    get:
+      operationId: getJourney
+      summary: Read a critical user journey
+      description: The current revision with its health and linked SLO status.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyView'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/journeys/{id}/history:
+    get:
+      operationId: listJourneyRevisions
+      summary: List journey revisions
+      description: Every applied revision, oldest first.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JourneyRevision'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/journeys/{id}/manifest:
+    get:
+      operationId: getJourneyManifest
+      summary: Export a journey as YAML
+      description: The current or a chosen revision as nines.dev/v1beta1 YAML (or v1alpha1 on request).
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - name: revision
+          in: query
+          required: false
+          description: Revision to export.
+          schema:
+            type: integer
+        - name: apiVersion
+          in: query
+          required: false
+          description: Manifest version.
+          schema:
+            type: string
+            enum:
+              - nines.dev/v1beta1
+              - nines.dev/v1alpha1
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/journeys/{id}/runs:
+    get:
+      operationId: listJourneyRuns
+      summary: List recorded agentic runs
+      description: Run evidence recorded against the journey, each with its verdict.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JourneyRun'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: recordJourneyRun
+      summary: Record an agentic run
+      description: Record one run's evidence and verdict against the journey's current contract. Runs are immutable by ID.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunEvidence'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyRun'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/journeys/plan:
+    post:
+      operationId: planJourney
+      summary: Plan a journey change
+      description: Validate a journey manifest (v1beta1 or v1alpha1) and show what applying it would change. Saves nothing.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JourneyRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyPlan'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/journeys/apply:
+    post:
+      operationId: applyJourney
+      summary: Apply a journey
+      description: 'Create or update a journey at expectedRevision: 0 creates, the current revision updates. Editor or owner.'
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JourneyRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyRevision'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/bindings/{id}:
+    get:
+      operationId: getBinding
+      summary: Read a measurement binding
+      description: The binding at its current or a chosen revision.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - name: revision
+          in: query
+          required: false
+          description: Revision to read.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyResource'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/bindings/{id}/manifest:
+    get:
+      operationId: getBindingManifest
+      summary: Export a binding as YAML
+      description: As nines.dev/v1beta1 YAML (or v1alpha1 on request).
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - name: revision
+          in: query
+          required: false
+          description: Revision to export.
+          schema:
+            type: integer
+        - name: apiVersion
+          in: query
+          required: false
+          description: Manifest version.
+          schema:
+            type: string
+            enum:
+              - nines.dev/v1beta1
+              - nines.dev/v1alpha1
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/bindings/{id}/health:
+    get:
+      operationId: checkBinding
+      summary: Check a binding against live telemetry
+      description: Whether the binding's metric and labels still exist with the declared types on its connection.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - name: expectedRevision
+          in: query
+          required: false
+          description: Refuse with 409 unless the resource is at this revision.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BindingHealth'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/bindings/{id}/compile:
+    post:
+      operationId: compileBinding
+      summary: Compile an SLO from a binding
+      description: Check the binding against live telemetry and return an SLO definition measured by it. Saves nothing.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompileBindingInput'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompiledBinding'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/dependency-maps/{id}:
+    get:
+      operationId: getDependencyMap
+      summary: Read a dependency map
+      description: The map at its current or a chosen revision.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - name: revision
+          in: query
+          required: false
+          description: Revision to read.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyResource'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/dependency-maps/{id}/manifest:
+    get:
+      operationId: getDependencyMapManifest
+      summary: Export a dependency map as YAML
+      description: As nines.dev/v1beta1 YAML (or v1alpha1 on request).
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - name: revision
+          in: query
+          required: false
+          description: Revision to export.
+          schema:
+            type: integer
+        - name: apiVersion
+          in: query
+          required: false
+          description: Manifest version.
+          schema:
+            type: string
+            enum:
+              - nines.dev/v1beta1
+              - nines.dev/v1alpha1
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/yaml:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/dependency-maps/{id}/view:
+    get:
+      operationId: getDependencyView
+      summary: Read a dependency map's view
+      description: Services, declared and observed dependencies, and linked SLO health for drawing the map.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - name: expectedRevision
+          in: query
+          required: false
+          description: Refuse with 409 unless the resource is at this revision.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DependencyView'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/dependency-maps/{id}/composition:
+    get:
+      operationId: getDependencyComposition
+      summary: Check SLO targets against dependencies
+      description: Whether each committed availability SLO is achievable given its critical dependencies' committed SLOs. Reads stored definitions only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DependencyComposition'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/journeys/{id}/context:
+    get:
+      operationId: getJourneyContext
+      summary: Read a journey's context
+      description: A bounded, revision-bound summary of the journey and its linked SLOs for agents and reviews, paged by cursor.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+        - name: at
+          in: query
+          required: false
+          description: Context at this time.
+          schema:
+            type: string
+            format: date-time
+        - name: expectedRevision
+          in: query
+          required: false
+          description: Refuse with 409 unless the journey is at this revision.
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          required: false
+          description: Linked SLOs per page.
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          required: false
+          description: Next page.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JourneyContext'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -2465,6 +3082,49 @@ components:
         - digest
         - name
         - revision
+      type: object
+    BindingSpec:
+      additionalProperties: false
+      properties:
+        countFrom:
+          type: string
+        displayName:
+          type: string
+        eventMetric:
+          type: string
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+        measurement:
+          type: string
+        metric:
+          type: string
+        observationPoint:
+          type: string
+        scrapeIntervalSeconds:
+          type: integer
+        service:
+          type: string
+        source:
+          type: string
+        stepSeconds:
+          type: integer
+        successLabels:
+          additionalProperties:
+            type: string
+          type: object
+        thresholdSeconds:
+          type: number
+      required:
+        - displayName
+        - labels
+        - measurement
+        - metric
+        - observationPoint
+        - service
+        - source
+        - stepSeconds
       type: object
     BudgetBand:
       additionalProperties: false
@@ -2886,6 +3546,69 @@ components:
         - points
         - state
       type: object
+    CompileBindingInput:
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+        expectedRevision:
+          type: integer
+        name:
+          type: string
+        policies:
+          items:
+            $ref: '#/components/schemas/BurnRatePolicy'
+          type: array
+        policy:
+          $ref: '#/components/schemas/BurnRatePolicy'
+        target:
+          type: number
+        windowSeconds:
+          type: integer
+      required:
+        - displayName
+        - expectedRevision
+        - name
+        - target
+        - windowSeconds
+      type: object
+    CompiledBinding:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        binding:
+          $ref: '#/components/schemas/BindingReference'
+        compilerVersion:
+          type: string
+        definition:
+          $ref: '#/components/schemas/MeasurementBinding'
+        digest:
+          type: string
+        evidence:
+          $ref: '#/components/schemas/TelemetryDiscovery'
+        manifest:
+          $ref: '#/components/schemas/ServiceLevelObjective'
+        measurementDigest:
+          type: string
+        tenant:
+          type: string
+        warnings:
+          items:
+            type: string
+          type: array
+        yaml:
+          type: string
+      required:
+        - apiVersion
+        - compilerVersion
+        - digest
+        - evidence
+        - manifest
+        - tenant
+        - warnings
+        - yaml
+      type: object
     CompiledMeasurement:
       additionalProperties: false
       properties:
@@ -2919,6 +3642,51 @@ components:
         - tenant
         - warnings
         - yaml
+      type: object
+    CompositionCheck:
+      additionalProperties: false
+      properties:
+        ceiling:
+          type: number
+        dependencies:
+          items:
+            $ref: '#/components/schemas/CompositionPromise'
+          type: array
+        headroom:
+          type: number
+        service:
+          type: string
+        sloId:
+          type: string
+        target:
+          type: number
+        unmeasuredDependencies:
+          items:
+            type: string
+          type: array
+        verdict:
+          type: string
+      required:
+        - dependencies
+        - service
+        - sloId
+        - target
+        - unmeasuredDependencies
+        - verdict
+      type: object
+    CompositionPromise:
+      additionalProperties: false
+      properties:
+        service:
+          type: string
+        sloId:
+          type: string
+        target:
+          type: number
+      required:
+        - service
+        - sloId
+        - target
       type: object
     Condition:
       additionalProperties: false
@@ -3160,6 +3928,166 @@ components:
         - matches
         - origin
         - owner
+        - warnings
+      type: object
+    DependencyComposition:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        checks:
+          items:
+            $ref: '#/components/schemas/CompositionCheck'
+          type: array
+        id:
+          type: string
+        limitations:
+          items:
+            type: string
+          type: array
+        observedAt:
+          format: date-time
+          type: string
+        revision:
+          type: integer
+        tenant:
+          type: string
+      required:
+        - apiVersion
+        - checks
+        - id
+        - limitations
+        - observedAt
+        - revision
+        - tenant
+      type: object
+    DependencyEdge:
+      additionalProperties: false
+      properties:
+        alignment:
+          type: string
+        callee:
+          type: string
+        caller:
+          type: string
+        connectionType:
+          type: string
+        critical:
+          type: boolean
+        description:
+          type: string
+        evidence:
+          $ref: '#/components/schemas/GraphEdgeEvidence'
+        origin:
+          type: string
+        provenance:
+          type: string
+        requests:
+          type: number
+      required:
+        - callee
+        - caller
+        - critical
+        - provenance
+      type: object
+    DependencyNode:
+      additionalProperties: false
+      properties:
+        declared:
+          type: boolean
+        displayName:
+          type: string
+        health:
+          type: string
+        impactTruncated:
+          type: boolean
+        journeyLinksTruncated:
+          type: boolean
+        journeys:
+          items:
+            $ref: '#/components/schemas/MapJourney'
+          type: array
+        name:
+          type: string
+        objectives:
+          items:
+            $ref: '#/components/schemas/MapObjective'
+          type: array
+        position:
+          $ref: '#/components/schemas/GraphPosition'
+        potentialImpact:
+          items:
+            $ref: '#/components/schemas/MapJourney'
+          type: array
+      required:
+        - declared
+        - displayName
+        - health
+        - impactTruncated
+        - journeyLinksTruncated
+        - journeys
+        - name
+        - objectives
+        - potentialImpact
+      type: object
+    DependencyView:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        declaredEdges:
+          type: integer
+        edges:
+          items:
+            $ref: '#/components/schemas/DependencyEdge'
+          type: array
+        from:
+          format: date-time
+          type: string
+        id:
+          type: string
+        instrumentationCoverage:
+          type: string
+        matchedDeclaredEdges:
+          type: integer
+        nodes:
+          items:
+            $ref: '#/components/schemas/DependencyNode'
+          type: array
+        observationState:
+          type: string
+        observedAt:
+          format: date-time
+          type: string
+        revision:
+          type: integer
+        source:
+          type: string
+        sourceDigest:
+          type: string
+        tenant:
+          type: string
+        to:
+          format: date-time
+          type: string
+        truncated:
+          type: boolean
+        warnings:
+          items:
+            type: string
+          type: array
+      required:
+        - apiVersion
+        - declaredEdges
+        - edges
+        - id
+        - matchedDeclaredEdges
+        - nodes
+        - observationState
+        - observedAt
+        - revision
+        - tenant
+        - truncated
         - warnings
       type: object
     Document:
@@ -3567,6 +4495,75 @@ components:
         - matches
         - origin
         - warnings
+      type: object
+    GraphEdgeEvidence:
+      additionalProperties: false
+      properties:
+        freshness:
+          type: string
+        from:
+          format: date-time
+          type: string
+        instrumentationCoverage:
+          type: string
+        maxSampleAgeSeconds:
+          type: integer
+        metric:
+          type: string
+        readAt:
+          format: date-time
+          type: string
+        sampleAgeSeconds:
+          type: integer
+        samples:
+          $ref: '#/components/schemas/GraphSampleEvidence'
+        source:
+          type: string
+        sourceDigest:
+          type: string
+        to:
+          format: date-time
+          type: string
+      required:
+        - freshness
+        - from
+        - instrumentationCoverage
+        - maxSampleAgeSeconds
+        - metric
+        - readAt
+        - source
+        - sourceDigest
+        - to
+      type: object
+    GraphPosition:
+      additionalProperties: false
+      properties:
+        x:
+          type: integer
+        y:
+          type: integer
+      required:
+        - x
+        - y
+      type: object
+    GraphSampleEvidence:
+      additionalProperties: false
+      properties:
+        lastSampleAt:
+          format: date-time
+          type: string
+        resolutionSeconds:
+          type: integer
+        sampleContinuity:
+          type: number
+        samples:
+          type: number
+        series:
+          type: integer
+      required:
+        - resolutionSeconds
+        - samples
+        - series
       type: object
     Group:
       additionalProperties: false
@@ -5043,6 +6040,52 @@ components:
         - totalLinks
         - warnings
       type: object
+    JourneyLinkStatus:
+      additionalProperties: false
+      properties:
+        health:
+          type: string
+        link:
+          $ref: '#/components/schemas/JourneySLO'
+        slo:
+          $ref: '#/components/schemas/SLO'
+        status:
+          $ref: '#/components/schemas/Snapshot'
+      required:
+        - health
+        - link
+        - slo
+        - status
+      type: object
+    JourneyPlan:
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+        digest:
+          type: string
+        expectedRevision:
+          type: integer
+        manifest:
+          $ref: '#/components/schemas/Journey'
+        previous:
+          $ref: '#/components/schemas/JourneyRevision'
+      required:
+        - action
+        - digest
+        - expectedRevision
+        - manifest
+      type: object
+    JourneyRequest:
+      additionalProperties: false
+      properties:
+        expectedRevision:
+          type: integer
+        manifest:
+          type: string
+      required:
+        - manifest
+      type: object
     JourneyRevision:
       additionalProperties: false
       properties:
@@ -5060,6 +6103,98 @@ components:
         - digest
         - manifest
         - revision
+      type: object
+    JourneyRun:
+      additionalProperties: false
+      properties:
+        contractDigest:
+          type: string
+        evidence:
+          $ref: '#/components/schemas/RunEvidence'
+        findings:
+          items:
+            type: string
+          type: array
+        journeyId:
+          type: string
+        receivedAt:
+          format: date-time
+          type: string
+        verdict:
+          type: string
+      required:
+        - contractDigest
+        - evidence
+        - findings
+        - journeyId
+        - receivedAt
+        - verdict
+      type: object
+    JourneyRunObjective:
+      additionalProperties: false
+      properties:
+        budgetRemainingFraction:
+          oneOf:
+            - type: number
+            - type: 'null'
+        burnRate:
+          oneOf:
+            - type: number
+            - type: 'null'
+        failed:
+          type: integer
+        from:
+          format: date-time
+          type: string
+        judged:
+          type: integer
+        limitations:
+          items:
+            type: string
+          type: array
+        minRuns:
+          type: integer
+        otherRevision:
+          type: integer
+        passed:
+          type: integer
+        reliability:
+          oneOf:
+            - type: number
+            - type: 'null'
+        state:
+          type: string
+        target:
+          type: number
+        to:
+          format: date-time
+          type: string
+        truncated:
+          type: boolean
+        unjudged:
+          type: integer
+        violated:
+          type: integer
+        windowSeconds:
+          type: integer
+      required:
+        - budgetRemainingFraction
+        - burnRate
+        - failed
+        - from
+        - judged
+        - limitations
+        - minRuns
+        - otherRevision
+        - passed
+        - reliability
+        - state
+        - target
+        - to
+        - truncated
+        - unjudged
+        - violated
+        - windowSeconds
       type: object
     JourneySLO:
       additionalProperties: false
@@ -5129,6 +6264,29 @@ components:
         - name
         - sloRefs
       type: object
+    JourneyView:
+      additionalProperties: false
+      properties:
+        health:
+          type: string
+        links:
+          items:
+            $ref: '#/components/schemas/JourneyLinkStatus'
+          type: array
+        reasons:
+          items:
+            type: string
+          type: array
+        resource:
+          $ref: '#/components/schemas/JourneyRevision'
+        runObjective:
+          $ref: '#/components/schemas/JourneyRunObjective'
+      required:
+        - health
+        - links
+        - reasons
+        - resource
+      type: object
     LinkedSLOContext:
       additionalProperties: false
       properties:
@@ -5161,6 +6319,69 @@ components:
           type: object
           additionalProperties: true
       additionalProperties: true
+    MapJourney:
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+        id:
+          type: string
+        revision:
+          type: integer
+        steps:
+          items:
+            $ref: '#/components/schemas/MapJourneyStep'
+          type: array
+      required:
+        - displayName
+        - id
+        - revision
+      type: object
+    MapJourneyStep:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+      type: object
+    MapObjective:
+      additionalProperties: false
+      properties:
+        collectionState:
+          type: string
+        dataStatus:
+          type: string
+        displayName:
+          type: string
+        freshness:
+          type: string
+        health:
+          type: string
+        id:
+          type: string
+        reliability:
+          oneOf:
+            - type: number
+            - type: 'null'
+        revision:
+          type: integer
+        target:
+          type: number
+      required:
+        - collectionState
+        - dataStatus
+        - displayName
+        - freshness
+        - health
+        - id
+        - reliability
+        - revision
+        - target
+      type: object
     Measurement:
       additionalProperties: false
       properties:
@@ -5231,6 +6452,23 @@ components:
         - target
         - total
         - windowStart
+      type: object
+    MeasurementBinding:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        kind:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+        spec:
+          $ref: '#/components/schemas/BindingSpec'
+      required:
+        - apiVersion
+        - kind
+        - metadata
+        - spec
       type: object
     MeasurementQuality:
       additionalProperties: false
@@ -6458,6 +7696,38 @@ components:
         - target
         - yaml
       type: object
+    RunEvidence:
+      additionalProperties: false
+      properties:
+        approvalObserved:
+          type: boolean
+        costUSD:
+          type: number
+        finishedAt:
+          format: date-time
+          type: string
+        id:
+          type: string
+        journeyRevision:
+          type: integer
+        outcome:
+          type: string
+        policyViolations:
+          items:
+            type: string
+          type: array
+        startedAt:
+          format: date-time
+          type: string
+        steps:
+          type: integer
+      required:
+        - finishedAt
+        - id
+        - journeyRevision
+        - outcome
+        - startedAt
+      type: object
     RunObjective:
       additionalProperties: false
       properties:
@@ -7072,6 +8342,43 @@ components:
       required:
         - goodServiceFilter
         - totalServiceFilter
+      type: object
+    TopologyResource:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        resource:
+          $ref: '#/components/schemas/TopologyRevision'
+        tenant:
+          type: string
+      required:
+        - apiVersion
+        - resource
+        - tenant
+      type: object
+    TopologyRevision:
+      additionalProperties: false
+      properties:
+        appliedAt:
+          format: date-time
+          type: string
+        digest:
+          type: string
+        id:
+          type: string
+        kind:
+          type: string
+        manifest: {}
+        revision:
+          type: integer
+      required:
+        - appliedAt
+        - digest
+        - id
+        - kind
+        - manifest
+        - revision
       type: object
     V1alpha1Metadata:
       additionalProperties: false

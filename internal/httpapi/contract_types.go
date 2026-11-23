@@ -56,3 +56,10 @@ type SLORevisionList struct {
 	Revisions          []v1.SLORevision `json:"revisions"`
 	NextBeforeRevision int64            `json:"nextBeforeRevision"`
 }
+
+// TopologyResource is a measurement binding or dependency map revision.
+type TopologyResource struct {
+	APIVersion string                 `json:"apiVersion"`
+	Tenant     string                 `json:"tenant"`
+	Resource   model.TopologyRevision `json:"resource"`
+}
