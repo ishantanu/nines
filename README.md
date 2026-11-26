@@ -15,7 +15,7 @@ Service level objectives and critical user journeys as versioned YAML, with a po
 - **Deliver through Git:** optionally open a reviewed pull or merge request on [GitHub or GitLab](docs/public/git-delivery.md) instead of applying, with drift and applied-state reporting. Your pipeline deploys it.
 - **Migrate in:** [convert Sloth and Pyrra definitions](docs/public/migration.md) into reviewed Nines SLOs and run them beside your current rules.
 - **Work with agents:** use provider-configurable models, deterministic CLI skills and tenant-scoped MCP tools over stdio or opt-in [remote OAuth HTTP](docs/public/remote-mcp.md).
-- **Run it yourself:** use native binaries for Linux, macOS and Windows, [signed container images](docs/public/deployment/container-images.md), Docker Compose or Kubernetes.
+- **Run it yourself:** use native binaries for Linux, macOS and Windows, [signed container images](docs/public/deployment/container-images.md), Docker Compose, or Kubernetes with a [Helm chart](docs/public/deployment/kubernetes.md#install-with-helm).
 
 **Pre-release MVP, under active development.** Resources use `nines.dev/v1beta1` YAML; `nines.dev/v1alpha1` is still accepted. The [compatibility and deprecation policy](docs/public/compatibility.md) states what you can rely on across releases. Model-assisted workflows, visual evaluations and session replay are experimental; production-scale readiness has not been established.
 
