@@ -14,7 +14,7 @@ Nines supports a server/portal deployment and a standalone Kubernetes operator.
 * **Container images**: [Published images](deployment/container-images.md) · Signed `linux/amd64` and `linux/arm64` server and operator images on GitHub Container Registry
 * **Docker Compose**: [Persistent container setup](deployment/docker-compose.md) · Recommended first evaluation with a dedicated database volume
 * **Linux service**: [Native binary and systemd](deployment/linux-service.md) · One server behind a TLS reverse proxy
-* **Kubernetes**: [Single-replica manifests](deployment/kubernetes.md) · Server deployment with optional reviewed operator publishing
+* **Kubernetes**: [Helm chart or manifests](deployment/kubernetes.md) · One server replica with an external database, and the optional operator
 * **Kubernetes operator**: [Controller and offline rendering](deployment/operator.md) · GitOps CRDs, PrometheusRule/Mimir reconciliation, namespaced RBAC and lease-based standby
 * **Team access**: [Identity and tenant configuration](deployment/identity-and-tenants.md) · Local accounts, API keys, OIDC/Microsoft Entra, LDAP and roles
 * **Metrics and rules**: [Prometheus/Mimir routing](deployment/metrics-and-rules.md) · Explicit query connections and reviewed rule destinations
