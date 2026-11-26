@@ -62,7 +62,8 @@ func (r *tenantReconciler) Reconcile(ctx context.Context) error {
 		live, ok := r.live[t.ID]
 		if !ok {
 			if live, err = r.open(ctx, t); err != nil {
-				r.log.Error("registered tenant could not be opened; retrying", "tenant", t.ID, "error", err)
+				// The cause is not logged: opening a tenant reads credentials.
+				r.log.Error("registered tenant could not be opened; retrying. Check database connectivity and connection settings", "tenant", t.ID)
 				continue
 			}
 			r.live[t.ID] = live
