@@ -50,16 +50,16 @@ func (s *Service) cliStart(w http.ResponseWriter, r *http.Request) {
 	if !s.rateLogin(w, r) {
 		return
 	}
-	var f cliFlow
-	if e := decode(w, r, &f); e != nil {
+	var in CLIStartInput
+	if e := decode(w, r, &in); e != nil {
 		authFailure(w, e)
 		return
 	}
-	if !tenancy.ValidID(f.Tenant) || !validCallback(f.Redirect) || !validOpaque(f.Challenge) || !validOpaque(f.State) || !f.Expires.IsZero() || f.DeviceHash != "" || f.UserCode != "" {
+	if !tenancy.ValidID(in.Tenant) || !validCallback(in.Redirect) || !validOpaque(in.Challenge) || !validOpaque(in.State) {
 		authFailure(w, ErrInvalid)
 		return
 	}
-	f.Expires = s.Now().Add(5 * time.Minute)
+	f := cliFlow{Tenant: in.Tenant, Redirect: in.Redirect, Challenge: in.Challenge, State: in.State, Expires: s.Now().Add(5 * time.Minute)}
 	ticket := randomToken()
 	e := s.repo.Update(r.Context(), "cli:requests", func(tx Tx) error {
 		rows, e := tx.List("cli_flow", "global")
@@ -75,7 +75,7 @@ func (s *Service) cliStart(w http.ResponseWriter, r *http.Request) {
 		authFailure(w, e)
 		return
 	}
-	authJSON(w, 200, map[string]any{"authorizationURL": s.config.PublicURL + "/auth/cli/authorize?request=" + ticket, "expiresAt": f.Expires})
+	authJSON(w, 200, CLIStarted{AuthorizationURL: s.config.PublicURL + "/auth/cli/authorize?request=" + ticket, Expires: f.Expires})
 }
 func (s *Service) readCLIFlow(ctx context.Context, ticket string) (cliFlow, error) {
 	var f cliFlow
@@ -275,11 +275,7 @@ func (s *Service) cliExchange(w http.ResponseWriter, r *http.Request) {
 	if !s.rateLogin(w, r) {
 		return
 	}
-	var in struct {
-		Code     string `json:"code"`
-		Verifier string `json:"codeVerifier"`
-		Redirect string `json:"redirectURI"`
-	}
+	var in CLIExchangeInput
 	if e := decode(w, r, &in); e != nil {
 		authFailure(w, e)
 		return
@@ -325,7 +321,7 @@ func (s *Service) cliExchange(w http.ResponseWriter, r *http.Request) {
 		authFailure(w, e)
 		return
 	}
-	authJSON(w, 200, map[string]any{"token": token, "expiresAt": g.Expires, "tenant": g.Tenant, "actor": a, "role": a.Grants[g.Tenant]})
+	authJSON(w, 200, CLIToken{Token: token, Expires: g.Expires, Tenant: g.Tenant, Actor: a, Role: a.Grants[g.Tenant]})
 }
 func minTime(a, b time.Time) time.Time {
 	if a.Before(b) {
@@ -381,5 +377,5 @@ func (s *Service) cliLogout(w http.ResponseWriter, r *http.Request) {
 		authFailure(w, e)
 		return
 	}
-	authJSON(w, 200, map[string]string{"status": "signed_out"})
+	authJSON(w, 200, StatusResult{Status: "signed_out"})
 }

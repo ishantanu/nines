@@ -118,3 +118,38 @@ type ConnectionTestResult struct {
 type ConnectionDeleted struct {
 	State string `json:"state"`
 }
+
+// WorkspaceInfo is the body of GET /api/workspace: what the portal needs to know
+// about the tenant and its configuration before rendering.
+type WorkspaceInfo struct {
+	Mode                 string                `json:"mode"`
+	Connections          []WorkspaceConnection `json:"connections"`
+	PrometheusConfigured bool                  `json:"prometheusConfigured"`
+	JourneysConfigured   bool                  `json:"journeysConfigured"`
+	Tenant               WorkspaceTenant       `json:"tenant"`
+	Source               WorkspaceSource       `json:"source"`
+	Role                 string                `json:"role"`
+	WorkflowsConfigured  bool                  `json:"workflowsConfigured"`
+	ReplayCaptureEnabled bool                  `json:"replayCaptureEnabled"`
+	Features             []string              `json:"features"`
+}
+
+// WorkspaceConnection names a telemetry connection and its kind.
+type WorkspaceConnection struct {
+	ID   string `json:"id"`
+	Kind string `json:"kind"`
+}
+
+// WorkspaceTenant identifies the tenant.
+type WorkspaceTenant struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// WorkspaceSource summarizes the tenant's telemetry: one kind, "multiple" or
+// "manual" when nothing is connected.
+type WorkspaceSource struct {
+	Kind            string `json:"kind"`
+	Configured      bool   `json:"configured"`
+	ConnectionCount int    `json:"connectionCount"`
+}

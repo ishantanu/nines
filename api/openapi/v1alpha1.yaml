@@ -2,7 +2,7 @@ openapi: 3.1.1
 info:
   title: 'Nines HTTP API: reviewed SLO workflows'
   version: 0.1.0-alpha.4
-  description: The bearer-token HTTP API. Operations marked x-nines-maturity experimental belong to experimental features and may change in any release; see the compatibility policy. Stable routes not yet described here are listed in api/openapi/scope.yaml (#73). Resource manifests use nines.dev/v1beta1 or v1alpha1; HTTP paths are not URL-versioned.
+  description: The bearer-token HTTP API. Operations marked x-nines-maturity experimental belong to experimental features and may change in any release; see the compatibility policy. Every stable route is described here except browser sign-in and session routes, listed in api/openapi/scope.yaml. Resource manifests use nines.dev/v1beta1 or v1alpha1; HTTP paths are not URL-versioned.
 servers:
   - url: /
     description: The configured Nines server origin.
@@ -3026,7 +3026,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TeamAccessStatus'
+                $ref: '#/components/schemas/StatusResult'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -3094,7 +3094,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TeamAccessStatus'
+                $ref: '#/components/schemas/StatusResult'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -3161,7 +3161,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TeamAccessStatus'
+                $ref: '#/components/schemas/StatusResult'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -3514,6 +3514,567 @@ paths:
           $ref: '#/components/responses/Error'
         '503':
           $ref: '#/components/responses/Error'
+  /auth/cli/start:
+    post:
+      operationId: startCLISignIn
+      summary: Start a CLI browser sign-in
+      description: Nines-mediated CLI sign-in through the browser, with PKCE. The CLI listens on a loopback redirect URI. Never log challenge, codeVerifier, code or token. Returns the authorization URL to open, valid for five minutes.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CLIStartInput'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CLIStarted'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /auth/cli/exchange:
+    post:
+      operationId: exchangeCLISignIn
+      summary: Exchange a CLI sign-in code for a token
+      description: Nines-mediated CLI sign-in through the browser, with PKCE. The CLI listens on a loopback redirect URI. Never log challenge, codeVerifier, code or token. The one-time code from the redirect and the PKCE verifier are exchanged for a tenant token that lasts at most an hour and never outlives the browser session. The token is shown once.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CLIExchangeInput'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CLIToken'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /auth/cli/logout:
+    post:
+      operationId: signOutCLI
+      summary: Revoke the calling CLI token
+      description: Revokes the CLI token sent as the bearer credential and records the sign-out in each granted tenant's audit log.
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResult'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/audit:
+    get:
+      operationId: listAuditRecords
+      summary: List audit records
+      description: Governed actions in the tenant, newest first. Owners and editors only. Filters combine; from and to bound the time range.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: conversation
+          in: query
+          required: false
+          description: Only records for this intent conversation.
+          schema:
+            type: string
+        - name: actor
+          in: query
+          required: false
+          description: Only records by this actor.
+          schema:
+            type: string
+        - name: action
+          in: query
+          required: false
+          description: Only this action.
+          schema:
+            type: string
+        - name: outcome
+          in: query
+          required: false
+          description: Only this outcome.
+          schema:
+            type: string
+        - name: resource
+          in: query
+          required: false
+          description: Only records about this resource.
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          description: Earliest record time.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Latest record time.
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          description: Page size.
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from nextCursor.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/audit/archive:
+    get:
+      operationId: getAuditArchiveStatus
+      summary: Read audit archive status
+      description: Whether audit records are archived to external storage, with counts by state. Owners and editors only. With record, also reports that record.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: record
+          in: query
+          required: false
+          description: Report this audit record ID.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditArchiveStatus'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/audit/{id}:
+    get:
+      operationId: getAuditRecord
+      summary: Read an audit record
+      description: One audit record. Owners and editors only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecord'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/slo-templates:
+    get:
+      operationId: listSLOTemplates
+      summary: List SLO templates
+      description: Built-in and installed templates by category, with the catalog digest.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: category
+          in: query
+          required: false
+          description: Only templates in this category.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SLOTemplateCatalog'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/slo-templates/{template}:
+    get:
+      operationId: getSLOTemplate
+      summary: Read an SLO template
+      description: One template with its inputs and default measurement.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: template
+          in: path
+          required: true
+          description: Template ID.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SLOTemplateDetail'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/slo-templates/{template}/render:
+    post:
+      operationId: renderSLOTemplate
+      summary: Render an SLO template
+      description: Renders a draft SLO manifest from template inputs without saving it. Values can replace the whole measurement but cannot add queries, destinations, credentials or deployment options. Pass expectedTemplateDigest to refuse a changed template. telemetryVerified is false until the queries are checked against a connection.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: template
+          in: path
+          required: true
+          description: Template ID.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TemplateValues'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SLOTemplateDraft'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/resources/search:
+    get:
+      operationId: searchResources
+      summary: Search resources
+      description: SLOs and journeys by kind, project or text. Names and descriptions are untrusted resource data (textTrust). linkedSLO finds journeys that use an SLO.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: kind
+          in: query
+          required: false
+          description: Only this resource kind.
+          schema:
+            type: string
+        - name: project
+          in: query
+          required: false
+          description: Only this project.
+          schema:
+            type: string
+        - name: query
+          in: query
+          required: false
+          description: Text to match.
+          schema:
+            type: string
+        - name: linkedSLO
+          in: query
+          required: false
+          description: Only journeys that use this SLO.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Page size.
+          schema:
+            type: integer
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from nextCursor.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResourceSearch'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/topology/resources:
+    get:
+      operationId: listTopologyResources
+      summary: List bindings and dependency maps
+      description: Measurement bindings and service dependency maps, with their current revision.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: kind
+          in: query
+          required: false
+          description: Only this kind.
+          schema:
+            type: string
+            enum:
+              - MeasurementBinding
+              - ServiceDependencyMap
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from nextCursor.
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          description: Page size.
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopologyCatalog'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/workspace:
+    get:
+      operationId: getWorkspace
+      summary: Read the workspace
+      description: The tenant, the caller's role, telemetry connections and the experimental features this server turns on.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Workspace'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/skills:
+    get:
+      operationId: listSkills
+      summary: List agent skills
+      description: Versioned instructions agents follow, with a digest of each.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Skill'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/skills/{id}:
+    get:
+      operationId: getSkill
+      summary: Read an agent skill
+      description: One skill and its instructions.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - $ref: '#/components/parameters/ID'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Skill'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/events:
+    get:
+      operationId: listAlertDeliveries
+      summary: List alert deliveries
+      description: Burn-rate alert events and the state of their webhook delivery, with attempts and the last error.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AlertDelivery'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -3573,7 +4134,7 @@ components:
             type: boolean
           type:
             - object
-            - "null"
+            - 'null'
       required:
         - id
         - label
@@ -3589,7 +4150,7 @@ components:
             $ref: '#/components/schemas/AccessBinding'
           type:
             - array
-            - "null"
+            - 'null'
         bindingsVisible:
           type: boolean
         currentRole:
@@ -3601,7 +4162,7 @@ components:
             $ref: '#/components/schemas/AccessPermission'
           type:
             - array
-            - "null"
+            - 'null'
         tenant:
           type: string
         userManagementSupported:
@@ -3638,6 +4199,29 @@ components:
         - name
         - role
       type: object
+    Actor:
+      additionalProperties: false
+      properties:
+        expiresAt:
+          format: date-time
+          type: string
+        id:
+          type: string
+        identitySubject:
+          type: string
+        kind:
+          type: string
+        name:
+          type: string
+        platformAdmin:
+          type: boolean
+        provider:
+          type: string
+      required:
+        - id
+        - kind
+        - name
+      type: object
     AgenticContract:
       additionalProperties: false
       properties:
@@ -3654,6 +4238,26 @@ components:
       required:
         - approvalRequired
         - successDefinition
+      type: object
+    AlertDelivery:
+      additionalProperties: false
+      properties:
+        attempts:
+          type: integer
+        event:
+          $ref: '#/components/schemas/AlertEvent'
+        lastError:
+          type: string
+        nextAttempt:
+          format: date-time
+          type: string
+        status:
+          type: string
+      required:
+        - attempts
+        - event
+        - nextAttempt
+        - status
       type: object
     AlertEvent:
       additionalProperties: false
@@ -3772,6 +4376,141 @@ components:
         - outcome
         - resource
       type: object
+    AuditArchiveReceipt:
+      additionalProperties: false
+      properties:
+        bucket:
+          type: string
+        key:
+          type: string
+        mode:
+          type: string
+        retainUntil:
+          format: date-time
+          type: string
+        sha256:
+          type: string
+        verifiedAt:
+          format: date-time
+          type: string
+        versionId:
+          type: string
+      required:
+        - bucket
+        - key
+        - mode
+        - retainUntil
+        - sha256
+        - verifiedAt
+        - versionId
+      type: object
+    AuditArchiveStatus:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        enabled:
+          type: boolean
+        expired:
+          type: integer
+        failed:
+          type: integer
+        lastError:
+          type: string
+        pending:
+          type: integer
+        receipt:
+          $ref: '#/components/schemas/AuditArchiveReceipt'
+        recordId:
+          type: string
+        retained:
+          type: integer
+        state:
+          type: string
+        target:
+          type: string
+        tenant:
+          type: string
+        verified:
+          type: integer
+      required:
+        - apiVersion
+        - enabled
+        - expired
+        - failed
+        - pending
+        - retained
+        - state
+        - tenant
+        - verified
+      type: object
+    AuditPage:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        from:
+          format: date-time
+          type: string
+        items:
+          items:
+            $ref: '#/components/schemas/AuditRecord'
+          type:
+            - array
+            - "null"
+        nextCursor:
+          type: string
+        tenant:
+          type: string
+        to:
+          format: date-time
+          type: string
+      required:
+        - apiVersion
+        - from
+        - items
+        - tenant
+        - to
+      type: object
+    AuditRecord:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        approvalDigest:
+          type: string
+        conversation:
+          type: string
+        event:
+          $ref: '#/components/schemas/IntentAuditEvent'
+        id:
+          type: string
+        outcome:
+          $ref: '#/components/schemas/IntentOutcome'
+        proposal:
+          $ref: '#/components/schemas/IntentChangeSet'
+        recoveredFromConversation:
+          type: boolean
+        resources:
+          items:
+            $ref: '#/components/schemas/IntentAppliedResource'
+          type:
+            - array
+            - "null"
+        safetyCheck:
+          $ref: '#/components/schemas/IntentSafetyCheck'
+        systemOne:
+          $ref: '#/components/schemas/SystemOneAuditEvidence'
+        tenant:
+          type: string
+      required:
+        - apiVersion
+        - conversation
+        - event
+        - id
+        - resources
+        - tenant
+      type: object
     BadIntervalPolicy:
       additionalProperties: false
       properties:
@@ -3848,7 +4587,7 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         measurement:
           type: string
         metric:
@@ -3915,7 +4654,7 @@ components:
             $ref: '#/components/schemas/QualityCheck'
           type:
             - array
-            - "null"
+            - 'null'
         coverage:
           type: number
         freshness:
@@ -4067,6 +4806,70 @@ components:
           type: string
           pattern: ^[A-Za-z0-9_-]{43}$
           writeOnly: true
+    CLIExchangeInput:
+      additionalProperties: false
+      properties:
+        code:
+          type: string
+        codeVerifier:
+          type: string
+        redirectURI:
+          type: string
+      required:
+        - code
+        - codeVerifier
+        - redirectURI
+      type: object
+    CLIStartInput:
+      additionalProperties: false
+      properties:
+        challenge:
+          type: string
+        redirectURI:
+          type: string
+        state:
+          type: string
+        tenant:
+          type: string
+      required:
+        - challenge
+        - redirectURI
+        - state
+        - tenant
+      type: object
+    CLIStarted:
+      additionalProperties: false
+      properties:
+        authorizationURL:
+          type: string
+        expiresAt:
+          format: date-time
+          type: string
+      required:
+        - authorizationURL
+        - expiresAt
+      type: object
+    CLIToken:
+      additionalProperties: false
+      properties:
+        actor:
+          $ref: '#/components/schemas/Actor'
+        expiresAt:
+          format: date-time
+          type: string
+        role:
+          type: string
+        tenant:
+          type: string
+        token:
+          type: string
+      required:
+        - actor
+        - expiresAt
+        - role
+        - tenant
+        - token
+      type: object
     Capabilities:
       additionalProperties: false
       properties:
@@ -4107,7 +4910,7 @@ components:
             $ref: '#/components/schemas/CohortContribution'
           type:
             - array
-            - "null"
+            - 'null'
         effectiveCohorts:
           type: number
         entropy:
@@ -4121,7 +4924,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         state:
           type: string
         topShare:
@@ -4154,7 +4957,7 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         representation:
           type: number
       required:
@@ -4172,7 +4975,7 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         peerReliability:
           type: number
         reliability:
@@ -4196,13 +4999,13 @@ components:
             $ref: '#/components/schemas/CohortOutlier'
           type:
             - array
-            - "null"
+            - 'null'
         limitations:
           items:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         state:
           type: string
         threshold:
@@ -4226,13 +5029,13 @@ components:
             $ref: '#/components/schemas/CohortResult'
           type:
             - array
-            - "null"
+            - 'null'
         labels:
           items:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         matchesAggregate:
           type: boolean
         message:
@@ -4258,21 +5061,21 @@ components:
         burnRate:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         good:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         labels:
           additionalProperties:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         reliability:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         state:
           type: string
         total:
@@ -4403,7 +5206,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         yaml:
           type: string
       required:
@@ -4438,7 +5241,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         yaml:
           type: string
       required:
@@ -4462,7 +5265,7 @@ components:
             $ref: '#/components/schemas/CompositionPromise'
           type:
             - array
-            - "null"
+            - 'null'
         headroom:
           type: number
         service:
@@ -4476,7 +5279,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         verdict:
           type: string
       required:
@@ -4591,7 +5394,7 @@ components:
             $ref: '#/components/schemas/ConnectionView'
           type:
             - array
-            - "null"
+            - 'null'
         managedConnectionsEnabled:
           type: boolean
         managedProviderRoutes:
@@ -4601,7 +5404,7 @@ components:
             type: array
           type:
             - object
-            - "null"
+            - 'null'
         management:
           type: string
         manualIngestion:
@@ -4613,7 +5416,7 @@ components:
             $ref: '#/components/schemas/Descriptor'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - connections
         - managedConnectionsEnabled
@@ -4665,17 +5468,17 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         queryLanguages:
           items:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         rules:
           oneOf:
             - $ref: '#/components/schemas/RuleDestination'
-            - type: "null"
+            - type: 'null'
         version:
           type: integer
       required:
@@ -4735,7 +5538,7 @@ components:
             $ref: '#/components/schemas/CustomerRef'
           type:
             - array
-            - "null"
+            - 'null'
         label:
           type: string
       required:
@@ -4767,7 +5570,7 @@ components:
             $ref: '#/components/schemas/CustomerResult'
           type:
             - array
-            - "null"
+            - 'null'
         label:
           type: string
         limitations:
@@ -4775,7 +5578,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         message:
           type: string
         revision:
@@ -4783,7 +5586,7 @@ components:
         serviceBurnRate:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         sloId:
           type: string
         state:
@@ -4866,7 +5669,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - document
         - matches
@@ -4887,13 +5690,13 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         thresholds:
           items:
             $ref: '#/components/schemas/NativeThreshold'
           type:
             - array
-            - "null"
+            - 'null'
         type:
           type: string
       required:
@@ -4926,7 +5729,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - document
         - matches
@@ -4944,7 +5747,7 @@ components:
             $ref: '#/components/schemas/CompositionCheck'
           type:
             - array
-            - "null"
+            - 'null'
         id:
           type: string
         limitations:
@@ -4952,7 +5755,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         observedAt:
           format: date-time
           type: string
@@ -5016,7 +5819,7 @@ components:
             $ref: '#/components/schemas/MapJourney'
           type:
             - array
-            - "null"
+            - 'null'
         name:
           type: string
         objectives:
@@ -5024,7 +5827,7 @@ components:
             $ref: '#/components/schemas/MapObjective'
           type:
             - array
-            - "null"
+            - 'null'
         position:
           $ref: '#/components/schemas/GraphPosition'
         potentialImpact:
@@ -5032,7 +5835,7 @@ components:
             $ref: '#/components/schemas/MapJourney'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - declared
         - displayName
@@ -5056,7 +5859,7 @@ components:
             $ref: '#/components/schemas/DependencyEdge'
           type:
             - array
-            - "null"
+            - 'null'
         from:
           format: date-time
           type: string
@@ -5071,7 +5874,7 @@ components:
             $ref: '#/components/schemas/DependencyNode'
           type:
             - array
-            - "null"
+            - 'null'
         observationState:
           type: string
         observedAt:
@@ -5095,7 +5898,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - apiVersion
         - declaredEdges
@@ -5124,7 +5927,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - apiVersion
         - capabilities
@@ -5168,7 +5971,7 @@ components:
         budgetRemainingFraction:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         definitionDigest:
           type: string
         evaluatedAt:
@@ -5192,7 +5995,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         requiredPostmortems:
           description: Recent incidents whose postmortem the policy requires and that have none published yet.
           items:
@@ -5277,6 +6080,62 @@ components:
           type: integer
           format: int64
       additionalProperties: false
+    ExtensionEvaluation:
+      additionalProperties: false
+      properties:
+        missingVerdict:
+          type: string
+        name:
+          type: string
+        populationLabels:
+          additionalProperties:
+            type: string
+          type:
+            - object
+            - "null"
+        rubric:
+          type: string
+        sampling:
+          type: string
+        unknownVerdict:
+          type: string
+        version:
+          type: string
+      required:
+        - missingVerdict
+        - name
+        - populationLabels
+        - rubric
+        - sampling
+        - unknownVerdict
+        - version
+      type: object
+    ExtensionInput:
+      additionalProperties: false
+      properties:
+        default: {}
+        description:
+          type: string
+        enum:
+          items:
+            type: string
+          type: array
+        field:
+          type: string
+        maximum:
+          type: number
+        minimum:
+          type: number
+        required:
+          type: boolean
+        type:
+          type: string
+      required:
+        - description
+        - field
+        - required
+        - type
+      type: object
     ExtensionReference:
       additionalProperties: false
       properties:
@@ -5288,8 +6147,8 @@ components:
           type: string
       required:
         - name
-        - version
         - sha256
+        - version
       type: object
     FederatedMember:
       additionalProperties: false
@@ -5306,7 +6165,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         user:
           $ref: '#/components/schemas/User'
       required:
@@ -5536,7 +6395,7 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
       required:
         - displayName
         - goal
@@ -5561,7 +6420,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - document
         - matches
@@ -5666,7 +6525,7 @@ components:
             $ref: '#/components/schemas/Rule'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - interval
         - name
@@ -5680,7 +6539,7 @@ components:
             $ref: '#/components/schemas/AlertEvent'
           type:
             - array
-            - "null"
+            - 'null'
         alertEventsBounded:
           type: boolean
         configRevision:
@@ -5697,7 +6556,7 @@ components:
             $ref: '#/components/schemas/HistoryPoint'
           type:
             - array
-            - "null"
+            - 'null'
         policies:
           items:
             $ref: '#/components/schemas/BurnRatePolicy'
@@ -5722,7 +6581,7 @@ components:
             $ref: '#/components/schemas/ViolationSpan'
           type:
             - array
-            - "null"
+            - 'null'
         windowSeconds:
           type: integer
       required:
@@ -5837,7 +6696,7 @@ components:
             $ref: '#/components/schemas/Point'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - samples
       type: object
@@ -5970,6 +6829,112 @@ components:
           type: array
           items:
             type: string
+    IntentAppliedResource:
+      additionalProperties: false
+      properties:
+        digest:
+          type: string
+        kind:
+          type: string
+        name:
+          type: string
+        revision:
+          type: integer
+      required:
+        - digest
+        - kind
+        - name
+        - revision
+      type: object
+    IntentAuditEvent:
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+        actor:
+          $ref: '#/components/schemas/InvestigationActor'
+        at:
+          format: date-time
+          type: string
+        changeSetDigest:
+          type: string
+        evidenceDigest:
+          type: string
+        hash:
+          type: string
+        outcome:
+          type: string
+        previousHash:
+          type: string
+        reason:
+          type: string
+        sequence:
+          type: integer
+        version:
+          type: integer
+      required:
+        - action
+        - actor
+        - at
+        - outcome
+        - reason
+        - sequence
+        - version
+      type: object
+    IntentBacktestSummary:
+      additionalProperties: false
+      properties:
+        burnBreaches:
+          type: integer
+        complete:
+          type: integer
+        digest:
+          type: string
+        from:
+          format: date-time
+          type: string
+        noTraffic:
+          type: integer
+        resolutionSeconds:
+          type: integer
+        targetViolations:
+          type: integer
+        to:
+          format: date-time
+          type: string
+        unknown:
+          type: integer
+      required:
+        - burnBreaches
+        - complete
+        - digest
+        - from
+        - noTraffic
+        - resolutionSeconds
+        - targetViolations
+        - to
+        - unknown
+      type: object
+    IntentBindingConfirmation:
+      additionalProperties: false
+      properties:
+        actor:
+          $ref: '#/components/schemas/InvestigationActor'
+        at:
+          format: date-time
+          type: string
+        binding:
+          $ref: '#/components/schemas/IntentSelection'
+        intentDigest:
+          type: string
+        measurementDigest:
+          type: string
+      required:
+        - actor
+        - at
+        - binding
+        - intentDigest
+      type: object
     IntentCandidateDiscovery:
       additionalProperties: false
       properties:
@@ -5980,12 +6945,13 @@ components:
         candidates:
           items:
             $ref: '#/components/schemas/IntentMeasurementCandidate'
-          type: array
+          type:
+            - array
+            - "null"
         catalogDigest:
           type: string
         humanConfirmationRequired:
           type: boolean
-          const: true
         maxAdapterCalls:
           type: integer
         metricNameDiscovery:
@@ -5993,14 +6959,18 @@ components:
         names:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         observedAt:
           format: date-time
           type: string
         questions:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         scope:
           $ref: '#/components/schemas/IntentCandidateInput'
         seriesDiscovery:
@@ -6008,13 +6978,13 @@ components:
         sourceDigest:
           type: string
         state:
-          type: string
           enum:
             - unsupported
             - provider_error
             - partial
             - no_matching_metrics
             - needs_input
+          type: string
         tenant:
           type: string
         textTrust:
@@ -6024,82 +6994,159 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
-        - apiVersion
-        - tenant
-        - observedAt
-        - textTrust
-        - scope
-        - sourceDigest
-        - catalogDigest
-        - state
-        - metricNameDiscovery
-        - seriesDiscovery
         - adapterCalls
-        - maxAdapterCalls
-        - names
-        - truncated
+        - apiVersion
         - candidates
-        - questions
-        - warnings
+        - catalogDigest
         - humanConfirmationRequired
+        - maxAdapterCalls
+        - metricNameDiscovery
+        - names
+        - observedAt
+        - questions
+        - scope
+        - seriesDiscovery
+        - sourceDigest
+        - state
+        - tenant
+        - textTrust
+        - truncated
+        - warnings
       type: object
     IntentCandidateInput:
       additionalProperties: false
       properties:
         category:
-          type: string
           maxLength: 63
+          type: string
         limit:
-          type: integer
-          minimum: 0
-          maximum: 3
-          default: 3
           description: Zero or omission uses the default of three inspections.
+          maximum: 3
+          minimum: 0
+          type: integer
         metrics:
           items:
             type: string
-            pattern: ^[a-zA-Z_:][a-zA-Z0-9_:]{0,199}$
-          type: array
           maxItems: 3
+          type: array
         outcome:
-          type: string
           enum:
             - availability
             - latency
+          type: string
         population:
           additionalProperties:
             type: string
-            maxLength: 200
-          type: object
-          minProperties: 1
-          maxProperties: 16
           description: Explicit equality labels. Reserved labels including le and __ prefixes are rejected.
+          type:
+            - object
+            - "null"
         prefix:
-          type: string
-          maxLength: 100
           description: Literal metric prefix, not a query.
+          maxLength: 100
+          type: string
         project:
-          type: string
-          minLength: 1
           maxLength: 200
+          minLength: 1
+          type: string
         service:
-          type: string
-          minLength: 1
           maxLength: 200
+          minLength: 1
+          type: string
         source:
-          type: string
           pattern: ^[a-z0-9][a-z0-9-]{0,62}$
-        threshold:
           type: string
-          maxLength: 32
+        threshold:
           description: 'Positive latency duration with explicit units, at most 24h; requires outcome latency. Example: 30ms.'
+          maxLength: 32
+          type: string
       required:
+        - population
+        - project
         - service
         - source
-        - project
-        - population
+      type: object
+    IntentChangeSet:
+      additionalProperties: false
+      properties:
+        applied:
+          items:
+            $ref: '#/components/schemas/IntentAppliedResource'
+          type: array
+        appliedAt:
+          format: date-time
+          type: string
+        appliedBy:
+          $ref: '#/components/schemas/InvestigationActor'
+        approvalDigest:
+          type: string
+        approvalReason:
+          type: string
+        approvedAt:
+          format: date-time
+          type: string
+        approvedBy:
+          $ref: '#/components/schemas/InvestigationActor'
+        binding:
+          $ref: '#/components/schemas/IntentSelection'
+        changes:
+          items:
+            $ref: '#/components/schemas/IntentDefinitionChange'
+          type:
+            - array
+            - "null"
+        createdAt:
+          format: date-time
+          type: string
+        createdBy:
+          $ref: '#/components/schemas/InvestigationActor'
+        digest:
+          type: string
+        id:
+          type: string
+        intentDigest:
+          type: string
+        observationPolicy:
+          $ref: '#/components/schemas/IntentObservationPolicy'
+        outcome:
+          $ref: '#/components/schemas/IntentOutcome'
+        recommendation:
+          $ref: '#/components/schemas/IntentRecommendation'
+        rejectedAt:
+          format: date-time
+          type: string
+        rejectedBy:
+          $ref: '#/components/schemas/InvestigationActor'
+        rejectionReason:
+          type: string
+        rollback:
+          $ref: '#/components/schemas/IntentRollback'
+        rollbackHistory:
+          items:
+            $ref: '#/components/schemas/IntentRollback'
+          type: array
+        safetyCheck:
+          $ref: '#/components/schemas/IntentSafetyCheck'
+        safetyException:
+          $ref: '#/components/schemas/IntentSafetyException'
+        sourceDigest:
+          type: string
+        state:
+          type: string
+      required:
+        - binding
+        - changes
+        - createdAt
+        - createdBy
+        - digest
+        - id
+        - intentDigest
+        - sourceDigest
+        - state
       type: object
     IntentChangeSetReview:
       type: object
@@ -6251,6 +7298,32 @@ components:
         changeSet:
           $ref: '#/components/schemas/IntentChangeSetReview'
       additionalProperties: true
+    IntentDefinitionChange:
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+        digest:
+          type: string
+        expectedRevision:
+          type: integer
+        kind:
+          type: string
+        manifest:
+          type:
+            - null
+            - "null"
+        name:
+          type: string
+        previous: {}
+      required:
+        - action
+        - digest
+        - expectedRevision
+        - kind
+        - manifest
+        - name
+      type: object
     IntentEvidence:
       additionalProperties: false
       properties:
@@ -6263,14 +7336,15 @@ components:
         comparisons:
           items:
             $ref: '#/components/schemas/IntentEvidenceComparison'
-          type: array
+          type:
+            - array
+            - "null"
         digest:
           type: string
         expectedRevision:
           type: integer
         humanConfirmationRequired:
           type: boolean
-          const: true
         intentDigest:
           type: string
         maxAdapterCalls:
@@ -6283,33 +7357,35 @@ components:
         sourceDigest:
           type: string
         state:
-          type: string
           enum:
             - observed
             - partial
             - unsupported
+          type: string
         tenant:
           type: string
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
-        - apiVersion
-        - tenant
-        - observedAt
-        - intentDigest
-        - measurementDigest
-        - sourceDigest
-        - catalogDigest
-        - expectedRevision
-        - state
         - adapterCalls
-        - maxAdapterCalls
+        - apiVersion
+        - catalogDigest
         - comparisons
-        - warnings
-        - humanConfirmationRequired
         - digest
+        - expectedRevision
+        - humanConfirmationRequired
+        - intentDigest
+        - maxAdapterCalls
+        - measurementDigest
+        - observedAt
+        - sourceDigest
+        - state
+        - tenant
+        - warnings
       type: object
     IntentEvidenceAlternative:
       additionalProperties: false
@@ -6339,17 +7415,15 @@ components:
         allowedBadEventsPerMillion:
           type: number
         current:
-          anyOf:
-            - $ref: '#/components/schemas/IntentEvidenceCurrent'
-            - type: 'null'
+          $ref: '#/components/schemas/IntentEvidenceCurrent'
         gaps:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         history:
-          anyOf:
-            - $ref: '#/components/schemas/IntentEvidenceHistory'
-            - type: 'null'
+          $ref: '#/components/schemas/IntentEvidenceHistory'
         historyState:
           type: string
         lifecycleAllowsAlerts:
@@ -6359,7 +7433,9 @@ components:
         policies:
           items:
             $ref: '#/components/schemas/IntentPolicyTradeoff'
-          type: array
+          type:
+            - array
+            - "null"
         state:
           type: string
         target:
@@ -6367,15 +7443,15 @@ components:
         windowSeconds:
           type: integer
       required:
+        - allowedBadEventsPerMillion
+        - gaps
+        - historyState
         - lifecycleAllowsAlerts
         - name
+        - policies
         - state
         - target
         - windowSeconds
-        - allowedBadEventsPerMillion
-        - policies
-        - historyState
-        - gaps
       type: object
     IntentEvidenceCurrent:
       additionalProperties: false
@@ -6384,13 +7460,15 @@ components:
           format: date-time
           type: string
         burnRate:
-          anyOf:
+          oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         checks:
           items:
             $ref: '#/components/schemas/QualityCheck'
-          type: array
+          type:
+            - array
+            - "null"
         coverage:
           type: number
         dataStatus:
@@ -6405,26 +7483,26 @@ components:
         minimumEvents:
           type: number
         reliability:
-          anyOf:
+          oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         state:
           type: string
         total:
           type: number
       required:
-        - state
         - at
-        - from
-        - good
-        - total
-        - coverage
-        - reliability
         - burnRate
+        - checks
+        - coverage
         - dataStatus
         - freshness
+        - from
+        - good
         - minimumEvents
-        - checks
+        - reliability
+        - state
+        - total
       type: object
     IntentEvidenceHistory:
       additionalProperties: false
@@ -6448,14 +7526,14 @@ components:
         unknownCutoffs:
           type: integer
       required:
-        - from
-        - to
-        - resolutionSeconds
-        - completeCutoffs
-        - unknownCutoffs
-        - noTrafficCutoffs
-        - targetViolationCutoffs
         - burnThresholdCutoffs
+        - completeCutoffs
+        - from
+        - noTrafficCutoffs
+        - resolutionSeconds
+        - targetViolationCutoffs
+        - to
+        - unknownCutoffs
       type: object
     IntentEvidenceInput:
       additionalProperties: false
@@ -6530,6 +7608,22 @@ components:
           minItems: 1
           type: array
       type: object
+    IntentFieldChange:
+      additionalProperties: false
+      properties:
+        after: {}
+        before: {}
+        field:
+          type: string
+        impact:
+          type: string
+        resource:
+          type: string
+      required:
+        - field
+        - impact
+        - resource
+      type: object
     IntentJourney:
       additionalProperties: false
       properties:
@@ -6574,7 +7668,9 @@ components:
         labelNames:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         matchingBoundaryObserved:
           type: boolean
         metric:
@@ -6586,19 +7682,21 @@ components:
         questions:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         recipes:
           items:
             $ref: '#/components/schemas/IntentRecipeReference'
-          type: array
+          type:
+            - array
+            - "null"
         requestedMetric:
           type: string
         state:
           type: string
         thresholdSeconds:
-          anyOf:
-            - type: number
-            - type: 'null'
+          type: number
         to:
           format: date-time
           type: string
@@ -6609,27 +7707,140 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
-        - id
-        - requestedMetric
-        - metric
-        - state
-        - metricType
-        - unit
-        - observedSeries
-        - labelNames
-        - truncated
-        - matchingBoundaryObserved
-        - recipes
-        - questions
-        - warnings
         - evidenceDigest
+        - id
+        - labelNames
+        - matchingBoundaryObserved
+        - metric
+        - metricType
+        - observedSeries
+        - questions
+        - recipes
+        - requestedMetric
+        - state
+        - truncated
+        - unit
+        - warnings
+      type: object
+    IntentObservationPolicy:
+      additionalProperties: false
+      properties:
+        deadlineSeconds:
+          type: integer
+        observeSeconds:
+          type: integer
+        warmupSeconds:
+          type: integer
+      required:
+        - deadlineSeconds
+        - observeSeconds
+        - warmupSeconds
+      type: object
+    IntentOutcome:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        baselineReliability:
+          type: number
+        budget:
+          $ref: '#/components/schemas/ErrorBudgetDecision'
+        burnState:
+          type: string
+        changeSetDigest:
+          type: string
+        checkedAt:
+          format: date-time
+          type: string
+        code:
+          type: string
+        comparison:
+          type: string
+        conversation:
+          type: string
+        deadlineAt:
+          format: date-time
+          type: string
+        definitionDigest:
+          type: string
+        deployment:
+          $ref: '#/components/schemas/IntegrationStage'
+        evaluation:
+          $ref: '#/components/schemas/IntegrationStage'
+        healthySince:
+          format: date-time
+          type: string
+        limitations:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        message:
+          type: string
+        nextCheckAt:
+          format: date-time
+          type: string
+        operation:
+          type: string
+        operationDigest:
+          type: string
+        quality:
+          $ref: '#/components/schemas/MeasurementQuality'
+        reliability:
+          type: number
+        revision:
+          type: integer
+        rollbackStatus:
+          type: string
+        ruleOutput:
+          $ref: '#/components/schemas/IntegrationStage'
+        sloId:
+          type: string
+        sourceDigest:
+          type: string
+        startedAt:
+          format: date-time
+          type: string
+        state:
+          type: string
+        tenant:
+          type: string
+        warmupUntil:
+          format: date-time
+          type: string
+      required:
+        - apiVersion
+        - changeSetDigest
+        - checkedAt
+        - code
+        - comparison
+        - conversation
+        - deadlineAt
+        - definitionDigest
+        - limitations
+        - message
+        - operation
+        - operationDigest
+        - revision
+        - rollbackStatus
+        - sloId
+        - sourceDigest
+        - startedAt
+        - state
+        - tenant
+        - warmupUntil
       type: object
     IntentPolicyTradeoff:
       additionalProperties: false
       properties:
         burnRate:
+          type: number
+        confidence:
           type: number
         forSeconds:
           type: integer
@@ -6648,28 +7859,24 @@ components:
         shortWindowSeconds:
           type: integer
       required:
+        - burnRate
+        - forSeconds
+        - longWindowBudgetFraction
+        - longWindowSeconds
         - minCoverage
         - minEvents
         - name
         - severity
         - shortWindowSeconds
-        - longWindowSeconds
-        - forSeconds
-        - burnRate
-        - longWindowBudgetFraction
       type: object
     IntentPreparationCheck:
-      type: object
       additionalProperties: false
-      required:
-        - code
-        - state
-        - message
       properties:
         code:
           type: string
-        state:
+        message:
           type: string
+        state:
           enum:
             - missing
             - invalid
@@ -6677,26 +7884,28 @@ components:
             - stale
             - not_recorded
             - not_checked
-        message:
           type: string
-    IntentPreparationEvidence:
-      type: object
-      additionalProperties: false
       required:
-        - capturedVersion
-        - requestedBy
-        - report
+        - code
+        - message
+        - state
+      type: object
+    IntentPreparationEvidence:
+      additionalProperties: false
       properties:
         capturedVersion:
-          type: integer
-          format: int64
           minimum: 1
-        requestedBy:
-          type: object
-          description: Authenticated server-attributed actor; never supplied by the caller.
-          additionalProperties: true
+          type: integer
         report:
           $ref: '#/components/schemas/IntentEvidence'
+        requestedBy:
+          $ref: '#/components/schemas/InvestigationActor'
+          description: Authenticated server-attributed actor; never supplied by the caller.
+      required:
+        - capturedVersion
+        - report
+        - requestedBy
+      type: object
     IntentRecipeReference:
       additionalProperties: false
       properties:
@@ -6705,9 +7914,7 @@ components:
         digest:
           type: string
         extension:
-          anyOf:
-            - $ref: '#/components/schemas/ExtensionReference'
-            - type: 'null'
+          $ref: '#/components/schemas/ExtensionReference'
         id:
           type: string
         match:
@@ -6717,12 +7924,96 @@ components:
         sli:
           type: string
       required:
-        - id
-        - revision
-        - digest
         - category
-        - sli
+        - digest
+        - id
         - match
+        - revision
+        - sli
+      type: object
+    IntentRecommendation:
+      additionalProperties: false
+      properties:
+        backtest:
+          $ref: '#/components/schemas/IntentBacktestSummary'
+        basis:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        binding:
+          $ref: '#/components/schemas/BindingReference'
+        budgetDecision:
+          $ref: '#/components/schemas/ErrorBudgetDecision'
+        compilerVersion:
+          type: string
+        draftRoute:
+          $ref: '#/components/schemas/ReviewModelRoute'
+        evidenceDigest:
+          type: string
+        explanation:
+          type: string
+        fields:
+          items:
+            $ref: '#/components/schemas/IntentFieldChange'
+          type:
+            - array
+            - "null"
+        limitations:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        measurementDigest:
+          type: string
+        mode:
+          type: string
+        modelRoute:
+          $ref: '#/components/schemas/ReviewModelRoute'
+        observedFrom:
+          format: date-time
+          type: string
+        observedTo:
+          format: date-time
+          type: string
+        preparationEvidence:
+          $ref: '#/components/schemas/IntentPreparationEvidence'
+        requestedBy:
+          $ref: '#/components/schemas/InvestigationActor'
+        reviewPacket:
+          $ref: '#/components/schemas/IntentReviewPacket'
+        rollbackStatus:
+          type: string
+        runId:
+          type: string
+        skill:
+          $ref: '#/components/schemas/ReviewSkillRef'
+        sourceDigest:
+          type: string
+        summary:
+          type: string
+        systemOne:
+          $ref: '#/components/schemas/SystemOneAssessment'
+        systemOneRoute:
+          $ref: '#/components/schemas/SystemOneRoute'
+        template:
+          $ref: '#/components/schemas/IntentTemplateSelection'
+      required:
+        - basis
+        - binding
+        - compilerVersion
+        - evidenceDigest
+        - fields
+        - limitations
+        - mode
+        - observedFrom
+        - observedTo
+        - requestedBy
+        - rollbackStatus
+        - sourceDigest
+        - summary
       type: object
     IntentRecommendationReview:
       type: object
@@ -6769,49 +8060,39 @@ components:
         health:
           type: string
     IntentReviewCandidateReceipt:
-      type: object
       additionalProperties: false
-      required:
-        - state
-        - runId
-        - runInputDigest
-        - stepDigest
-        - at
       properties:
-        state:
+        at:
+          format: date-time
           type: string
+        intentDigest:
+          type: string
+        report:
+          $ref: '#/components/schemas/IntentCandidateDiscovery'
+        runId:
+          type: string
+        runInputDigest:
+          type: string
+        state:
           enum:
             - recorded
             - prior_goal
             - unverified
             - stale
             - invalid
-        runId:
-          type: string
-        runInputDigest:
           type: string
         stepDigest:
           type: string
-        intentDigest:
-          type: string
-        at:
-          type: string
-          format: date-time
-        report:
-          $ref: '#/components/schemas/IntentCandidateDiscovery'
-    IntentReviewDestination:
-      type: object
-      additionalProperties: false
       required:
-        - tenant
-        - project
-        - service
-        - source
-        - sourceDigest
+        - at
+        - runId
+        - runInputDigest
         - state
+        - stepDigest
+      type: object
+    IntentReviewDestination:
+      additionalProperties: false
       properties:
-        tenant:
-          type: string
         project:
           type: string
         service:
@@ -6821,86 +8102,212 @@ components:
         sourceDigest:
           type: string
         state:
-          const: not_verified
-    IntentReviewExclusions:
-      type: object
-      additionalProperties: false
-      required:
-        - state
-        - definition
-        - intentDigest
-        - confirmation
-      properties:
-        state:
           type: string
-          enum:
-            - recorded
-            - unconfirmed
+        tenant:
+          type: string
+      required:
+        - project
+        - service
+        - source
+        - sourceDigest
+        - state
+        - tenant
+      type: object
+    IntentReviewExclusions:
+      additionalProperties: false
+      properties:
+        confirmation:
+          $ref: '#/components/schemas/IntentBindingConfirmation'
         definition:
           $ref: '#/components/schemas/IntentExclusions'
         intentDigest:
           type: string
-        confirmation:
-          type: object
-          additionalProperties: true
-    IntentReviewPacket:
-      type: object
-      additionalProperties: false
+        state:
+          enum:
+            - recorded
+            - unconfirmed
+          type: string
       required:
-        - goal
         - confirmation
-        - checks
-        - destination
-        - resources
-        - limitations
+        - definition
+        - intentDigest
+        - state
+      type: object
+    IntentReviewPacket:
+      additionalProperties: false
       properties:
-        exclusions:
-          $ref: '#/components/schemas/IntentReviewExclusions'
         candidateDiscovery:
           $ref: '#/components/schemas/IntentReviewCandidateReceipt'
-        goal:
-          $ref: '#/components/schemas/Manifest'
-        confirmation:
-          type: object
-          description: Exact saved human measurement confirmation, including actor and timestamp.
-          additionalProperties: true
-        legacyMeasurement:
-          $ref: '#/components/schemas/Manifest'
         checks:
-          type: array
           items:
             $ref: '#/components/schemas/IntentPreparationCheck'
+          type:
+            - array
+            - "null"
+        confirmation:
+          $ref: '#/components/schemas/IntentBindingConfirmation'
+          description: Exact saved human measurement confirmation, including actor and timestamp.
         destination:
           $ref: '#/components/schemas/IntentReviewDestination'
-        resources:
-          type: array
-          items:
-            $ref: '#/components/schemas/IntentReviewResource'
+        exclusions:
+          $ref: '#/components/schemas/IntentReviewExclusions'
+        goal:
+          $ref: '#/components/schemas/SLOIntent'
+        legacyMeasurement:
+          $ref: '#/components/schemas/MeasurementBinding'
         limitations:
-          type: array
           items:
             type: string
-    IntentReviewResource:
-      type: object
-      additionalProperties: false
+          type:
+            - array
+            - "null"
+        resources:
+          items:
+            $ref: '#/components/schemas/IntentReviewResource'
+          type:
+            - array
+            - "null"
       required:
-        - kind
-        - name
-        - action
-        - expectedRevision
-        - digest
+        - checks
+        - confirmation
+        - destination
+        - goal
+        - limitations
+        - resources
+      type: object
+    IntentReviewResource:
+      additionalProperties: false
       properties:
+        action:
+          type: string
+        digest:
+          type: string
+        expectedRevision:
+          type: integer
         kind:
           type: string
         name:
           type: string
-        action:
+      required:
+        - action
+        - digest
+        - expectedRevision
+        - kind
+        - name
+      type: object
+    IntentRollback:
+      additionalProperties: false
+      properties:
+        applied:
+          items:
+            $ref: '#/components/schemas/IntentAppliedResource'
+          type: array
+        appliedAt:
+          format: date-time
           type: string
-        expectedRevision:
-          type: integer
-          format: int64
+        appliedBy:
+          $ref: '#/components/schemas/InvestigationActor'
+        approvalDigest:
+          type: string
+        approvalReason:
+          type: string
+        approvedAt:
+          format: date-time
+          type: string
+        approvedBy:
+          $ref: '#/components/schemas/InvestigationActor'
+        blockers:
+          items:
+            type: string
+          type: array
+        changes:
+          items:
+            $ref: '#/components/schemas/IntentDefinitionChange'
+          type:
+            - array
+            - "null"
+        createdAt:
+          format: date-time
+          type: string
+        createdBy:
+          $ref: '#/components/schemas/InvestigationActor'
         digest:
           type: string
+        expected:
+          items:
+            $ref: '#/components/schemas/IntentAppliedResource'
+          type:
+            - array
+            - "null"
+        id:
+          type: string
+        originalDigest:
+          type: string
+        outcome:
+          $ref: '#/components/schemas/IntentOutcome'
+        reason:
+          type: string
+        safetyCheck:
+          $ref: '#/components/schemas/IntentSafetyCheck'
+        state:
+          type: string
+      required:
+        - changes
+        - createdAt
+        - createdBy
+        - digest
+        - expected
+        - id
+        - originalDigest
+        - reason
+        - state
+      type: object
+    IntentSafetyCheck:
+      additionalProperties: false
+      properties:
+        budget:
+          $ref: '#/components/schemas/ErrorBudgetDecision'
+        burnState:
+          type: string
+        checkedAt:
+          format: date-time
+          type: string
+        exception:
+          $ref: '#/components/schemas/IntentSafetyException'
+        measurementDigest:
+          type: string
+        message:
+          type: string
+        quality:
+          $ref: '#/components/schemas/MeasurementQuality'
+        state:
+          type: string
+        windowSeconds:
+          type: integer
+      required:
+        - checkedAt
+        - message
+        - state
+      type: object
+    IntentSafetyException:
+      additionalProperties: false
+      properties:
+        approvedAt:
+          format: date-time
+          type: string
+        approvedBy:
+          $ref: '#/components/schemas/InvestigationActor'
+        expiresAt:
+          format: date-time
+          type: string
+        reason:
+          type: string
+      required:
+        - approvedAt
+        - approvedBy
+        - expiresAt
+        - reason
+      type: object
     IntentSelection:
       additionalProperties: false
       properties:
@@ -6909,8 +8316,8 @@ components:
         name:
           type: string
       required:
-        - name
         - expectedRevision
+        - name
       type: object
     IntentSourceContext:
       additionalProperties: false
@@ -6959,7 +8366,7 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         quality:
           $ref: '#/components/schemas/MeasurementQualityPolicy'
         service:
@@ -6983,6 +8390,35 @@ components:
         - source
         - target
         - windowSeconds
+      type: object
+    IntentTemplateSelection:
+      additionalProperties: false
+      properties:
+        at:
+          format: date-time
+          type: string
+        catalogDigest:
+          type: string
+        extension:
+          $ref: '#/components/schemas/ExtensionReference'
+        intentDigest:
+          type: string
+        templateDigest:
+          type: string
+        templateId:
+          type: string
+        templateRevision:
+          type: integer
+        valuesDigest:
+          type: string
+      required:
+        - at
+        - catalogDigest
+        - intentDigest
+        - templateDigest
+        - templateId
+        - templateRevision
+        - valuesDigest
       type: object
     IntentUsage:
       type: object
@@ -7097,7 +8533,7 @@ components:
             $ref: '#/components/schemas/EvidenceReference'
           type:
             - array
-            - "null"
+            - 'null'
         health:
           type: string
         healthScope:
@@ -7107,7 +8543,7 @@ components:
             $ref: '#/components/schemas/LinkedSLOContext'
           type:
             - array
-            - "null"
+            - 'null'
         nextCursor:
           type: string
         observedAt:
@@ -7131,7 +8567,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - apiVersion
         - evidence
@@ -7223,7 +8659,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         journeyId:
           type: string
         receivedAt:
@@ -7245,11 +8681,11 @@ components:
         budgetRemainingFraction:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         burnRate:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         failed:
           type: integer
         from:
@@ -7262,7 +8698,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         minRuns:
           type: integer
         otherRevision:
@@ -7272,7 +8708,7 @@ components:
         reliability:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         state:
           type: string
         target:
@@ -7341,13 +8777,13 @@ components:
             $ref: '#/components/schemas/JourneySLO'
           type:
             - array
-            - "null"
+            - 'null'
         steps:
           items:
             $ref: '#/components/schemas/JourneyStep'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - criticality
         - description
@@ -7374,7 +8810,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - actor
         - id
@@ -7391,13 +8827,13 @@ components:
             $ref: '#/components/schemas/JourneyLinkStatus'
           type:
             - array
-            - "null"
+            - 'null'
         reasons:
           items:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         resource:
           $ref: '#/components/schemas/JourneyRevision'
         runObjective:
@@ -7650,7 +9086,7 @@ components:
             $ref: '#/components/schemas/QualityCheck'
           type:
             - array
-            - "null"
+            - 'null'
         cohorts:
           $ref: '#/components/schemas/CohortReport'
         collectedSourceDigest:
@@ -7671,7 +9107,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         minimumEvents:
           type: number
         observationPoint:
@@ -7739,7 +9175,7 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         metric:
           type: string
         observationPoint:
@@ -7810,7 +9246,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         observedAt:
           format: date-time
           type: string
@@ -7961,7 +9397,7 @@ components:
             $ref: '#/components/schemas/NativeObjective'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - description
         - events
@@ -8380,7 +9816,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - document
         - entityGUID
@@ -8487,7 +9923,7 @@ components:
         spec:
           type:
             - null
-            - "null"
+            - 'null'
         status:
           $ref: '#/components/schemas/Status'
       required:
@@ -8545,6 +9981,33 @@ components:
           format: int64
         digest:
           type: string
+    ResourceSearch:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        items:
+          items:
+            $ref: '#/components/schemas/ResourceSummary'
+          type:
+            - array
+            - "null"
+        nextCursor:
+          type: string
+        observedAt:
+          format: date-time
+          type: string
+        tenant:
+          type: string
+        textTrust:
+          type: string
+      required:
+        - apiVersion
+        - items
+        - observedAt
+        - tenant
+        - textTrust
+      type: object
     ResourceSummary:
       additionalProperties: false
       properties:
@@ -8636,7 +10099,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         digest:
           type: string
         expectedRevision:
@@ -8648,7 +10111,7 @@ components:
             $ref: '#/components/schemas/RetirementReference'
           type:
             - array
-            - "null"
+            - 'null'
         resourceUID:
           type: string
         retirement:
@@ -8757,6 +10220,26 @@ components:
           items:
             type: string
       additionalProperties: true
+    ReviewModelRoute:
+      additionalProperties: false
+      properties:
+        local:
+          type: boolean
+        model:
+          type: string
+        protocol:
+          type: string
+        provider:
+          type: string
+        routeDigest:
+          type: string
+      required:
+        - local
+        - model
+        - protocol
+        - provider
+        - routeDigest
+      type: object
     ReviewRequest:
       type: object
       required:
@@ -8776,6 +10259,20 @@ components:
         safetyExceptionReason:
           type: string
       additionalProperties: false
+    ReviewSkillRef:
+      additionalProperties: false
+      properties:
+        digest:
+          type: string
+        id:
+          type: string
+        version:
+          type: string
+      required:
+        - digest
+        - id
+        - version
+      type: object
     Rule:
       additionalProperties: false
       properties:
@@ -8794,7 +10291,7 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         record:
           type: string
       required:
@@ -9109,7 +10606,7 @@ components:
             $ref: '#/components/schemas/EvidenceReference'
           type:
             - array
-            - "null"
+            - 'null'
         freshness:
           $ref: '#/components/schemas/Freshness'
         health:
@@ -9136,7 +10633,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - apiVersion
         - collection
@@ -9150,6 +10647,35 @@ components:
         - tenant
         - textTrust
         - warnings
+      type: object
+    SLOExtensionInfo:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        engine:
+          type: string
+        name:
+          type: string
+        publisher:
+          type: string
+        recipes:
+          type: integer
+        sha256:
+          type: string
+        tests:
+          type: integer
+        version:
+          type: string
+      required:
+        - description
+        - engine
+        - name
+        - publisher
+        - recipes
+        - sha256
+        - tests
+        - version
       type: object
     SLOIntent:
       additionalProperties: false
@@ -9212,7 +10738,7 @@ components:
             $ref: '#/components/schemas/RetirementEvent'
           type:
             - array
-            - "null"
+            - 'null'
         cleanup:
           type: string
         evaluationAt:
@@ -9284,7 +10810,7 @@ components:
             $ref: '#/components/schemas/SLORevision'
           type:
             - array
-            - "null"
+            - 'null'
         sloId:
           type: string
       required:
@@ -9349,6 +10875,158 @@ components:
         - target
         - windowSeconds
       type: object
+    SLOTemplate:
+      additionalProperties: false
+      properties:
+        category:
+          type: string
+        description:
+          type: string
+        digest:
+          type: string
+        eligibleEvents:
+          type: string
+        evaluation:
+          $ref: '#/components/schemas/ExtensionEvaluation'
+        extension:
+          $ref: '#/components/schemas/ExtensionReference'
+        goodEvents:
+          type: string
+        id:
+          type: string
+        inputs:
+          additionalProperties:
+            $ref: '#/components/schemas/ExtensionInput'
+          type: object
+        manifest:
+          $ref: '#/components/schemas/ServiceLevelObjective'
+        requirements:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        revision:
+          type: integer
+        sli:
+          type: string
+        title:
+          type: string
+      required:
+        - category
+        - description
+        - digest
+        - eligibleEvents
+        - goodEvents
+        - id
+        - manifest
+        - requirements
+        - revision
+        - sli
+        - title
+      type: object
+    SLOTemplateCatalog:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        categories:
+          items:
+            $ref: '#/components/schemas/SLOTemplateCategory'
+          type:
+            - array
+            - "null"
+        digest:
+          type: string
+        extensions:
+          items:
+            $ref: '#/components/schemas/SLOExtensionInfo'
+          type: array
+        kind:
+          type: string
+        templates:
+          items:
+            $ref: '#/components/schemas/SLOTemplate'
+          type:
+            - array
+            - "null"
+        tenant:
+          type: string
+      required:
+        - apiVersion
+        - categories
+        - digest
+        - kind
+        - templates
+      type: object
+    SLOTemplateCategory:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+      required:
+        - id
+        - title
+      type: object
+    SLOTemplateDetail:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        template:
+          $ref: '#/components/schemas/SLOTemplate'
+        tenant:
+          type: string
+      required:
+        - apiVersion
+        - template
+        - tenant
+      type: object
+    SLOTemplateDraft:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        extension:
+          $ref: '#/components/schemas/ExtensionReference'
+        kind:
+          type: string
+        manifest:
+          $ref: '#/components/schemas/ServiceLevelObjective'
+        manifestDigest:
+          type: string
+        telemetryVerified:
+          type: boolean
+        templateDigest:
+          type: string
+        templateId:
+          type: string
+        templateRevision:
+          type: integer
+        tenant:
+          type: string
+        warnings:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        yaml:
+          type: string
+      required:
+        - apiVersion
+        - kind
+        - manifest
+        - manifestDigest
+        - telemetryVerified
+        - templateDigest
+        - templateId
+        - templateRevision
+        - warnings
+        - yaml
+      type: object
     SLOView:
       additionalProperties: false
       properties:
@@ -9402,6 +11080,29 @@ components:
         - kind
         - metadata
         - spec
+      type: object
+    Skill:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        digest:
+          type: string
+        id:
+          type: string
+        instructions:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+      required:
+        - description
+        - digest
+        - id
+        - instructions
+        - name
+        - version
       type: object
     Snapshot:
       additionalProperties: false
@@ -9480,7 +11181,7 @@ components:
             $ref: '#/components/schemas/Objective'
           type:
             - array
-            - "null"
+            - 'null'
         service:
           type: string
         timeWindow:
@@ -9488,7 +11189,7 @@ components:
             $ref: '#/components/schemas/Window'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - budgetingMethod
         - indicator
@@ -9506,7 +11207,7 @@ components:
             $ref: '#/components/schemas/Condition'
           type:
             - array
-            - "null"
+            - 'null'
         definitionDigest:
           type: string
         deployment:
@@ -9537,6 +11238,110 @@ components:
       required:
         - conditions
         - observedGeneration
+      type: object
+    StatusResult:
+      additionalProperties: false
+      properties:
+        status:
+          type: string
+      required:
+        - status
+      type: object
+    SystemOneAssessment:
+      additionalProperties: false
+      properties:
+        at:
+          format: date-time
+          type: string
+        errorCode:
+          type: string
+        inputDigest:
+          type: string
+        inputTokens:
+          type: integer
+        judgments:
+          $ref: '#/components/schemas/SystemOneJudgments'
+        outputTokens:
+          type: integer
+        requestDigest:
+          type: string
+        resolvedModel:
+          type: string
+        status:
+          type: string
+      required:
+        - at
+        - inputDigest
+        - inputTokens
+        - outputTokens
+        - status
+      type: object
+    SystemOneAuditEvidence:
+      additionalProperties: false
+      properties:
+        assessment:
+          $ref: '#/components/schemas/SystemOneAssessment'
+        inputDigest:
+          type: string
+        route:
+          oneOf:
+            - $ref: '#/components/schemas/SystemOneRoute'
+            - type: "null"
+        runId:
+          type: string
+      required:
+        - inputDigest
+        - route
+        - runId
+      type: object
+    SystemOneChoice:
+      additionalProperties: false
+      properties:
+        choice:
+          type: string
+        confidence:
+          type: number
+        probabilities:
+          additionalProperties:
+            type: number
+          type:
+            - object
+            - "null"
+      required:
+        - choice
+        - confidence
+        - probabilities
+      type: object
+    SystemOneJudgments:
+      additionalProperties: false
+      properties:
+        category:
+          $ref: '#/components/schemas/SystemOneChoice'
+        goodEventsDefined:
+          type: number
+        observationPointDefined:
+          type: number
+        populationDefined:
+          type: number
+      required:
+        - category
+        - goodEventsDefined
+        - observationPointDefined
+        - populationDefined
+      type: object
+    SystemOneRoute:
+      additionalProperties: false
+      properties:
+        contractDigest:
+          type: string
+        model:
+          type: string
+        provider:
+          type: string
+      required:
+        - contractDigest
+        - model
+        - provider
       type: object
     Target:
       additionalProperties: false
@@ -9591,7 +11396,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         name:
           type: string
         role:
@@ -9613,20 +11418,12 @@ components:
             $ref: '#/components/schemas/Audit'
           type:
             - array
-            - "null"
+            - 'null'
         nextCursor:
           type: string
       required:
         - items
         - nextCursor
-      type: object
-    TeamAccessStatus:
-      additionalProperties: false
-      properties:
-        status:
-          type: string
-      required:
-        - status
       type: object
     TeamDirectory:
       additionalProperties: false
@@ -9636,31 +11433,31 @@ components:
             $ref: '#/components/schemas/MemberView'
           type:
             - array
-            - "null"
+            - 'null'
         providers:
           items:
             $ref: '#/components/schemas/ProviderView'
           type:
             - array
-            - "null"
+            - 'null'
         serviceAccounts:
           items:
             $ref: '#/components/schemas/AccountView'
           type:
             - array
-            - "null"
+            - 'null'
         ssoMappings:
           items:
             $ref: '#/components/schemas/MappingView'
           type:
             - array
-            - "null"
+            - 'null'
         ssoMembers:
           items:
             $ref: '#/components/schemas/FederatedMember'
           type:
             - array
-            - "null"
+            - 'null'
         ssoMembersTruncated:
           type: boolean
         teams:
@@ -9668,7 +11465,7 @@ components:
             $ref: '#/components/schemas/Team'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - members
         - providers
@@ -9690,7 +11487,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         name:
           type: string
         role:
@@ -9734,7 +11531,7 @@ components:
             $ref: '#/components/schemas/TelemetryMetadata'
           type:
             - array
-            - "null"
+            - 'null'
         metric:
           type: string
         series:
@@ -9744,7 +11541,7 @@ components:
             type: object
           type:
             - array
-            - "null"
+            - 'null'
         source:
           type: string
         tenant:
@@ -9759,7 +11556,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - apiVersion
         - fingerprint
@@ -9787,6 +11584,31 @@ components:
         - type
         - unit
       type: object
+    TemplateValues:
+      additionalProperties: false
+      properties:
+        expectedTemplateDigest:
+          type: string
+        inputs:
+          additionalProperties: {}
+          type: object
+        measurement:
+          $ref: '#/components/schemas/MeasurementSpec'
+        name:
+          type: string
+        project:
+          type: string
+        service:
+          type: string
+        source:
+          type: string
+        stepSeconds:
+          type: integer
+        target:
+          type: number
+        windowSeconds:
+          type: integer
+      type: object
     TimeSeriesRatio:
       additionalProperties: false
       properties:
@@ -9797,6 +11619,26 @@ components:
       required:
         - goodServiceFilter
         - totalServiceFilter
+      type: object
+    TopologyCatalog:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        items:
+          items:
+            $ref: '#/components/schemas/V1alpha1TopologyResource'
+          type:
+            - array
+            - "null"
+        nextCursor:
+          type: string
+        tenant:
+          type: string
+      required:
+        - apiVersion
+        - items
+        - tenant
       type: object
     TopologyResource:
       additionalProperties: false
@@ -9827,7 +11669,7 @@ components:
         manifest:
           type:
             - null
-            - "null"
+            - 'null'
         revision:
           type: integer
       required:
@@ -9907,6 +11749,30 @@ components:
           type: string
       required:
         - name
+      type: object
+    V1alpha1TopologyResource:
+      additionalProperties: false
+      properties:
+        appliedAt:
+          format: date-time
+          type: string
+        digest:
+          type: string
+        displayName:
+          type: string
+        id:
+          type: string
+        kind:
+          type: string
+        revision:
+          type: integer
+      required:
+        - appliedAt
+        - digest
+        - displayName
+        - id
+        - kind
+        - revision
       type: object
     ValidationResult:
       type: object
@@ -10011,3 +11877,82 @@ components:
           type: object
           additionalProperties: true
       additionalProperties: true
+    Workspace:
+      additionalProperties: false
+      properties:
+        connections:
+          items:
+            $ref: '#/components/schemas/WorkspaceConnection'
+          type:
+            - array
+            - "null"
+        features:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        journeysConfigured:
+          type: boolean
+        mode:
+          type: string
+        prometheusConfigured:
+          type: boolean
+        replayCaptureEnabled:
+          type: boolean
+        role:
+          type: string
+        source:
+          $ref: '#/components/schemas/WorkspaceSource'
+        tenant:
+          $ref: '#/components/schemas/WorkspaceTenant'
+        workflowsConfigured:
+          type: boolean
+      required:
+        - connections
+        - features
+        - journeysConfigured
+        - mode
+        - prometheusConfigured
+        - replayCaptureEnabled
+        - role
+        - source
+        - tenant
+        - workflowsConfigured
+      type: object
+    WorkspaceConnection:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+      required:
+        - id
+        - kind
+      type: object
+    WorkspaceSource:
+      additionalProperties: false
+      properties:
+        configured:
+          type: boolean
+        connectionCount:
+          type: integer
+        kind:
+          type: string
+      required:
+        - configured
+        - connectionCount
+        - kind
+      type: object
+    WorkspaceTenant:
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+      type: object

@@ -15,10 +15,15 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
+	"github.com/ishantanu/nines/internal/intentflow"
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/service"
+	"github.com/ishantanu/nines/internal/slotemplates"
 	"github.com/ishantanu/nines/internal/store"
+	"github.com/ishantanu/nines/internal/tenancy"
+	"github.com/ishantanu/nines/internal/workflow"
 )
 
 // Real responses from the HTTP handlers must match the contract. This catches
@@ -61,33 +66,64 @@ func TestResponsesConformToTheContract(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	server := httptest.NewServer(httpapi.New(svc, "owner", slog.New(slog.NewTextHandler(io.Discard, nil))))
+	// The tenant as cmd/server wires it, so templates, skills and audit are
+	// mounted too.
+	handler, err := httpapi.NewMulti([]httpapi.Workspace{{
+		ID: "default", Name: "Default workspace", Service: svc, Features: features.All(),
+		Grants:              []tenancy.Grant{{Token: "owner", Role: "owner"}},
+		Templates:           slotemplates.Default(),
+		Workflows:           workflow.New(svc, workflow.NewMemory()),
+		IntentConversations: intentflow.New(svc, intentflow.NewMemory()),
+	}}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(handler)
 	defer server.Close()
 
-	for path, want := range map[string]map[string]any{
-		"/api/slos":                                         {"type": "array", "items": ref("SLOView")},
-		"/api/slos/checkout":                                ref("SLOView"),
-		"/api/slos/checkout/status":                         ref("Snapshot"),
-		"/api/slos/checkout/quality":                        ref("MeasurementQuality"),
-		"/api/slos/checkout/budget":                         ref("ErrorBudgetDecision"),
-		"/api/slos/checkout/samples":                        {"type": "array", "items": ref("Point")},
-		"/api/slos/checkout/history":                        ref("History"),
-		"/api/slos/checkout/revisions":                      ref("SLORevisionList"),
-		"/api/slos/checkout/journeys":                       {"type": "array", "items": ref("JourneyRevision")},
-		"/api/slos/checkout/context":                        ref("SLOContext"),
-		"/api/slos/checkout/retirement/plan?action=archive": ref("RetirementPlan"),
-		"/api/access":                                       ref("AccessView"),
-		"/api/journeys":                                     {"type": "array", "items": ref("JourneyView")},
-		"/api/journeys/purchase":                            ref("JourneyView"),
-		"/api/journeys/purchase/history":                    {"type": "array", "items": ref("JourneyRevision")},
-		"/api/journeys/purchase/runs":                       {"type": "array", "items": ref("JourneyRun")},
-		"/api/journeys/purchase/context":                    ref("JourneyContext"),
-		"/api/dependency-maps/shop":                         ref("TopologyResource"),
-		"/api/dependency-maps/shop/view":                    ref("DependencyView"),
-		"/api/dependency-maps/shop/composition":             ref("DependencyComposition"),
+	for route, want := range map[string]map[string]any{
+		"/api/slos":                                            {"type": "array", "items": ref("SLOView")},
+		"/api/slos/checkout":                                   ref("SLOView"),
+		"/api/slos/checkout/status":                            ref("Snapshot"),
+		"/api/slos/checkout/quality":                           ref("MeasurementQuality"),
+		"/api/slos/checkout/budget":                            ref("ErrorBudgetDecision"),
+		"/api/slos/checkout/samples":                           {"type": "array", "items": ref("Point")},
+		"/api/slos/checkout/history":                           ref("History"),
+		"/api/slos/checkout/revisions":                         ref("SLORevisionList"),
+		"/api/slos/checkout/journeys":                          {"type": "array", "items": ref("JourneyRevision")},
+		"/api/slos/checkout/context":                           ref("SLOContext"),
+		"/api/slos/checkout/retirement/plan?action=archive":    ref("RetirementPlan"),
+		"/api/access":                                          ref("AccessView"),
+		"/api/journeys":                                        {"type": "array", "items": ref("JourneyView")},
+		"/api/journeys/purchase":                               ref("JourneyView"),
+		"/api/journeys/purchase/history":                       {"type": "array", "items": ref("JourneyRevision")},
+		"/api/journeys/purchase/runs":                          {"type": "array", "items": ref("JourneyRun")},
+		"/api/journeys/purchase/context":                       ref("JourneyContext"),
+		"/api/dependency-maps/shop":                            ref("TopologyResource"),
+		"/api/dependency-maps/shop/view":                       ref("DependencyView"),
+		"/api/dependency-maps/shop/composition":                ref("DependencyComposition"),
+		"/api/workspace":                                       ref("Workspace"),
+		"/api/slo-templates":                                   ref("SLOTemplateCatalog"),
+		"/api/slo-templates/agent-task-completion":             ref("SLOTemplateDetail"),
+		"POST /api/slo-templates/agent-task-completion/render": ref("SLOTemplateDraft"),
+		"/api/resources/search":                                ref("ResourceSearch"),
+		"/api/topology/resources":                              ref("TopologyCatalog"),
+		"/api/skills":                                          {"type": "array", "items": ref("Skill")},
+		"/api/skills/reliability-investigation":                ref("Skill"),
+		"/api/events":                                          {"type": "array", "items": ref("AlertDelivery")},
+		"/api/audit":                                           ref("AuditPage"),
+		"/api/audit/archive":                                   ref("AuditArchiveStatus"),
 	} {
-		req, _ := http.NewRequest("GET", server.URL+path, nil)
+		method, path, post := "GET", route, strings.HasPrefix(route, "POST ")
+		var payload io.Reader
+		if post {
+			method, path, payload = "POST", strings.TrimPrefix(route, "POST "), strings.NewReader(`{"project":"shop"}`)
+		}
+		req, _ := http.NewRequest(method, server.URL+path, payload)
 		req.Header.Set("Authorization", "Bearer owner")
+		if post {
+			req.Header.Set("Content-Type", "application/json")
+		}
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
 			t.Fatal(err)

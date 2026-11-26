@@ -1,9 +1,8 @@
 # Scope of the OpenAPI contract (v1alpha1.yaml), enforced by contract_test.go.
 #
-# browser: routes outside the bearer-token API contract, with the reason.
-# uncovered: stable routes not yet in the contract (#73). This list may only
-# shrink: a new stable route must be documented, and a documented route must
-# be removed from it.
+# Every stable route the server registers is in the contract, except the
+# browser routes below, which sit outside the bearer-token API, with the
+# reason. Experimental routes are marked x-nines-maturity: experimental.
 browser:
   GET /auth/cli/authorize: page the browser opens during CLI sign-in
   GET /auth/oidc/{provider}/callback: browser sign-in redirect
@@ -11,25 +10,9 @@ browser:
   GET /auth/providers: sign-in page
   GET /auth/session: browser session
   POST /auth/cli/approve: browser approval during CLI sign-in
+  POST /auth/cli/ldap: browser sign-in form during CLI sign-in
+  POST /auth/cli/password: browser sign-in form during CLI sign-in
   POST /auth/ldap/{provider}/login: browser sign-in
   POST /auth/local/{provider}/login: browser sign-in
   POST /auth/logout: browser session
   POST /auth/logout-all: browser session
-uncovered:
-  - GET /api/audit
-  - GET /api/audit/archive
-  - GET /api/audit/{id}
-  - GET /api/events
-  - GET /api/resources/search
-  - GET /api/skills
-  - GET /api/skills/{id}
-  - GET /api/slo-templates
-  - GET /api/slo-templates/{template}
-  - GET /api/topology/resources
-  - GET /api/workspace
-  - POST /api/slo-templates/{template}/render
-  - POST /auth/cli/exchange
-  - POST /auth/cli/ldap
-  - POST /auth/cli/logout
-  - POST /auth/cli/password
-  - POST /auth/cli/start

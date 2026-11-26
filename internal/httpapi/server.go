@@ -89,25 +89,25 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 			role = p.Role
 		}
 		count := 0
-		connections := []map[string]string{}
+		connections := []WorkspaceConnection{}
 		kinds := map[string]bool{}
 		if s.Collector != nil {
 			count++
 			kinds[s.SourceKind] = true
-			connections = append(connections, map[string]string{"id": "primary", "kind": s.SourceKind})
+			connections = append(connections, WorkspaceConnection{ID: "primary", Kind: s.SourceKind})
 		}
 		for name, source := range s.Sources {
 			if source.Collector != nil {
 				count++
 				kinds[source.Kind] = true
-				connections = append(connections, map[string]string{"id": name, "kind": source.Kind})
+				connections = append(connections, WorkspaceConnection{ID: name, Kind: source.Kind})
 			}
 		}
 		if workspace.ManagedSources != nil {
 			for _, connection := range workspace.ManagedSources.List() {
 				count++
 				kinds[connection.Kind] = true
-				connections = append(connections, map[string]string{"id": connection.ID, "kind": connection.Kind})
+				connections = append(connections, WorkspaceConnection{ID: connection.ID, Kind: connection.Kind})
 			}
 		}
 		kind := "manual"
@@ -117,7 +117,14 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 		if len(kinds) > 1 {
 			kind = "multiple"
 		}
-		write(w, 200, map[string]any{"mode": mode, "connections": connections, "prometheusConfigured": count > 0, "journeysConfigured": s.Journeys != nil, "tenant": map[string]string{"id": s.TenantID, "name": s.TenantName}, "source": map[string]any{"kind": kind, "configured": count > 0, "connectionCount": count}, "role": role, "workflowsConfigured": workflows != nil && workspace.Features.Enabled("workflows"), "replayCaptureEnabled": workspace.Replays != nil && !workspace.Replays.Privacy.Disabled && workspace.Features.Enabled("session-replay"), "features": workspace.Features.List()})
+		write(w, 200, WorkspaceInfo{
+			Mode: mode, Connections: connections, PrometheusConfigured: count > 0, JourneysConfigured: s.Journeys != nil,
+			Tenant: WorkspaceTenant{ID: s.TenantID, Name: s.TenantName},
+			Source: WorkspaceSource{Kind: kind, Configured: count > 0, ConnectionCount: count},
+			Role:   role, WorkflowsConfigured: workflows != nil && workspace.Features.Enabled("workflows"),
+			ReplayCaptureEnabled: workspace.Replays != nil && !workspace.Replays.Privacy.Disabled && workspace.Features.Enabled("session-replay"),
+			Features:             workspace.Features.List(),
+		})
 	})
 	api.HandleFunc("GET /api/visual-evaluations/capabilities", a.visualCapabilities)
 	api.HandleFunc("GET /api/incidents", a.incidentList)
