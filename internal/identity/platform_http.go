@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,6 +19,9 @@ type platformMutation struct {
 	Role            string            `json:"role,omitempty"`
 	ExpectedVersion int64             `json:"expectedVersion"`
 	User            *LocalUserInput   `json:"user,omitempty"`
+	Name            string            `json:"name,omitempty"`
+	Confirm         string            `json:"confirm,omitempty"`
+	NewTenant       *TenantInput      `json:"newTenant,omitempty"`
 	Policy          *PlatformAIPolicy `json:"policy,omitempty"`
 }
 
@@ -58,9 +60,13 @@ func (s *Service) PlatformHandler() http.Handler {
 			var out any
 			switch {
 			case suffix == "overview":
-				tenants := append([]PlatformTenant{}, s.platformInventory()...)
-				sort.Slice(tenants, func(i, j int) bool { return tenants[i].ID < tenants[j].ID })
-				out = map[string]any{"tenants": tenants, "providers": s.Providers(), "administrators": s.config.PlatformAdmins, "administratorRolesManagedBy": "server configuration", "tenantProvisioning": "server configuration", "auditRetentionDays": 90}
+				var tenants []PlatformTenant
+				tenants, err = s.platformTenantList(r.Context())
+				provisioning := "server configuration"
+				if s.TenantsChanged != nil {
+					provisioning = "platform console"
+				}
+				out = map[string]any{"tenants": tenants, "providers": s.Providers(), "administrators": s.config.PlatformAdmins, "administratorRolesManagedBy": "server configuration", "tenantProvisioning": provisioning, "auditRetentionDays": 90}
 			case suffix == "users":
 				out, err = s.platformUsers(r.Context(), a, before)
 			case suffix == "audit":
@@ -112,6 +118,10 @@ func (s *Service) PlatformHandler() http.Handler {
 			return
 		}
 		a.platformReason = in.Reason
+		if in.NewTenant != nil && in.Tenant == "" {
+			// Audit a failed creation against the tenant it was for.
+			in.Tenant = in.NewTenant.ID
+		}
 		var out any = map[string]bool{"ok": true}
 		switch suffix {
 		case "users/create":
@@ -132,6 +142,8 @@ func (s *Service) PlatformHandler() http.Handler {
 			out, err = s.Grant(r.Context(), a, in.Tenant, in.Provider, in.Subject, in.Role, in.ExpectedVersion)
 		case "memberships/remove":
 			err = s.RemoveMember(r.Context(), a, in.Tenant, in.UserID, in.ExpectedVersion)
+		case "tenants/create", "tenants/rename", "tenants/retire", "tenants/delete":
+			out, err = s.platformTenantChange(r.Context(), a, suffix, in)
 		case "system-one/save":
 			if in.Policy == nil {
 				err = ErrInvalid

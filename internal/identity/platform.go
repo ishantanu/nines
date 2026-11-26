@@ -26,6 +26,14 @@ type PlatformTenant struct {
 	SourceKind  string             `json:"sourceKind"`
 	Connections int                `json:"connections"`
 	SystemOne   *v1.SystemOneRoute `json:"systemOne,omitempty"`
+	// ManagedBy is "configuration" for TENANTS_FILE tenants, which the
+	// console cannot change, or "console".
+	ManagedBy string `json:"managedBy"`
+	// State, Version and CreatedAt describe console tenants.
+	State     string     `json:"state,omitempty"`
+	Version   int64      `json:"version,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	RetiredAt *time.Time `json:"retiredAt,omitempty"`
 }
 type PlatformUser struct {
 	User            User                 `json:"user"`

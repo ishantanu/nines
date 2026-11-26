@@ -23,6 +23,7 @@ import (
 	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/slotemplates"
+	"github.com/ishantanu/nines/internal/store"
 )
 
 func main() {
@@ -228,6 +229,12 @@ func run(log *slog.Logger) error {
 			return fmt.Errorf("tenant registry: %w", err)
 		}
 		workers.Go(func() { reconciler.Run(ctx) })
+		// Platform administrators create, rename, retire and delete tenants;
+		// this process applies each change before replying.
+		auth.TenantsChanged = reconciler.Reconcile
+		auth.DeleteTenantData = func(ctx context.Context, id string) error {
+			return store.DeleteTenantData(ctx, os.Getenv("DATABASE_URL"), id)
+		}
 	}
 	server := &http.Server{Addr: *addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 3 * time.Minute, IdleTimeout: 60 * time.Second}
 	listener, err := net.Listen("tcp", *addr)
