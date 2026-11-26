@@ -57,3 +57,34 @@ type CreatedServiceAccount struct {
 type StatusResult struct {
 	Status string `json:"status"`
 }
+
+// CLIStartInput starts a browser sign-in for the CLI. The CLI listens on a
+// loopback redirect URI and proves possession with a PKCE challenge.
+type CLIStartInput struct {
+	Tenant    string `json:"tenant"`
+	Redirect  string `json:"redirectURI"`
+	Challenge string `json:"challenge"`
+	State     string `json:"state"`
+}
+
+// CLIStarted is where the CLI sends the browser, and until when.
+type CLIStarted struct {
+	AuthorizationURL string    `json:"authorizationURL"`
+	Expires          time.Time `json:"expiresAt"`
+}
+
+// CLIExchangeInput trades the one-time code from the browser for a token.
+type CLIExchangeInput struct {
+	Code     string `json:"code"`
+	Verifier string `json:"codeVerifier"`
+	Redirect string `json:"redirectURI"`
+}
+
+// CLIToken is a CLI credential for one tenant, shown once.
+type CLIToken struct {
+	Token   string    `json:"token"`
+	Expires time.Time `json:"expiresAt"`
+	Tenant  string    `json:"tenant"`
+	Actor   Actor     `json:"actor"`
+	Role    string    `json:"role"`
+}

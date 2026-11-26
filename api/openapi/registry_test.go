@@ -9,6 +9,7 @@ import (
 	"github.com/ishantanu/nines/internal/model"
 	"github.com/ishantanu/nines/internal/rules"
 	"github.com/ishantanu/nines/internal/service"
+	"github.com/ishantanu/nines/skills"
 )
 
 // generatedTypes are the request and response bodies of documented stable
@@ -67,7 +68,7 @@ var generatedTypes = map[string]any{
 	"Team":                  identity.Team{},
 	"ServiceAccountInput":   identity.ServiceAccountInput{},
 	"CreatedServiceAccount": identity.CreatedServiceAccount{},
-	"TeamAccessStatus":      identity.StatusResult{},
+	"StatusResult":          identity.StatusResult{},
 	"LocalUserInput":        identity.LocalUserInput{},
 	"User":                  identity.User{},
 
@@ -79,4 +80,28 @@ var generatedTypes = map[string]any{
 	"ConnectionDeleted":    httpapi.ConnectionDeleted{},
 	"MetricNames":          v1.MetricNames{},
 	"TelemetryDiscovery":   v1.TelemetryDiscovery{},
+
+	// CLI sign-in
+	"CLIStartInput":    identity.CLIStartInput{},
+	"CLIStarted":       identity.CLIStarted{},
+	"CLIExchangeInput": identity.CLIExchangeInput{},
+	"CLIToken":         identity.CLIToken{},
+
+	// Audit
+	"AuditPage":          v1.AuditPage{},
+	"AuditRecord":        v1.AuditRecord{},
+	"AuditArchiveStatus": v1.AuditArchiveStatus{},
+
+	// SLO templates
+	"SLOTemplateCatalog": v1.SLOTemplateCatalog{},
+	"SLOTemplateDetail":  v1.SLOTemplateDetail{},
+	"TemplateValues":     v1.TemplateValues{},
+	"SLOTemplateDraft":   v1.SLOTemplateDraft{},
+
+	// Workspace, search, topology, skills and alert deliveries
+	"Workspace":       httpapi.WorkspaceInfo{},
+	"ResourceSearch":  v1.ResourceSearch{},
+	"TopologyCatalog": v1.TopologyCatalog{},
+	"Skill":           skills.Skill{},
+	"AlertDelivery":   model.Delivery{},
 }

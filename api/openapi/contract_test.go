@@ -67,7 +67,12 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 				t.Error("missing success response", id)
 			}
 			params, ok := operation["parameters"].([]any)
-			if strings.HasPrefix(path, "/auth/cli/") {
+			if path == "/auth/cli/logout" {
+				// Sign-out revokes the CLI token it is called with.
+				if _, public := operation["security"]; public {
+					t.Error("CLI sign-out must require the CLI token", id)
+				}
+			} else if strings.HasPrefix(path, "/auth/cli/") {
 				security, public := operation["security"].([]any)
 				if !public || len(security) != 0 {
 					t.Error("CLI bootstrap must not require a resource bearer credential", id)
@@ -238,8 +243,7 @@ func TestContractCoversTheStableSurface(t *testing.T) {
 		t.Fatal(err)
 	}
 	var scope struct {
-		Browser   map[string]string `yaml:"browser"`
-		Uncovered []string          `yaml:"uncovered"`
+		Browser map[string]string `yaml:"browser"`
 	}
 	raw, err := os.ReadFile("scope.yaml")
 	if err != nil {
@@ -258,25 +262,16 @@ func TestContractCoversTheStableSurface(t *testing.T) {
 			}
 		}
 	}
-	uncovered := map[string]bool{}
-	for _, r := range scope.Uncovered {
-		uncovered[r] = true
-	}
 	registered := registeredRoutes(t)
 	for route := range registered {
 		_, path, _ := strings.Cut(route, " ")
 		inBrowser := scope.Browser[route] != ""
 		switch {
 		case experimentalRoute(path):
-		case documented[route] && (uncovered[route] || inBrowser):
+		case documented[route] && inBrowser:
 			t.Errorf("%s is documented: remove it from scope.yaml", route)
-		case !documented[route] && !uncovered[route] && !inBrowser:
+		case !documented[route] && !inBrowser:
 			t.Errorf("stable route %s is not in the contract: document it in v1alpha1.yaml", route)
-		}
-	}
-	for route := range uncovered {
-		if !registered[route] {
-			t.Errorf("scope.yaml lists %s, which the server no longer registers", route)
 		}
 	}
 	for route := range scope.Browser {
