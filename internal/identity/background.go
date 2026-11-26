@@ -18,7 +18,7 @@ func (s *Service) AuthorizeBackgroundRead(ctx context.Context, tenant, subject, 
 	return s.authorizeBackground(ctx, tenant, subject, kind, rank("viewer"))
 }
 func (s *Service) authorizeBackground(ctx context.Context, tenant, subject, kind string, minimum int) error {
-	if !s.tenants[tenant] {
+	if !s.knownTenant(tenant) {
 		return ErrForbidden
 	}
 	return s.repo.View(ctx, func(tx Tx) error {

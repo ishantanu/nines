@@ -114,340 +114,15 @@ func initTenantsWithOptions(ctx context.Context, file string, demo, memory bool,
 		}
 		return nil, err
 	}
+	o := tenantOptions{demo: demo, memory: memory, identityEnabled: identityEnabled, collectorOnly: collectorOnly, configDir: filepath.Dir(file)}
 	for _, t := range configured {
-		var scopedDSN string
-		var st store.Store
-		var repository workflow.Repository
-		if demo || memory {
-			st = store.NewMemory()
-			repository = workflow.NewMemory()
-		} else {
-			connection := os.Getenv("DATABASE_URL")
-			if connection == "" {
-				return fail(fmt.Errorf("set DATABASE_URL, or explicitly use -demo / -memory"))
-			}
-			scoped, err := store.TenantDatabaseURL(ctx, connection, t.Config.ID)
-			if err != nil {
-				return fail(fmt.Errorf("tenant %s database namespace: %w", t.Config.ID, err))
-			}
-			if collectorOnly {
-				u, e := url.Parse(scoped)
-				if e != nil {
-					return fail(e)
-				}
-				q := u.Query()
-				if q.Get("pool_max_conns") == "" {
-					q.Set("pool_max_conns", "2")
-				}
-				u.RawQuery = q.Encode()
-				scoped = u.String()
-			}
-			scopedDSN = scoped
-			st, err = store.NewPostgres(ctx, scoped)
-			if err != nil {
-				return fail(fmt.Errorf("tenant %s initialize database: %w", t.Config.ID, err))
-			}
-			repository = workflow.NewMemory()
-			if !collectorOnly {
-				repository, err = workflow.NewPostgres(ctx, scoped)
-				if err != nil {
-					st.Close()
-					return fail(fmt.Errorf("tenant %s initialize workflows: %w", t.Config.ID, err))
-				}
-			}
-		}
-		var collector service.Collector
-		if t.Config.Source.Kind != "manual" {
-			var err error
-			collector, err = openProvider(t.Config.Source, t.Credentials, t.BearerToken, t.BasicPassword)
-			if err != nil {
-				repository.Close()
-				st.Close()
-				return fail(fmt.Errorf("tenant %s source configuration: %w", t.Config.ID, err))
-			}
-		}
-		if t.Webhook != "" {
-			u, err := url.Parse(t.Webhook)
-			if err != nil || u.Host == "" || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") {
-				repository.Close()
-				st.Close()
-				return fail(fmt.Errorf("tenant %s invalid alert webhook URL", t.Config.ID))
-			}
-		}
-		sources := map[string]service.MetricSource{}
-		ruleTargets := map[string]rules.Target{}
-		connections := []tenancy.Connection{{Name: "primary", Source: t.Config.Source}}
-		addTarget := func(name string, source tenancy.Source, bearer, basicPassword, rulesBearer, rulesPassword string, credentials map[string]string) {
-			if cfg := source.Rules; cfg != nil {
-				username := source.BasicUsername
-				if cfg.BearerTokenEnv != "" || cfg.BasicUsername != "" {
-					bearer = rulesBearer
-					basicPassword = rulesPassword
-					username = cfg.BasicUsername
-				}
-				ruleTargets[name] = rules.Target{NewRelicAccountID: source.Options["accountID"], NewRelicEntityGUID: cfg.EntityGUID, NewRelicUserKey: credentials["userKey"], DatadogAPIKey: credentials["apiKey"], DatadogApplicationKey: credentials["applicationKey"], Connection: name, Kind: source.Kind, QueryURL: source.URL, RulerURL: cfg.RulerURL, MimirOrgID: source.MimirOrgID, GoogleProjectID: source.Options["projectID"], GoogleServiceID: source.Options["serviceID"], GoogleAuth: source.Options["auth"], Dataset: source.Options["dataset"], Namespace: cfg.Namespace, Directory: cfg.Directory, Reload: cfg.Reload, AutoDeploy: cfg.AutoDeploy, Publisher: cfg.Publisher, BearerToken: bearer, BasicUsername: username, BasicPassword: basicPassword}
-				if cfg.Mode == "operator" {
-					target := ruleTargets[name]
-					target.ProviderKind = source.Kind
-					target.Kind = "operator"
-					ruleTargets[name] = target
-				}
-			}
-		}
-		addTarget("primary", t.Config.Source, t.BearerToken, t.BasicPassword, t.RulesBearerToken, t.RulesBasicPassword, t.Credentials)
-		for _, connection := range t.Connections {
-			cfg := connection.Config
-			var named service.Collector
-			if cfg.Kind != "manual" {
-				var err error
-				named, err = openProvider(cfg.Source, connection.Credentials, connection.BearerToken, connection.BasicPassword)
-				if err != nil {
-					repository.Close()
-					st.Close()
-					return fail(fmt.Errorf("connection %s initialization: %w", cfg.Name, err))
-				}
-			}
-			sources[cfg.Name] = service.MetricSource{Kind: cfg.Kind, Collector: named, CollectionMode: cfg.CollectionMode}
-			connections = append(connections, cfg)
-			addTarget(cfg.Name, cfg.Source, connection.BearerToken, connection.BasicPassword, connection.RulesBearerToken, connection.RulesBasicPassword, connection.Credentials)
-		}
-
-		var reviewer rm.Model
-		svc := service.New(st, collector)
-		if !demo && !collectorOnly && t.Config.KubernetesDiscovery != nil {
-			reader, err := kubediscovery.InCluster(*t.Config.KubernetesDiscovery)
-			if err != nil {
-				repository.Close()
-				st.Close()
-				return fail(fmt.Errorf("tenant %s Kubernetes discovery: %w", t.Config.ID, err))
-			}
-			svc.KubernetesDiscovery = reader
-		}
-		if !demo && !collectorOnly {
-			drafter, err := intentmodel.FromEnvironment(t.Config.IntentModel, os.Getenv)
-			if err != nil {
-				repository.Close()
-				st.Close()
-				return fail(fmt.Errorf("tenant %s intent model configuration: %w", t.Config.ID, err))
-			}
-			if drafter != nil {
-				svc.IntentDrafter = drafter
-				reviewer = drafter
-			}
-			if t.Config.ReviewModel != nil {
-				configured, err := intentmodel.FromEnvironment(t.Config.ReviewModel, os.Getenv)
-				if err != nil {
-					repository.Close()
-					st.Close()
-					return fail(fmt.Errorf("tenant %s review model configuration: %w", t.Config.ID, err))
-				}
-				reviewer = nil
-				if configured != nil {
-					reviewer = configured
-				}
-			}
-		}
-		svc.TenantID = t.Config.ID
-		svc.TenantName = t.Config.Name
-		svc.SourceKind = t.Config.Source.Kind
-		svc.CollectionMode = t.Config.Source.CollectionMode
-		svc.Sources = sources
-		var managed *datasources.Registry
-		var err error
-		if !demo && os.Getenv("NINES_SOURCE_HOSTS") != "" {
-			var connectionRepo identity.Repository
-			if memory {
-				connectionRepo = identity.NewMemory()
-			} else {
-				connectionRepo, err = identity.NewPostgres(ctx, scopedDSN)
-				if err != nil {
-					return fail(err)
-				}
-			}
-			reserved, hosts, orgs := map[string]bool{"primary": true}, map[string]bool{}, map[string]bool{}
-			for _, host := range strings.Split(os.Getenv("NINES_SOURCE_HOSTS"), ",") {
-				if host = strings.TrimSpace(host); host != "" {
-					hosts[strings.ToLower(host)] = true
-				}
-			}
-			for _, connection := range connections {
-				reserved[connection.Name] = true
-				if connection.MimirOrgID != "" {
-					orgs[connection.MimirOrgID] = true
-				}
-			}
-			routes := datasources.ProviderRoutes{}
-			for kind, values := range t.Config.ManagedProviderRoutes {
-				routes[kind] = append([]string{}, values...)
-			}
-			for _, connection := range connections {
-				if connection.Kind == "newrelic" {
-					routes["newrelic"] = append(routes["newrelic"], connection.Options["accountID"])
-					if connection.Rules != nil && connection.Rules.EntityGUID != "" {
-						routes["newrelic-entity"] = append(routes["newrelic-entity"], connection.Rules.EntityGUID)
-					}
-				}
-				if connection.Kind == "victoriametrics" && connection.Options["accountID"] != "" {
-					route := connection.Options["accountID"]
-					if project := connection.Options["projectID"]; project != "" {
-						route += ":" + project
-					}
-					routes["victoriametrics"] = append(routes["victoriametrics"], route)
-				}
-				if connection.Kind == "dash0" {
-					routes["dash0"] = append(routes["dash0"], connection.Options["dataset"])
-				}
-			}
-			managed, err = datasources.New(ctx, connectionRepo, t.Config.ID, reserved, hosts, orgs, os.Getenv("NINES_SOURCE_ENCRYPTION_KEY"), os.Getenv("NINES_MANAGED_RULE_DIRECTORY"), st, routes)
-			if err != nil {
-				connectionRepo.Close()
-				return fail(err)
-			}
-			svc.DynamicSource = managed.Source
-		}
-		stored, err := st.List(ctx)
+		runtime, err := buildTenant(ctx, t, o)
 		if err != nil {
-			repository.Close()
-			st.Close()
 			return fail(err)
-		}
-		for _, objective := range stored {
-			if err := svc.ValidateSource(objective); err != nil {
-				repository.Close()
-				st.Close()
-				return fail(fmt.Errorf("stored SLO %s: %w", objective.ID, err))
-			}
-		}
-		if collectorOnly {
-			out = append(out, tenantRuntime{ManagedSources: managed, Repository: repository, Workspace: httpapi.Workspace{ID: t.Config.ID, Name: t.Config.Name, Service: svc}})
-			continue
-		}
-		svc.Demo = demo
-		wf := workflow.New(svc, repository)
-		auth := "none"
-		if t.BearerToken != "" {
-			auth = "bearer"
-		} else if t.BasicPassword != "" {
-			auth = "basic"
-		}
-
-		var invRepo investigation.Repository
-		if demo || memory {
-			invRepo = investigation.NewMemory()
-		} else {
-			invRepo, err = investigation.NewPostgres(ctx, scopedDSN)
-			if err != nil {
-				repository.Close()
-				st.Close()
-				return fail(err)
-			}
-		}
-		var replayRepo replay.Repository
-		if demo || memory {
-			replayRepo = replay.NewMemory()
-		} else {
-			replayRepo, err = replay.NewPostgres(ctx, scopedDSN)
-			if err != nil {
-				invRepo.Close()
-				repository.Close()
-				st.Close()
-				return fail(err)
-			}
-		}
-		var intentRepo intentflow.Repository
-		if demo || memory {
-			intentRepo = intentflow.NewMemory()
-		} else {
-			intentRepo, err = intentflow.NewPostgres(ctx, scopedDSN)
-			if err != nil {
-				replayRepo.Close()
-				invRepo.Close()
-				repository.Close()
-				st.Close()
-				return fail(err)
-			}
-		}
-
-		var notification *workflowhook.Dispatcher
-		if t.WorkflowWebhook != nil {
-			journal, ok := intentRepo.(workflowhook.Repository)
-			if !ok {
-				if managed != nil {
-					managed.Close()
-				}
-				intentRepo.Close()
-				replayRepo.Close()
-				invRepo.Close()
-				repository.Close()
-				st.Close()
-				return fail(fmt.Errorf("tenant %s workflow journal does not support webhook delivery", t.Config.ID))
-			}
-			notification, err = workflowhook.New(journal, t.Config.ID, *t.WorkflowWebhook)
-			if err != nil {
-				if managed != nil {
-					managed.Close()
-				}
-				intentRepo.Close()
-				replayRepo.Close()
-				invRepo.Close()
-				repository.Close()
-				st.Close()
-				return fail(fmt.Errorf("tenant %s: %w", t.Config.ID, err))
-			}
-		}
-		var gitDelivery httpapi.GitDelivery
-		if t.GitOps != nil {
-			var gitErr error
-			if gitDelivery, gitErr = gitops.New(t.GitOps, nil); gitErr != nil {
-				return fail(gitErr)
-			}
-		}
-		runtime := tenantRuntime{WorkflowWebhook: notification, ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !identityEnabled, Workflows: wf, GitOps: gitDelivery}, Repository: repository, Webhook: t.Webhook}
-		runtime.Workspace.Replays.Privacy = t.Config.ReplayPrivacy
-		if t.Config.SLOExtensionLock != "" {
-			extensionPath := t.Config.SLOExtensionLock
-			if !filepath.IsAbs(extensionPath) {
-				extensionPath = filepath.Join(filepath.Dir(file), extensionPath)
-			}
-			registry, err := slotemplates.Load(extensionPath)
-			if err != nil {
-				runtime.Close()
-				return fail(fmt.Errorf("tenant %s extension initialization: %w", t.Config.ID, err))
-			}
-			runtime.Workspace.Templates = registry
-		}
-		if t.Config.AuditArchive != nil {
-			if memory && !demo {
-				runtime.Close()
-				return fail(fmt.Errorf("tenant %s auditArchive requires durable PostgreSQL storage outside demo mode", t.Config.ID))
-			}
-			sink, e := auditarchive.NewS3(ctx, *t.Config.AuditArchive)
-			if e != nil {
-				runtime.Close()
-				return fail(fmt.Errorf("tenant %s audit archive initialization failed: %w", t.Config.ID, e))
-			}
-			runtime.Workspace.IntentConversations.Archive = &auditarchive.Worker{Tenant: t.Config.ID, Config: *t.Config.AuditArchive, Repository: intentRepo, Sink: sink}
-		}
-		svc.RuleManager = runtime.Workspace.Rules
-		runtime.Workspace.Rules.PublicationGuard = svc.PinRuleDestination
-		if managed != nil {
-			runtime.Workspace.Rules.DynamicTarget = managed.Target
-		}
-		runtime.Workspace.Investigations.Model = reviewer
-		runtime.Workspace.IntentConversations.Model = reviewer
-		if !demo {
-			assessor, err := systemone.New(t.Config.SystemOne, os.Getenv)
-			if err != nil {
-				runtime.Close()
-				return fail(fmt.Errorf("tenant %s System One configuration: %w", t.Config.ID, err))
-			}
-			if assessor != nil {
-				runtime.Workspace.IntentConversations.SystemOne = assessor
-			}
 		}
 		out = append(out, runtime)
 		if demo {
-			if err := seed(ctx, svc); err != nil {
+			if err := seed(ctx, runtime.Workspace.Service); err != nil {
 				return fail(err)
 			}
 			if err := seedReplay(ctx, runtime.Workspace.Replays); err != nil {
@@ -456,6 +131,348 @@ func initTenantsWithOptions(ctx context.Context, file string, demo, memory bool,
 		}
 	}
 	return out, nil
+}
+
+// tenantOptions are the process-wide settings every tenant is built with.
+type tenantOptions struct {
+	demo, memory, identityEnabled, collectorOnly bool
+	// configDir resolves relative paths in the tenants file.
+	configDir string
+}
+
+// buildTenant opens one tenant's stores and services. On error it closes
+// what it opened.
+func buildTenant(ctx context.Context, t tenancy.Resolved, o tenantOptions) (tenantRuntime, error) {
+	var scopedDSN string
+	var st store.Store
+	var repository workflow.Repository
+	if o.demo || o.memory {
+		st = store.NewMemory()
+		repository = workflow.NewMemory()
+	} else {
+		connection := os.Getenv("DATABASE_URL")
+		if connection == "" {
+			return tenantRuntime{}, fmt.Errorf("set DATABASE_URL, or explicitly use -o.demo / -o.memory")
+		}
+		scoped, err := store.TenantDatabaseURL(ctx, connection, t.Config.ID)
+		if err != nil {
+			return tenantRuntime{}, fmt.Errorf("tenant %s database namespace: %w", t.Config.ID, err)
+		}
+		if o.collectorOnly {
+			u, e := url.Parse(scoped)
+			if e != nil {
+				return tenantRuntime{}, e
+			}
+			q := u.Query()
+			if q.Get("pool_max_conns") == "" {
+				q.Set("pool_max_conns", "2")
+			}
+			u.RawQuery = q.Encode()
+			scoped = u.String()
+		}
+		scopedDSN = scoped
+		st, err = store.NewPostgres(ctx, scoped)
+		if err != nil {
+			return tenantRuntime{}, fmt.Errorf("tenant %s initialize database: %w", t.Config.ID, err)
+		}
+		repository = workflow.NewMemory()
+		if !o.collectorOnly {
+			repository, err = workflow.NewPostgres(ctx, scoped)
+			if err != nil {
+				st.Close()
+				return tenantRuntime{}, fmt.Errorf("tenant %s initialize workflows: %w", t.Config.ID, err)
+			}
+		}
+	}
+	var collector service.Collector
+	if t.Config.Source.Kind != "manual" {
+		var err error
+		collector, err = openProvider(t.Config.Source, t.Credentials, t.BearerToken, t.BasicPassword)
+		if err != nil {
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s source configuration: %w", t.Config.ID, err)
+		}
+	}
+	if t.Webhook != "" {
+		u, err := url.Parse(t.Webhook)
+		if err != nil || u.Host == "" || u.User != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s invalid alert webhook URL", t.Config.ID)
+		}
+	}
+	sources := map[string]service.MetricSource{}
+	ruleTargets := map[string]rules.Target{}
+	connections := []tenancy.Connection{{Name: "primary", Source: t.Config.Source}}
+	addTarget := func(name string, source tenancy.Source, bearer, basicPassword, rulesBearer, rulesPassword string, credentials map[string]string) {
+		if cfg := source.Rules; cfg != nil {
+			username := source.BasicUsername
+			if cfg.BearerTokenEnv != "" || cfg.BasicUsername != "" {
+				bearer = rulesBearer
+				basicPassword = rulesPassword
+				username = cfg.BasicUsername
+			}
+			ruleTargets[name] = rules.Target{NewRelicAccountID: source.Options["accountID"], NewRelicEntityGUID: cfg.EntityGUID, NewRelicUserKey: credentials["userKey"], DatadogAPIKey: credentials["apiKey"], DatadogApplicationKey: credentials["applicationKey"], Connection: name, Kind: source.Kind, QueryURL: source.URL, RulerURL: cfg.RulerURL, MimirOrgID: source.MimirOrgID, GoogleProjectID: source.Options["projectID"], GoogleServiceID: source.Options["serviceID"], GoogleAuth: source.Options["auth"], Dataset: source.Options["dataset"], Namespace: cfg.Namespace, Directory: cfg.Directory, Reload: cfg.Reload, AutoDeploy: cfg.AutoDeploy, Publisher: cfg.Publisher, BearerToken: bearer, BasicUsername: username, BasicPassword: basicPassword}
+			if cfg.Mode == "operator" {
+				target := ruleTargets[name]
+				target.ProviderKind = source.Kind
+				target.Kind = "operator"
+				ruleTargets[name] = target
+			}
+		}
+	}
+	addTarget("primary", t.Config.Source, t.BearerToken, t.BasicPassword, t.RulesBearerToken, t.RulesBasicPassword, t.Credentials)
+	for _, connection := range t.Connections {
+		cfg := connection.Config
+		var named service.Collector
+		if cfg.Kind != "manual" {
+			var err error
+			named, err = openProvider(cfg.Source, connection.Credentials, connection.BearerToken, connection.BasicPassword)
+			if err != nil {
+				repository.Close()
+				st.Close()
+				return tenantRuntime{}, fmt.Errorf("connection %s initialization: %w", cfg.Name, err)
+			}
+		}
+		sources[cfg.Name] = service.MetricSource{Kind: cfg.Kind, Collector: named, CollectionMode: cfg.CollectionMode}
+		connections = append(connections, cfg)
+		addTarget(cfg.Name, cfg.Source, connection.BearerToken, connection.BasicPassword, connection.RulesBearerToken, connection.RulesBasicPassword, connection.Credentials)
+	}
+
+	var reviewer rm.Model
+	svc := service.New(st, collector)
+	if !o.demo && !o.collectorOnly && t.Config.KubernetesDiscovery != nil {
+		reader, err := kubediscovery.InCluster(*t.Config.KubernetesDiscovery)
+		if err != nil {
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s Kubernetes discovery: %w", t.Config.ID, err)
+		}
+		svc.KubernetesDiscovery = reader
+	}
+	if !o.demo && !o.collectorOnly {
+		drafter, err := intentmodel.FromEnvironment(t.Config.IntentModel, os.Getenv)
+		if err != nil {
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s intent model configuration: %w", t.Config.ID, err)
+		}
+		if drafter != nil {
+			svc.IntentDrafter = drafter
+			reviewer = drafter
+		}
+		if t.Config.ReviewModel != nil {
+			configured, err := intentmodel.FromEnvironment(t.Config.ReviewModel, os.Getenv)
+			if err != nil {
+				repository.Close()
+				st.Close()
+				return tenantRuntime{}, fmt.Errorf("tenant %s review model configuration: %w", t.Config.ID, err)
+			}
+			reviewer = nil
+			if configured != nil {
+				reviewer = configured
+			}
+		}
+	}
+	svc.TenantID = t.Config.ID
+	svc.TenantName = t.Config.Name
+	svc.SourceKind = t.Config.Source.Kind
+	svc.CollectionMode = t.Config.Source.CollectionMode
+	svc.Sources = sources
+	var managed *datasources.Registry
+	var err error
+	if !o.demo && os.Getenv("NINES_SOURCE_HOSTS") != "" {
+		var connectionRepo identity.Repository
+		if o.memory {
+			connectionRepo = identity.NewMemory()
+		} else {
+			connectionRepo, err = identity.NewPostgres(ctx, scopedDSN)
+			if err != nil {
+				return tenantRuntime{}, err
+			}
+		}
+		reserved, hosts, orgs := map[string]bool{"primary": true}, map[string]bool{}, map[string]bool{}
+		for _, host := range strings.Split(os.Getenv("NINES_SOURCE_HOSTS"), ",") {
+			if host = strings.TrimSpace(host); host != "" {
+				hosts[strings.ToLower(host)] = true
+			}
+		}
+		for _, connection := range connections {
+			reserved[connection.Name] = true
+			if connection.MimirOrgID != "" {
+				orgs[connection.MimirOrgID] = true
+			}
+		}
+		routes := datasources.ProviderRoutes{}
+		for kind, values := range t.Config.ManagedProviderRoutes {
+			routes[kind] = append([]string{}, values...)
+		}
+		for _, connection := range connections {
+			if connection.Kind == "newrelic" {
+				routes["newrelic"] = append(routes["newrelic"], connection.Options["accountID"])
+				if connection.Rules != nil && connection.Rules.EntityGUID != "" {
+					routes["newrelic-entity"] = append(routes["newrelic-entity"], connection.Rules.EntityGUID)
+				}
+			}
+			if connection.Kind == "victoriametrics" && connection.Options["accountID"] != "" {
+				route := connection.Options["accountID"]
+				if project := connection.Options["projectID"]; project != "" {
+					route += ":" + project
+				}
+				routes["victoriametrics"] = append(routes["victoriametrics"], route)
+			}
+			if connection.Kind == "dash0" {
+				routes["dash0"] = append(routes["dash0"], connection.Options["dataset"])
+			}
+		}
+		managed, err = datasources.New(ctx, connectionRepo, t.Config.ID, reserved, hosts, orgs, os.Getenv("NINES_SOURCE_ENCRYPTION_KEY"), os.Getenv("NINES_MANAGED_RULE_DIRECTORY"), st, routes)
+		if err != nil {
+			connectionRepo.Close()
+			return tenantRuntime{}, err
+		}
+		svc.DynamicSource = managed.Source
+	}
+	stored, err := st.List(ctx)
+	if err != nil {
+		repository.Close()
+		st.Close()
+		return tenantRuntime{}, err
+	}
+	for _, objective := range stored {
+		if err := svc.ValidateSource(objective); err != nil {
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, fmt.Errorf("stored SLO %s: %w", objective.ID, err)
+		}
+	}
+	if o.collectorOnly {
+		return tenantRuntime{ManagedSources: managed, Repository: repository, Workspace: httpapi.Workspace{ID: t.Config.ID, Name: t.Config.Name, Service: svc}}, nil
+	}
+	svc.Demo = o.demo
+	wf := workflow.New(svc, repository)
+	auth := "none"
+	if t.BearerToken != "" {
+		auth = "bearer"
+	} else if t.BasicPassword != "" {
+		auth = "basic"
+	}
+
+	var invRepo investigation.Repository
+	if o.demo || o.memory {
+		invRepo = investigation.NewMemory()
+	} else {
+		invRepo, err = investigation.NewPostgres(ctx, scopedDSN)
+		if err != nil {
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, err
+		}
+	}
+	var replayRepo replay.Repository
+	if o.demo || o.memory {
+		replayRepo = replay.NewMemory()
+	} else {
+		replayRepo, err = replay.NewPostgres(ctx, scopedDSN)
+		if err != nil {
+			invRepo.Close()
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, err
+		}
+	}
+	var intentRepo intentflow.Repository
+	if o.demo || o.memory {
+		intentRepo = intentflow.NewMemory()
+	} else {
+		intentRepo, err = intentflow.NewPostgres(ctx, scopedDSN)
+		if err != nil {
+			replayRepo.Close()
+			invRepo.Close()
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, err
+		}
+	}
+
+	var notification *workflowhook.Dispatcher
+	if t.WorkflowWebhook != nil {
+		journal, ok := intentRepo.(workflowhook.Repository)
+		if !ok {
+			if managed != nil {
+				managed.Close()
+			}
+			intentRepo.Close()
+			replayRepo.Close()
+			invRepo.Close()
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s workflow journal does not support webhook delivery", t.Config.ID)
+		}
+		notification, err = workflowhook.New(journal, t.Config.ID, *t.WorkflowWebhook)
+		if err != nil {
+			if managed != nil {
+				managed.Close()
+			}
+			intentRepo.Close()
+			replayRepo.Close()
+			invRepo.Close()
+			repository.Close()
+			st.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s: %w", t.Config.ID, err)
+		}
+	}
+	var gitDelivery httpapi.GitDelivery
+	if t.GitOps != nil {
+		var gitErr error
+		if gitDelivery, gitErr = gitops.New(t.GitOps, nil); gitErr != nil {
+			return tenantRuntime{}, gitErr
+		}
+	}
+	runtime := tenantRuntime{WorkflowWebhook: notification, ManagedSources: managed, IntentConversations: intentRepo, Replays: replayRepo, Investigations: invRepo, Workspace: httpapi.Workspace{ManagedSources: managed, IntentConversations: intentflow.New(svc, intentRepo), Replays: replay.New(svc, replayRepo), Investigations: investigation.New(svc, invRepo), Connections: connections, Rules: &rules.Manager{Tenant: t.Config.ID, Targets: ruleTargets, External: &operator.Publisher{Tenant: t.Config.ID, Store: st}}, ID: t.Config.ID, Name: t.Config.Name, Service: svc, Source: t.Config.Source, SourceAuth: auth, AccessConfig: t.Config.Access, Grants: t.Grants, Anonymous: len(t.Grants) == 0 && !o.identityEnabled, Workflows: wf, GitOps: gitDelivery}, Repository: repository, Webhook: t.Webhook}
+	runtime.Workspace.Replays.Privacy = t.Config.ReplayPrivacy
+	if t.Config.SLOExtensionLock != "" {
+		extensionPath := t.Config.SLOExtensionLock
+		if !filepath.IsAbs(extensionPath) {
+			extensionPath = filepath.Join(o.configDir, extensionPath)
+		}
+		registry, err := slotemplates.Load(extensionPath)
+		if err != nil {
+			runtime.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s extension initialization: %w", t.Config.ID, err)
+		}
+		runtime.Workspace.Templates = registry
+	}
+	if t.Config.AuditArchive != nil {
+		if o.memory && !o.demo {
+			runtime.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s auditArchive requires durable PostgreSQL storage outside o.demo mode", t.Config.ID)
+		}
+		sink, e := auditarchive.NewS3(ctx, *t.Config.AuditArchive)
+		if e != nil {
+			runtime.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s audit archive initialization failed: %w", t.Config.ID, e)
+		}
+		runtime.Workspace.IntentConversations.Archive = &auditarchive.Worker{Tenant: t.Config.ID, Config: *t.Config.AuditArchive, Repository: intentRepo, Sink: sink}
+	}
+	svc.RuleManager = runtime.Workspace.Rules
+	runtime.Workspace.Rules.PublicationGuard = svc.PinRuleDestination
+	if managed != nil {
+		runtime.Workspace.Rules.DynamicTarget = managed.Target
+	}
+	runtime.Workspace.Investigations.Model = reviewer
+	runtime.Workspace.IntentConversations.Model = reviewer
+	if !o.demo {
+		assessor, err := systemone.New(t.Config.SystemOne, os.Getenv)
+		if err != nil {
+			runtime.Close()
+			return tenantRuntime{}, fmt.Errorf("tenant %s System One configuration: %w", t.Config.ID, err)
+		}
+		if assessor != nil {
+			runtime.Workspace.IntentConversations.SystemOne = assessor
+		}
+	}
+	return runtime, nil
 }
 
 func runWorkflowRecovery(ctx context.Context, wf *workflow.Service, log *slog.Logger) {

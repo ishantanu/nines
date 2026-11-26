@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -112,6 +114,9 @@ type limitEntry struct {
 	at      time.Time
 }
 type Service struct {
+	// tenantMu guards the tenants and platform inventory, which change when
+	// a tenant is created or retired while the server runs.
+	tenantMu        sync.RWMutex
 	platformTenants map[string]PlatformTenant
 	platformGuards  []func([]byte) bool
 	repo            Repository
@@ -128,7 +133,7 @@ func New(ctx context.Context, c Config, repo Repository, tenants map[string]bool
 	if err := validatePlatformAdmins(c); err != nil {
 		return nil, err
 	}
-	s := &Service{repo: repo, config: c, providers: map[string]provider{}, tenants: tenants, Now: time.Now, limits: map[string]limitEntry{}, loginSlots: make(chan struct{}, 8)}
+	s := &Service{repo: repo, config: c, providers: map[string]provider{}, tenants: maps.Clone(tenants), Now: time.Now, limits: map[string]limitEntry{}, loginSlots: make(chan struct{}, 8)}
 	for _, cfg := range c.Providers {
 		if err := validateMappings(&cfg); err != nil {
 			return nil, err
@@ -318,7 +323,7 @@ func (s *Service) ServiceActor(ctx context.Context, token string) (Actor, error)
 		if err != nil {
 			return err
 		}
-		if !s.tenants[a.Tenant] || !a.Expires.After(s.Now()) || !validRole(a.Role, false) {
+		if !s.knownTenant(a.Tenant) || !a.Expires.After(s.Now()) || !validRole(a.Role, false) {
 			return ErrForbidden
 		}
 		actor = Actor{ID: a.ID, Kind: "service_account", Name: a.Name, Grants: map[string]string{a.Tenant: a.Role}, Expires: a.Expires}
@@ -331,7 +336,7 @@ func rank(role string) int {
 }
 func validRole(role string, owner bool) bool { return rank(role) > 0 && (owner || role != "owner") }
 func (s *Service) checkOwner(tx Tx, tenant string, a Actor) error {
-	if !s.tenants[tenant] {
+	if !s.knownTenant(tenant) {
 		return ErrForbidden
 	}
 	if a.platformOperation {
@@ -733,7 +738,7 @@ func (s *Service) Ping(ctx context.Context) error {
 }
 func (s *Service) EnsureAdministration(ctx context.Context, legacy map[string]bool) error {
 	return s.repo.View(ctx, func(tx Tx) error {
-		for tenant := range s.tenants {
+		for _, tenant := range s.knownTenants() {
 			if legacy[tenant] {
 				continue
 			}
@@ -753,4 +758,25 @@ func (s *Service) EnsureAdministration(ctx context.Context, legacy map[string]bo
 		}
 		return nil
 	})
+}
+
+// knownTenant reports whether the tenant exists on this server.
+func (s *Service) knownTenant(id string) bool {
+	s.tenantMu.RLock()
+	defer s.tenantMu.RUnlock()
+	return s.tenants[id]
+}
+
+func (s *Service) knownTenants() []string {
+	s.tenantMu.RLock()
+	defer s.tenantMu.RUnlock()
+	return slices.Sorted(maps.Keys(s.tenants))
+}
+
+// AddTenant makes a tenant created while the server runs known to identity,
+// so its members can be granted access.
+func (s *Service) AddTenant(id string) {
+	s.tenantMu.Lock()
+	defer s.tenantMu.Unlock()
+	s.tenants[id] = true
 }

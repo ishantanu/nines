@@ -123,3 +123,59 @@ func TestCollectionSchedulerCoalescesAcrossReplicas(t *testing.T) {
 		t.Fatal("duplicate scheduled provider query", worked.Load(), source.calls.Load())
 	}
 }
+
+// A tenant added while the scheduler runs is collected, and a removed one is
+// not collected again.
+func TestCollectionSchedulerAddsAndRemovesTenantsWhileRunning(t *testing.T) {
+	source := &fairnessSource{delay: time.Millisecond}
+	first := scheduledTenant(t, "first", 1, source)
+	scheduler, err := NewCollectionScheduler([]*Service{first}, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scheduler.Poll = 5 * time.Millisecond
+	var mu sync.Mutex
+	seen := map[string]int{}
+	scheduler.OnResult = func(r CollectionResult) {
+		mu.Lock()
+		seen[r.Tenant]++
+		mu.Unlock()
+	}
+	count := func(tenant string) int {
+		mu.Lock()
+		defer mu.Unlock()
+		return seen[tenant]
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stopped := make(chan struct{})
+	go func() { defer close(stopped); scheduler.Run(ctx, nil) }()
+
+	added := scheduledTenant(t, "added", 1, source)
+	if err = scheduler.Add(added); err != nil {
+		t.Fatal(err)
+	}
+	if err = scheduler.Add(added); err != nil || len(scheduler.services()) != 2 {
+		t.Fatal("adding a tenant twice must schedule it once", err, len(scheduler.services()))
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for count("added") == 0 {
+		if time.Now().After(deadline) {
+			t.Fatal("the added tenant was never collected")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	scheduler.Remove(added)
+	if services := scheduler.services(); len(services) != 1 || services[0] != first {
+		t.Fatal("the removed tenant is still scheduled")
+	}
+	// Let a job that was already running finish, then nothing more starts.
+	time.Sleep(50 * time.Millisecond)
+	after := count("added")
+	time.Sleep(100 * time.Millisecond)
+	if count("added") != after {
+		t.Fatal("a removed tenant was collected again")
+	}
+	cancel()
+	<-stopped
+}

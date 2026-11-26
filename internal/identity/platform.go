@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -105,12 +107,34 @@ func (s *Service) platformAdminTx(tx Tx, a Actor) error {
 	}
 	return nil
 }
+
+// ConfigurePlatform sets the tenants the platform console lists. It is
+// called again when tenants are created or retired.
 func (s *Service) ConfigurePlatform(tenants []PlatformTenant, guards ...func([]byte) bool) {
-	s.platformGuards = guards
-	s.platformTenants = map[string]PlatformTenant{}
+	inventory := map[string]PlatformTenant{}
 	for _, t := range tenants {
-		s.platformTenants[t.ID] = t
+		inventory[t.ID] = t
 	}
+	s.tenantMu.Lock()
+	defer s.tenantMu.Unlock()
+	s.platformGuards = guards
+	s.platformTenants = inventory
+}
+func (s *Service) platformTenant(id string) (PlatformTenant, bool) {
+	s.tenantMu.RLock()
+	defer s.tenantMu.RUnlock()
+	t, ok := s.platformTenants[id]
+	return t, ok
+}
+func (s *Service) platformInventory() []PlatformTenant {
+	s.tenantMu.RLock()
+	defer s.tenantMu.RUnlock()
+	return slices.Collect(maps.Values(s.platformTenants))
+}
+func (s *Service) credentialGuards() []func([]byte) bool {
+	s.tenantMu.RLock()
+	defer s.tenantMu.RUnlock()
+	return s.platformGuards
 }
 func (s *Service) recordPlatform(tx Tx, a Actor, action, resource, outcome string, details any) error {
 	if !a.platformOperation {
@@ -157,7 +181,7 @@ func (s *Service) platformUsers(ctx context.Context, a Actor, before string) (an
 				return err
 			}
 			for _, g := range direct {
-				if s.tenants[g.Tenant] {
+				if s.knownTenant(g.Tenant) {
 					p.Memberships = append(p.Memberships, PlatformMembership(g))
 				}
 			}
@@ -202,7 +226,7 @@ func (s *Service) platformAI(ctx context.Context, a Actor, tenant string) (any, 
 		if err := s.platformAdminTx(tx, a); err != nil {
 			return err
 		}
-		t, ok := s.platformTenants[tenant]
+		t, ok := s.platformTenant(tenant)
 		if !ok {
 			return ErrNotFound
 		}
@@ -228,7 +252,7 @@ func (s *Service) savePlatformAI(ctx context.Context, a Actor, tenant string, in
 		if err := s.platformAdminTx(tx, a); err != nil {
 			return err
 		}
-		t, ok := s.platformTenants[tenant]
+		t, ok := s.platformTenant(tenant)
 		if !ok {
 			return ErrNotFound
 		}
@@ -337,7 +361,7 @@ func (s *Service) platformReasonSafe(reason string) bool {
 		}
 	}
 	raw, _ := json.Marshal(reason)
-	for _, guard := range s.platformGuards {
+	for _, guard := range s.credentialGuards() {
 		if guard(raw) {
 			return false
 		}

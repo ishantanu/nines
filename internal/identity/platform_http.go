@@ -58,10 +58,7 @@ func (s *Service) PlatformHandler() http.Handler {
 			var out any
 			switch {
 			case suffix == "overview":
-				tenants := []PlatformTenant{}
-				for _, t := range s.platformTenants {
-					tenants = append(tenants, t)
-				}
+				tenants := append([]PlatformTenant{}, s.platformInventory()...)
 				sort.Slice(tenants, func(i, j int) bool { return tenants[i].ID < tenants[j].ID })
 				out = map[string]any{"tenants": tenants, "providers": s.Providers(), "administrators": s.config.PlatformAdmins, "administratorRolesManagedBy": "server configuration", "tenantProvisioning": "server configuration", "auditRetentionDays": 90}
 			case suffix == "users":

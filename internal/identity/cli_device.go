@@ -31,7 +31,7 @@ func (s *Service) cliDeviceStart(w http.ResponseWriter, r *http.Request) {
 		authFailure(w, err)
 		return
 	}
-	if !s.tenants[in.Tenant] || !validOpaque(in.Challenge) {
+	if !s.knownTenant(in.Tenant) || !validOpaque(in.Challenge) {
 		authFailure(w, ErrInvalid)
 		return
 	}
