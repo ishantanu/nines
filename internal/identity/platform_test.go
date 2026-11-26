@@ -361,7 +361,11 @@ func TestPlatformSSOIdentityIsIndependentFromTenantOwnerClaims(t *testing.T) {
 		t.Fatal("platform access ignored provider binding", err)
 	}
 }
-func TestPlatformRejectsScopedMachineCredentialsAndSecretReasons(t *testing.T) {
+
+// A platform administrator's CLI token from `nines auth login` reaches the
+// platform API, needs no CSRF token and is audited as such. Another user's CLI
+// token, API keys and service accounts never reach it.
+func TestPlatformAcceptsAdministratorCLITokensOnly(t *testing.T) {
 	s, h := platformFixture(t, NewMemory())
 	c, csrf := platformLogin(t, h, "admin", "platform-fixture-password")
 	a := platformActor(t, s, h, c)
@@ -369,28 +373,61 @@ func TestPlatformRejectsScopedMachineCredentialsAndSecretReasons(t *testing.T) {
 	if _, err := s.Grant(ctx, a, "alpha", "local", "admin", "owner", 0); err != nil {
 		t.Fatal(err)
 	}
-	cliToken := "wp_cli_" + randomToken()
-	if err := s.repo.Update(ctx, "fixture-cli", func(tx Tx) error {
-		return put(tx, "cli_token", "global", hash(cliToken), cliGrant{SessionHash: a.sessionHash, Tenant: "alpha", Expires: s.Now().Add(time.Hour)}, s.Now().Add(time.Hour))
-	}); err != nil {
-		t.Fatal(err)
+	issue := func(session string) string {
+		token := "wp_cli_" + randomToken()
+		if err := s.repo.Update(ctx, "fixture-cli", func(tx Tx) error {
+			return put(tx, "cli_token", "global", hash(token), cliGrant{SessionHash: session, Tenant: "alpha", Expires: s.Now().Add(time.Hour)}, s.Now().Add(time.Hour))
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return token
+	}
+	call := func(method, path, token, body string) int {
+		t.Helper()
+		r, _ := http.NewRequest(method, h.URL+path, strings.NewReader(body))
+		r.Header.Set("Authorization", "Bearer "+token)
+		if body != "" {
+			r.Header.Set("Content-Type", "application/json")
+		}
+		// No cookie jar: the token is the only credential.
+		res, err := http.DefaultClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = res.Body.Close()
+		return res.StatusCode
+	}
+	adminCLI := issue(a.sessionHash)
+	if code := call("GET", "/api/platform/users", adminCLI, ""); code != 200 {
+		t.Fatal("administrator CLI token refused", code)
+	}
+	if code := call("POST", "/api/platform/users/create", adminCLI, `{"reason":"Provision from the CLI","tenant":"alpha","user":{"provider":"local","username":"bob","name":"Bob","password":"platform-bob-password","role":"viewer"}}`); code != 200 {
+		t.Fatal("administrator CLI change refused", code)
+	}
+	var events []PlatformAudit
+	_ = json.Unmarshal(request(t, c, "GET", h.URL+"/api/platform/audit", "", "", 200)["items"], &events)
+	if len(events) == 0 || events[0].Action != "user.create" || events[0].Channel != "cli" {
+		t.Fatal("CLI change not audited as cli", events)
+	}
+
+	bob, _ := platformLogin(t, h, "bob", "platform-bob-password")
+	bobCLI := issue(platformActor(t, s, h, bob).sessionHash)
+	if code := call("GET", "/api/platform/users", bobCLI, ""); code != 403 {
+		t.Fatal("a non-administrator's CLI token entered platform", code)
 	}
 	_, serviceToken, err := s.CreateAccount(ctx, a, "alpha", "platform-test", "Scoped agent", "agent", s.Now().Add(time.Hour))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, token := range []string{cliToken, serviceToken} {
-		r, _ := http.NewRequest("GET", h.URL+"/api/platform/users", nil)
-		r.Header.Set("Authorization", "Bearer "+token)
-		res, err := c.Do(r)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = res.Body.Close()
-		if res.StatusCode != 401 {
-			t.Fatal("scoped credential entered platform", res.StatusCode)
-		}
+	if code := call("GET", "/api/platform/users", serviceToken, ""); code != 401 {
+		t.Fatal("service account entered platform", code)
 	}
+	_ = csrf
+}
+
+func TestPlatformRejectsSecretReasons(t *testing.T) {
+	s, h := platformFixture(t, NewMemory())
+	c, csrf := platformLogin(t, h, "admin", "platform-fixture-password")
 	guard := &systemOneFixture{}
 	s.ConfigurePlatform([]PlatformTenant{{ID: "alpha", SystemOne: &v1.SystemOneRoute{Model: "jev-fixture"}}}, guard.ContainsCredential)
 	for _, reason := range []string{"platform-fixture-password", "fixture-model-key"} {

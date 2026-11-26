@@ -10,7 +10,9 @@ import (
 	"unicode/utf8"
 )
 
-type platformMutation struct {
+// PlatformRequest is the body of every platform change. Each operation reads
+// the fields it needs; reason is always required.
+type PlatformRequest struct {
 	Reason          string            `json:"reason"`
 	Tenant          string            `json:"tenant,omitempty"`
 	UserID          string            `json:"userId,omitempty"`
@@ -25,15 +27,41 @@ type platformMutation struct {
 	Policy          *PlatformAIPolicy `json:"policy,omitempty"`
 }
 
+// PlatformHandler serves the platform API. Its routes are registered here,
+// so anything else is not found before authentication runs.
 func (s *Service) PlatformHandler() http.Handler {
+	h := s.platformHandler()
+	mux := http.NewServeMux()
+	for _, route := range []string{
+		"GET /api/platform/overview",
+		"GET /api/platform/users",
+		"GET /api/platform/audit",
+		"GET /api/platform/tenants/{tenant}/system-one",
+		"POST /api/platform/users/create",
+		"POST /api/platform/users/update",
+		"POST /api/platform/users/revoke-sessions",
+		"POST /api/platform/memberships/save",
+		"POST /api/platform/memberships/remove",
+		"POST /api/platform/system-one/save",
+		"POST /api/platform/tenants/create",
+		"POST /api/platform/tenants/rename",
+		"POST /api/platform/tenants/retire",
+		"POST /api/platform/tenants/delete",
+	} {
+		mux.Handle(route, h)
+	}
+	return mux
+}
+
+func (s *Service) platformHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		a, found, err := s.Resolve(r)
 		if err != nil {
 			authFailure(w, err)
 			return
 		}
-		if !found || !a.Session || a.Kind != "user" {
-			authJSON(w, 401, map[string]string{"error": "Sign in with a platform administrator account"})
+		if !found || !a.Session && !a.cli || a.Kind != "user" {
+			authJSON(w, 401, map[string]string{"error": "Sign in with a platform administrator account, in the browser or with nines auth login"})
 			return
 		}
 		err = s.repo.View(r.Context(), func(tx Tx) error { return s.platformAdminTx(tx, a) })
@@ -45,7 +73,9 @@ func (s *Service) PlatformHandler() http.Handler {
 			authFailure(w, ErrForbidden)
 			return
 		}
-		if r.Method != http.MethodGet && (r.Method != http.MethodPost || !s.RequireCSRF(r, a)) {
+		// A CLI token is sent explicitly, never by a browser, so it needs no
+		// CSRF token; a browser session does.
+		if r.Method != http.MethodGet && (r.Method != http.MethodPost || a.Session && !s.RequireCSRF(r, a)) {
 			authFailure(w, ErrForbidden)
 			return
 		}
@@ -66,7 +96,7 @@ func (s *Service) PlatformHandler() http.Handler {
 				if s.TenantsChanged != nil {
 					provisioning = "platform console"
 				}
-				out = map[string]any{"tenants": tenants, "providers": s.Providers(), "administrators": s.config.PlatformAdmins, "administratorRolesManagedBy": "server configuration", "tenantProvisioning": provisioning, "auditRetentionDays": 90}
+				out = PlatformOverview{Tenants: tenants, Providers: s.Providers(), Administrators: append([]PlatformAdmin{}, s.config.PlatformAdmins...), AdministratorRolesManagedBy: "server configuration", TenantProvisioning: provisioning, AuditRetentionDays: 90}
 			case suffix == "users":
 				out, err = s.platformUsers(r.Context(), a, before)
 			case suffix == "audit":
@@ -93,7 +123,7 @@ func (s *Service) PlatformHandler() http.Handler {
 					events = events[:100]
 					next = events[99].Cursor
 				}
-				out = map[string]any{"items": events, "nextCursor": next}
+				out = PlatformAuditPage{Items: events, NextCursor: next}
 			case strings.HasPrefix(suffix, "tenants/") && strings.HasSuffix(suffix, "/system-one"):
 				tenant := strings.TrimSuffix(strings.TrimPrefix(suffix, "tenants/"), "/system-one")
 				out, err = s.platformAI(r.Context(), a, tenant)
@@ -108,7 +138,7 @@ func (s *Service) PlatformHandler() http.Handler {
 			authJSON(w, 200, out)
 			return
 		}
-		var in platformMutation
+		var in PlatformRequest
 		if err = decode(w, r, &in); err != nil {
 			authFailure(w, err)
 			return
@@ -122,7 +152,7 @@ func (s *Service) PlatformHandler() http.Handler {
 			// Audit a failed creation against the tenant it was for.
 			in.Tenant = in.NewTenant.ID
 		}
-		var out any = map[string]bool{"ok": true}
+		var out any = PlatformOK{OK: true}
 		switch suffix {
 		case "users/create":
 			if in.User == nil {

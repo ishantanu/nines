@@ -72,6 +72,14 @@ func TestContractStructureAndRegisteredRoutes(t *testing.T) {
 				if _, public := operation["security"]; public {
 					t.Error("CLI sign-out must require the CLI token", id)
 				}
+			} else if strings.HasPrefix(path, "/api/platform/") {
+				// Platform operations name their tenant in the body; the
+				// server refuses the tenant header.
+				for _, p := range params {
+					if m, _ := p.(map[string]any); m["$ref"] == "#/components/parameters/Tenant" {
+						t.Error("platform operations take no tenant header", id)
+					}
+				}
 			} else if strings.HasPrefix(path, "/auth/cli/") {
 				security, public := operation["security"].([]any)
 				if !public || len(security) != 0 {
