@@ -1,0 +1,12 @@
+apiVersion: v2
+name: nines
+description: Nines reliability portal, with the optional Kubernetes operator. Uses an external PostgreSQL database.
+type: application
+# The release workflow requires both to match the release tag.
+version: 0.1.0-alpha.4
+appVersion: v0.1.0-alpha.4
+kubeVersion: '>=1.29.0-0'
+home: https://ishantanu.github.io/nines/
+sources:
+  - https://github.com/ishantanu/nines
+keywords: [slo, sre, reliability, error-budget, prometheus]

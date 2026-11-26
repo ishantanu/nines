@@ -55,6 +55,14 @@ gh attestation verify oci://ghcr.io/ishantanu/nines:v0.1.0-alpha.4 --repo ishant
 
 Use the same commands with `nines-operator` for the operator image.
 
+From v0.1.0-alpha.5, releases also publish the [Helm chart](kubernetes.md#install-with-helm) as `oci://ghcr.io/ishantanu/charts/nines`, pinned to the release's image digests and signed by the same workflow. Verify it the same way, using the chart digest from the release notes:
+
+```sh
+cosign verify ghcr.io/ishantanu/charts/nines@sha256:CHART_DIGEST_FROM_THE_RELEASE_NOTES \
+  --certificate-identity "https://github.com/ishantanu/nines/.github/workflows/alpha-release.yml@refs/tags/v0.1.0-alpha.5" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
 ## Build your own
 
 The images use the repository `Dockerfile` and `deploy/operator/Dockerfile`. Both cross-compile, so one machine can build both platforms:
