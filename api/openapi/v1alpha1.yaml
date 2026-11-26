@@ -3251,6 +3251,269 @@ paths:
           $ref: '#/components/responses/Error'
         '503':
           $ref: '#/components/responses/Error'
+  /api/connections:
+    get:
+      operationId: listConnections
+      summary: List telemetry connections
+      description: Configured and tenant-managed connections, how each authenticates (never its credentials), the installed providers and managed-connection limits.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionList'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createConnection
+      summary: Create a managed connection
+      description: A tenant-managed connection to an endpoint the server allows. Credentials are encrypted at rest and never returned. Owner.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectionInput'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionView'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/connections/{connection}:
+    put:
+      operationId: updateConnection
+      summary: Update a managed connection
+      description: At the expected version; omitted credentials are kept unless cleared. Owner.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: connection
+          in: path
+          required: true
+          description: Connection name, such as primary.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectionInput'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionView'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    delete:
+      operationId: deleteConnection
+      summary: Delete a managed connection
+      description: At the version in If-Match. Owner.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: connection
+          in: path
+          required: true
+          description: Connection name, such as primary.
+          schema:
+            type: string
+        - $ref: '#/components/parameters/IfMatch'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionDeleted'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/connections/{connection}/test:
+    post:
+      operationId: testConnection
+      summary: Test a connection
+      description: Probe reachability and authentication. Stores nothing; metric permissions and SLO coverage are not verified.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: connection
+          in: path
+          required: true
+          description: Connection name, such as primary.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionTestResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/connections/{connection}/metrics:
+    get:
+      operationId: listMetricNames
+      summary: List metric names
+      description: Metric names on the connection, optionally by prefix. Bounded; reads metadata only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: connection
+          in: path
+          required: true
+          description: Connection name, such as primary.
+          schema:
+            type: string
+        - name: prefix
+          in: query
+          required: false
+          description: Name prefix.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricNames'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/connections/{connection}/telemetry:
+    get:
+      operationId: discoverTelemetry
+      summary: Inspect a metric
+      description: A metric's type, label values and series, filtered by exact labels. Bounded; reads metadata and recent series only.
+      parameters:
+        - $ref: '#/components/parameters/Tenant'
+        - name: connection
+          in: path
+          required: true
+          description: Connection name, such as primary.
+          schema:
+            type: string
+        - name: metric
+          in: query
+          required: true
+          description: Metric name.
+          schema:
+            type: string
+        - name: labels
+          in: query
+          required: false
+          description: Equality filters as a JSON object, such as {"service":"api"}.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelemetryDiscovery'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '500':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -3308,7 +3571,9 @@ components:
         roles:
           additionalProperties:
             type: boolean
-          type: object
+          type:
+            - object
+            - "null"
       required:
         - id
         - label
@@ -3322,7 +3587,9 @@ components:
         bindings:
           items:
             $ref: '#/components/schemas/AccessBinding'
-          type: array
+          type:
+            - array
+            - "null"
         bindingsVisible:
           type: boolean
         currentRole:
@@ -3332,7 +3599,9 @@ components:
         permissions:
           items:
             $ref: '#/components/schemas/AccessPermission'
-          type: array
+          type:
+            - array
+            - "null"
         tenant:
           type: string
         userManagementSupported:
@@ -3577,7 +3846,9 @@ components:
         labels:
           additionalProperties:
             type: string
-          type: object
+          type:
+            - object
+            - "null"
         measurement:
           type: string
         metric:
@@ -3642,7 +3913,9 @@ components:
         checks:
           items:
             $ref: '#/components/schemas/QualityCheck'
-          type: array
+          type:
+            - array
+            - "null"
         coverage:
           type: number
         freshness:
@@ -3794,13 +4067,47 @@ components:
           type: string
           pattern: ^[A-Za-z0-9_-]{43}$
           writeOnly: true
+    Capabilities:
+      additionalProperties: false
+      properties:
+        cohorts:
+          type: boolean
+        dependencies:
+          type: boolean
+        discovery:
+          type: boolean
+        intervalCounts:
+          type: boolean
+        nativeSLOCatalog:
+          type: boolean
+        nativeSLOPublishing:
+          type: boolean
+        nativeSLOResults:
+          type: boolean
+        ruleDeployment:
+          type: boolean
+        windowCounts:
+          type: boolean
+      required:
+        - cohorts
+        - dependencies
+        - discovery
+        - intervalCounts
+        - nativeSLOCatalog
+        - nativeSLOPublishing
+        - nativeSLOResults
+        - ruleDeployment
+        - windowCounts
+      type: object
     CohortConcentration:
       additionalProperties: false
       properties:
         contributors:
           items:
             $ref: '#/components/schemas/CohortContribution'
-          type: array
+          type:
+            - array
+            - "null"
         effectiveCohorts:
           type: number
         entropy:
@@ -3812,7 +4119,9 @@ components:
         limitations:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         state:
           type: string
         topShare:
@@ -3843,7 +4152,9 @@ components:
         labels:
           additionalProperties:
             type: string
-          type: object
+          type:
+            - object
+            - "null"
         representation:
           type: number
       required:
@@ -3859,7 +4170,9 @@ components:
         labels:
           additionalProperties:
             type: string
-          type: object
+          type:
+            - object
+            - "null"
         peerReliability:
           type: number
         reliability:
@@ -3881,11 +4194,15 @@ components:
         items:
           items:
             $ref: '#/components/schemas/CohortOutlier'
-          type: array
+          type:
+            - array
+            - "null"
         limitations:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         state:
           type: string
         threshold:
@@ -3907,11 +4224,15 @@ components:
         items:
           items:
             $ref: '#/components/schemas/CohortResult'
-          type: array
+          type:
+            - array
+            - "null"
         labels:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         matchesAggregate:
           type: boolean
         message:
@@ -3937,19 +4258,21 @@ components:
         burnRate:
           oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         good:
           oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         labels:
           additionalProperties:
             type: string
-          type: object
+          type:
+            - object
+            - "null"
         reliability:
           oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         state:
           type: string
         total:
@@ -4078,7 +4401,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         yaml:
           type: string
       required:
@@ -4111,7 +4436,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         yaml:
           type: string
       required:
@@ -4133,7 +4460,9 @@ components:
         dependencies:
           items:
             $ref: '#/components/schemas/CompositionPromise'
-          type: array
+          type:
+            - array
+            - "null"
         headroom:
           type: number
         service:
@@ -4145,7 +4474,9 @@ components:
         unmeasuredDependencies:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         verdict:
           type: string
       required:
@@ -4194,6 +4525,172 @@ components:
         - status
         - type
       type: object
+    ConnectionDeleted:
+      additionalProperties: false
+      properties:
+        state:
+          type: string
+      required:
+        - state
+      type: object
+    ConnectionInput:
+      additionalProperties: false
+      properties:
+        autoDeploy:
+          type: boolean
+        bearerToken:
+          type: string
+        clearCredentials:
+          type: boolean
+        collectionMode:
+          type: string
+        credentials:
+          additionalProperties:
+            type: string
+          type: object
+        expectedVersion:
+          type: integer
+        kind:
+          type: string
+        mimirOrgID:
+          type: string
+        name:
+          type: string
+        nativeEntityGUID:
+          type: string
+        options:
+          additionalProperties:
+            type: string
+          type: object
+        reload:
+          type: boolean
+        rulerURL:
+          type: string
+        rulesEnabled:
+          type: boolean
+        url:
+          type: string
+      required:
+        - autoDeploy
+        - bearerToken
+        - clearCredentials
+        - expectedVersion
+        - kind
+        - mimirOrgID
+        - name
+        - reload
+        - rulerURL
+        - rulesEnabled
+        - url
+      type: object
+    ConnectionList:
+      additionalProperties: false
+      properties:
+        connections:
+          items:
+            $ref: '#/components/schemas/ConnectionView'
+          type:
+            - array
+            - "null"
+        managedConnectionsEnabled:
+          type: boolean
+        managedProviderRoutes:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type:
+            - object
+            - "null"
+        management:
+          type: string
+        manualIngestion:
+          type: boolean
+        maxConnections:
+          type: integer
+        providers:
+          items:
+            $ref: '#/components/schemas/Descriptor'
+          type:
+            - array
+            - "null"
+      required:
+        - connections
+        - managedConnectionsEnabled
+        - managedProviderRoutes
+        - management
+        - manualIngestion
+        - maxConnections
+        - providers
+      type: object
+    ConnectionTestResult:
+      additionalProperties: false
+      properties:
+        check:
+          type: string
+        scope:
+          type: string
+        status:
+          type: string
+        testedAt:
+          format: date-time
+          type: string
+      required:
+        - check
+        - scope
+        - status
+        - testedAt
+      type: object
+    ConnectionView:
+      additionalProperties: false
+      properties:
+        authentication:
+          type: string
+        capabilities:
+          $ref: '#/components/schemas/Capabilities'
+        collectionMode:
+          type: string
+        configuration:
+          type: string
+        endpoint:
+          type: string
+        id:
+          type: string
+        kind:
+          type: string
+        mimirOrgID:
+          type: string
+        options:
+          additionalProperties:
+            type: string
+          type:
+            - object
+            - "null"
+        queryLanguages:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        rules:
+          oneOf:
+            - $ref: '#/components/schemas/RuleDestination'
+            - type: "null"
+        version:
+          type: integer
+      required:
+        - authentication
+        - capabilities
+        - collectionMode
+        - configuration
+        - endpoint
+        - id
+        - kind
+        - mimirOrgID
+        - options
+        - queryLanguages
+        - rules
+      type: object
     ContextError:
       additionalProperties: false
       properties:
@@ -4236,7 +4733,9 @@ components:
         customers:
           items:
             $ref: '#/components/schemas/CustomerRef'
-          type: array
+          type:
+            - array
+            - "null"
         label:
           type: string
       required:
@@ -4266,13 +4765,17 @@ components:
         items:
           items:
             $ref: '#/components/schemas/CustomerResult'
-          type: array
+          type:
+            - array
+            - "null"
         label:
           type: string
         limitations:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         message:
           type: string
         revision:
@@ -4280,7 +4783,7 @@ components:
         serviceBurnRate:
           oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         sloId:
           type: string
         state:
@@ -4361,7 +4864,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - document
         - matches
@@ -4380,11 +4885,15 @@ components:
         tags:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         thresholds:
           items:
             $ref: '#/components/schemas/NativeThreshold'
-          type: array
+          type:
+            - array
+            - "null"
         type:
           type: string
       required:
@@ -4415,7 +4924,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - document
         - matches
@@ -4431,13 +4942,17 @@ components:
         checks:
           items:
             $ref: '#/components/schemas/CompositionCheck'
-          type: array
+          type:
+            - array
+            - "null"
         id:
           type: string
         limitations:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         observedAt:
           format: date-time
           type: string
@@ -4499,19 +5014,25 @@ components:
         journeys:
           items:
             $ref: '#/components/schemas/MapJourney'
-          type: array
+          type:
+            - array
+            - "null"
         name:
           type: string
         objectives:
           items:
             $ref: '#/components/schemas/MapObjective'
-          type: array
+          type:
+            - array
+            - "null"
         position:
           $ref: '#/components/schemas/GraphPosition'
         potentialImpact:
           items:
             $ref: '#/components/schemas/MapJourney'
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - declared
         - displayName
@@ -4533,7 +5054,9 @@ components:
         edges:
           items:
             $ref: '#/components/schemas/DependencyEdge'
-          type: array
+          type:
+            - array
+            - "null"
         from:
           format: date-time
           type: string
@@ -4546,7 +5069,9 @@ components:
         nodes:
           items:
             $ref: '#/components/schemas/DependencyNode'
-          type: array
+          type:
+            - array
+            - "null"
         observationState:
           type: string
         observedAt:
@@ -4568,7 +5093,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - apiVersion
         - declaredEdges
@@ -4582,6 +5109,27 @@ components:
         - tenant
         - truncated
         - warnings
+      type: object
+    Descriptor:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        capabilities:
+          $ref: '#/components/schemas/Capabilities'
+        kind:
+          type: string
+        queryLanguages:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      required:
+        - apiVersion
+        - capabilities
+        - kind
+        - queryLanguages
       type: object
     Document:
       additionalProperties: false
@@ -4620,7 +5168,7 @@ components:
         budgetRemainingFraction:
           oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         definitionDigest:
           type: string
         evaluatedAt:
@@ -4642,7 +5190,9 @@ components:
         reasonCodes:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         requiredPostmortems:
           description: Recent incidents whose postmortem the policy requires and that have none published yet.
           items:
@@ -4754,7 +5304,9 @@ components:
         mappingIds:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         user:
           $ref: '#/components/schemas/User'
       required:
@@ -4982,7 +5534,9 @@ components:
         userLabels:
           additionalProperties:
             type: string
-          type: object
+          type:
+            - object
+            - "null"
       required:
         - displayName
         - goal
@@ -5005,7 +5559,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - document
         - matches
@@ -5108,7 +5664,9 @@ components:
         rules:
           items:
             $ref: '#/components/schemas/Rule'
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - interval
         - name
@@ -5120,7 +5678,9 @@ components:
         alertEvents:
           items:
             $ref: '#/components/schemas/AlertEvent'
-          type: array
+          type:
+            - array
+            - "null"
         alertEventsBounded:
           type: boolean
         configRevision:
@@ -5135,7 +5695,9 @@ components:
         points:
           items:
             $ref: '#/components/schemas/HistoryPoint'
-          type: array
+          type:
+            - array
+            - "null"
         policies:
           items:
             $ref: '#/components/schemas/BurnRatePolicy'
@@ -5158,7 +5720,9 @@ components:
         violations:
           items:
             $ref: '#/components/schemas/ViolationSpan'
-          type: array
+          type:
+            - array
+            - "null"
         windowSeconds:
           type: integer
       required:
@@ -5271,7 +5835,9 @@ components:
         samples:
           items:
             $ref: '#/components/schemas/Point'
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - samples
       type: object
@@ -6391,7 +6957,9 @@ components:
         population:
           additionalProperties:
             type: string
-          type: object
+          type:
+            - object
+            - "null"
         quality:
           $ref: '#/components/schemas/MeasurementQualityPolicy'
         service:
@@ -6527,7 +7095,9 @@ components:
         evidence:
           items:
             $ref: '#/components/schemas/EvidenceReference'
-          type: array
+          type:
+            - array
+            - "null"
         health:
           type: string
         healthScope:
@@ -6535,7 +7105,9 @@ components:
         links:
           items:
             $ref: '#/components/schemas/LinkedSLOContext'
-          type: array
+          type:
+            - array
+            - "null"
         nextCursor:
           type: string
         observedAt:
@@ -6557,7 +7129,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - apiVersion
         - evidence
@@ -6647,7 +7221,9 @@ components:
         findings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         journeyId:
           type: string
         receivedAt:
@@ -6669,11 +7245,11 @@ components:
         budgetRemainingFraction:
           oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         burnRate:
           oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         failed:
           type: integer
         from:
@@ -6684,7 +7260,9 @@ components:
         limitations:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         minRuns:
           type: integer
         otherRevision:
@@ -6694,7 +7272,7 @@ components:
         reliability:
           oneOf:
             - type: number
-            - type: 'null'
+            - type: "null"
         state:
           type: string
         target:
@@ -6761,11 +7339,15 @@ components:
         slos:
           items:
             $ref: '#/components/schemas/JourneySLO'
-          type: array
+          type:
+            - array
+            - "null"
         steps:
           items:
             $ref: '#/components/schemas/JourneyStep'
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - criticality
         - description
@@ -6790,7 +7372,9 @@ components:
         sloRefs:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - actor
         - id
@@ -6805,11 +7389,15 @@ components:
         links:
           items:
             $ref: '#/components/schemas/JourneyLinkStatus'
-          type: array
+          type:
+            - array
+            - "null"
         reasons:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         resource:
           $ref: '#/components/schemas/JourneyRevision'
         runObjective:
@@ -7060,7 +7648,9 @@ components:
         checks:
           items:
             $ref: '#/components/schemas/QualityCheck'
-          type: array
+          type:
+            - array
+            - "null"
         cohorts:
           $ref: '#/components/schemas/CohortReport'
         collectedSourceDigest:
@@ -7079,7 +7669,9 @@ components:
         limitations:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         minimumEvents:
           type: number
         observationPoint:
@@ -7145,7 +7737,9 @@ components:
         labels:
           additionalProperties:
             type: string
-          type: object
+          type:
+            - object
+            - "null"
         metric:
           type: string
         observationPoint:
@@ -7205,6 +7799,34 @@ components:
           $ref: '#/components/schemas/MetricSource'
       required:
         - metricSource
+      type: object
+    MetricNames:
+      additionalProperties: false
+      properties:
+        apiVersion:
+          type: string
+        names:
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        observedAt:
+          format: date-time
+          type: string
+        source:
+          type: string
+        tenant:
+          type: string
+        truncated:
+          type: boolean
+      required:
+        - apiVersion
+        - names
+        - observedAt
+        - source
+        - tenant
+        - truncated
       type: object
     MetricSource:
       additionalProperties: false
@@ -7337,7 +7959,9 @@ components:
         objectives:
           items:
             $ref: '#/components/schemas/NativeObjective'
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - description
         - events
@@ -7754,7 +8378,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - document
         - entityGUID
@@ -7858,7 +8484,10 @@ components:
           type: string
         metadata:
           $ref: '#/components/schemas/V1alpha1Metadata'
-        spec: {}
+        spec:
+          type:
+            - null
+            - "null"
         status:
           $ref: '#/components/schemas/Status'
       required:
@@ -8005,7 +8634,9 @@ components:
         blockers:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         digest:
           type: string
         expectedRevision:
@@ -8015,7 +8646,9 @@ components:
         references:
           items:
             $ref: '#/components/schemas/RetirementReference'
-          type: array
+          type:
+            - array
+            - "null"
         resourceUID:
           type: string
         retirement:
@@ -8159,7 +8792,9 @@ components:
         labels:
           additionalProperties:
             type: string
-          type: object
+          type:
+            - object
+            - "null"
         record:
           type: string
       required:
@@ -8271,6 +8906,34 @@ components:
         - message
         - state
         - target
+      type: object
+    RuleDestination:
+      additionalProperties: false
+      properties:
+        autoDeploy:
+          type: boolean
+        basicPasswordEnv:
+          type: string
+        basicUsername:
+          type: string
+        bearerTokenEnv:
+          type: string
+        directory:
+          type: string
+        entityGUID:
+          type: string
+        mode:
+          type: string
+        namespace:
+          type: string
+        publisher:
+          type: string
+        reload:
+          type: boolean
+        rulerURL:
+          type: string
+      required:
+        - namespace
       type: object
     RulePlan:
       additionalProperties: false
@@ -8444,7 +9107,9 @@ components:
         evidence:
           items:
             $ref: '#/components/schemas/EvidenceReference'
-          type: array
+          type:
+            - array
+            - "null"
         freshness:
           $ref: '#/components/schemas/Freshness'
         health:
@@ -8469,7 +9134,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - apiVersion
         - collection
@@ -8543,7 +9210,9 @@ components:
         audit:
           items:
             $ref: '#/components/schemas/RetirementEvent'
-          type: array
+          type:
+            - array
+            - "null"
         cleanup:
           type: string
         evaluationAt:
@@ -8613,7 +9282,9 @@ components:
         revisions:
           items:
             $ref: '#/components/schemas/SLORevision'
-          type: array
+          type:
+            - array
+            - "null"
         sloId:
           type: string
       required:
@@ -8807,13 +9478,17 @@ components:
         objectives:
           items:
             $ref: '#/components/schemas/Objective'
-          type: array
+          type:
+            - array
+            - "null"
         service:
           type: string
         timeWindow:
           items:
             $ref: '#/components/schemas/Window'
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - budgetingMethod
         - indicator
@@ -8829,7 +9504,9 @@ components:
         conditions:
           items:
             $ref: '#/components/schemas/Condition'
-          type: array
+          type:
+            - array
+            - "null"
         definitionDigest:
           type: string
         deployment:
@@ -8912,7 +9589,9 @@ components:
         members:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         name:
           type: string
         role:
@@ -8932,7 +9611,9 @@ components:
         items:
           items:
             $ref: '#/components/schemas/Audit'
-          type: array
+          type:
+            - array
+            - "null"
         nextCursor:
           type: string
       required:
@@ -8953,29 +9634,41 @@ components:
         members:
           items:
             $ref: '#/components/schemas/MemberView'
-          type: array
+          type:
+            - array
+            - "null"
         providers:
           items:
             $ref: '#/components/schemas/ProviderView'
-          type: array
+          type:
+            - array
+            - "null"
         serviceAccounts:
           items:
             $ref: '#/components/schemas/AccountView'
-          type: array
+          type:
+            - array
+            - "null"
         ssoMappings:
           items:
             $ref: '#/components/schemas/MappingView'
-          type: array
+          type:
+            - array
+            - "null"
         ssoMembers:
           items:
             $ref: '#/components/schemas/FederatedMember'
-          type: array
+          type:
+            - array
+            - "null"
         ssoMembersTruncated:
           type: boolean
         teams:
           items:
             $ref: '#/components/schemas/Team'
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - members
         - providers
@@ -8995,7 +9688,9 @@ components:
         members:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
         name:
           type: string
         role:
@@ -9037,7 +9732,9 @@ components:
         metadata:
           items:
             $ref: '#/components/schemas/TelemetryMetadata'
-          type: array
+          type:
+            - array
+            - "null"
         metric:
           type: string
         series:
@@ -9045,7 +9742,9 @@ components:
             additionalProperties:
               type: string
             type: object
-          type: array
+          type:
+            - array
+            - "null"
         source:
           type: string
         tenant:
@@ -9058,7 +9757,9 @@ components:
         warnings:
           items:
             type: string
-          type: array
+          type:
+            - array
+            - "null"
       required:
         - apiVersion
         - fingerprint
@@ -9123,7 +9824,10 @@ components:
           type: string
         kind:
           type: string
-        manifest: {}
+        manifest:
+          type:
+            - null
+            - "null"
         revision:
           type: integer
       required:

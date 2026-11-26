@@ -27,7 +27,7 @@ func TestManagedVictoriaMetricsRoutesPersistenceAndCapabilities(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if public["kind"] != "victoriametrics" || public["authentication"] != "bearer" || strings.Contains(string(encodeRecord(public)), "synthetic-vm-secret") {
+	if public.Kind != "victoriametrics" || public.Authentication != "bearer" || strings.Contains(string(encodeRecord(public)), "synthetic-vm-secret") {
 		t.Fatal("provider metadata or credential boundary changed")
 	}
 	restarted := create()

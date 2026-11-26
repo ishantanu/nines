@@ -64,7 +64,7 @@ func (a *Server) access(w http.ResponseWriter, r *http.Request) {
 }
 func (a *Server) connections(w http.ResponseWriter, r *http.Request) {
 
-	items := []map[string]any{}
+	items := []datasources.ConnectionView{}
 	connections := a.Workspace.Connections
 	if len(connections) == 0 && a.Service.Collector != nil {
 		connections = []tenancy.Connection{{Name: "primary", Source: a.Workspace.Source}}
@@ -85,7 +85,7 @@ func (a *Server) connections(w http.ResponseWriter, r *http.Request) {
 			auth = a.Workspace.SourceAuth
 		}
 		descriptor, _ := providers.Default.Describe(connection.Kind)
-		items = append(items, map[string]any{"capabilities": descriptor.Capabilities, "queryLanguages": descriptor.QueryLanguages, "id": connection.Name, "kind": connection.Kind, "endpoint": connection.URL, "mimirOrgID": connection.MimirOrgID, "authentication": auth, "configuration": "server_configuration", "collectionMode": connection.CollectionMode, "rules": connection.Rules, "options": connection.Options})
+		items = append(items, datasources.ConnectionView{Capabilities: descriptor.Capabilities, QueryLanguages: descriptor.QueryLanguages, ID: connection.Name, Kind: connection.Kind, Endpoint: connection.URL, MimirOrgID: connection.MimirOrgID, Authentication: auth, Configuration: "server_configuration", CollectionMode: connection.CollectionMode, Rules: connection.Rules, Options: connection.Options})
 	}
 	managed := a.Workspace.ManagedSources != nil && a.Workspace.ManagedSources.Enabled()
 	if a.Workspace.ManagedSources != nil {
@@ -95,7 +95,7 @@ func (a *Server) connections(w http.ResponseWriter, r *http.Request) {
 	if a.Workspace.ManagedSources != nil {
 		routes = a.Workspace.ManagedSources.AllowedProviderRoutes()
 	}
-	write(w, 200, map[string]any{"management": "server_configuration", "managedConnectionsEnabled": managed, "providers": providers.Default.List(), "connections": items, "manualIngestion": true, "maxConnections": 21, "managedProviderRoutes": routes})
+	write(w, 200, ConnectionList{Management: "server_configuration", ManagedConnectionsEnabled: managed, Providers: providers.Default.List(), Connections: items, ManualIngestion: true, MaxConnections: 21, ManagedProviderRoutes: routes})
 }
 
 func (a *Server) connectionTest(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +121,7 @@ func (a *Server) connectionTest(w http.ResponseWriter, r *http.Request) {
 			write(w, 502, map[string]string{"status": "failed", "error": "Configured provider authentication probe failed; check credentials and availability"})
 			return
 		}
-		write(w, 200, map[string]any{"status": "reachable", "testedAt": time.Now().UTC(), "scope": "configured tenant", "check": "Provider authentication probe only; metric permissions and SLO coverage are not verified"})
+		write(w, 200, ConnectionTestResult{Status: "reachable", TestedAt: time.Now().UTC(), Scope: "configured tenant", Check: "Provider authentication probe only; metric permissions and SLO coverage are not verified"})
 		return
 	}
 	at := time.Now().UTC().Truncate(time.Minute)
@@ -130,5 +130,5 @@ func (a *Server) connectionTest(w http.ResponseWriter, r *http.Request) {
 		write(w, 502, map[string]string{"status": "failed", "error": "Configured source query failed; check server configuration and source availability"})
 		return
 	}
-	write(w, 200, map[string]any{"status": "reachable", "testedAt": time.Now().UTC(), "scope": "configured tenant", "check": "Prometheus range query; no samples stored"})
+	write(w, 200, ConnectionTestResult{Status: "reachable", TestedAt: time.Now().UTC(), Scope: "configured tenant", Check: "Prometheus range query; no samples stored"})
 }
