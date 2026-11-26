@@ -1,4 +1,4 @@
-.PHONY: test-collector demo run build server cli mcp operator ui test test-providers test-integration test-mimir test-victoriametrics test-prometheus test-ceph test-operator test-upgrade test-identity test-dependencies test-topology intent-eval intent-workflow-eval template-eval selection-eval check release-check public-source release site site-check lint lint-go lint-python check-api
+.PHONY: test-collector demo run build server cli mcp operator ui test test-providers test-integration test-mimir test-victoriametrics test-prometheus test-ceph test-operator test-helm check-helm test-upgrade test-identity test-dependencies test-topology intent-eval intent-workflow-eval template-eval selection-eval check release-check public-source release site site-check lint lint-go lint-python check-api
 VERSION ?= dev
 RELEASE_TARGETS ?= linux/amd64,linux/arm64,darwin/amd64,darwin/arm64,windows/amd64,windows/arm64
 ui:
@@ -51,6 +51,12 @@ test-dependencies:
 	sh integration/dependencies/run.sh
 test-operator:
 	sh integration/operator/run.sh
+# Lint and render the Helm chart in each configuration; no cluster.
+check-helm:
+	python3 integration/helm/static.py
+# Install the Helm chart on a disposable kind cluster and check it end to end.
+test-helm: check-helm
+	sh integration/helm/run.sh
 # Upgrade databases created by every published release with this build.
 test-upgrade:
 	sh integration/upgrade/run.sh

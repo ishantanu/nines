@@ -1,0 +1,35 @@
+Nines {{ .Chart.AppVersion }} is starting in namespace {{ .Release.Namespace }}.
+
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "nines.fullname" . }}
+{{- if .Values.ingress.enabled }}
+
+Open {{ include "nines.publicURL" . }}
+{{- else }}
+
+Reach the portal:
+
+  kubectl -n {{ .Release.Namespace }} port-forward service/{{ include "nines.fullname" . }} 8080:{{ .Values.service.port }}
+
+and open {{ include "nines.publicURL" . }}
+{{- end }}
+{{- if and (contains "bootstrapUsername: admin" .Values.auth.config) (not .Values.credentials.existingSecret) }}
+
+Sign in as admin. The password was generated for this installation:
+
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "nines.credentialsSecret" . }} \
+    -o jsonpath='{.data.NINES_BOOTSTRAP_PASSWORD}' | base64 -d; echo
+
+Then add people under Access control, and service accounts for automation.
+{{- end }}
+{{- if not .Values.credentials.existingSecret }}
+
+Back up the Secret {{ include "nines.credentialsSecret" . }} with your database: it holds the key
+that encrypts telemetry connection credentials. Uninstalling keeps it.
+{{- end }}
+{{- if .Values.operator.enabled }}
+
+The operator reconciles ServiceLevelObjectives in {{ .Release.Namespace }} for tenant {{ .Values.operator.tenant }}:
+
+  kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "nines.operatorName" . }}
+  kubectl -n {{ .Release.Namespace }} get slo
+{{- end }}

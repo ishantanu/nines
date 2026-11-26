@@ -1,0 +1,152 @@
+# Nines server and optional operator. Defaults are secure and need only a
+# database: create a Secret holding DATABASE_URL, then
+#
+#   helm install nines oci://ghcr.io/ishantanu/charts/nines \
+#     --namespace nines --create-namespace \
+#     --set database.existingSecret=nines-database
+#
+# The server runs one replica: it collects and evaluates on a schedule, and two
+# copies would collect twice. Upgrades replace the Pod (brief downtime).
+
+image:
+  repository: ghcr.io/ishantanu/nines
+  # Defaults to the chart's appVersion. Pin a digest from the release notes.
+  tag: ''
+  digest: ''
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# The origin people use to reach the portal, used for sign-in redirects and
+# cookies. Defaults to the ingress host when ingress is enabled, otherwise to
+# http://127.0.0.1:8080 for kubectl port-forward.
+publicURL: ''
+
+database:
+  # Required. A Secret in the release namespace holding the PostgreSQL URL,
+  # such as postgres://nines:PASSWORD@db.internal:5432/nines?sslmode=verify-full.
+  # The role must be able to create tables and schemas.
+  existingSecret: ''
+  key: DATABASE_URL
+
+credentials:
+  # The chart generates the first administrator's password (and the managed
+  # connection encryption key) into a Secret it keeps across upgrades and
+  # uninstalls. To supply your own, name a Secret with NINES_BOOTSTRAP_PASSWORD
+  # (12 to 72 bytes) and, when connections are enabled,
+  # NINES_SOURCE_ENCRYPTION_KEY (base64 of 32 random bytes).
+  existingSecret: ''
+
+# Identity configuration (AUTH_CONFIG_FILE). The default signs in local
+# accounts: user admin, password from the credentials Secret, owner of tenant
+# default and platform administrator. Replace it for SSO; reference secrets
+# through environment variables (see extraEnvFrom). Guide:
+# https://ishantanu.github.io/nines/docs/deployment/identity-and-tenants/
+auth:
+  config: |
+    publicURLEnv: NINES_PUBLIC_URL
+    sessionHours: 12
+    providers:
+      - id: local
+        name: Local account
+        type: local
+        bootstrapUsername: admin
+        bootstrapPasswordEnv: NINES_BOOTSTRAP_PASSWORD
+    bootstrap:
+      - tenant: default
+        provider: local
+        subject: admin
+        role: owner
+    platformAdmins:
+      - provider: local
+        subject: admin
+
+# Tenants and their telemetry sources (TENANTS_FILE). Empty runs one tenant,
+# default, whose connections are added in the portal. Provider credentials
+# belong in Secrets referenced by environment variable names.
+tenants:
+  config: ''
+
+# Telemetry connections managed in the portal. Only these hosts (host or
+# host:port) may be connected; empty turns managed connections off.
+connections:
+  allowedHosts: []
+
+# Extra environment for the server, such as provider credentials from Secrets.
+extraEnv: []
+extraEnvFrom: []
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ''
+  annotations: {}
+  host: ''
+  # Name of a TLS Secret for the host. Without it the portal is served over
+  # plain HTTP; use it only behind a TLS-terminating proxy.
+  tlsSecretName: ''
+
+serviceAccount:
+  # The server needs no Kubernetes API access, so its token is not mounted
+  # unless operator publishing is enabled.
+  create: true
+  name: ''
+  annotations: {}
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: '2'
+    memory: 1Gi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# The Kubernetes operator: reconciles ServiceLevelObjective resources in this
+# namespace into PrometheusRule or Mimir rule groups. One operator per
+# namespace and tenant.
+operator:
+  enabled: false
+  image:
+    repository: ghcr.io/ishantanu/nines-operator
+    tag: ''
+    digest: ''
+    pullPolicy: IfNotPresent
+  # The Nines tenant this namespace belongs to, and the projects it may hold.
+  tenant: default
+  projects: [default]
+  # Rule destinations by name. kind is prometheus-operator (needs the
+  # PrometheusRule CRD) or mimir (also rulerURL, mimirOrgID, rulerNamespace).
+  sources:
+    primary:
+      kind: prometheus-operator
+      queryURL: http://prometheus-operated.monitoring.svc:9090
+      prometheusLabels: {}
+  # A Secret mounted read-only at /etc/nines-credentials, for the sources'
+  # bearer token files, such as rulerBearerTokenFile:
+  # /etc/nines-credentials/mimir-token.
+  credentialsSecret: ''
+  # Let the portal publish reviewed SLOs to this namespace for the operator to
+  # deploy. Mounts a token for the server's service account, limited to
+  # ServiceLevelObjectives here. Set rules.mode: operator on the tenant source.
+  publishFromPortal: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: '512Mi'
+
+# Install or upgrade the nines.dev CustomResourceDefinitions with the
+# operator. They are kept on uninstall, so resources are not deleted with them.
+crds:
+  install: true
