@@ -140,6 +140,18 @@ func conforms(v any, s map[string]any, schemas map[string]any, at string) error 
 		}
 	}
 	typ, _ := s["type"].(string)
+	if types, ok := s["type"].([]any); ok {
+		// A type list, such as [array, null]: null is allowed, otherwise
+		// check the first type.
+		if v == nil {
+			for _, t := range types {
+				if t == "null" {
+					return nil
+				}
+			}
+		}
+		typ = fmt.Sprint(types[0])
+	}
 	switch typ {
 	case "":
 		return nil

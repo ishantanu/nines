@@ -2,6 +2,7 @@ package openapi
 
 import (
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
+	"github.com/ishantanu/nines/internal/datasources"
 	"github.com/ishantanu/nines/internal/engine"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/identity"
@@ -69,4 +70,13 @@ var generatedTypes = map[string]any{
 	"TeamAccessStatus":      identity.StatusResult{},
 	"LocalUserInput":        identity.LocalUserInput{},
 	"User":                  identity.User{},
+
+	// Telemetry connections
+	"ConnectionList":       httpapi.ConnectionList{},
+	"ConnectionView":       datasources.ConnectionView{},
+	"ConnectionInput":      datasources.Input{},
+	"ConnectionTestResult": httpapi.ConnectionTestResult{},
+	"ConnectionDeleted":    httpapi.ConnectionDeleted{},
+	"MetricNames":          v1.MetricNames{},
+	"TelemetryDiscovery":   v1.TelemetryDiscovery{},
 }

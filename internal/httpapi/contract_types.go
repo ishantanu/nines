@@ -3,6 +3,9 @@ package httpapi
 import (
 	"time"
 
+	"github.com/ishantanu/nines/internal/datasources"
+	"github.com/ishantanu/nines/internal/telemetryprovider"
+
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
 	"github.com/ishantanu/nines/internal/model"
 )
@@ -88,4 +91,30 @@ type AccessPermission struct {
 type AccessBinding struct {
 	CredentialRef string `json:"credentialRef"`
 	Role          string `json:"role"`
+}
+
+// ConnectionList is the body of GET /api/connections: configured and managed
+// telemetry connections, the installed providers and the managed-connection
+// limits.
+type ConnectionList struct {
+	Management                string                         `json:"management"`
+	ManagedConnectionsEnabled bool                           `json:"managedConnectionsEnabled"`
+	Providers                 []telemetryprovider.Descriptor `json:"providers"`
+	Connections               []datasources.ConnectionView   `json:"connections"`
+	ManualIngestion           bool                           `json:"manualIngestion"`
+	MaxConnections            int                            `json:"maxConnections"`
+	ManagedProviderRoutes     datasources.ProviderRoutes     `json:"managedProviderRoutes"`
+}
+
+// ConnectionTestResult reports a reachability probe; it stores nothing.
+type ConnectionTestResult struct {
+	Status   string    `json:"status"`
+	TestedAt time.Time `json:"testedAt"`
+	Scope    string    `json:"scope"`
+	Check    string    `json:"check"`
+}
+
+// ConnectionDeleted reports a removed managed connection.
+type ConnectionDeleted struct {
+	State string `json:"state"`
 }

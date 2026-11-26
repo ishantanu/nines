@@ -54,5 +54,5 @@ func (a *Server) connectionDelete(w http.ResponseWriter, r *http.Request) {
 		a.fail(w, r, err)
 		return
 	}
-	write(w, 200, map[string]string{"state": "deleted"})
+	write(w, 200, ConnectionDeleted{State: "deleted"})
 }

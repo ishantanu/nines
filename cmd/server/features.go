@@ -38,9 +38,7 @@ func checkProviderGates(runtimes []tenantRuntime, gates features.Set) error {
 		}
 		if w.ManagedSources != nil {
 			for _, c := range w.ManagedSources.List() {
-				if kind, ok := c["kind"].(string); ok {
-					kinds = append(kinds, kind)
-				}
+				kinds = append(kinds, c.Kind)
 			}
 		}
 		for _, kind := range kinds {

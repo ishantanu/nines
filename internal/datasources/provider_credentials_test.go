@@ -38,7 +38,7 @@ func TestManagedProviderCredentialsRoutesAndRestarts(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			if public["collectionMode"] != "manual" {
+			if public.CollectionMode != "manual" {
 				t.Fatal("manual collection lost")
 			}
 			if _, ok := r.Target("trial"); ok {

@@ -106,8 +106,8 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 		if workspace.ManagedSources != nil {
 			for _, connection := range workspace.ManagedSources.List() {
 				count++
-				kinds[connection["kind"].(string)] = true
-				connections = append(connections, map[string]string{"id": connection["id"].(string), "kind": connection["kind"].(string)})
+				kinds[connection.Kind] = true
+				connections = append(connections, map[string]string{"id": connection.ID, "kind": connection.Kind})
 			}
 		}
 		kind := "manual"

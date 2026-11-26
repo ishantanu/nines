@@ -16,13 +16,9 @@ browser:
   POST /auth/logout: browser session
   POST /auth/logout-all: browser session
 uncovered:
-  - DELETE /api/connections/{connection}
   - GET /api/audit
   - GET /api/audit/archive
   - GET /api/audit/{id}
-  - GET /api/connections
-  - GET /api/connections/{connection}/metrics
-  - GET /api/connections/{connection}/telemetry
   - GET /api/events
   - GET /api/resources/search
   - GET /api/skills
@@ -31,12 +27,9 @@ uncovered:
   - GET /api/slo-templates/{template}
   - GET /api/topology/resources
   - GET /api/workspace
-  - POST /api/connections
-  - POST /api/connections/{connection}/test
   - POST /api/slo-templates/{template}/render
   - POST /auth/cli/exchange
   - POST /auth/cli/ldap
   - POST /auth/cli/logout
   - POST /auth/cli/password
   - POST /auth/cli/start
-  - PUT /api/connections/{connection}

@@ -136,7 +136,7 @@ func (r *Registry) Target(name string) (rules.Target, bool) {
 	}
 	return *e.target, true
 }
-func (r *Registry) public(e entry) map[string]any {
+func (r *Registry) public(e entry) ConnectionView {
 	auth := "none"
 	if len(e.Secret) > 0 {
 		auth = "provider_credentials"
@@ -153,9 +153,9 @@ func (r *Registry) public(e entry) map[string]any {
 		}
 	}
 	descriptor, _ := providers.Default.Describe(e.Kind)
-	return map[string]any{"capabilities": descriptor.Capabilities, "queryLanguages": descriptor.QueryLanguages, "id": e.Name, "kind": e.Kind, "endpoint": e.URL, "mimirOrgID": e.MimirOrgID, "authentication": auth, "configuration": "managed", "version": e.Version, "rules": destination, "options": copyOptions(e.Options), "collectionMode": collectionMode(e.CollectionMode)}
+	return ConnectionView{Capabilities: descriptor.Capabilities, QueryLanguages: descriptor.QueryLanguages, ID: e.Name, Kind: e.Kind, Endpoint: e.URL, MimirOrgID: e.MimirOrgID, Authentication: auth, Configuration: "managed", Version: e.Version, Rules: destination, Options: copyOptions(e.Options), CollectionMode: collectionMode(e.CollectionMode)}
 }
-func (r *Registry) List() []map[string]any {
+func (r *Registry) List() []ConnectionView {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	names := []string{}
@@ -163,7 +163,7 @@ func (r *Registry) List() []map[string]any {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	out := []map[string]any{}
+	out := []ConnectionView{}
 	for _, name := range names {
 		out = append(out, r.public(r.entries[name]))
 	}
@@ -281,21 +281,21 @@ func (r *Registry) referenced(ctx context.Context, name string) bool {
 
 // Save is called under the definition lock, preventing a reference from being
 // created concurrently with an endpoint identity change or deletion.
-func (r *Registry) Save(ctx context.Context, in Input) (map[string]any, error) {
+func (r *Registry) Save(ctx context.Context, in Input) (ConnectionView, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if !r.Enabled() {
-		return nil, model.ErrUnavailable
+		return ConnectionView{}, model.ErrUnavailable
 	}
 	if r.reserved[in.Name] {
-		return nil, model.Invalid("this source is managed by server configuration")
+		return ConnectionView{}, model.Invalid("this source is managed by server configuration")
 	}
 	old, exists := r.entries[in.Name]
 	if in.ExpectedVersion < 0 || (!exists && in.ExpectedVersion != 0) || (exists && old.Version != in.ExpectedVersion) {
-		return nil, model.ErrRevisionConflict
+		return ConnectionView{}, model.ErrRevisionConflict
 	}
 	if !exists && len(r.entries)+len(r.reserved) >= 21 {
-		return nil, model.Invalid("tenant connection limit reached")
+		return ConnectionView{}, model.Invalid("tenant connection limit reached")
 	}
 	v := record{NativeEntityGUID: in.NativeEntityGUID, Name: in.Name, Kind: in.Kind, URL: strings.TrimRight(in.URL, "/"), MimirOrgID: in.MimirOrgID, RulesEnabled: in.RulesEnabled, Reload: in.Reload, AutoDeploy: in.AutoDeploy, RulerURL: strings.TrimRight(in.RulerURL, "/"), Version: in.ExpectedVersion + 1, Secret: old.Secret, CredentialFormat: old.CredentialFormat, Options: copyOptions(in.Options), CollectionMode: in.CollectionMode}
 	publicationChanged := old.RulesEnabled != v.RulesEnabled || old.NativeEntityGUID != v.NativeEntityGUID
@@ -303,18 +303,18 @@ func (r *Registry) Save(ctx context.Context, in Input) (map[string]any, error) {
 		publicationChanged = false
 	}
 	if exists && (old.URL != v.URL || old.Kind != v.Kind || old.MimirOrgID != v.MimirOrgID || publicationChanged || old.RulerURL != v.RulerURL || model.DefinitionDigest(copyOptions(old.Options)) != model.DefinitionDigest(v.Options)) && r.referenced(ctx, in.Name) {
-		return nil, model.Invalid("source is referenced by an SLO or measurement binding; create a new connection and review definition changes")
+		return ConnectionView{}, model.Invalid("source is referenced by an SLO or measurement binding; create a new connection and review definition changes")
 	}
 	if old.Kind != v.Kind {
 		v.Secret = nil
 		v.CredentialFormat = ""
 	}
 	if err := r.updateCredentials(&v, in); err != nil {
-		return nil, err
+		return ConnectionView{}, err
 	}
 	next, err := r.prepare(v)
 	if err != nil {
-		return nil, err
+		return ConnectionView{}, err
 	}
 	err = r.repo.Update(ctx, "data-sources:"+r.tenant, func(tx identity.Tx) error {
 		current, e := tx.Get("data_source", r.tenant, in.Name)
@@ -333,7 +333,7 @@ func (r *Registry) Save(ctx context.Context, in Input) (map[string]any, error) {
 		return tx.Put("data_source", r.tenant, in.Name, encodeRecord(v), time.Time{})
 	})
 	if err != nil {
-		return nil, err
+		return ConnectionView{}, err
 	}
 	r.entries[in.Name] = next
 	return r.public(next), nil

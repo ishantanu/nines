@@ -159,8 +159,12 @@ func (g *generator) object(t reflect.Type) map[string]any {
 			}
 			s := g.schema(f.Type)
 			omit := strings.Contains(opts, "omitempty")
-			if f.Type.Kind() == reflect.Pointer && !omit {
+			switch kind := f.Type.Kind(); {
+			case kind == reflect.Pointer && !omit:
 				s = map[string]any{"oneOf": []any{s, map[string]any{"type": "null"}}}
+			case (kind == reflect.Map || kind == reflect.Slice) && !omit && !stringEncoded[f.Type] && s["type"] != "string":
+				// encoding/json writes a nil map or slice as null.
+				s["type"] = []any{s["type"], "null"}
 			}
 			properties[name] = s
 			if !omit && !slices.Contains(optionalFields[t], name) {

@@ -26,7 +26,7 @@ func TestManagedSourcesEncryptPersistAndEnforceDatasetBounds(t *testing.T) {
 	r := create()
 	in := Input{Name: "prod", Kind: "mimir", URL: "https://metrics.test/prometheus", MimirOrgID: "alpha-org", BearerToken: "super-private-token", RulesEnabled: true}
 	out, err := r.Save(ctx, in)
-	if err != nil || out["version"] != int64(1) {
+	if err != nil || out.Version != 1 {
 		t.Fatal(out, err)
 	}
 	if strings.Contains(string(encodeRecord(out)), in.BearerToken) {
