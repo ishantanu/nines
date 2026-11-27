@@ -81,7 +81,7 @@ nines intent conversations run CONVERSATION_ID -f prepare.yaml
 
 - With a configured identity service, platform administrators can pause Jev and set per-tenant daily request limits in the [admin console](platform-administration.md#jev-controls).
   - These persisted UTC-day request reservations are separate from per-run consent and the generative model budget.
-  - Provider keys, pinned model routes and tenant provisioning remain server-owned.
+  - Provider keys and pinned model routes remain server-owned.
 
 ## Failure, audit and approval
 

@@ -1,6 +1,6 @@
 # Platform administration
 
-The admin console is at `/admin/tenants`, with separate pages for [users](#users-and-tenant-access), [Jev policies](#jev-controls) and [audit history](#audit-history).
+The admin console is at `/admin/tenants`, where you [create and manage tenants](#tenants), with separate pages for [users](#users-and-tenant-access), [Jev policies](#jev-controls) and [audit history](#audit-history).
 
 - Platform administrators manage deployment-wide identity and configuration controls. Tenant owners administer their own workspaces. Neither role implies the other: a platform administrator without a tenant membership cannot read or change that tenant’s SLOs through tenant APIs.
 
@@ -38,13 +38,49 @@ platformAdmins:
   - For LDAP, use the configured stable subject attribute.
   - Platform privileges are checked against the current server-owned allowlist on each request.
   - Changing a provider’s identity binding invalidates the old session.
-- Administrator assignments and tenant provisioning remain in server configuration.
+- Administrator assignments remain in server configuration. Tenants can be [created in the console](#tenants); tenants defined in `TENANTS_FILE` stay managed there.
   - The console cannot silently promote an ordinary identity to platform administrator, change the trust configuration or delete its own recovery administrator.
   - Keep a separately configured recovery identity and retain access to the authentication configuration.
-- Browser sessions are required.
-  - Tenant API keys, service-account keys and tenant-scoped CLI credentials cannot access platform endpoints, even if their tenant role is `owner`.
-  - Mutations require the existing browser CSRF token and a nonempty reason.
-  - Platform requests do not accept `X-Nines-Tenant`; their scope is explicit in the operation.
+- Sign in as a person: in the browser, or with `nines auth login` for the [command line](#from-the-command-line).
+  - A CLI token works only while the browser session that approved it is valid, and only for a configured platform administrator.
+  - API keys and service-account keys cannot access platform endpoints, even if their tenant role is `owner`.
+  - Browser changes require the CSRF token; every change requires a nonempty reason. The audit history records whether a change came from the browser or the CLI.
+  - Platform requests do not accept `X-Nines-Tenant`; their scope is explicit in the operation. The [API reference](api.md) documents every platform operation.
+
+## Tenants
+
+Create a tenant for a new team without editing the tenants file or restarting the server.
+
+1. Open **Tenants** and select **Create tenant**.
+2. Enter an ID (lowercase letters, digits and hyphens; it cannot change later) and a display name.
+3. Choose the first owner: a new local account with an initial password, or someone who can already sign in through a configured provider.
+4. Give a reason and create it.
+
+- The tenant is ready at once: its owner can sign in, add telemetry connections, invite people and create SLOs. Every server process serves it within 10 seconds, including separate collector processes.
+- Each tenant has its own database schema, rules, collection and background work. Nothing is shared with other tenants.
+- **Rename** changes the display name. The ID stays the same.
+- **Retire** stops collection and alerting and makes the tenant read-only. People keep read access and its data is kept.
+- **Delete** is available once a tenant is retired. Type its ID to confirm. It permanently deletes the tenant's SLOs, measurements, history, members, teams and access keys, and its sessions and keys stop working at once. If deletion is interrupted, the tenant shows **Deletion incomplete**; select **Finish deleting** to resume.
+- Tenants from server configuration are marked **Configured** and are changed there. The ID `default` is reserved for the server's base tenant.
+- Every change needs a reason, is refused if someone changed the tenant first, and is recorded in [audit history](#audit-history).
+- Creating tenants here needs the identity service and a PostgreSQL database. Without them, as in `-demo` or `-memory` mode, the console lists the configured tenants only.
+
+### From the command line
+
+Sign in once with `nines auth login`, then:
+
+```sh
+nines admin tenants list
+printf '%s\n' "$INITIAL_PASSWORD" | nines admin tenants create payments --name Payments \
+  --owner-username pat --owner-name "Pat Example" --owner-password-stdin --reason "Onboard the payments team"
+nines admin tenants rename payments --name "Payments platform" --reason "Team renamed"
+nines admin tenants retire payments --reason "Merged into billing"
+nines admin tenants delete payments --confirm-id payments --reason "Merged into billing"
+```
+
+- To make someone who can already sign in the first owner, use `--owner-provider` and `--owner-subject` instead of the local account flags.
+- A new owner's password is read from stdin, never from a flag, so it stays out of shell history and process lists.
+- Changes use the tenant's current version unless you pass `--expected-version`; then they are refused if someone changed the tenant since that version.
 
 ## Users and tenant access
 

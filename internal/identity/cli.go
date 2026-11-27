@@ -352,6 +352,7 @@ func (s *Service) CLIActor(ctx context.Context, token string) (Actor, error) {
 		}
 		a.Grants = map[string]string{g.Tenant: role}
 		a.Session = false
+		a.cli = true
 		a.Expires = minTime(a.Expires, g.Expires)
 		return nil
 	})

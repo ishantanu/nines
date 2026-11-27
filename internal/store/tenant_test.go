@@ -148,3 +148,52 @@ func TestPostgresTenantSchemasIsolateAllResources(t *testing.T) {
 		t.Fatal("tenant data leaked into legacy namespace", original, err)
 	}
 }
+
+// Deleting a tenant's data drops only its schema, and never the default
+// tenant's base schema.
+func TestDeleteTenantDataDropsOnlyThatTenant(t *testing.T) {
+	_, base := postgres(t)
+	ctx := context.Background()
+	slo := model.SLO{ID: "checkout", Project: "p", Service: "api", Name: "Checkout", Target: .99, WindowSeconds: 3600, StepSeconds: 60}
+	open := func(id string) (*store.Postgres, string) {
+		t.Helper()
+		scoped, err := store.TenantDatabaseURL(ctx, base, id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		st, err := store.NewPostgres(ctx, scoped)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return st, scoped
+	}
+	gone, _ := open("retiring")
+	if err := service.New(gone, nil).Create(ctx, slo); err != nil {
+		t.Fatal(err)
+	}
+	gone.Close()
+	kept, _ := open("staying")
+	defer kept.Close()
+	if err := service.New(kept, nil).Create(ctx, slo); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.DeleteTenantData(ctx, base, "default"); err == nil {
+		t.Fatal("deleted the default tenant's base schema")
+	}
+	if err := store.DeleteTenantData(ctx, base, "retiring"); err != nil {
+		t.Fatal(err)
+	}
+	// Deleting again is harmless, so an interrupted deletion can resume.
+	if err := store.DeleteTenantData(ctx, base, "retiring"); err != nil {
+		t.Fatal(err)
+	}
+	if list, err := kept.List(ctx); err != nil || len(list) != 1 {
+		t.Fatal("another tenant's data changed", list, err)
+	}
+	reopened, _ := open("retiring")
+	defer reopened.Close()
+	if list, err := reopened.List(ctx); err != nil || len(list) != 0 {
+		t.Fatal("deleted tenant data remains", list, err)
+	}
+}

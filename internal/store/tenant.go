@@ -34,14 +34,7 @@ func TenantDatabaseURL(ctx context.Context, base, id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// Include the configured base namespace so test/deployment namespaces do not
-	// alias one another when they happen to share a database.
-	namespace := config.ConnConfig.RuntimeParams["search_path"]
-	if namespace == "" {
-		namespace = "public"
-	}
-	sum := sha256.Sum256([]byte(namespace + "\x00" + id))
-	schemaName := "wp_tenant_" + hex.EncodeToString(sum[:16])
+	schemaName := tenantSchema(config, id)
 	config.ConnConfig.Tracer = observability.PGTracer{}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
@@ -55,4 +48,37 @@ func TenantDatabaseURL(ctx context.Context, base, id string) (string, error) {
 	query.Set("search_path", schemaName)
 	u.RawQuery = query.Encode()
 	return strings.TrimSpace(u.String()), nil
+}
+
+// tenantSchema names a tenant's schema. It includes the configured base
+// namespace so test or deployment namespaces sharing a database do not alias
+// one another.
+func tenantSchema(config *pgxpool.Config, id string) string {
+	namespace := config.ConnConfig.RuntimeParams["search_path"]
+	if namespace == "" {
+		namespace = "public"
+	}
+	sum := sha256.Sum256([]byte(namespace + "\x00" + id))
+	return "wp_tenant_" + hex.EncodeToString(sum[:16])
+}
+
+// DeleteTenantData drops a tenant's schema and everything in it: SLOs,
+// samples, workflows, reviews, replays and connections. It cannot be undone.
+// The default tenant, which uses the base schema, is refused.
+func DeleteTenantData(ctx context.Context, base, id string) error {
+	if !tenancy.ValidID(id) || id == "default" {
+		return fmt.Errorf("refusing to delete data for tenant %q", id)
+	}
+	config, err := pgxpool.ParseConfig(base)
+	if err != nil {
+		return err
+	}
+	config.ConnConfig.Tracer = observability.PGTracer{}
+	pool, err := pgxpool.NewWithConfig(ctx, config)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	_, err = pool.Exec(ctx, "DROP SCHEMA IF EXISTS "+pgx.Identifier{tenantSchema(config, id)}.Sanitize()+" CASCADE")
+	return err
 }

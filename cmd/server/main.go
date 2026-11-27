@@ -23,6 +23,7 @@ import (
 	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/slotemplates"
+	"github.com/ishantanu/nines/internal/store"
 )
 
 func main() {
@@ -115,19 +116,29 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	log.Info("feature gates", "experimental", gates.List())
-	workspaces := make([]httpapi.Workspace, 0, len(runtimes))
-	for _, runtime := range runtimes {
-		workspace := runtime.Workspace
+	// Settings every tenant gets, including those created while running.
+	prepare := func(workspace *httpapi.Workspace) {
 		workspace.Features = gates
 		workspace.Service.IncidentsEnabled = gates.Enabled("incidents")
 		if sharedTemplates != nil {
-			if workspace.Templates != nil {
-				return fmt.Errorf("configure shared or tenant-local extension locks, not both")
-			}
 			workspace.Templates = sharedTemplates
 		}
-		workspaces = append(workspaces, workspace)
 	}
+	workspaces := make([]httpapi.Workspace, 0, len(runtimes))
+	configured := map[string]bool{}
+	for _, runtime := range runtimes {
+		workspace := runtime.Workspace
+		if sharedTemplates != nil && workspace.Templates != nil {
+			return fmt.Errorf("configure shared or tenant-local extension locks, not both")
+		}
+		prepare(&workspace)
+		workspaces = append(workspaces, workspace)
+		configured[workspace.ID] = true
+	}
+	// Tenants created in the platform console live in the identity database,
+	// so they exist only when identity is configured and storage is durable.
+	registry := *authFile != "" && !*demo && !*memory
+	options := tenantOptions{identityEnabled: true, collectorOnly: *processRole == "collector"}
 	services := make([]*service.Service, 0, len(runtimes))
 	for _, runtime := range runtimes {
 		services = append(services, runtime.Workspace.Service)
@@ -137,28 +148,32 @@ func run(log *slog.Logger) error {
 		return err
 	}
 	if *processRole == "collector" {
+		if registry {
+			repo, err := openIdentityRepository(ctx)
+			if err != nil {
+				return err
+			}
+			defer repo.Close()
+			reconciler := &tenantReconciler{repo: repo, opts: options, configured: configured, prepare: prepare, scheduler: scheduler, log: log}
+			defer reconciler.Close()
+			if err = reconciler.Reconcile(ctx); err != nil {
+				return fmt.Errorf("tenant registry: %w", err)
+			}
+			go reconciler.Run(ctx)
+		}
 		log.Info("collection worker started", "tenants", len(services), "workers", *collectionWorkers)
 		scheduler.Run(ctx, log)
 		return nil
 	}
 	var auth *identity.Service
+	var identityRepo identity.Repository
 	if *authFile != "" {
-		var repo identity.Repository
 		if *memory {
-			repo = identity.NewMemory()
-		} else {
-			db := os.Getenv("AUTH_DATABASE_URL")
-			if db == "" {
-				db = os.Getenv("DATABASE_URL")
-			}
-			if db == "" {
-				return fmt.Errorf("authentication requires AUTH_DATABASE_URL or DATABASE_URL")
-			}
-			repo, err = identity.NewPostgres(ctx, db)
-			if err != nil {
-				return fmt.Errorf("identity database: %w", err)
-			}
+			identityRepo = identity.NewMemory()
+		} else if identityRepo, err = openIdentityRepository(ctx); err != nil {
+			return err
 		}
+		repo := identityRepo
 		setup, stopSetup := context.WithTimeout(ctx, 60*time.Second)
 		known := map[string]bool{}
 		for _, w := range workspaces {
@@ -184,10 +199,11 @@ func run(log *slog.Logger) error {
 		}
 		defer auth.Close()
 	}
-	handler, err := httpapi.NewMulti(workspaces, log, auth)
+	router, err := httpapi.NewRouter(workspaces, log, auth)
 	if err != nil {
 		return err
 	}
+	var handler http.Handler = router
 	var workers sync.WaitGroup
 	if auth != nil {
 		workers.Go(func() { auth.Run(ctx) })
@@ -195,34 +211,29 @@ func run(log *slog.Logger) error {
 	if *processRole == "all" {
 		workers.Go(func() { scheduler.Run(ctx, log) })
 	}
+	tenantWorkers := map[string]func(){}
 	for _, runtime := range runtimes {
-		svc := runtime.Workspace.Service
-		tenantLog := log.With("tenant", runtime.Workspace.ID)
-		workers.Go(func() { svc.RunMeasurementMonitor(ctx, tenantLog) })
-		ruleManager := runtime.Workspace.Rules
-		workers.Go(func() { svc.RunRuleReconciler(ctx, ruleManager, tenantLog) })
-		intentConversations := runtime.Workspace.IntentConversations
-		workers.Go(func() { intentConversations.RunWorker(ctx, tenantLog) })
-		workers.Go(func() { intentConversations.RunOutcomeObserver(ctx, tenantLog) })
-		if intentConversations.Archive != nil {
-			workers.Go(func() { intentConversations.Archive.Run(ctx, tenantLog) })
+		tenantWorkers[runtime.Workspace.ID] = startTenantWorkers(ctx, runtime, *demo, log)
+	}
+	defer func() {
+		for _, stop := range tenantWorkers {
+			stop()
 		}
-		replays := runtime.Workspace.Replays
-		workers.Go(func() { replays.RunRetention(ctx, tenantLog) })
-		reviews := runtime.Workspace.Investigations
-		workers.Go(func() { reviews.RunWorker(ctx, tenantLog) })
-		wf := runtime.Workspace.Workflows
-		workers.Go(func() { runWorkflowRecovery(ctx, wf, tenantLog) })
-		if *demo {
-			workers.Go(func() { runDemo(ctx, svc, tenantLog) })
+	}()
+	if registry && auth != nil {
+		reconciler := &tenantReconciler{repo: identityRepo, opts: options, configured: configured, prepare: prepare, router: router, auth: auth, scheduler: scheduler, log: log,
+			workers: func(runtime tenantRuntime) func() { return startTenantWorkers(ctx, runtime, false, log) }}
+		defer reconciler.Close()
+		// Serve every registered tenant from the first request.
+		if err = reconciler.Reconcile(ctx); err != nil {
+			return fmt.Errorf("tenant registry: %w", err)
 		}
-		if runtime.WorkflowWebhook != nil {
-			workers.Go(func() { runtime.WorkflowWebhook.Run(ctx, tenantLog) })
-		}
-		if runtime.Webhook != "" {
-			dispatcher := service.NewDispatcher(svc.Store, runtime.Webhook)
-			dispatcher.TenantID = runtime.Workspace.ID
-			workers.Go(func() { dispatcher.Run(ctx, tenantLog) })
+		workers.Go(func() { reconciler.Run(ctx) })
+		// Platform administrators create, rename, retire and delete tenants;
+		// this process applies each change before replying.
+		auth.TenantsChanged = reconciler.Reconcile
+		auth.DeleteTenantData = func(ctx context.Context, id string) error {
+			return store.DeleteTenantData(ctx, os.Getenv("DATABASE_URL"), id)
 		}
 	}
 	server := &http.Server{Addr: *addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 3 * time.Minute, IdleTimeout: 60 * time.Second}
@@ -251,6 +262,63 @@ func run(log *slog.Logger) error {
 		return nil
 	}
 	return err
+}
+
+// startTenantWorkers runs one tenant's background work: measurement checks,
+// rule reconciliation, reviews, workflows and alert delivery. The returned
+// function stops it and waits, for a tenant retired while the server runs.
+func startTenantWorkers(parent context.Context, runtime tenantRuntime, demo bool, log *slog.Logger) func() {
+	ctx, cancel := context.WithCancel(parent)
+	var workers sync.WaitGroup
+	svc := runtime.Workspace.Service
+	tenantLog := log.With("tenant", runtime.Workspace.ID)
+	workers.Go(func() { svc.RunMeasurementMonitor(ctx, tenantLog) })
+	ruleManager := runtime.Workspace.Rules
+	workers.Go(func() { svc.RunRuleReconciler(ctx, ruleManager, tenantLog) })
+	intentConversations := runtime.Workspace.IntentConversations
+	workers.Go(func() { intentConversations.RunWorker(ctx, tenantLog) })
+	workers.Go(func() { intentConversations.RunOutcomeObserver(ctx, tenantLog) })
+	if intentConversations.Archive != nil {
+		workers.Go(func() { intentConversations.Archive.Run(ctx, tenantLog) })
+	}
+	replays := runtime.Workspace.Replays
+	workers.Go(func() { replays.RunRetention(ctx, tenantLog) })
+	reviews := runtime.Workspace.Investigations
+	workers.Go(func() { reviews.RunWorker(ctx, tenantLog) })
+	wf := runtime.Workspace.Workflows
+	workers.Go(func() { runWorkflowRecovery(ctx, wf, tenantLog) })
+	if demo {
+		workers.Go(func() { runDemo(ctx, svc, tenantLog) })
+	}
+	if runtime.WorkflowWebhook != nil {
+		workers.Go(func() { runtime.WorkflowWebhook.Run(ctx, tenantLog) })
+	}
+	if runtime.Webhook != "" {
+		dispatcher := service.NewDispatcher(svc.Store, runtime.Webhook)
+		dispatcher.TenantID = runtime.Workspace.ID
+		workers.Go(func() { dispatcher.Run(ctx, tenantLog) })
+	}
+	return func() {
+		cancel()
+		workers.Wait()
+	}
+}
+
+// openIdentityRepository opens the identity database: AUTH_DATABASE_URL, or
+// DATABASE_URL when identity shares the server database.
+func openIdentityRepository(ctx context.Context) (identity.Repository, error) {
+	db := os.Getenv("AUTH_DATABASE_URL")
+	if db == "" {
+		db = os.Getenv("DATABASE_URL")
+	}
+	if db == "" {
+		return nil, fmt.Errorf("authentication requires AUTH_DATABASE_URL or DATABASE_URL")
+	}
+	repo, err := identity.NewPostgres(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("identity database: %w", err)
+	}
+	return repo, nil
 }
 
 func seed(ctx context.Context, svc *service.Service) error {

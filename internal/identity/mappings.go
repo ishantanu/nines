@@ -149,7 +149,7 @@ func (s *Service) evaluateMappings(p ProviderConfig, f federation) (map[string]s
 		return grants, ids
 	}
 	for _, m := range p.RoleMappings {
-		if !s.tenants[m.Tenant] {
+		if !s.knownTenant(m.Tenant) {
 			continue
 		}
 		values := f.Claims.Roles
@@ -198,7 +198,7 @@ func (s *Service) effectiveGrants(tx Tx, u User) (map[string]string, error) {
 		if !validRole(g.Member.EffectiveRole, true) {
 			return nil, ErrForbidden
 		}
-		if s.tenants[g.Tenant] && rank(g.Member.EffectiveRole) > rank(grants[g.Tenant]) {
+		if s.knownTenant(g.Tenant) && rank(g.Member.EffectiveRole) > rank(grants[g.Tenant]) {
 			grants[g.Tenant] = g.Member.EffectiveRole
 		}
 	}

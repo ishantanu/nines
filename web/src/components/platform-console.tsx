@@ -3,6 +3,7 @@ import {
   type PlatformDraft as Draft,
 } from "./platform-change-dialog";
 import { useEffect, useRef, useState } from "react";
+import { TenantDialog, type TenantAction } from "./tenant-dialog";
 import { Brand } from "./brand";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -26,6 +27,7 @@ import {
   type PlatformUser,
   type PlatformEvent,
   type PlatformPolicy,
+  type PlatformTenant,
 } from "@/lib/platform";
 
 const blank = (tenant: string, provider: string): Draft => ({
@@ -64,6 +66,10 @@ export function PlatformConsole({
     [busy, setBusy] = useState(false),
     [epoch, setEpoch] = useState(0);
   const [draft, setDraft] = useState<Draft>();
+  const [tenantChange, setTenantChange] = useState<{
+    action: TenantAction;
+    tenant?: PlatformTenant;
+  }>();
   const live = useRef(true),
     generation = useRef(0);
   const csrf = auth.csrfToken ?? "";
@@ -370,15 +376,29 @@ export function PlatformConsole({
             <>
               <Card>
                 <CardHeader>
-                  <CardTitle>
-                    <h2>Configured tenants</h2>
-                  </CardTitle>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <CardTitle>
+                      <h2>All tenants</h2>
+                    </CardTitle>
+                    {overview.tenantProvisioning === "platform console" ? (
+                      <Button
+                        size="sm"
+                        disabled={busy || !csrf}
+                        onClick={() => setTenantChange({ action: "create" })}
+                      >
+                        Create tenant
+                      </Button>
+                    ) : null}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <p className="mb-4 text-sm text-muted-foreground">
-                    Tenant provisioning, provider credentials and pinned model
-                    routes are managed in server configuration. Platform
-                    administration does not grant access to a tenant’s SLO data.
+                    {overview.tenantProvisioning === "platform console"
+                      ? "Create, rename and retire tenants here; each one is ready at once. Tenants from server configuration are marked and are changed there."
+                      : "Tenants are managed in server configuration on this server."}{" "}
+                    Provider credentials and pinned model routes stay in server
+                    configuration. Platform administration does not grant access
+                    to a tenant’s SLO data.
                   </p>
                   <div className="overflow-x-auto">
                     <Table>
@@ -399,6 +419,19 @@ export function PlatformConsole({
                               <div className="text-xs text-muted-foreground">
                                 {tenant.id}
                               </div>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {tenant.managedBy === "configuration" ? (
+                                  <Badge variant="secondary">Configured</Badge>
+                                ) : null}
+                                {tenant.state === "retired" ? (
+                                  <Badge variant="outline">Retired</Badge>
+                                ) : null}
+                                {tenant.state === "deleting" ? (
+                                  <Badge variant="destructive">
+                                    Deletion incomplete
+                                  </Badge>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableCell>
                               {tenant.sourceKind || "manual"}
@@ -408,14 +441,71 @@ export function PlatformConsole({
                               {tenant.systemOne?.model ?? "Not configured"}
                             </TableCell>
                             <TableCell>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={busy}
-                                onClick={() => void editPolicy(tenant.id)}
-                              >
-                                Jev policy
-                              </Button>
+                              <div className="flex flex-wrap gap-2">
+                                {tenant.state !== "deleting" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() => void editPolicy(tenant.id)}
+                                  >
+                                    Jev policy
+                                  </Button>
+                                ) : null}
+                                {tenant.managedBy === "console" ? (
+                                  <>
+                                    {tenant.state === "active" ? (
+                                      <>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={busy}
+                                          aria-label={`Rename ${tenant.name}`}
+                                          onClick={() =>
+                                            setTenantChange({
+                                              action: "rename",
+                                              tenant,
+                                            })
+                                          }
+                                        >
+                                          Rename
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          disabled={busy}
+                                          aria-label={`Retire ${tenant.name}`}
+                                          onClick={() =>
+                                            setTenantChange({
+                                              action: "retire",
+                                              tenant,
+                                            })
+                                          }
+                                        >
+                                          Retire
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        disabled={busy}
+                                        aria-label={`Delete ${tenant.name}`}
+                                        onClick={() =>
+                                          setTenantChange({
+                                            action: "delete",
+                                            tenant,
+                                          })
+                                        }
+                                      >
+                                        {tenant.state === "deleting"
+                                          ? "Finish deleting"
+                                          : "Delete"}
+                                      </Button>
+                                    )}
+                                  </>
+                                ) : null}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -614,6 +704,21 @@ export function PlatformConsole({
           ) : null}
         </main>
       </div>
+      {tenantChange && overview ? (
+        <TenantDialog
+          action={tenantChange.action}
+          tenant={tenantChange.tenant}
+          overview={overview}
+          csrf={csrf}
+          onClose={() => setTenantChange(undefined)}
+          onDone={() => {
+            setTenantChange(undefined);
+            setEpoch((n) => n + 1);
+            // The administrator may now own the tenant, or have lost one.
+            onRefreshAccess();
+          }}
+        />
+      ) : null}
       {draft ? (
         <PlatformChangeDialog
           draft={draft}

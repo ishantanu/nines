@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -23,10 +24,41 @@ type CollectionResult struct {
 // CollectionScheduler limits scheduled work across tenants. A replica has at
 // most one active job per tenant; replicas coordinate individual SLOs in storage.
 type CollectionScheduler struct {
+	// Services are the tenants collected. Change them while running with
+	// Add and Remove.
 	Services    []*Service
 	Concurrency int
 	Poll        time.Duration
 	OnResult    func(CollectionResult)
+	mu          sync.Mutex
+}
+
+// Add schedules a tenant created while the scheduler runs.
+func (w *CollectionScheduler) Add(s *Service) error {
+	if _, ok := s.Store.(store.CollectionQueue); !ok {
+		return errors.New("store does not support durable collection scheduling")
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if slices.Contains(w.Services, s) {
+		return nil
+	}
+	w.Services = append(slices.Clone(w.Services), s)
+	return nil
+}
+
+// Remove stops scheduling a tenant, such as one that was retired. A job
+// already running finishes.
+func (w *CollectionScheduler) Remove(s *Service) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.Services = slices.DeleteFunc(slices.Clone(w.Services), func(x *Service) bool { return x == s })
+}
+
+func (w *CollectionScheduler) services() []*Service {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.Services
 }
 
 func NewCollectionScheduler(services []*Service, concurrency int) (*CollectionScheduler, error) {
@@ -108,30 +140,32 @@ func (w *CollectionScheduler) Run(ctx context.Context, log *slog.Logger) {
 	tick := time.NewTicker(w.Poll)
 	defer tick.Stop()
 	type completion struct {
-		index  int
-		worked bool
-		err    error
+		service *Service
+		worked  bool
+		err     error
 	}
 	done := make(chan completion, w.Concurrency)
-	active := make([]bool, len(w.Services))
-	next := make([]time.Time, len(w.Services))
+	active := map[*Service]bool{}
+	next := map[*Service]time.Time{}
 	running, cursor := 0, 0
 	var group sync.WaitGroup
 	defer group.Wait()
 	launch := func() {
-		for scanned := 0; scanned < len(w.Services) && running < w.Concurrency; scanned++ {
-			i := cursor
-			cursor = (cursor + 1) % len(w.Services)
-			if active[i] || time.Now().Before(next[i]) {
+		services := w.services()
+		for scanned := 0; scanned < len(services) && running < w.Concurrency; scanned++ {
+			cursor %= len(services)
+			s := services[cursor]
+			cursor++
+			if active[s] || time.Now().Before(next[s]) {
 				continue
 			}
-			active[i] = true
+			active[s] = true
 			running++
 			group.Add(1)
 			go func() {
 				defer group.Done()
-				worked, err := w.CollectOne(ctx, w.Services[i])
-				done <- completion{i, worked, err}
+				worked, err := w.CollectOne(ctx, s)
+				done <- completion{s, worked, err}
 			}()
 		}
 	}
@@ -143,13 +177,15 @@ func (w *CollectionScheduler) Run(ctx context.Context, log *slog.Logger) {
 		case <-tick.C:
 			launch()
 		case result := <-done:
-			active[result.index] = false
+			delete(active, result.service)
 			running--
 			if !result.worked || result.err != nil {
-				next[result.index] = time.Now().Add(w.Poll)
+				next[result.service] = time.Now().Add(w.Poll)
+			} else {
+				delete(next, result.service)
 			}
 			if result.err != nil && ctx.Err() == nil {
-				log.Warn("scheduled collection needs attention", "tenant", w.Services[result.index].TenantID)
+				log.Warn("scheduled collection needs attention", "tenant", result.service.TenantID)
 			}
 			launch()
 		}

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -24,6 +26,14 @@ type PlatformTenant struct {
 	SourceKind  string             `json:"sourceKind"`
 	Connections int                `json:"connections"`
 	SystemOne   *v1.SystemOneRoute `json:"systemOne,omitempty"`
+	// ManagedBy is "configuration" for TENANTS_FILE tenants, which the
+	// console cannot change, or "console".
+	ManagedBy string `json:"managedBy"`
+	// State, Version and CreatedAt describe console tenants.
+	State     string     `json:"state,omitempty"`
+	Version   int64      `json:"version,omitempty"`
+	CreatedAt *time.Time `json:"createdAt,omitempty"`
+	RetiredAt *time.Time `json:"retiredAt,omitempty"`
 }
 type PlatformUser struct {
 	User            User                 `json:"user"`
@@ -48,6 +58,8 @@ type PlatformAudit struct {
 	Reason        string    `json:"reason"`
 	Outcome       string    `json:"outcome"`
 	Details       any       `json:"details,omitempty"`
+	// Channel is "browser" or "cli".
+	Channel string `json:"channel,omitempty"`
 }
 type PlatformAIPolicy struct {
 	Version           int64 `json:"version"`
@@ -88,8 +100,12 @@ func (s *Service) isPlatformIdentity(u User) bool {
 	}
 	return false
 }
+
+// platformAdminTx admits a configured platform administrator signed in
+// through the browser, or through a CLI token that browser session approved.
+// The session must still be valid. API keys and service accounts never are.
 func (s *Service) platformAdminTx(tx Tx, a Actor) error {
-	if !a.Session || a.Kind != "user" {
+	if !a.Session && !a.cli || a.Kind != "user" {
 		return ErrForbidden
 	}
 	u, err := read[User](tx, "user", "global", a.ID)
@@ -105,12 +121,34 @@ func (s *Service) platformAdminTx(tx Tx, a Actor) error {
 	}
 	return nil
 }
+
+// ConfigurePlatform sets the tenants the platform console lists. It is
+// called again when tenants are created or retired.
 func (s *Service) ConfigurePlatform(tenants []PlatformTenant, guards ...func([]byte) bool) {
-	s.platformGuards = guards
-	s.platformTenants = map[string]PlatformTenant{}
+	inventory := map[string]PlatformTenant{}
 	for _, t := range tenants {
-		s.platformTenants[t.ID] = t
+		inventory[t.ID] = t
 	}
+	s.tenantMu.Lock()
+	defer s.tenantMu.Unlock()
+	s.platformGuards = guards
+	s.platformTenants = inventory
+}
+func (s *Service) platformTenant(id string) (PlatformTenant, bool) {
+	s.tenantMu.RLock()
+	defer s.tenantMu.RUnlock()
+	t, ok := s.platformTenants[id]
+	return t, ok
+}
+func (s *Service) platformInventory() []PlatformTenant {
+	s.tenantMu.RLock()
+	defer s.tenantMu.RUnlock()
+	return slices.Collect(maps.Values(s.platformTenants))
+}
+func (s *Service) credentialGuards() []func([]byte) bool {
+	s.tenantMu.RLock()
+	defer s.tenantMu.RUnlock()
+	return s.platformGuards
 }
 func (s *Service) recordPlatform(tx Tx, a Actor, action, resource, outcome string, details any) error {
 	if !a.platformOperation {
@@ -119,7 +157,11 @@ func (s *Service) recordPlatform(tx Tx, a Actor, action, resource, outcome strin
 	now := s.Now().UTC()
 	id := model.NewID()
 	cursor := fmt.Sprintf("%020d-%s", now.UnixNano(), id)
-	event := PlatformAudit{ID: id, Cursor: cursor, At: now, ActorID: a.ID, ActorName: a.Name, ActorProvider: a.Provider, Action: action, Resource: resource, Reason: a.platformReason, Outcome: outcome, Details: details}
+	channel := "browser"
+	if a.cli {
+		channel = "cli"
+	}
+	event := PlatformAudit{ID: id, Cursor: cursor, At: now, ActorID: a.ID, ActorName: a.Name, ActorProvider: a.Provider, Action: action, Resource: resource, Reason: a.platformReason, Outcome: outcome, Details: details, Channel: channel}
 	return put(tx, "platform_audit", "global", cursor, event, now.Add(90*24*time.Hour))
 }
 func (s *Service) platformUsers(ctx context.Context, a Actor, before string) (any, error) {
@@ -157,14 +199,14 @@ func (s *Service) platformUsers(ctx context.Context, a Actor, before string) (an
 				return err
 			}
 			for _, g := range direct {
-				if s.tenants[g.Tenant] {
+				if s.knownTenant(g.Tenant) {
 					p.Memberships = append(p.Memberships, PlatformMembership(g))
 				}
 			}
 			sort.Slice(p.Memberships, func(i, j int) bool { return p.Memberships[i].Tenant < p.Memberships[j].Tenant })
 			users = append(users, p)
 		}
-		out = map[string]any{"items": users, "nextCursor": next}
+		out = PlatformUserPage{Items: users, NextCursor: next}
 		return nil
 	})
 	return out, err
@@ -202,7 +244,7 @@ func (s *Service) platformAI(ctx context.Context, a Actor, tenant string) (any, 
 		if err := s.platformAdminTx(tx, a); err != nil {
 			return err
 		}
-		t, ok := s.platformTenants[tenant]
+		t, ok := s.platformTenant(tenant)
 		if !ok {
 			return ErrNotFound
 		}
@@ -215,7 +257,7 @@ func (s *Service) platformAI(ctx context.Context, a Actor, tenant string) (any, 
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return err
 		}
-		out = map[string]any{"tenant": tenant, "configured": t.SystemOne != nil, "route": t.SystemOne, "policy": p, "date": date, "reservedRequests": u.Reserved, "credentialStorage": "server-owned environment reference", "generativeModelsManaged": false}
+		out = PlatformAIStatus{Tenant: tenant, Configured: t.SystemOne != nil, Route: t.SystemOne, Policy: p, Date: date, ReservedRequests: u.Reserved, CredentialStorage: "server-owned environment reference", GenerativeModelsManaged: false}
 		return nil
 	})
 	return out, err
@@ -228,7 +270,7 @@ func (s *Service) savePlatformAI(ctx context.Context, a Actor, tenant string, in
 		if err := s.platformAdminTx(tx, a); err != nil {
 			return err
 		}
-		t, ok := s.platformTenants[tenant]
+		t, ok := s.platformTenant(tenant)
 		if !ok {
 			return ErrNotFound
 		}
@@ -337,7 +379,7 @@ func (s *Service) platformReasonSafe(reason string) bool {
 		}
 	}
 	raw, _ := json.Marshal(reason)
-	for _, guard := range s.platformGuards {
+	for _, guard := range s.credentialGuards() {
 		if guard(raw) {
 			return false
 		}

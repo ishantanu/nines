@@ -5,12 +5,21 @@ export type PlatformTenant = {
   sourceKind: string;
   connections: number;
   systemOne?: { provider: string; model: string; contractDigest: string };
+  // "configuration" tenants come from the server's tenants file and cannot
+  // be changed here; "console" tenants were created by an administrator.
+  managedBy: "configuration" | "console";
+  state?: "active" | "retired" | "deleting";
+  version?: number;
+  createdAt?: string;
+  retiredAt?: string;
 };
 export type PlatformOverview = {
   tenants: PlatformTenant[];
   providers: { id: string; name: string; type: string }[];
   administrators: { provider: string; subject: string }[];
   auditRetentionDays: number;
+  // "platform console" when administrators can create tenants here.
+  tenantProvisioning: "server configuration" | "platform console";
 };
 export type PlatformUser = {
   user: {
