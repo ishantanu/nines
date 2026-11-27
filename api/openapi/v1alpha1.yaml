@@ -4075,6 +4075,418 @@ paths:
           $ref: '#/components/responses/Error'
         '503':
           $ref: '#/components/responses/Error'
+  /api/platform/overview:
+    get:
+      operationId: getPlatformOverview
+      summary: Read the platform overview
+      description: 'Every tenant on the server, with who manages it, its state and version; sign-in providers and platform administrators. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      parameters: []
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformOverview'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/tenants/create:
+    post:
+      operationId: createTenant
+      summary: Create a tenant
+      description: 'Creates a tenant and its first owner (an existing user, or a new local account) in one transaction. It is served at once on this server and within 10 seconds on others. The ID default is reserved. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantCreateRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisteredTenant'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/tenants/rename:
+    post:
+      operationId: renameTenant
+      summary: Rename a tenant
+      description: 'Changes the display name at the expected version. The ID never changes. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantChangeRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisteredTenant'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/tenants/retire:
+    post:
+      operationId: retireTenant
+      summary: Retire a tenant
+      description: 'Stops collection and alerting and makes the tenant read-only, keeping its data. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantChangeRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisteredTenant'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/tenants/delete:
+    post:
+      operationId: deleteTenant
+      summary: Delete a tenant
+      description: 'Permanently deletes a retired tenant: its data, members, teams and access keys. confirm must repeat the ID. If deleting its data fails, the tenant stays deleting and deleting it again resumes. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TenantChangeRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/users:
+    get:
+      operationId: listPlatformUsers
+      summary: List users across tenants
+      description: 'Identities, their tenant memberships and effective grants, and whether each is a platform administrator. Paginated. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters:
+        - name: before
+          in: query
+          required: false
+          description: Cursor from nextCursor, for the next page.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformUserPage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/audit:
+    get:
+      operationId: listPlatformAudit
+      summary: List platform audit records
+      description: 'Platform changes, newest first, kept 90 days. channel says whether a change came from the browser or the CLI. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters:
+        - name: before
+          in: query
+          required: false
+          description: Cursor from nextCursor, for the next page.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformAuditPage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/tenants/{tenant}/system-one:
+    get:
+      operationId: getTenantJevPolicy
+      summary: Read a tenant's Jev policy
+      description: 'Whether Jev is configured and enabled for the tenant, its daily request limit and the requests reserved today (UTC). Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters:
+        - name: tenant
+          in: path
+          required: true
+          description: Tenant ID.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformAIStatus'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/users/create:
+    post:
+      operationId: createPlatformLocalUser
+      summary: Create a local account
+      description: 'Creates a local account with an initial password and a role in one tenant (tenant, user). Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/users/update:
+    post:
+      operationId: updatePlatformLocalUser
+      summary: Edit a local account
+      description: 'Changes a local account''s name and email, or resets its password, at its expected version (userId, user). A password change signs the user out everywhere. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/users/revoke-sessions:
+    post:
+      operationId: revokeUserSessions
+      summary: Sign a user out everywhere
+      description: 'Revokes the user''s browser sessions and CLI tokens (userId, expectedVersion). Service-account keys are separate. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformOK'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/memberships/save:
+    post:
+      operationId: savePlatformMembership
+      summary: Grant a tenant role
+      description: 'Gives a user a direct role in a tenant, at the membership''s expected version (tenant, provider, subject, role, expectedVersion). Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamMember'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/memberships/remove:
+    post:
+      operationId: removePlatformMembership
+      summary: Remove a tenant role
+      description: 'Removes a user''s direct role in a tenant (tenant, userId, expectedVersion). A tenant''s last owner cannot be removed. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformOK'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/system-one/save:
+    post:
+      operationId: saveTenantJevPolicy
+      summary: Change a tenant's Jev policy
+      description: 'Enables or pauses Jev for a tenant and sets its daily request limit (tenant, policy). Model routes and credentials stay in server configuration. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformOK'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -4457,7 +4869,7 @@ components:
             $ref: '#/components/schemas/AuditRecord'
           type:
             - array
-            - "null"
+            - 'null'
         nextCursor:
           type: string
         tenant:
@@ -4496,7 +4908,7 @@ components:
             $ref: '#/components/schemas/IntentAppliedResource'
           type:
             - array
-            - "null"
+            - 'null'
         safetyCheck:
           $ref: '#/components/schemas/IntentSafetyCheck'
         systemOne:
@@ -6092,7 +6504,7 @@ components:
             type: string
           type:
             - object
-            - "null"
+            - 'null'
         rubric:
           type: string
         sampling:
@@ -6947,7 +7359,7 @@ components:
             $ref: '#/components/schemas/IntentMeasurementCandidate'
           type:
             - array
-            - "null"
+            - 'null'
         catalogDigest:
           type: string
         humanConfirmationRequired:
@@ -6961,7 +7373,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         observedAt:
           format: date-time
           type: string
@@ -6970,7 +7382,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         scope:
           $ref: '#/components/schemas/IntentCandidateInput'
         seriesDiscovery:
@@ -6996,7 +7408,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - adapterCalls
         - apiVersion
@@ -7044,7 +7456,7 @@ components:
           description: Explicit equality labels. Reserved labels including le and __ prefixes are rejected.
           type:
             - object
-            - "null"
+            - 'null'
         prefix:
           description: Literal metric prefix, not a query.
           maxLength: 100
@@ -7098,7 +7510,7 @@ components:
             $ref: '#/components/schemas/IntentDefinitionChange'
           type:
             - array
-            - "null"
+            - 'null'
         createdAt:
           format: date-time
           type: string
@@ -7312,7 +7724,7 @@ components:
         manifest:
           type:
             - null
-            - "null"
+            - 'null'
         name:
           type: string
         previous: {}
@@ -7338,7 +7750,7 @@ components:
             $ref: '#/components/schemas/IntentEvidenceComparison'
           type:
             - array
-            - "null"
+            - 'null'
         digest:
           type: string
         expectedRevision:
@@ -7369,7 +7781,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - adapterCalls
         - apiVersion
@@ -7421,7 +7833,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         history:
           $ref: '#/components/schemas/IntentEvidenceHistory'
         historyState:
@@ -7435,7 +7847,7 @@ components:
             $ref: '#/components/schemas/IntentPolicyTradeoff'
           type:
             - array
-            - "null"
+            - 'null'
         state:
           type: string
         target:
@@ -7462,13 +7874,13 @@ components:
         burnRate:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         checks:
           items:
             $ref: '#/components/schemas/QualityCheck'
           type:
             - array
-            - "null"
+            - 'null'
         coverage:
           type: number
         dataStatus:
@@ -7485,7 +7897,7 @@ components:
         reliability:
           oneOf:
             - type: number
-            - type: "null"
+            - type: 'null'
         state:
           type: string
         total:
@@ -7670,7 +8082,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         matchingBoundaryObserved:
           type: boolean
         metric:
@@ -7684,13 +8096,13 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         recipes:
           items:
             $ref: '#/components/schemas/IntentRecipeReference'
           type:
             - array
-            - "null"
+            - 'null'
         requestedMetric:
           type: string
         state:
@@ -7709,7 +8121,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - evidenceDigest
         - id
@@ -7779,7 +8191,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         message:
           type: string
         nextCheckAt:
@@ -7941,7 +8353,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         binding:
           $ref: '#/components/schemas/BindingReference'
         budgetDecision:
@@ -7959,13 +8371,13 @@ components:
             $ref: '#/components/schemas/IntentFieldChange'
           type:
             - array
-            - "null"
+            - 'null'
         limitations:
           items:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         measurementDigest:
           type: string
         mode:
@@ -8143,7 +8555,7 @@ components:
             $ref: '#/components/schemas/IntentPreparationCheck'
           type:
             - array
-            - "null"
+            - 'null'
         confirmation:
           $ref: '#/components/schemas/IntentBindingConfirmation'
           description: Exact saved human measurement confirmation, including actor and timestamp.
@@ -8160,13 +8572,13 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         resources:
           items:
             $ref: '#/components/schemas/IntentReviewResource'
           type:
             - array
-            - "null"
+            - 'null'
       required:
         - checks
         - confirmation
@@ -8225,7 +8637,7 @@ components:
             $ref: '#/components/schemas/IntentDefinitionChange'
           type:
             - array
-            - "null"
+            - 'null'
         createdAt:
           format: date-time
           type: string
@@ -8238,7 +8650,7 @@ components:
             $ref: '#/components/schemas/IntentAppliedResource'
           type:
             - array
-            - "null"
+            - 'null'
         id:
           type: string
         originalDigest:
@@ -9743,6 +10155,274 @@ components:
       required:
         - intent
       type: object
+    PlatformAIPolicy:
+      additionalProperties: false
+      properties:
+        dailyRequestLimit:
+          type: integer
+        enabled:
+          type: boolean
+        version:
+          type: integer
+      required:
+        - dailyRequestLimit
+        - enabled
+        - version
+      type: object
+    PlatformAIStatus:
+      additionalProperties: false
+      properties:
+        configured:
+          type: boolean
+        credentialStorage:
+          type: string
+        date:
+          type: string
+        generativeModelsManaged:
+          type: boolean
+        policy:
+          $ref: '#/components/schemas/PlatformAIPolicy'
+        reservedRequests:
+          type: integer
+        route:
+          oneOf:
+            - $ref: '#/components/schemas/SystemOneRoute'
+            - type: 'null'
+        tenant:
+          type: string
+      required:
+        - configured
+        - credentialStorage
+        - date
+        - generativeModelsManaged
+        - policy
+        - reservedRequests
+        - route
+        - tenant
+      type: object
+    PlatformAdmin:
+      additionalProperties: false
+      properties:
+        provider:
+          type: string
+        subject:
+          type: string
+      required:
+        - provider
+        - subject
+      type: object
+    PlatformAudit:
+      additionalProperties: false
+      properties:
+        action:
+          type: string
+        actorId:
+          type: string
+        actorName:
+          type: string
+        actorProvider:
+          type: string
+        at:
+          format: date-time
+          type: string
+        channel:
+          type: string
+        cursor:
+          type: string
+        details: {}
+        id:
+          type: string
+        outcome:
+          type: string
+        reason:
+          type: string
+        resource:
+          type: string
+      required:
+        - action
+        - actorId
+        - at
+        - cursor
+        - id
+        - outcome
+        - reason
+        - resource
+      type: object
+    PlatformAuditPage:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/PlatformAudit'
+          type:
+            - array
+            - 'null'
+        nextCursor:
+          type: string
+      required:
+        - items
+        - nextCursor
+      type: object
+    PlatformMembership:
+      additionalProperties: false
+      properties:
+        member:
+          $ref: '#/components/schemas/TeamMember'
+        tenant:
+          type: string
+      required:
+        - member
+        - tenant
+      type: object
+    PlatformOK:
+      additionalProperties: false
+      properties:
+        ok:
+          type: boolean
+      required:
+        - ok
+      type: object
+    PlatformOverview:
+      additionalProperties: false
+      properties:
+        administratorRolesManagedBy:
+          type: string
+        administrators:
+          items:
+            $ref: '#/components/schemas/PlatformAdmin'
+          type:
+            - array
+            - 'null'
+        auditRetentionDays:
+          type: integer
+        providers:
+          items:
+            $ref: '#/components/schemas/ProviderView'
+          type:
+            - array
+            - 'null'
+        tenantProvisioning:
+          type: string
+        tenants:
+          items:
+            $ref: '#/components/schemas/PlatformTenant'
+          type:
+            - array
+            - 'null'
+      required:
+        - administratorRolesManagedBy
+        - administrators
+        - auditRetentionDays
+        - providers
+        - tenantProvisioning
+        - tenants
+      type: object
+    PlatformRequest:
+      additionalProperties: false
+      properties:
+        confirm:
+          type: string
+        expectedVersion:
+          type: integer
+        name:
+          type: string
+        newTenant:
+          $ref: '#/components/schemas/TenantInput'
+        policy:
+          $ref: '#/components/schemas/PlatformAIPolicy'
+        provider:
+          type: string
+        reason:
+          type: string
+        role:
+          type: string
+        subject:
+          type: string
+        tenant:
+          type: string
+        user:
+          $ref: '#/components/schemas/LocalUserInput'
+        userId:
+          type: string
+      required:
+        - expectedVersion
+        - reason
+      type: object
+    PlatformTenant:
+      additionalProperties: false
+      properties:
+        connections:
+          type: integer
+        createdAt:
+          format: date-time
+          type: string
+        id:
+          type: string
+        managedBy:
+          type: string
+        name:
+          type: string
+        retiredAt:
+          format: date-time
+          type: string
+        sourceKind:
+          type: string
+        state:
+          type: string
+        systemOne:
+          $ref: '#/components/schemas/SystemOneRoute'
+        version:
+          type: integer
+      required:
+        - connections
+        - id
+        - managedBy
+        - name
+        - sourceKind
+      type: object
+    PlatformUser:
+      additionalProperties: false
+      properties:
+        effectiveGrants:
+          additionalProperties:
+            type: string
+          type:
+            - object
+            - 'null'
+        local:
+          type: boolean
+        memberships:
+          items:
+            $ref: '#/components/schemas/PlatformMembership'
+          type:
+            - array
+            - 'null'
+        platformAdmin:
+          type: boolean
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - effectiveGrants
+        - local
+        - memberships
+        - platformAdmin
+        - user
+      type: object
+    PlatformUserPage:
+      additionalProperties: false
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/PlatformUser'
+          type:
+            - array
+            - 'null'
+        nextCursor:
+          type: string
+      required:
+        - items
+        - nextCursor
+      type: object
     Point:
       additionalProperties: false
       properties:
@@ -9886,6 +10566,33 @@ components:
           maxItems: 2
           items:
             $ref: '#/components/schemas/IntentEvidenceAlternative'
+    RegisteredTenant:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        createdBy:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        retiredAt:
+          format: date-time
+          type: string
+        state:
+          type: string
+        version:
+          type: integer
+      required:
+        - createdAt
+        - createdBy
+        - id
+        - name
+        - state
+        - version
+      type: object
     RequestBased:
       additionalProperties: false
       properties:
@@ -9991,7 +10698,7 @@ components:
             $ref: '#/components/schemas/ResourceSummary'
           type:
             - array
-            - "null"
+            - 'null'
         nextCursor:
           type: string
         observedAt:
@@ -10905,7 +11612,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         revision:
           type: integer
         sli:
@@ -10935,7 +11642,7 @@ components:
             $ref: '#/components/schemas/SLOTemplateCategory'
           type:
             - array
-            - "null"
+            - 'null'
         digest:
           type: string
         extensions:
@@ -10949,7 +11656,7 @@ components:
             $ref: '#/components/schemas/SLOTemplate'
           type:
             - array
-            - "null"
+            - 'null'
         tenant:
           type: string
       required:
@@ -11012,7 +11719,7 @@ components:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         yaml:
           type: string
       required:
@@ -11286,7 +11993,7 @@ components:
         route:
           oneOf:
             - $ref: '#/components/schemas/SystemOneRoute'
-            - type: "null"
+            - type: 'null'
         runId:
           type: string
       required:
@@ -11306,7 +12013,7 @@ components:
             type: number
           type:
             - object
-            - "null"
+            - 'null'
       required:
         - choice
         - confidence
@@ -11609,6 +12316,57 @@ components:
         windowSeconds:
           type: integer
       type: object
+    TenantChangeRequest:
+      additionalProperties: false
+      properties:
+        confirm:
+          type: string
+        expectedVersion:
+          type: integer
+        name:
+          type: string
+        reason:
+          type: string
+        tenant:
+          type: string
+      required:
+        - expectedVersion
+        - reason
+        - tenant
+      type: object
+    TenantCreateRequest:
+      additionalProperties: false
+      properties:
+        newTenant:
+          $ref: '#/components/schemas/TenantInput'
+        reason:
+          type: string
+      required:
+        - newTenant
+        - reason
+      type: object
+    TenantInput:
+      additionalProperties: false
+      properties:
+        confirm:
+          type: string
+        expectedVersion:
+          type: integer
+        id:
+          type: string
+        name:
+          type: string
+        ownerProvider:
+          type: string
+        ownerSubject:
+          type: string
+        ownerUser:
+          $ref: '#/components/schemas/LocalUserInput'
+      required:
+        - expectedVersion
+        - id
+        - name
+      type: object
     TimeSeriesRatio:
       additionalProperties: false
       properties:
@@ -11630,7 +12388,7 @@ components:
             $ref: '#/components/schemas/V1alpha1TopologyResource'
           type:
             - array
-            - "null"
+            - 'null'
         nextCursor:
           type: string
         tenant:
@@ -11885,13 +12643,13 @@ components:
             $ref: '#/components/schemas/WorkspaceConnection'
           type:
             - array
-            - "null"
+            - 'null'
         features:
           items:
             type: string
           type:
             - array
-            - "null"
+            - 'null'
         journeysConfigured:
           type: boolean
         mode:

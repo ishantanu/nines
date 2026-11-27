@@ -293,7 +293,7 @@ func (s *Service) platformTenantList(ctx context.Context) ([]PlatformTenant, err
 
 // platformTenantChange applies a console tenant change and serves it on
 // this process before replying.
-func (s *Service) platformTenantChange(ctx context.Context, a Actor, action string, in platformMutation) (any, error) {
+func (s *Service) platformTenantChange(ctx context.Context, a Actor, action string, in PlatformRequest) (any, error) {
 	if s.TenantsChanged == nil {
 		return nil, fmt.Errorf("tenants are managed by server configuration on this server: %w", ErrConflict)
 	}
@@ -320,7 +320,7 @@ func (s *Service) platformTenantChange(ctx context.Context, a Actor, action stri
 			}
 			return s.DeleteTenantData(ctx, in.Tenant)
 		})
-		out = map[string]string{"status": "deleted"}
+		out = StatusResult{Status: "deleted"}
 	}
 	if err != nil {
 		return nil, err

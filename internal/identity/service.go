@@ -79,7 +79,10 @@ type flow struct {
 	Expires  time.Time `json:"expiresAt"`
 }
 type Actor struct {
-	sessionHash       string
+	sessionHash string
+	// cli marks a CLI token, which carries the browser session that
+	// approved it; platform requests from it need no CSRF token.
+	cli               bool
 	PlatformAdmin     bool `json:"platformAdmin,omitempty"`
 	platformOperation bool
 	platformReason    string

@@ -1,6 +1,10 @@
 package identity
 
-import "time"
+import (
+	"time"
+
+	v1 "github.com/ishantanu/nines/api/v1alpha1"
+)
 
 // Request and response bodies of the team access API, named so the OpenAPI
 // contract is generated from, and checked against, the shapes encoded.
@@ -87,4 +91,62 @@ type CLIToken struct {
 	Tenant  string    `json:"tenant"`
 	Actor   Actor     `json:"actor"`
 	Role    string    `json:"role"`
+}
+
+// PlatformOverview is the body of GET /api/platform/overview.
+type PlatformOverview struct {
+	Tenants                     []PlatformTenant `json:"tenants"`
+	Providers                   []ProviderView   `json:"providers"`
+	Administrators              []PlatformAdmin  `json:"administrators"`
+	AdministratorRolesManagedBy string           `json:"administratorRolesManagedBy"`
+	// TenantProvisioning is "platform console" when tenants can be created
+	// and changed through the platform API, else "server configuration".
+	TenantProvisioning string `json:"tenantProvisioning"`
+	AuditRetentionDays int    `json:"auditRetentionDays"`
+}
+
+// TenantCreateRequest is the body of POST /api/platform/tenants/create.
+type TenantCreateRequest struct {
+	Reason    string      `json:"reason"`
+	NewTenant TenantInput `json:"newTenant"`
+}
+
+// TenantChangeRequest is the body of POST /api/platform/tenants/rename,
+// retire and delete: the tenant, the version the caller read, and for
+// rename the new name or for delete the ID repeated.
+type TenantChangeRequest struct {
+	Reason          string `json:"reason"`
+	Tenant          string `json:"tenant"`
+	Name            string `json:"name,omitempty"`
+	Confirm         string `json:"confirm,omitempty"`
+	ExpectedVersion int64  `json:"expectedVersion"`
+}
+
+// PlatformUserPage is a page of users across tenants.
+type PlatformUserPage struct {
+	Items      []PlatformUser `json:"items"`
+	NextCursor string         `json:"nextCursor"`
+}
+
+// PlatformAuditPage is a page of platform audit records, newest first.
+type PlatformAuditPage struct {
+	Items      []PlatformAudit `json:"items"`
+	NextCursor string          `json:"nextCursor"`
+}
+
+// PlatformAIStatus is a tenant's Jev (System One) policy and today's usage.
+type PlatformAIStatus struct {
+	Tenant                  string             `json:"tenant"`
+	Configured              bool               `json:"configured"`
+	Route                   *v1.SystemOneRoute `json:"route"`
+	Policy                  PlatformAIPolicy   `json:"policy"`
+	Date                    string             `json:"date"`
+	ReservedRequests        int                `json:"reservedRequests"`
+	CredentialStorage       string             `json:"credentialStorage"`
+	GenerativeModelsManaged bool               `json:"generativeModelsManaged"`
+}
+
+// PlatformOK acknowledges a platform change with no other result.
+type PlatformOK struct {
+	OK bool `json:"ok"`
 }
