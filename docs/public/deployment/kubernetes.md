@@ -72,6 +72,7 @@ extraEnvFrom:
 - `auth.config` and `tenants.config` take the formats in [identity and tenants](identity-and-tenants.md). Keep credentials in Secrets, referenced through `extraEnvFrom`.
 - To supply your own administrator password and encryption key instead of generated ones, set `credentials.existingSecret` to a Secret with `NINES_BOOTSTRAP_PASSWORD` and `NINES_SOURCE_ENCRYPTION_KEY`.
 - Pin an image by digest with `image.digest`. Released charts already do.
+- Export Nines' own traces, metrics and logs with `telemetry.otlpEndpoint`, such as `http://otel-collector.observability.svc:4318`, and optional `telemetry.resourceAttributes`. See [monitor Nines itself](monitoring.md).
 
 ### The operator
 

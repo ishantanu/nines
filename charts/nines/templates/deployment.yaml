@@ -48,6 +48,7 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args: ['-addr', '0.0.0.0:8080']
           env:
+            {{- include "nines.telemetryEnv" (list "nines-server" .) | nindent 12 }}
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:

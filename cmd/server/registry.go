@@ -4,10 +4,12 @@ import (
 	"context"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/identity"
+	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/service"
 	"github.com/ishantanu/nines/internal/tenancy"
 )
@@ -34,6 +36,8 @@ type tenantReconciler struct {
 
 	mu   sync.Mutex
 	live map[string]*liveTenant
+	// lastSuccess is when a reconcile last completed, for telemetry.
+	lastSuccess atomic.Pointer[time.Time]
 }
 
 type liveTenant struct {
@@ -45,7 +49,15 @@ type liveTenant struct {
 
 // Reconcile mounts new registry tenants and retires retired ones. A tenant
 // that fails to open is skipped and retried on the next pass.
-func (r *tenantReconciler) Reconcile(ctx context.Context) error {
+func (r *tenantReconciler) Reconcile(ctx context.Context) (err error) {
+	start := time.Now()
+	defer func() {
+		observability.TenantsReconciled(ctx, time.Since(start), err)
+		if err == nil {
+			now := time.Now()
+			r.lastSuccess.Store(&now)
+		}
+	}()
 	registered, err := identity.RegisteredTenants(ctx, r.repo)
 	if err != nil {
 		return err
@@ -71,9 +83,12 @@ func (r *tenantReconciler) Reconcile(ctx context.Context) error {
 			continue
 		}
 		if !ok {
-			if live, err = r.open(ctx, t); err != nil {
-				// The cause is not logged: opening a tenant reads credentials.
-				r.log.Error("registered tenant could not be opened; retrying. Check database connectivity and connection settings", "tenant", t.ID)
+			var stage string
+			var openErr error
+			if live, stage, openErr = r.open(ctx, t); openErr != nil {
+				// Only a class is logged: the error can carry configuration.
+				observability.TenantOpenFailed(ctx, stage, openErr)
+				r.log.Error("registered tenant could not be served; retrying. Check database connectivity and connection settings", "tenant", t.ID, "stage", stage, "error.class", observability.ErrorClass(openErr))
 				continue
 			}
 			r.live[t.ID] = live
@@ -98,11 +113,13 @@ func (r *tenantReconciler) Reconcile(ctx context.Context) error {
 	return nil
 }
 
-func (r *tenantReconciler) open(ctx context.Context, t identity.RegisteredTenant) (*liveTenant, error) {
+// open serves a registered tenant. On failure it reports the stage that
+// failed: open (its stores), schedule or mount.
+func (r *tenantReconciler) open(ctx context.Context, t identity.RegisteredTenant) (*liveTenant, string, error) {
 	resolved := tenancy.Resolved{Config: tenancy.Tenant{ID: t.ID, Name: t.Name, Source: tenancy.Source{Kind: "manual"}}}
 	runtime, err := buildTenant(ctx, resolved, r.opts)
 	if err != nil {
-		return nil, err
+		return nil, "open", err
 	}
 	if r.prepare != nil {
 		r.prepare(&runtime.Workspace)
@@ -112,7 +129,7 @@ func (r *tenantReconciler) open(ctx context.Context, t identity.RegisteredTenant
 	if !live.retired {
 		if err = r.scheduler.Add(runtime.Workspace.Service); err != nil {
 			runtime.Close()
-			return nil, err
+			return nil, "schedule", err
 		}
 	}
 	if r.router != nil {
@@ -126,13 +143,39 @@ func (r *tenantReconciler) open(ctx context.Context, t identity.RegisteredTenant
 		if err != nil {
 			r.scheduler.Remove(runtime.Workspace.Service)
 			runtime.Close()
-			return nil, err
+			return nil, "mount", err
 		}
 	}
 	if !live.retired && r.workers != nil {
 		live.stop = r.workers(runtime)
 	}
-	return live, nil
+	return live, "", nil
+}
+
+// tenantCounts reports the tenants this process serves, for nines.tenants.
+func (r *tenantReconciler) tenantCounts() []observability.TenantCount {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	active, retired := int64(0), int64(0)
+	for _, live := range r.live {
+		if live.retired {
+			retired++
+		} else {
+			active++
+		}
+	}
+	return []observability.TenantCount{
+		{State: "active", ManagedBy: "configuration", Count: int64(len(r.configured))},
+		{State: "active", ManagedBy: "console", Count: active},
+		{State: "retired", ManagedBy: "console", Count: retired},
+	}
+}
+
+func (r *tenantReconciler) lastReconciled() time.Time {
+	if at := r.lastSuccess.Load(); at != nil {
+		return *at
+	}
+	return time.Time{}
 }
 
 func (r *tenantReconciler) retire(id string, live *liveTenant) {
