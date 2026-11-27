@@ -229,7 +229,7 @@ func rootCommand(o *options, out, errOut io.Writer) *cobra.Command {
 		}
 		g.AddCommand(mark(position(reviewSkillCommand(a, o), use, min, max), "server", "read", a+" server review skills"))
 	}
-	r.AddCommand(auditCommand(o), operatorCommand(o), configCommand(o), authCommand(o), loginCommand(o), skillsCommand(o))
+	r.AddCommand(auditCommand(o), adminCommand(o), operatorCommand(o), configCommand(o), authCommand(o), loginCommand(o), skillsCommand(o))
 	r.AddCommand(mark(&cobra.Command{Use: "version", Args: cobra.NoArgs, RunE: func(c *cobra.Command, args []string) error {
 		b, _ := debug.ReadBuildInfo()
 		return render(c.OutOrStdout(), map[string]string{"name": "nines", "module": b.Main.Path, "version": buildinfo.Version, "commit": buildinfo.Commit, "builtAt": buildinfo.Date, "goVersion": b.GoVersion}, o.format("json"), "version")

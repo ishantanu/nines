@@ -18,11 +18,22 @@ const overview = {
         model: "jev-1.14.0",
         contractDigest: "contract",
       },
+      managedBy: "configuration",
+    },
+    {
+      id: "beta",
+      name: "Beta",
+      sourceKind: "manual",
+      connections: 1,
+      managedBy: "console",
+      state: "retired",
+      version: 3,
     },
   ],
   providers: [{ id: "local", name: "Local", type: "local" }],
   administrators: [{ provider: "local", subject: "admin" }],
   auditRetentionDays: 90,
+  tenantProvisioning: "platform console",
 };
 const auth = {
   enabled: true,
@@ -136,7 +147,8 @@ async function field(id: string, value: string) {
 }
 test("tenant inventory has independent administration navigation and does not send tenant credentials", async () => {
   await render("tenants");
-  expect(host.textContent).toContain("Configured tenants");
+  expect(host.querySelector("h2")?.textContent).toBe("All tenants");
+  expect(host.textContent).toContain("Configured");
   expect(document.title).toBe("Tenants | Platform administration | Nines");
   expect(host.textContent).toContain("does not grant access");
   expect(host.querySelector('a[href="/admin/users"]')).toBeTruthy();
@@ -201,4 +213,72 @@ test("platform audit shows a readable actor and retains its stable identifier in
   expect(article.textContent).toContain("Administrator");
   expect(article.textContent).toContain("(local)");
   expect(article.querySelector("pre")?.textContent).toContain("u-admin");
+});
+
+function submit() {
+  return document.querySelector<HTMLButtonElement>(
+    '[role="dialog"] button[type="submit"]',
+  )!;
+}
+test("configured tenants cannot be changed; console tenants show their state", async () => {
+  await render("tenants");
+  const rows = [...host.querySelectorAll("tbody tr")];
+  expect(rows[0].textContent).toContain("Configured");
+  const labels = (row: Element) =>
+    [...row.querySelectorAll("button")].map((b) => b.textContent);
+  expect(labels(rows[0])).toEqual(["Jev policy"]);
+  expect(rows[1].textContent).toContain("Retired");
+  expect(labels(rows[1])).toEqual(["Jev policy", "Delete"]);
+});
+test("creating a tenant gives it a first owner and refreshes access", async () => {
+  await render("tenants");
+  await act(async () => button("Create tenant").click());
+  expect(submit().getAttribute("aria-disabled")).toBe("true");
+  await field("tenant-id", "Payments");
+  expect((document.getElementById("tenant-id") as HTMLInputElement).value).toBe(
+    "payments",
+  );
+  await field("tenant-name", "Payments");
+  await field("tenant-username", "pat");
+  await field("tenant-owner-name", "Pat");
+  await field("tenant-password", "synthetic-password");
+  await field("tenant-reason", "Onboard the payments team");
+  expect(submit().getAttribute("aria-disabled")).not.toBe("true");
+  await act(async () => submit().click());
+  const request = calls.find((c) => c.url.endsWith("/tenants/create"))!;
+  expect(new Headers(request.init?.headers).get("X-CSRF-Token")).toBe(
+    "platform-csrf",
+  );
+  expect(JSON.parse(String(request.init?.body))).toEqual({
+    reason: "Onboard the payments team",
+    newTenant: {
+      id: "payments",
+      name: "Payments",
+      ownerUser: {
+        provider: "local",
+        username: "pat",
+        name: "Pat",
+        password: "synthetic-password",
+      },
+    },
+  });
+  expect(document.getElementById("tenant-password")).toBeNull();
+  expect(refresh).toHaveBeenCalledOnce();
+});
+test("deleting a tenant needs its ID typed and sends the reviewed version", async () => {
+  await render("tenants");
+  await act(async () => button("Delete").click());
+  expect(document.body.textContent).toContain("cannot be undone");
+  await field("tenant-reason", "Team merged");
+  await field("tenant-confirm", "Beta");
+  expect(submit().getAttribute("aria-disabled")).toBe("true");
+  await field("tenant-confirm", "beta");
+  await act(async () => submit().click());
+  const request = calls.find((c) => c.url.endsWith("/tenants/delete"))!;
+  expect(JSON.parse(String(request.init?.body))).toEqual({
+    reason: "Team merged",
+    expectedVersion: 3,
+    tenant: "beta",
+    confirm: "beta",
+  });
 });

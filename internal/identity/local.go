@@ -166,38 +166,44 @@ func (s *Service) CreateLocalUser(ctx context.Context, a Actor, tenant string, i
 		if e := s.checkOwner(tx, tenant, a); e != nil {
 			return e
 		}
-		if _, e := tx.Get("user", "global", u.ID); e == nil {
-			return ErrConflict
-		} else if !errors.Is(e, ErrNotFound) {
-			return e
-		}
-		if _, e := tx.Get("local_password", "global", u.ID); e == nil {
-			return ErrConflict
-		} else if !errors.Is(e, ErrNotFound) {
-			return e
-		}
-		if e := tx.Ensure("local_password", "global", u.ID, localJSON(localCredential{Hash: h})); e != nil {
-			return e
-		}
-		current, e := read[localCredential](tx, "local_password", "global", u.ID)
-		if e != nil {
-			return e
-		}
-		if !equal(string(current.Hash), string(h)) {
-			return ErrConflict
-		}
-		if e = put(tx, "user", "global", u.ID, u, time.Time{}); e != nil {
-			return e
-		}
-		if e = s.saveMember(tx, tenant, Member{UserID: u.ID, Role: in.Role}); e != nil {
-			return e
-		}
-		if err := s.recompute(tx, tenant, u.ID); err != nil {
-			return err
-		}
-		return s.recordPlatform(tx, a, "user.create", u.ID, "succeeded", map[string]any{"tenant": tenant, "provider": u.Provider, "username": u.Subject, "role": in.Role})
+		return s.createLocalUserTx(tx, a, tenant, u, h, in.Role)
 	})
 	return u, err
+}
+
+// createLocalUserTx stores a new local account with a role in a tenant. The
+// caller has authorized it and validated the input.
+func (s *Service) createLocalUserTx(tx Tx, a Actor, tenant string, u User, h []byte, role string) error {
+	if _, e := tx.Get("user", "global", u.ID); e == nil {
+		return ErrConflict
+	} else if !errors.Is(e, ErrNotFound) {
+		return e
+	}
+	if _, e := tx.Get("local_password", "global", u.ID); e == nil {
+		return ErrConflict
+	} else if !errors.Is(e, ErrNotFound) {
+		return e
+	}
+	if e := tx.Ensure("local_password", "global", u.ID, localJSON(localCredential{Hash: h})); e != nil {
+		return e
+	}
+	current, e := read[localCredential](tx, "local_password", "global", u.ID)
+	if e != nil {
+		return e
+	}
+	if !equal(string(current.Hash), string(h)) {
+		return ErrConflict
+	}
+	if e = put(tx, "user", "global", u.ID, u, time.Time{}); e != nil {
+		return e
+	}
+	if e = s.saveMember(tx, tenant, Member{UserID: u.ID, Role: role}); e != nil {
+		return e
+	}
+	if err := s.recompute(tx, tenant, u.ID); err != nil {
+		return err
+	}
+	return s.recordPlatform(tx, a, "user.create", u.ID, "succeeded", map[string]any{"tenant": tenant, "provider": u.Provider, "username": u.Subject, "role": role})
 }
 func (s *Service) UpdateLocalUser(ctx context.Context, a Actor, tenant, id string, in LocalUserInput) (User, error) {
 	var out User

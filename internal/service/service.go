@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	v1 "github.com/ishantanu/nines/api/v1alpha1"
@@ -40,8 +41,10 @@ type Service struct {
 	Demo                bool
 	TenantID            string
 	TenantName          string
-	SourceKind          string
-	Collector           Collector
+	// renamed holds a display name changed while running; see DisplayName.
+	renamed    atomic.Pointer[string]
+	SourceKind string
+	Collector  Collector
 	// IncidentsEnabled turns on incident records (the incidents feature gate).
 	IncidentsEnabled bool
 	Now              func() time.Time
@@ -495,3 +498,15 @@ func (s *Service) ValidateSource(c model.SLO) error {
 	}
 	return nil
 }
+
+// DisplayName is the tenant's current display name, including a rename made
+// while the server runs.
+func (s *Service) DisplayName() string {
+	if name := s.renamed.Load(); name != nil {
+		return *name
+	}
+	return s.TenantName
+}
+
+// Rename changes the display name while requests may be reading it.
+func (s *Service) Rename(name string) { s.renamed.Store(&name) }

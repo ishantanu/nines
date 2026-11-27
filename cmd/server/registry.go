@@ -39,6 +39,7 @@ type tenantReconciler struct {
 type liveTenant struct {
 	runtime tenantRuntime
 	stop    func()
+	name    string
 	retired bool
 }
 
@@ -54,12 +55,21 @@ func (r *tenantReconciler) Reconcile(ctx context.Context) error {
 	if r.live == nil {
 		r.live = map[string]*liveTenant{}
 	}
+	present := map[string]bool{}
 	for _, t := range registered {
 		if r.configured[t.ID] {
 			r.log.Error("registered tenant has the ID of a configured tenant; skipped", "tenant", t.ID)
 			continue
 		}
+		present[t.ID] = true
 		live, ok := r.live[t.ID]
+		if t.State == identity.TenantDeleting {
+			// Its data is being deleted: stop serving it.
+			if ok {
+				r.remove(t.ID, live)
+			}
+			continue
+		}
 		if !ok {
 			if live, err = r.open(ctx, t); err != nil {
 				// The cause is not logged: opening a tenant reads credentials.
@@ -69,9 +79,20 @@ func (r *tenantReconciler) Reconcile(ctx context.Context) error {
 			r.live[t.ID] = live
 			r.log.Info("tenant mounted", "tenant", t.ID)
 		}
+		if live.name != t.Name {
+			if r.router != nil {
+				r.router.Rename(t.ID, t.Name)
+			}
+			live.name = t.Name
+		}
 		if t.State == identity.TenantRetired && !live.retired {
 			r.retire(t.ID, live)
 			r.log.Info("tenant retired", "tenant", t.ID)
+		}
+	}
+	for id, live := range r.live {
+		if !present[id] {
+			r.remove(id, live)
 		}
 	}
 	return nil
@@ -86,7 +107,7 @@ func (r *tenantReconciler) open(ctx context.Context, t identity.RegisteredTenant
 	if r.prepare != nil {
 		r.prepare(&runtime.Workspace)
 	}
-	live := &liveTenant{runtime: runtime, stop: func() {}, retired: t.State == identity.TenantRetired}
+	live := &liveTenant{runtime: runtime, stop: func() {}, name: t.Name, retired: t.State == identity.TenantRetired}
 	// Retired before this process started: serve it read-only, run nothing.
 	if !live.retired {
 		if err = r.scheduler.Add(runtime.Workspace.Service); err != nil {
@@ -122,6 +143,18 @@ func (r *tenantReconciler) retire(id string, live *liveTenant) {
 		_ = r.router.Retire(id)
 	}
 	live.retired = true
+}
+
+// remove stops serving a deleted tenant and closes its stores.
+func (r *tenantReconciler) remove(id string, live *liveTenant) {
+	r.scheduler.Remove(live.runtime.Workspace.Service)
+	live.stop()
+	if r.router != nil {
+		r.router.Unmount(id)
+	}
+	live.runtime.Close()
+	delete(r.live, id)
+	r.log.Info("tenant removed", "tenant", id)
 }
 
 // Run reconciles until ctx ends.

@@ -79,7 +79,10 @@ type flow struct {
 	Expires  time.Time `json:"expiresAt"`
 }
 type Actor struct {
-	sessionHash       string
+	sessionHash string
+	// cli marks a CLI token, which carries the browser session that
+	// approved it; platform requests from it need no CSRF token.
+	cli               bool
 	PlatformAdmin     bool `json:"platformAdmin,omitempty"`
 	platformOperation bool
 	platformReason    string
@@ -123,17 +126,26 @@ type Service struct {
 	config          Config
 	providers       map[string]provider
 	tenants         map[string]bool
-	Now             func() time.Time
-	limitMu         sync.Mutex
-	limits          map[string]limitEntry
-	loginSlots      chan struct{}
+	// configured are the tenants from server configuration, which the
+	// console cannot change.
+	configured map[string]bool
+	Now        func() time.Time
+	// TenantsChanged, when set, applies a tenant registry change on this
+	// process at once; other processes apply it within seconds. Without it,
+	// tenants come only from server configuration.
+	TenantsChanged func(context.Context) error
+	// DeleteTenantData deletes a deleted tenant's stored data.
+	DeleteTenantData func(ctx context.Context, id string) error
+	limitMu          sync.Mutex
+	limits           map[string]limitEntry
+	loginSlots       chan struct{}
 }
 
 func New(ctx context.Context, c Config, repo Repository, tenants map[string]bool) (*Service, error) {
 	if err := validatePlatformAdmins(c); err != nil {
 		return nil, err
 	}
-	s := &Service{repo: repo, config: c, providers: map[string]provider{}, tenants: maps.Clone(tenants), Now: time.Now, limits: map[string]limitEntry{}, loginSlots: make(chan struct{}, 8)}
+	s := &Service{repo: repo, config: c, providers: map[string]provider{}, tenants: maps.Clone(tenants), configured: maps.Clone(tenants), Now: time.Now, limits: map[string]limitEntry{}, loginSlots: make(chan struct{}, 8)}
 	for _, cfg := range c.Providers {
 		if err := validateMappings(&cfg); err != nil {
 			return nil, err
@@ -399,55 +411,63 @@ func (s *Service) Grant(ctx context.Context, a Actor, tenant, providerID, subjec
 		if err := s.checkOwner(tx, tenant, a); err != nil {
 			return err
 		}
-		m, err := read[Member](tx, "member", tenant, u.ID)
-		if errors.Is(err, ErrNotFound) {
-			if expected != 0 {
-				return ErrConflict
-			}
-			all, e := tx.List("member", tenant)
-			if e != nil {
-				return e
-			}
-			if len(all) >= maxRows {
-				return ErrInvalid
-			}
-			m = Member{UserID: u.ID, Version: 0}
-		} else if err != nil {
-			return err
-		}
-		if m.Version != expected {
-			return ErrConflict
-		}
-		if m.Role == "owner" && role != "owner" {
-			if err = s.checkOtherOwner(tx, tenant, u.ID); err != nil {
-				return err
-			}
-		}
-		existing, err := read[User](tx, "user", "global", u.ID)
-		if errors.Is(err, ErrNotFound) {
-			b, _ := json.Marshal(u)
-			if err = tx.Ensure("user", "global", u.ID, b); err != nil {
-				return err
-			}
-		} else if err != nil {
-			return err
-		} else {
-			u = existing
-		}
-		m.Role = role
-		if err = s.saveMember(tx, tenant, m); err != nil {
-			return err
-		}
-		if err = s.recompute(tx, tenant, u.ID); err != nil {
-			return err
-		}
-		result, err = read[Member](tx, "member", tenant, u.ID)
-		if err != nil {
-			return err
-		}
-		return s.recordPlatform(tx, a, "membership.save", tenant+"/"+u.ID, "succeeded", result)
+		var err error
+		result, err = s.grantTx(tx, a, tenant, u, role, expected)
+		return err
 	})
 	return result, err
+}
+
+// grantTx gives a user a role in a tenant. The caller has authorized it.
+func (s *Service) grantTx(tx Tx, a Actor, tenant string, u User, role string, expected int64) (Member, error) {
+	var result Member
+	m, err := read[Member](tx, "member", tenant, u.ID)
+	if errors.Is(err, ErrNotFound) {
+		if expected != 0 {
+			return result, ErrConflict
+		}
+		all, e := tx.List("member", tenant)
+		if e != nil {
+			return result, e
+		}
+		if len(all) >= maxRows {
+			return result, ErrInvalid
+		}
+		m = Member{UserID: u.ID, Version: 0}
+	} else if err != nil {
+		return result, err
+	}
+	if m.Version != expected {
+		return result, ErrConflict
+	}
+	if m.Role == "owner" && role != "owner" {
+		if err = s.checkOtherOwner(tx, tenant, u.ID); err != nil {
+			return result, err
+		}
+	}
+	existing, err := read[User](tx, "user", "global", u.ID)
+	if errors.Is(err, ErrNotFound) {
+		b, _ := json.Marshal(u)
+		if err = tx.Ensure("user", "global", u.ID, b); err != nil {
+			return result, err
+		}
+	} else if err != nil {
+		return result, err
+	} else {
+		u = existing
+	}
+	m.Role = role
+	if err = s.saveMember(tx, tenant, m); err != nil {
+		return result, err
+	}
+	if err = s.recompute(tx, tenant, u.ID); err != nil {
+		return result, err
+	}
+	result, err = read[Member](tx, "member", tenant, u.ID)
+	if err != nil {
+		return result, err
+	}
+	return result, s.recordPlatform(tx, a, "membership.save", tenant+"/"+u.ID, "succeeded", result)
 }
 func (s *Service) checkOtherOwner(tx Tx, tenant, user string) error {
 	members, err := list[Member](tx, "member", tenant)
@@ -771,6 +791,14 @@ func (s *Service) knownTenants() []string {
 	s.tenantMu.RLock()
 	defer s.tenantMu.RUnlock()
 	return slices.Sorted(maps.Keys(s.tenants))
+}
+
+// RemoveTenant forgets a deleted tenant: its sessions, grants and service
+// tokens stop working.
+func (s *Service) RemoveTenant(id string) {
+	s.tenantMu.Lock()
+	defer s.tenantMu.Unlock()
+	delete(s.tenants, id)
 }
 
 // AddTenant makes a tenant created while the server runs known to identity,

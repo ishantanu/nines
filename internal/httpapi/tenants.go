@@ -325,6 +325,53 @@ func (r *Router) Retire(id string) error {
 	return nil
 }
 
+// Unmount stops serving a tenant that is being deleted. Requests already
+// running finish; the caller closes its stores afterwards.
+func (r *Router) Unmount(id string) {
+	t := r.tenants
+	t.mu.Lock()
+	next := t.snapshot()
+	m, ok := next[id]
+	if ok {
+		delete(next, id)
+		t.current.Store(&next)
+		w := m.workspace
+		delete(t.services, w.Service)
+		delete(t.stores, w.Service.Store)
+		if w.Investigations != nil {
+			delete(t.investigationRepos, w.Investigations.Repository)
+		}
+		if w.Replays != nil {
+			delete(t.replayRepos, w.Replays.Repository)
+		}
+		if w.IntentConversations != nil {
+			delete(t.intentRepos, w.IntentConversations.Repository)
+		}
+	}
+	t.mu.Unlock()
+	if ok {
+		t.refreshPlatform()
+	}
+}
+
+// Rename changes a tenant's display name. Its ID never changes.
+func (r *Router) Rename(id, name string) {
+	t := r.tenants
+	t.mu.Lock()
+	next := t.snapshot()
+	m, ok := next[id]
+	if ok {
+		m.workspace.Name = name
+		m.workspace.Service.Rename(name)
+		next[id] = m
+		t.current.Store(&next)
+	}
+	t.mu.Unlock()
+	if ok {
+		t.refreshPlatform()
+	}
+}
+
 // Mounted reports whether a tenant is served, and whether it is retired.
 func (r *Router) Mounted(id string) (mounted, retired bool) {
 	m, ok := (*r.tenants.current.Load())[id]

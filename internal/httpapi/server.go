@@ -119,7 +119,7 @@ func newSingle(s *service.Service, log *slog.Logger, workflows *workflow.Service
 		}
 		write(w, 200, WorkspaceInfo{
 			Mode: mode, Connections: connections, PrometheusConfigured: count > 0, JourneysConfigured: s.Journeys != nil,
-			Tenant: WorkspaceTenant{ID: s.TenantID, Name: s.TenantName},
+			Tenant: WorkspaceTenant{ID: s.TenantID, Name: s.DisplayName()},
 			Source: WorkspaceSource{Kind: kind, Configured: count > 0, ConnectionCount: count},
 			Role:   role, WorkflowsConfigured: workflows != nil && workspace.Features.Enabled("workflows"),
 			ReplayCaptureEnabled: workspace.Replays != nil && !workspace.Replays.Privacy.Disabled && workspace.Features.Enabled("session-replay"),
