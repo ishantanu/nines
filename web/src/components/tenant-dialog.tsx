@@ -270,8 +270,8 @@ export function TenantDialog({
                   </FormField>
                   <FormField
                     htmlFor="tenant-password"
-                    label="Initial password"
-                    description="12 to 72 characters. Share it with the owner securely."
+                    label="Owner's initial password"
+                    description="For the new local account only; the tenant has no password. 12 to 72 characters. Share it with the owner securely."
                   >
                     <Input
                       id="tenant-password"
