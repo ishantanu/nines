@@ -39,6 +39,7 @@ tenants:
 - Native processes inherit the environment.
   - Containers need the file mounted read-only and every referenced secret explicitly passed into their environment.
   - YAML file changes require a server restart; they are not discovered from arbitrary request bodies.
+  - With an identity service, platform administrators can also [create tenants in the admin console](../platform-administration.md#tenants) without a restart.
 
 ## Portal URLs and browser sessions
 

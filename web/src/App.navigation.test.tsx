@@ -271,7 +271,9 @@ test("an administrator can return from the console to an explicitly authorized w
   allowed = ["alpha"];
   window.history.replaceState(null, "", "/admin/tenants");
   await render();
-  await until(() => host.textContent?.includes("Configured tenants") ?? false);
+  await until(
+    () => host.textContent?.includes("Platform administrators") ?? false,
+  );
   const link = [...host.querySelectorAll<HTMLAnchorElement>("a")].find(
     (a) => a.textContent === "Open workspace",
   )!;

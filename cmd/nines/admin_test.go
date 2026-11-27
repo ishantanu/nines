@@ -1,0 +1,90 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+)
+
+// The admin CLI calls the platform API without a tenant header, reads a new
+// owner's password only from stdin, looks up the current version when none
+// is given, and needs the ID repeated to delete.
+func TestAdminTenantsCLI(t *testing.T) {
+	cliEnv(t)
+	var mu sync.Mutex
+	calls := map[string]map[string]any{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Nines-Tenant") != "" || r.Header.Get("Authorization") != "Bearer wp_cli_synthetic" {
+			http.Error(w, `{"error":"bad request headers"}`, 400)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/platform/overview" {
+			_, _ = io.WriteString(w, `{"tenantProvisioning":"platform console","tenants":[{"id":"default","name":"Default","managedBy":"configuration"},{"id":"payments","name":"Payments","managedBy":"console","state":"retired","version":4}]}`)
+			return
+		}
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		mu.Lock()
+		calls[r.URL.Path] = body
+		mu.Unlock()
+		if r.URL.Path == "/api/platform/tenants/rename" {
+			w.WriteHeader(409)
+			_, _ = io.WriteString(w, `{"error":"the tenant changed since you read it"}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"id":"payments","name":"Payments","state":"active","version":1}`)
+	}))
+	defer server.Close()
+	base := []string{"--server", server.URL, "--tenant", "default", "--agent"}
+	t.Setenv("NINES_API_KEY", "wp_cli_synthetic")
+	var out bytes.Buffer
+
+	if err := run(append([]string{"admin", "tenants", "list", "-o", "table"}, base[:4]...), &out); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "payments  Payments  console") || !strings.Contains(out.String(), "default   Default   configuration") {
+		t.Fatal("table", out.String())
+	}
+
+	create := append([]string{"admin", "tenants", "create", "payments", "--name", "Payments", "--owner-username", "pat", "--reason", "Onboard payments"}, base...)
+	if err := run(create, &out); err == nil || !strings.Contains(err.Error(), "--owner-password-stdin") {
+		t.Fatal("password accepted without stdin", err)
+	}
+	original := passwordInput
+	passwordInput = func() io.Reader { return strings.NewReader("synthetic-password\n") }
+	defer func() { passwordInput = original }()
+	if err := run(append(create, "--owner-password-stdin"), &out); err != nil {
+		t.Fatal(err)
+	}
+	owner := calls["/api/platform/tenants/create"]["newTenant"].(map[string]any)["ownerUser"].(map[string]any)
+	if owner["password"] != "synthetic-password" || owner["provider"] != "local" || owner["name"] != "pat" {
+		t.Fatal("owner", owner)
+	}
+
+	if err := run(append([]string{"admin", "tenants", "rename", "payments", "--name", "Pay", "--reason", "Renamed"}, base...), &out); err == nil || !strings.Contains(err.Error(), "changed since you read it") {
+		t.Fatal("server reason lost", err)
+	}
+	if calls["/api/platform/tenants/rename"]["expectedVersion"] != float64(4) {
+		t.Fatal("current version not used", calls["/api/platform/tenants/rename"])
+	}
+	if err := run(append([]string{"admin", "tenants", "retire", "default", "--reason", "No"}, base...), &out); err == nil || !strings.Contains(err.Error(), "server configuration") {
+		t.Fatal("configured tenant not refused", err)
+	}
+
+	del := append([]string{"admin", "tenants", "delete", "payments", "--reason", "Merged"}, base...)
+	if err := run(del, &out); err == nil || !strings.Contains(err.Error(), "--confirm-id") {
+		t.Fatal("delete without confirmation", err)
+	}
+	if err := run(append(del, "--confirm-id", "payments", "--expected-version", "5"), &out); err != nil {
+		t.Fatal(err)
+	}
+	if got := calls["/api/platform/tenants/delete"]; got["confirm"] != "payments" || got["expectedVersion"] != float64(5) || got["reason"] != "Merged" {
+		t.Fatal("delete", got)
+	}
+}

@@ -81,6 +81,17 @@ var generatedTypes = map[string]any{
 	"MetricNames":          v1.MetricNames{},
 	"TelemetryDiscovery":   v1.TelemetryDiscovery{},
 
+	// Platform administration
+	"PlatformOverview":    identity.PlatformOverview{},
+	"TenantCreateRequest": identity.TenantCreateRequest{},
+	"TenantChangeRequest": identity.TenantChangeRequest{},
+	"RegisteredTenant":    identity.RegisteredTenant{},
+	"PlatformUserPage":    identity.PlatformUserPage{},
+	"PlatformAuditPage":   identity.PlatformAuditPage{},
+	"PlatformAIStatus":    identity.PlatformAIStatus{},
+	"PlatformOK":          identity.PlatformOK{},
+	"PlatformRequest":     identity.PlatformRequest{},
+
 	// CLI sign-in
 	"CLIStartInput":    identity.CLIStartInput{},
 	"CLIStarted":       identity.CLIStarted{},
