@@ -238,6 +238,11 @@ func loginCommand(o *options) *cobra.Command {
 			o.credentialSource = "browser-session"
 		}
 		v, e := o.authStatus(c.Context())
+		var rejected *client.APIError
+		if selected == "api-key" && errors.As(e, &rejected) && rejected.StatusCode == http.StatusUnauthorized {
+			// Auto mode picked an environment key the user may not know is set.
+			return &cliError{"unauthenticated", "The server rejected the API key in " + o.credentialSource + ". Unset NINES_API_KEY and API_TOKEN to sign in through the browser, or set a valid key", 3}
+		}
 		if e != nil {
 			return e
 		}

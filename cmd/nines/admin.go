@@ -50,8 +50,7 @@ func adminCommand(o *options) *cobra.Command {
 
 	var reason string
 	reasonFlag := func(c *cobra.Command) {
-		c.Flags().StringVar(&reason, "reason", "", "why, recorded in the platform audit log (required)")
-		_ = c.MarkFlagRequired("reason")
+		c.Flags().StringVar(&reason, "reason", "", "why, recorded in the platform audit log (optional)")
 	}
 	var expected int64
 	versionFlag := func(c *cobra.Command) {

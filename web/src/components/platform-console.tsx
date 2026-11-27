@@ -344,7 +344,7 @@ export function PlatformConsole({
         <main className="min-w-0 space-y-5">
           <PageHeader
             title={titles[page]}
-            description="Platform controls are separate from tenant access. Administrative changes require a reason and are audited."
+            description="Platform controls are separate from tenant access. Administrative changes are audited, with your reason when you give one."
           >
             <Button
               variant="outline"
@@ -666,7 +666,7 @@ export function PlatformConsole({
                         ? ` (${event.actorProvider})`
                         : ""} · {event.resource}
                     </p>
-                    <p>{event.reason}</p>
+                    {event.reason ? <p>{event.reason}</p> : null}
                     <details>
                       <summary className="cursor-pointer text-xs">
                         Change details
