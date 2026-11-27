@@ -1,0 +1,88 @@
+{{- if .Values.operator.enabled }}
+{{- $config := dict "namespace" .Release.Namespace "tenant" .Values.operator.tenant "projects" .Values.operator.projects "sources" .Values.operator.sources }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nines.operatorName" . }}
+  labels:
+    {{- include "nines.labels" . | nindent 4 }}
+data:
+  operator.yaml: |
+    {{- toYaml $config | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nines.operatorName" . }}
+  labels:
+    {{- include "nines.labels" . | nindent 4 }}
+    app.kubernetes.io/name: nines-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "nines.operatorSelector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nines.operatorSelector" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ toYaml $config | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "nines.operatorName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "nines.restrictedPod" . | nindent 8 }}
+      containers:
+        - name: operator
+          image: {{ include "nines.image" (list .Values.operator.image .) }}
+          imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
+          args: [-config, /etc/nines/operator.yaml, -health-addr, ':8081']
+          env:
+            - name: OTEL_SERVICE_NAME
+              value: nines-operator
+          ports:
+            - name: health
+              containerPort: 8081
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+          resources:
+            {{- toYaml .Values.operator.resources | nindent 12 }}
+          securityContext:
+            {{- include "nines.restrictedContainer" . | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nines
+              readOnly: true
+            {{- if .Values.operator.credentialsSecret }}
+            - name: credentials
+              mountPath: /etc/nines-credentials
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "nines.operatorName" . }}
+        {{- with .Values.operator.credentialsSecret }}
+        - name: credentials
+          secret:
+            secretName: {{ . }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,11 @@
+{{- if and .Values.operator.enabled .Values.crds.install }}
+{{- /* Templates rather than crds/, so upgrades update them. Kept on
+uninstall, so custom resources are not deleted with them. Inserted as text:
+re-encoding would turn large integer bounds into floats. */}}
+{{- range $doc := regexSplit "(?m)^---\\s*$" (.Files.Get "files/crds.yaml") -1 }}
+{{- if contains "kind: CustomResourceDefinition" $doc }}
+---
+{{ regexReplaceAll "(?m)^metadata:\\n( +)" (trim $doc) "metadata:\n${1}annotations:\n${1}${1}helm.sh/resource-policy: keep\n${1}" }}
+{{- end }}
+{{- end }}
+{{- end }}

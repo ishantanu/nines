@@ -1,0 +1,80 @@
+{{- if .Values.operator.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "nines.operatorName" . }}
+  labels:
+    {{- include "nines.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "nines.operatorName" . }}
+  labels:
+    {{- include "nines.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [nines.dev]
+    resources: [servicelevelobjectives, servicelevelobjectiveintents, criticaluserjourneys, measurementbindings]
+    verbs: [get, list]
+  - apiGroups: [nines.dev]
+    resources: [servicelevelobjectives]
+    verbs: [create, update]
+  - apiGroups: [nines.dev]
+    resources: [servicelevelobjectives/status, servicelevelobjectiveintents/status, criticaluserjourneys/status, measurementbindings/status, servicelevelobjectives/finalizers]
+    verbs: [update]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [prometheusrules]
+    verbs: [get, list, create, update]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [create]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    resourceNames: [nines-operator]
+    verbs: [get, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "nines.operatorName" . }}
+  labels:
+    {{- include "nines.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "nines.operatorName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "nines.operatorName" . }}
+{{- if .Values.operator.publishFromPortal }}
+---
+# The portal publishes reviewed SLOs here; the operator deploys their rules.
+# The server can manage ServiceLevelObjectives only, in this namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "nines.fullname" . }}-publisher
+  labels:
+    {{- include "nines.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [nines.dev]
+    resources: [servicelevelobjectives]
+    verbs: [get, create, update, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "nines.fullname" . }}-publisher
+  labels:
+    {{- include "nines.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "nines.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "nines.fullname" . }}-publisher
+{{- end }}
+{{- end }}

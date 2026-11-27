@@ -1,12 +1,115 @@
 # Kubernetes deployment reference
 
-The manifests run the normal Nines server with one replica and an external PostgreSQL database.
+Nines runs on Kubernetes as one server replica with an external PostgreSQL database, plus an optional [operator](operator.md). Install it with the Helm chart, or apply the plain manifests yourself.
 
-- They can run independently or use the [reviewed operator publishing bridge](operator.md#publish-portal-slos-through-the-operator) for rule deployment.
-- The supplied server manifests have passed a disposable kind cluster rollout, account/RBAC checks and server-restart persistence.
+- CI installs the chart on a disposable kind cluster, signs in, saves an SLO, and checks that it survives an upgrade and a restart and that the operator deploys an SLO's rules.
 - This does not establish production storage, ingress, HA or operator conformance across every Kubernetes/provider version.
 
-## Choose an image
+## Install with Helm
+
+You need a PostgreSQL database the cluster can reach; the chart does not install one. The database role must be able to create tables and schemas. Use private networking and verified TLS.
+
+Put the database URL in a Secret, then install:
+
+```sh
+kubectl create namespace nines
+kubectl -n nines create secret generic nines-database \
+  --from-literal=DATABASE_URL='postgres://nines:URL_ENCODED_PASSWORD@database.internal:5432/nines?sslmode=verify-full'
+
+helm install nines oci://ghcr.io/ishantanu/charts/nines --version 0.1.0-alpha.5 \
+  --namespace nines --set database.existingSecret=nines-database
+```
+
+- Releases publish the chart from v0.1.0-alpha.5, pinned to that release's image digests and signed like the images. For an earlier version, or to test a change, install from a checkout: `helm install nines ./charts/nines ...`.
+- The chart prints how to reach the portal and read the administrator password it generated. With the defaults, port-forward and sign in as `admin`:
+
+```sh
+kubectl -n nines port-forward service/nines 8080:8080
+kubectl -n nines get secret nines-credentials -o jsonpath='{.data.NINES_BOOTSTRAP_PASSWORD}' | base64 -d; echo
+```
+
+### What the defaults give you
+
+- Local accounts, with `admin` as owner of tenant `default` and platform administrator. Add people under **Access control**, and service accounts for automation.
+- A generated administrator password and connection encryption key, in the Secret `nines-credentials`. The chart keeps it across upgrades and when you uninstall, so a reinstall against the same database still works. Back it up with the database.
+- A restricted Pod: non-root, read-only root filesystem, no privilege escalation, all capabilities dropped and no Kubernetes API token.
+- One replica, replaced on upgrade (`Recreate`). Nines collects and evaluates on a schedule; a second copy would collect and alert twice, so the chart does not offer replicas or autoscaling. Upgrades have a short downtime.
+- A configuration change restarts the server, which reads its configuration at startup.
+
+### Common settings
+
+Set these in a values file and pass it with `--values`. The chart rejects unknown or misspelled settings. See [`values.yaml`](https://github.com/ishantanu/nines/blob/main/charts/nines/values.yaml) for all of them.
+
+```yaml
+database:
+  existingSecret: nines-database
+
+# HTTPS through your ingress controller; publicURL follows the host.
+ingress:
+  enabled: true
+  className: nginx
+  host: nines.example.com
+  tlsSecretName: nines-tls
+
+# Hosts that people may connect as telemetry sources in the portal.
+connections:
+  allowedHosts: [prometheus-operated.monitoring.svc:9090]
+
+# Single sign-on and tenants: the same YAML as AUTH_CONFIG_FILE and
+# TENANTS_FILE. Provider secrets come from environment variables.
+auth:
+  config: |
+    publicURLEnv: NINES_PUBLIC_URL
+    providers: [...]
+tenants:
+  config: |
+    tenants: [...]
+extraEnvFrom:
+  - secretRef:
+      name: nines-provider-credentials
+```
+
+- `auth.config` and `tenants.config` take the formats in [identity and tenants](identity-and-tenants.md). Keep credentials in Secrets, referenced through `extraEnvFrom`.
+- To supply your own administrator password and encryption key instead of generated ones, set `credentials.existingSecret` to a Secret with `NINES_BOOTSTRAP_PASSWORD` and `NINES_SOURCE_ENCRYPTION_KEY`.
+- Pin an image by digest with `image.digest`. Released charts already do.
+
+### The operator
+
+Set `operator.enabled: true` to run the [operator](operator.md) in the release namespace. It installs and upgrades the `nines.dev` CRDs (`crds.install`), which uninstall keeps so your resources are not deleted with them.
+
+```yaml
+operator:
+  enabled: true
+  tenant: default
+  projects: [default]
+  sources:
+    primary:
+      kind: prometheus-operator
+      queryURL: http://prometheus-operated.monitoring.svc:9090
+      prometheusLabels:
+        release: monitoring
+  # Let the portal publish reviewed SLOs here for the operator to deploy.
+  publishFromPortal: true
+```
+
+- The default `prometheus-operator` source needs Prometheus Operator and its `PrometheusRule` CRD. For Mimir, set `kind: mimir` with `rulerURL`, `mimirOrgID` and `rulerNamespace`, and put the ruler token in `operator.credentialsSecret`.
+- `publishFromPortal` gives the server's service account a token, limited to ServiceLevelObjectives in this namespace. Also set `rules.mode: operator` on the tenant's source; see [publish portal SLOs through the operator](operator.md#publish-portal-slos-through-the-operator).
+
+### Upgrade and uninstall
+
+```sh
+helm upgrade nines oci://ghcr.io/ishantanu/charts/nines --version NEW_VERSION \
+  --namespace nines --reuse-values
+```
+
+- Back up the database and the `nines-credentials` Secret first. Rolling back the chart does not undo database schema changes.
+- `helm uninstall nines -n nines` keeps the CRDs, your custom resources and `nines-credentials`. Delete them yourself if you mean to remove Nines entirely.
+
+## Install with manifests
+
+The manifests in `deploy/kubernetes` run the same server without Helm. They can run independently or use the [reviewed operator publishing bridge](operator.md#publish-portal-slos-through-the-operator) for rule deployment.
+
+### Choose an image
 
 Use the published image for the release, pinned by the digest listed in the release notes:
 
@@ -16,9 +119,9 @@ export NINES_IMAGE=ghcr.io/ishantanu/nines:v0.1.0-alpha.4@sha256:DIGEST_FROM_THE
 
 - The image supports `linux/amd64` and `linux/arm64`, is signed and carries build provenance. See [container images](container-images.md) to verify it.
 - `deploy/kubernetes/deployment.yaml` references the release tag. The `kubectl set image` step below replaces it with your pinned reference.
-- To build your own instead, see [build your own](container-images.md#build-your-own) and push it to a registry your cluster can reach. No Helm chart is provided.
+- To build your own instead, see [build your own](container-images.md#build-your-own) and push it to a registry your cluster can reach.
 
-## Database and credentials
+### Database and credentials
 
 - Create the deployment namespace and provision a dedicated PostgreSQL database outside these manifests.
   - The database role needs to create Nines tables and tenant schemas.

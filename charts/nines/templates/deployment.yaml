@@ -1,0 +1,136 @@
+{{- if not .Values.database.existingSecret }}
+{{- fail "Set database.existingSecret to a Secret holding DATABASE_URL, the PostgreSQL URL Nines uses. See https://ishantanu.github.io/nines/docs/deployment/kubernetes/" }}
+{{- end }}
+{{- if and .Values.ingress.enabled (not .Values.ingress.host) }}
+{{- fail "Set ingress.host when ingress.enabled is true." }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nines.fullname" . }}
+  labels:
+    {{- include "nines.labels" . | nindent 4 }}
+    app.kubernetes.io/name: nines
+spec:
+  # One collecting process: a second replica would collect and alert twice.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "nines.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "nines.selector" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Configuration changes restart the server, which reads it at startup.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "nines.serviceAccountName" . }}
+      # Only publishing to the operator needs the Kubernetes API.
+      automountServiceAccountToken: {{ and .Values.operator.enabled .Values.operator.publishFromPortal }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- include "nines.restrictedPod" . | nindent 8 }}
+      containers:
+        - name: nines
+          image: {{ include "nines.image" (list .Values.image .) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ['-addr', '0.0.0.0:8080']
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.key }}
+            - name: NINES_PUBLIC_URL
+              value: {{ include "nines.publicURL" . | quote }}
+            - name: NINES_BOOTSTRAP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nines.credentialsSecret" . }}
+                  key: NINES_BOOTSTRAP_PASSWORD
+                  # Only local accounts with a bootstrap user need it.
+                  optional: {{ ne .Values.credentials.existingSecret "" }}
+            {{- if .Values.auth.config }}
+            - name: AUTH_CONFIG_FILE
+              value: /etc/nines/auth.yaml
+            {{- end }}
+            {{- if .Values.tenants.config }}
+            - name: TENANTS_FILE
+              value: /etc/nines/tenants.yaml
+            {{- end }}
+            {{- with .Values.connections.allowedHosts }}
+            - name: NINES_SOURCE_HOSTS
+              value: {{ join "," . | quote }}
+            - name: NINES_SOURCE_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "nines.credentialsSecret" $ }}
+                  key: NINES_SOURCE_ENCRYPTION_KEY
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- include "nines.restrictedContainer" . | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/nines
+              readOnly: true
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "nines.fullname" . }}
+        - name: temporary
+          emptyDir:
+            sizeLimit: 256Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
