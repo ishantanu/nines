@@ -115,7 +115,6 @@ export function TenantDialog({
   }
 
   const ready =
-    reason.trim() !== "" &&
     csrf !== "" &&
     (action === "create"
       ? tenantID.test(id) &&
@@ -270,8 +269,8 @@ export function TenantDialog({
                   </FormField>
                   <FormField
                     htmlFor="tenant-password"
-                    label="Initial password"
-                    description="12 to 72 characters. Share it with the owner securely."
+                    label="Owner's initial password"
+                    description="For the new local account only; the tenant has no password. 12 to 72 characters. Share it with the owner securely."
                   >
                     <Input
                       id="tenant-password"
@@ -304,10 +303,9 @@ export function TenantDialog({
               />
             </FormField>
           ) : null}
-          <FormField htmlFor="tenant-reason" label="Reason for change">
+          <FormField htmlFor="tenant-reason" label="Reason (optional)">
             <Textarea
               id="tenant-reason"
-              required
               maxLength={1000}
               value={reason}
               disabled={busy}

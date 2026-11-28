@@ -13,9 +13,9 @@ import (
 )
 
 // PlatformRequest is the body of every platform change. Each operation reads
-// the fields it needs; reason is always required.
+// the fields it needs. The reason is optional and audited when given.
 type PlatformRequest struct {
-	Reason          string            `json:"reason"`
+	Reason          string            `json:"reason,omitempty"`
 	Tenant          string            `json:"tenant,omitempty"`
 	UserID          string            `json:"userId,omitempty"`
 	Provider        string            `json:"provider,omitempty"`
@@ -150,7 +150,9 @@ func (s *Service) platformHandler() http.Handler {
 			authFailure(w, err)
 			return
 		}
-		if !utf8.ValidString(in.Reason) || strings.TrimSpace(in.Reason) == "" || len(in.Reason) > 1000 || strings.ContainsRune(in.Reason, 0) || !s.platformReasonSafe(in.Reason) {
+		in.Reason = strings.TrimSpace(in.Reason)
+		// Optional; when given it is bounded and must not carry a credential.
+		if !utf8.ValidString(in.Reason) || len(in.Reason) > 1000 || strings.ContainsRune(in.Reason, 0) || in.Reason != "" && !s.platformReasonSafe(in.Reason) {
 			authFailure(w, ErrInvalid)
 			return
 		}

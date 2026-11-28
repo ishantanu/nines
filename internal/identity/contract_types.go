@@ -107,7 +107,7 @@ type PlatformOverview struct {
 
 // TenantCreateRequest is the body of POST /api/platform/tenants/create.
 type TenantCreateRequest struct {
-	Reason    string      `json:"reason"`
+	Reason    string      `json:"reason,omitempty"`
 	NewTenant TenantInput `json:"newTenant"`
 }
 
@@ -115,7 +115,7 @@ type TenantCreateRequest struct {
 // retire and delete: the tenant, the version the caller read, and for
 // rename the new name or for delete the ID repeated.
 type TenantChangeRequest struct {
-	Reason          string `json:"reason"`
+	Reason          string `json:"reason,omitempty"`
 	Tenant          string `json:"tenant"`
 	Name            string `json:"name,omitempty"`
 	Confirm         string `json:"confirm,omitempty"`

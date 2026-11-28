@@ -161,10 +161,11 @@ test("tenant inventory has independent administration navigation and does not se
   ).toBe(true);
   expect(calls.some((c) => c.init?.method === "POST")).toBe(false);
 });
-test("account creation requires a reason, transmits CSRF and clears the password", async () => {
+test("account creation transmits CSRF and an optional reason and clears the password", async () => {
   await render("users");
   await act(async () => button("Create user").click());
-  expect(button("Save change").getAttribute("aria-disabled")).toBe("true");
+  // The reason is optional; nothing blocks saving on it.
+  expect(button("Save change").getAttribute("aria-disabled")).not.toBe("true");
   await field("platform-username", "new-user");
   await field("platform-name", "New user");
   await field("platform-password", "test-private-password");
