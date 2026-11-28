@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -139,6 +140,22 @@ func run(log *slog.Logger) error {
 	// so they exist only when identity is configured and storage is durable.
 	registry := *authFile != "" && !*demo && !*memory
 	options := tenantOptions{identityEnabled: true, collectorOnly: *processRole == "collector"}
+	// nines.tenants and the registry's last success, from the reconciler
+	// once there is one; until then, the configured tenants.
+	var registryState atomic.Pointer[tenantReconciler]
+	if err = observability.ObserveTenants(func() []observability.TenantCount {
+		if r := registryState.Load(); r != nil {
+			return r.tenantCounts()
+		}
+		return []observability.TenantCount{{State: "active", ManagedBy: "configuration", Count: int64(len(configured))}}
+	}, func() time.Time {
+		if r := registryState.Load(); r != nil {
+			return r.lastReconciled()
+		}
+		return time.Time{}
+	}); err != nil {
+		return err
+	}
 	services := make([]*service.Service, 0, len(runtimes))
 	for _, runtime := range runtimes {
 		services = append(services, runtime.Workspace.Service)
@@ -155,6 +172,7 @@ func run(log *slog.Logger) error {
 			}
 			defer repo.Close()
 			reconciler := &tenantReconciler{repo: repo, opts: options, configured: configured, prepare: prepare, scheduler: scheduler, log: log}
+			registryState.Store(reconciler)
 			defer reconciler.Close()
 			if err = reconciler.Reconcile(ctx); err != nil {
 				return fmt.Errorf("tenant registry: %w", err)
@@ -223,6 +241,7 @@ func run(log *slog.Logger) error {
 	if registry && auth != nil {
 		reconciler := &tenantReconciler{repo: identityRepo, opts: options, configured: configured, prepare: prepare, router: router, auth: auth, scheduler: scheduler, log: log,
 			workers: func(runtime tenantRuntime) func() { return startTenantWorkers(ctx, runtime, false, log) }}
+		registryState.Store(reconciler)
 		defer reconciler.Close()
 		// Serve every registered tenant from the first request.
 		if err = reconciler.Reconcile(ctx); err != nil {

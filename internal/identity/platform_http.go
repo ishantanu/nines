@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/ishantanu/nines/internal/observability"
 )
 
 // PlatformRequest is the body of every platform change. Each operation reads
@@ -50,7 +52,12 @@ func (s *Service) PlatformHandler() http.Handler {
 	} {
 		mux.Handle(route, h)
 	}
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Label telemetry with the matched route, such as
+		// /api/platform/tenants/create, instead of /api/*.
+		defer func() { observability.Route(r.Context(), r.Pattern) }()
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func (s *Service) platformHandler() http.Handler {

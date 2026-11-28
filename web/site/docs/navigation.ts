@@ -334,6 +334,11 @@ export const docGroups: DocGroup[] = [
         "Backup and restore",
         "Preserve definitions, identities and retained evidence.",
       ),
+      page(
+        "deployment/monitoring",
+        "Monitor Nines itself",
+        "Export traces, metrics and logs, and alert on collection, tenants and sign-in.",
+      ),
     ],
   },
   {

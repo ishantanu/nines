@@ -48,7 +48,7 @@ See the [deployment guides](deployment.md) for container, Linux, Kubernetes, ide
 
 - `ALERT_WEBHOOK_URL` enables at-least-once delivery of alert transitions.
   - Deduplicate the stable event ID at the receiver.
-  - Configure standard `OTEL_*` variables to export server telemetry.
+  - Configure standard `OTEL_*` variables to export server telemetry; see [monitor Nines itself](deployment/monitoring.md).
   - Browser OTLP settings are build-time `VITE_*` configuration and are empty by default.
   - Do not put a private server credential in browser configuration.
 - Models are optional.

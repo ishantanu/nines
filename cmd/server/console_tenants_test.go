@@ -12,6 +12,10 @@ import (
 	"strings"
 	"testing"
 
+	"go.opentelemetry.io/otel"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
+	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
 	"github.com/ishantanu/nines/internal/features"
 	"github.com/ishantanu/nines/internal/httpapi"
 	"github.com/ishantanu/nines/internal/identity"
@@ -75,6 +79,10 @@ func signIn(t *testing.T, origin, user, password string) *consoleClient {
 // at once; retiring it blocks writes; deleting it needs the ID repeated,
 // revokes access and deletes its data. Configured tenants cannot be changed.
 func TestPlatformAdministratorsManageTenantsWithoutARestart(t *testing.T) {
+	reader := sdkmetric.NewManualReader()
+	previous := otel.GetMeterProvider()
+	otel.SetMeterProvider(sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader)))
+	defer otel.SetMeterProvider(previous)
 	ctx := context.Background()
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	server := httptest.NewUnstartedServer(nil)
@@ -174,6 +182,29 @@ func TestPlatformAdministratorsManageTenantsWithoutARestart(t *testing.T) {
 	owner.call("GET", "/api/slos", "", "payments", 403)
 	if mounted, _ := router.Mounted("payments"); mounted {
 		t.Fatal("a deleted tenant is still served")
+	}
+
+	// Each lifecycle step is measured, with its outcome.
+	var rm metricdata.ResourceMetrics
+	if err = reader.Collect(ctx, &rm); err != nil {
+		t.Fatal(err)
+	}
+	operations := map[string]int64{}
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			if sum, ok := m.Data.(metricdata.Sum[int64]); ok && m.Name == "nines.operation.count" {
+				for _, p := range sum.DataPoints {
+					op, _ := p.Attributes.Value("nines.operation")
+					outcome, _ := p.Attributes.Value("outcome")
+					operations[op.AsString()+"/"+outcome.AsString()] += p.Value
+				}
+			}
+		}
+	}
+	for _, want := range []string{"tenant.create/succeeded", "tenant.create/failed", "tenant.rename/succeeded", "tenant.rename/failed", "tenant.retire/succeeded", "tenant.delete/succeeded", "tenant.delete/failed"} {
+		if operations[want] == 0 {
+			t.Errorf("no %s operation recorded: %v", want, operations)
+		}
 	}
 
 	// Every change is in the platform audit log.

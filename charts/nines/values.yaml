@@ -72,6 +72,15 @@ tenants:
 connections:
   allowedHosts: []
 
+# OpenTelemetry: traces, metrics and logs from the server and operator, sent
+# over OTLP/HTTP (protobuf) to a collector, such as
+# http://otel-collector.observability.svc:4318. Empty keeps logs on stdout
+# only. Every signal carries the Kubernetes namespace and pod.
+telemetry:
+  otlpEndpoint: ''
+  # Extra resource attributes, such as deployment.environment.name: production.
+  resourceAttributes: {}
+
 # Extra environment for the server, such as provider credentials from Secrets.
 extraEnv: []
 extraEnvFrom: []
