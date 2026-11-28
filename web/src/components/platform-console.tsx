@@ -4,6 +4,14 @@ import {
 } from "./platform-change-dialog";
 import { useEffect, useRef, useState } from "react";
 import { TenantDialog, type TenantAction } from "./tenant-dialog";
+import { SetupLinkNotice, type SetupLink } from "./setup-link";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import { Brand } from "./brand";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
@@ -37,7 +45,6 @@ const blank = (tenant: string, provider: string): Draft => ({
   username: "",
   name: "",
   email: "",
-  password: "",
   role: "viewer",
   reason: "",
   enabled: false,
@@ -66,6 +73,7 @@ export function PlatformConsole({
     [busy, setBusy] = useState(false),
     [epoch, setEpoch] = useState(0);
   const [draft, setDraft] = useState<Draft>();
+  const [issued, setIssued] = useState<{ link: SetupLink; person: string }>();
   const [tenantChange, setTenantChange] = useState<{
     action: TenantAction;
     tenant?: PlatformTenant;
@@ -223,7 +231,6 @@ export function PlatformConsole({
           username: draft.username,
           name: draft.name,
           email: draft.email,
-          password: draft.password,
           role: draft.role,
           expectedVersion: 0,
         },
@@ -237,10 +244,12 @@ export function PlatformConsole({
         user: {
           name: draft.name,
           email: draft.email,
-          password: draft.password,
           expectedVersion: draft.version,
         },
       };
+    } else if (action === "setup") {
+      path = "users/setup-link";
+      body = { reason, userId: draft.user!.user.id };
     } else if (action === "revoke") {
       path = "users/revoke-sessions";
       body = {
@@ -281,11 +290,21 @@ export function PlatformConsole({
         },
       };
     }
-    // Passwords leave component state as soon as a request is submitted.
-    setDraft((old) => (old ? { ...old, password: "" } : old));
+    const person = draft.user?.user.name || draft.name || draft.username;
     try {
-      await platformWrite(path, csrf, body);
+      const result = await platformWrite<{
+        url?: string;
+        expiresAt?: string;
+        setupLink?: SetupLink;
+      }>(path, csrf, body);
       if (live.current && current === generation.current) {
+        // A new account, or a new link, is shown once to send to the person.
+        const link =
+          result?.setupLink ??
+          (result?.url && result.expiresAt
+            ? { url: result.url, expiresAt: result.expiresAt }
+            : undefined);
+        if (link) setIssued({ link, person });
         setDraft(undefined);
         setEpoch((old) => old + 1);
         onRefreshAccess();
@@ -592,14 +611,25 @@ export function PlatformConsole({
                           <TableCell>
                             <div className="flex max-w-xs flex-wrap gap-2">
                               {user.local ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  disabled={busy}
-                                  onClick={() => editUser("profile", user)}
-                                >
-                                  Edit account
-                                </Button>
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy}
+                                    onClick={() => editUser("profile", user)}
+                                  >
+                                    Edit account
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={busy}
+                                    aria-label={`New setup link for ${user.user.name}`}
+                                    onClick={() => editUser("setup", user)}
+                                  >
+                                    Setup link
+                                  </Button>
+                                </>
                               ) : null}
                               <Button
                                 size="sm"
@@ -718,6 +748,28 @@ export function PlatformConsole({
             onRefreshAccess();
           }}
         />
+      ) : null}
+      {issued ? (
+        <Dialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setIssued(undefined);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Setup link</DialogTitle>
+              <DialogDescription>
+                The person chooses their own password with it.
+              </DialogDescription>
+            </DialogHeader>
+            <SetupLinkNotice
+              link={issued.link}
+              person={issued.person}
+              onDone={() => setIssued(undefined)}
+            />
+          </DialogContent>
+        </Dialog>
       ) : null}
       {draft ? (
         <PlatformChangeDialog

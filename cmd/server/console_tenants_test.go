@@ -116,11 +116,15 @@ func TestPlatformAdministratorsManageTenantsWithoutARestart(t *testing.T) {
 	defer server.Close()
 
 	admin := signIn(t, origin, "admin", "synthetic-admin-password")
-	create := `{"reason":"Onboard the payments team","newTenant":{"id":"payments","name":"Payments","ownerUser":{"provider":"local","username":"pat","name":"Pat","password":"synthetic-owner-password"}}}`
-	var created identity.RegisteredTenant
-	if err = json.Unmarshal(admin.call("POST", "/api/platform/tenants/create", create, "", 200), &created); err != nil || created.Version != 1 || created.State != identity.TenantActive {
+	// The first owner is a new local account; the administrator never sets
+	// its password. The owner chooses one through the setup link.
+	create := `{"reason":"Onboard the payments team","newTenant":{"id":"payments","name":"Payments","ownerUser":{"provider":"local","username":"pat","name":"Pat"}}}`
+	var created identity.TenantCreated
+	if err = json.Unmarshal(admin.call("POST", "/api/platform/tenants/create", create, "", 200), &created); err != nil || created.Version != 1 || created.State != identity.TenantActive || created.SetupLink == nil {
 		t.Fatal("create", created, err)
 	}
+	_, token, _ := strings.Cut(created.SetupLink.URL, "/setup#")
+	(&consoleClient{t: t, origin: origin, http: http.DefaultClient}).call("POST", "/auth/local/setup", `{"token":"`+token+`","password":"synthetic-owner-password"}`, "", 200)
 	admin.call("POST", "/api/platform/tenants/create", create, "", 409)
 	admin.call("POST", "/api/platform/tenants/create", `{"reason":"Shadow the default tenant","newTenant":{"id":"default","name":"Default","ownerProvider":"local","ownerSubject":"admin"}}`, "", 400)
 	admin.call("POST", "/api/platform/tenants/create", `{"reason":"No owner","newTenant":{"id":"orphan","name":"Orphan"}}`, "", 400)

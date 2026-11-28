@@ -1,12 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
-	"os"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/spf13/cobra"
@@ -78,7 +74,6 @@ func adminCommand(o *options) *cobra.Command {
 
 	var in client.NewTenant
 	var owner client.NewLocalOwner
-	var passwordStdin bool
 	create := &cobra.Command{Use: "create ID", Args: cobra.ExactArgs(1), RunE: func(c *cobra.Command, args []string) error {
 		in.ID = args[0]
 		local := owner.Username != ""
@@ -86,14 +81,6 @@ func adminCommand(o *options) *cobra.Command {
 			return usage("choose the first owner: --owner-username for a new local account, or --owner-provider and --owner-subject for someone who can already sign in")
 		}
 		if local {
-			if !passwordStdin {
-				return usage("a new local owner needs --owner-password-stdin; the password is never taken as a flag")
-			}
-			password, err := readLine(passwordInput())
-			if err != nil {
-				return usage("read the owner's initial password from stdin")
-			}
-			owner.Password = password
 			if owner.Provider == "" {
 				owner.Provider = "local"
 			}
@@ -107,19 +94,21 @@ func adminCommand(o *options) *cobra.Command {
 			return err
 		}
 		out, err := a.CreateTenant(c.Context(), in, reason)
-		owner.Password = ""
 		if err != nil {
 			return err
+		}
+		if out.SetupLink != nil && !o.Agent {
+			// The link is the owner's only way in; say what to do with it.
+			_, _ = fmt.Fprintf(c.ErrOrStderr(), "Send this setup link to %s. It works once and expires %s:\n%s\n", owner.Username, out.SetupLink.ExpiresAt.Local().Format("2 Jan 2006 15:04 MST"), out.SetupLink.URL)
 		}
 		return render(c.OutOrStdout(), out, o.format("json"), "tenant")
 	}}
 	f := create.Flags()
 	f.StringVar(&in.Name, "name", "", "display name (required)")
 	_ = create.MarkFlagRequired("name")
-	f.StringVar(&owner.Username, "owner-username", "", "create the first owner as a new local account with this username")
+	f.StringVar(&owner.Username, "owner-username", "", "create the first owner as a new local account; they choose their password through the printed setup link")
 	f.StringVar(&owner.Name, "owner-name", "", "the new local owner's display name (default: the username)")
 	f.StringVar(&owner.Email, "owner-email", "", "the new local owner's email")
-	f.BoolVar(&passwordStdin, "owner-password-stdin", false, "read the new local owner's initial password (12 to 72 characters) from stdin")
 	f.StringVar(&in.OwnerProvider, "owner-provider", "", "sign-in provider of an existing person to make owner (with --owner-subject)")
 	f.StringVar(&in.OwnerSubject, "owner-subject", "", "that person's user ID at the provider")
 	reasonFlag(create)
@@ -189,20 +178,4 @@ func adminCommand(o *options) *cobra.Command {
 	versionFlag(del)
 	tenants.AddCommand(mark(del, "server", "write", "Permanently delete a retired tenant and its data"))
 	return admin
-}
-
-// passwordInput is where a new local owner's password is read; tests replace it.
-var passwordInput = func() io.Reader { return os.Stdin }
-
-// readLine reads one line, such as a password piped on stdin.
-func readLine(r io.Reader) (string, error) {
-	line, err := bufio.NewReader(io.LimitReader(r, 4096)).ReadString('\n')
-	if err != nil && err != io.EOF {
-		return "", err
-	}
-	line = strings.TrimRight(line, "\r\n")
-	if line == "" {
-		return "", fmt.Errorf("empty input")
-	}
-	return line, nil
 }

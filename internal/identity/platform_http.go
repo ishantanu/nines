@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -42,6 +43,7 @@ func (s *Service) PlatformHandler() http.Handler {
 		"POST /api/platform/users/create",
 		"POST /api/platform/users/update",
 		"POST /api/platform/users/revoke-sessions",
+		"POST /api/platform/users/setup-link",
 		"POST /api/platform/memberships/save",
 		"POST /api/platform/memberships/remove",
 		"POST /api/platform/system-one/save",
@@ -168,13 +170,20 @@ func (s *Service) platformHandler() http.Handler {
 				err = ErrInvalid
 				break
 			}
-			out, err = s.CreateLocalUser(r.Context(), a, in.Tenant, *in.User)
+			out, err = s.CreatePlatformLocalUser(r.Context(), a, in.Tenant, *in.User)
 		case "users/update":
 			if in.User == nil {
 				err = ErrInvalid
 				break
 			}
+			if in.User.Password != "" {
+				// Administrators never set passwords; the person does, with a link.
+				err = fmt.Errorf("issue a setup link instead; the person chooses their own password: %w", ErrInvalid)
+				break
+			}
 			out, err = s.UpdateLocalUser(r.Context(), a, in.Tenant, in.UserID, *in.User)
+		case "users/setup-link":
+			out, err = s.IssueSetupLink(r.Context(), a, in.UserID)
 		case "users/revoke-sessions":
 			err = s.revokePlatformSessions(r.Context(), a, in.UserID, in.ExpectedVersion)
 		case "memberships/save":

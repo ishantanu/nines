@@ -14,5 +14,6 @@ browser:
   POST /auth/cli/password: browser sign-in form during CLI sign-in
   POST /auth/ldap/{provider}/login: browser sign-in
   POST /auth/local/{provider}/login: browser sign-in
+  POST /auth/local/setup: browser page where a person sets their password from a setup link
   POST /auth/logout: browser session
   POST /auth/logout-all: browser session

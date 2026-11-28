@@ -73,43 +73,55 @@ func validTenantName(name string) bool {
 	return strings.TrimSpace(name) != "" && len(name) <= 200 && utf8.ValidString(name) && !strings.ContainsAny(name, "\x00\r\n")
 }
 
+// TenantCreated is a new tenant, with its first owner's setup link when the
+// owner is a new local account.
+type TenantCreated struct {
+	RegisteredTenant
+	SetupLink *SetupLink `json:"setupLink,omitempty"`
+}
+
 // CreateTenant registers a tenant and its first owner in one transaction.
 // Every process then serves it: this one at once, others within seconds.
-func (s *Service) CreateTenant(ctx context.Context, a Actor, in TenantInput) (_ RegisteredTenant, err error) {
+func (s *Service) CreateTenant(ctx context.Context, a Actor, in TenantInput) (_ TenantCreated, err error) {
 	ctx, finish := observability.Operation(ctx, "tenant.create", in.ID)
 	defer func() { finish(err) }()
 	t := RegisteredTenant{ID: in.ID, Name: strings.TrimSpace(in.Name), State: TenantActive, CreatedAt: s.Now().UTC(), CreatedBy: a.ID, Version: 1}
 	// default maps to the base database schema and is never a console tenant.
 	if !tenancy.ValidID(in.ID) || in.ID == "default" || !validTenantName(in.Name) || in.ExpectedVersion != 0 || in.Confirm != "" {
-		return t, ErrInvalid
+		return TenantCreated{RegisteredTenant: t}, ErrInvalid
 	}
 	existing := in.OwnerProvider != "" || in.OwnerSubject != ""
 	if existing == (in.OwnerUser != nil) {
-		return t, fmt.Errorf("choose an existing user or a new local account as the first owner: %w", ErrInvalid)
+		return TenantCreated{RegisteredTenant: t}, fmt.Errorf("choose an existing user or a new local account as the first owner: %w", ErrInvalid)
 	}
 	var owner User
 	var hash []byte
 	if existing {
 		if _, ok := s.providers[in.OwnerProvider]; !ok || len(in.OwnerSubject) > 500 {
-			return t, ErrInvalid
+			return TenantCreated{RegisteredTenant: t}, ErrInvalid
 		}
 		owner = s.user(in.OwnerProvider, externalUser{Subject: in.OwnerSubject})
 	} else {
 		u := *in.OwnerUser
 		p, ok := s.providers[u.Provider]
 		if !ok || p.config.Type != "local" || !localUsername.MatchString(u.Username) || strings.TrimSpace(u.Name) == "" || len(u.Name) > 300 || len(u.Email) > 320 || (u.Role != "" && u.Role != "owner") || u.ExpectedVersion != 0 {
-			return t, ErrInvalid
+			return TenantCreated{RegisteredTenant: t}, ErrInvalid
 		}
-		var err error
-		if hash, err = passwordHash(u.Password); err != nil {
-			return t, err
+		// Without a password the owner is pending until they use the setup
+		// link returned below; the administrator never sets one.
+		if u.Password != "" {
+			var err error
+			if hash, err = passwordHash(u.Password); err != nil {
+				return TenantCreated{RegisteredTenant: t}, err
+			}
 		}
 		owner = s.user(u.Provider, externalUser{Subject: u.Username, Name: u.Name, Email: u.Email})
 		owner.Version = 1
 	}
 	if s.knownTenant(in.ID) {
-		return t, fmt.Errorf("a tenant with this ID exists: %w", ErrConflict)
+		return TenantCreated{RegisteredTenant: t}, fmt.Errorf("a tenant with this ID exists: %w", ErrConflict)
 	}
+	var link *SetupLink
 	err = s.repo.Update(ctx, "tenant:"+in.ID, func(tx Tx) error {
 		if err := s.platformAdminTx(tx, a); err != nil {
 			return err
@@ -129,13 +141,21 @@ func (s *Service) CreateTenant(ctx context.Context, a Actor, in TenantInput) (_ 
 			_, err := s.grantTx(tx, a, t.ID, owner, "owner", 0)
 			return err
 		}
-		return s.createLocalUserTx(tx, a, t.ID, owner, hash, "owner")
+		if err := s.createLocalUserTx(tx, a, t.ID, owner, hash, "owner"); err != nil {
+			return err
+		}
+		if hash == nil {
+			issued, err := s.issueSetupTx(tx, a, owner)
+			link = &issued
+			return err
+		}
+		return nil
 	})
 	if err != nil {
-		return t, err
+		return TenantCreated{RegisteredTenant: t}, err
 	}
 	s.AddTenant(t.ID)
-	return t, nil
+	return TenantCreated{RegisteredTenant: t, SetupLink: link}, nil
 }
 
 // updateTenant changes a console tenant at its expected version.

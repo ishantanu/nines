@@ -47,6 +47,20 @@ type RegisteredTenant struct {
 	Version   int64      `json:"version"`
 }
 
+// SetupLink is a one-time link for a new local account's owner to choose a
+// password. Send it to them; it is shown only once.
+type SetupLink struct {
+	URL       string    `json:"url"`
+	ExpiresAt time.Time `json:"expiresAt"`
+}
+
+// CreatedTenant is a new tenant, with its owner's setup link when the owner
+// is a new local account.
+type CreatedTenant struct {
+	RegisteredTenant
+	SetupLink *SetupLink `json:"setupLink,omitempty"`
+}
+
 // NewTenant creates a tenant with its first owner: an existing user
 // (OwnerProvider and OwnerSubject) or a new local account (OwnerUser).
 type NewTenant struct {
@@ -57,13 +71,13 @@ type NewTenant struct {
 	OwnerUser     *NewLocalOwner `json:"ownerUser,omitempty"`
 }
 
-// NewLocalOwner is a local account created as a tenant's first owner.
+// NewLocalOwner is a local account created as a tenant's first owner. It
+// has no password until the owner uses the returned setup link.
 type NewLocalOwner struct {
 	Provider string `json:"provider"`
 	Username string `json:"username"`
 	Name     string `json:"name"`
 	Email    string `json:"email,omitempty"`
-	Password string `json:"password"`
 }
 
 // PlatformError is a refused platform request, with the server's reason.
@@ -141,8 +155,8 @@ func (c *Client) ListPlatformTenants(ctx context.Context) (PlatformTenants, erro
 }
 
 // CreateTenant creates a tenant and its first owner. It is served at once.
-func (c *Client) CreateTenant(ctx context.Context, in NewTenant, reason string) (RegisteredTenant, error) {
-	var out RegisteredTenant
+func (c *Client) CreateTenant(ctx context.Context, in NewTenant, reason string) (CreatedTenant, error) {
+	var out CreatedTenant
 	err := c.platform(ctx, http.MethodPost, "tenants/create", map[string]any{"reason": reason, "newTenant": in}, &out)
 	return out, err
 }
@@ -167,4 +181,12 @@ func (c *Client) RetireTenant(ctx context.Context, id string, expected int64, re
 // confirm must repeat the ID.
 func (c *Client) DeleteTenant(ctx context.Context, id, confirm string, expected int64, reason string) error {
 	return c.platform(ctx, http.MethodPost, "tenants/delete", map[string]any{"reason": reason, "tenant": id, "confirm": confirm, "expectedVersion": expected}, nil)
+}
+
+// IssueSetupLink gives a local user a new one-time setup link, replacing any
+// earlier one. Using it sets a new password and signs them out everywhere.
+func (c *Client) IssueSetupLink(ctx context.Context, userID, reason string) (SetupLink, error) {
+	var out SetupLink
+	err := c.platform(ctx, http.MethodPost, "users/setup-link", map[string]any{"reason": reason, "userId": userID}, &out)
+	return out, err
 }

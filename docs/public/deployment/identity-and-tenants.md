@@ -92,6 +92,7 @@ tenants:
 
 - The persistent Compose deployment and Kubernetes reference enable a local provider. `admin` is seeded with `NINES_BOOTSTRAP_PASSWORD` on the first start; its hash and memberships persist in PostgreSQL.
   - Owners use **Access control → Users** for profiles, password resets, roles and tenant access. A reset revokes existing sessions.
+  - Platform administrators create local accounts with a one-time setup link instead of a password, so the person chooses their own; see [platform administration](../platform-administration.md#users-and-tenant-access).
   - Changing the environment variable does not overwrite an existing password.
 - For native execution, mount or copy [the local account configuration](../../../examples/auth-local.yaml), set `AUTH_CONFIG_FILE` to it, and supply `NINES_PUBLIC_URL` and `NINES_BOOTSTRAP_PASSWORD` through the process environment. Use HTTPS outside loopback. API-token credentials can coexist with account login.
 

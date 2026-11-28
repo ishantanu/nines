@@ -4098,7 +4098,7 @@ paths:
     post:
       operationId: createTenant
       summary: Create a tenant
-      description: 'Creates a tenant and its first owner (an existing user, or a new local account) in one transaction. It is served at once on this server and within 10 seconds on others. The ID default is reserved. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes check the expected version and are recorded in the platform audit log, with an optional reason. Tenants from server configuration cannot be changed.'
+      description: 'Creates a tenant and its first owner (an existing user, or a new local account) in one transaction. A new local owner gets no password: the response carries a one-time setup link, valid for 72 hours, for the owner to choose one. It is served at once on this server and within 10 seconds on others. The ID default is reserved. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes check the expected version and are recorded in the platform audit log, with an optional reason. Tenants from server configuration cannot be changed.'
       parameters: []
       requestBody:
         required: true
@@ -4112,7 +4112,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegisteredTenant'
+                $ref: '#/components/schemas/TenantCreated'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -4305,7 +4305,7 @@ paths:
     post:
       operationId: createPlatformLocalUser
       summary: Create a local account
-      description: 'Creates a local account with an initial password and a role in one tenant (tenant, user). Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
+      description: 'Creates a local account with a role in one tenant (tenant, user). Without a password the account is pending and the response carries a one-time setup link, valid for 72 hours, for the person to choose one. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -4319,7 +4319,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: '#/components/schemas/UserCreated'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -4336,7 +4336,7 @@ paths:
     post:
       operationId: updatePlatformLocalUser
       summary: Edit a local account
-      description: 'Changes a local account''s name and email, or resets its password, at its expected version (userId, user). A password change signs the user out everywhere. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
+      description: 'Changes a local account''s name and email at its expected version (userId, user). It never sets a password: issue a setup link instead. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -4475,6 +4475,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PlatformOK'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/platform/users/setup-link:
+    post:
+      operationId: issueSetupLink
+      summary: Issue a setup link
+      description: 'Gives a local user a new one-time setup link (userId), valid for 72 hours, replacing any earlier one. Using it sets a new password and signs the person out everywhere, so it also resets a forgotten password. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformRequest'
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetupLink'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -11787,6 +11818,18 @@ components:
         - metadata
         - spec
       type: object
+    SetupLink:
+      additionalProperties: false
+      properties:
+        expiresAt:
+          format: date-time
+          type: string
+        url:
+          type: string
+      required:
+        - expiresAt
+        - url
+      type: object
     Skill:
       additionalProperties: false
       properties:
@@ -12342,6 +12385,35 @@ components:
       required:
         - newTenant
       type: object
+    TenantCreated:
+      additionalProperties: false
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        createdBy:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        retiredAt:
+          format: date-time
+          type: string
+        setupLink:
+          $ref: '#/components/schemas/SetupLink'
+        state:
+          type: string
+        version:
+          type: integer
+      required:
+        - createdAt
+        - createdBy
+        - id
+        - name
+        - state
+        - version
+      type: object
     TenantInput:
       additionalProperties: false
       properties:
@@ -12448,6 +12520,33 @@ components:
           type: string
         sessionEpoch:
           type: integer
+        subject:
+          type: string
+        version:
+          type: integer
+      required:
+        - id
+        - name
+        - provider
+        - sessionEpoch
+        - subject
+        - version
+      type: object
+    UserCreated:
+      additionalProperties: false
+      properties:
+        email:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        provider:
+          type: string
+        sessionEpoch:
+          type: integer
+        setupLink:
+          $ref: '#/components/schemas/SetupLink'
         subject:
           type: string
         version:
