@@ -135,7 +135,8 @@ func TestPlatformAdminCSRFIdentityAndRevisionFences(t *testing.T) {
 	c, csrf := platformLogin(t, h, "admin", "platform-fixture-password")
 	body := `{"reason":"Pause provider","tenant":"alpha","policy":{"version":0,"enabled":false,"dailyRequestLimit":10}}`
 	request(t, c, "POST", h.URL+"/api/platform/system-one/save", "", body, 403)
-	request(t, c, "POST", h.URL+"/api/platform/system-one/save", csrf, `{"reason":"","tenant":"alpha","policy":{"version":0,"enabled":false,"dailyRequestLimit":10}}`, 400)
+	// A reason is optional but bounded.
+	request(t, c, "POST", h.URL+"/api/platform/system-one/save", csrf, `{"reason":"`+strings.Repeat("x", 1001)+`","tenant":"alpha","policy":{"version":0,"enabled":false,"dailyRequestLimit":10}}`, 400)
 	for _, header := range []string{"Origin", "X-Nines-Tenant", "Authorization"} {
 		r, _ := http.NewRequest("GET", h.URL+"/api/platform/overview", nil)
 		value := "alpha"
@@ -157,7 +158,7 @@ func TestPlatformAdminCSRFIdentityAndRevisionFences(t *testing.T) {
 	}
 	request(t, c, "GET", h.URL+"/api/platform/users?before=a&before=b", "", "", 400)
 	request(t, c, "GET", h.URL+"/api/platform/users?unexpected=a", "", "", 400)
-	request(t, c, "POST", h.URL+"/api/platform/system-one/save", csrf, body, 200)
+	request(t, c, "POST", h.URL+"/api/platform/system-one/save", csrf, `{"tenant":"alpha","policy":{"version":0,"enabled":false,"dailyRequestLimit":10}}`, 200)
 	request(t, c, "POST", h.URL+"/api/platform/system-one/save", csrf, body, 409)
 	request(t, c, "POST", h.URL+"/api/platform/system-one/save", csrf, `{"reason":"Unconfigured provider cannot be enabled","tenant":"beta","policy":{"version":0,"enabled":true,"dailyRequestLimit":10}}`, 400)
 	a := platformActor(t, s, h, c)

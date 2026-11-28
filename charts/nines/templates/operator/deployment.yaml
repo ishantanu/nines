@@ -42,8 +42,7 @@ spec:
           imagePullPolicy: {{ .Values.operator.image.pullPolicy }}
           args: [-config, /etc/nines/operator.yaml, -health-addr, ':8081']
           env:
-            - name: OTEL_SERVICE_NAME
-              value: nines-operator
+            {{- include "nines.telemetryEnv" (list "nines-operator" .) | nindent 12 }}
           ports:
             - name: health
               containerPort: 8081

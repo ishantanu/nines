@@ -187,7 +187,8 @@ test("tenant inventory has independent administration navigation and does not se
 test("account creation sends no password and shows the setup link", async () => {
   await render("users");
   await act(async () => button("Create user").click());
-  expect(button("Save change").getAttribute("aria-disabled")).toBe("true");
+  // The reason is optional; nothing blocks saving on it.
+  expect(button("Save change").getAttribute("aria-disabled")).not.toBe("true");
   await field("platform-username", "new-user");
   await field("platform-name", "New user");
   expect(document.getElementById("platform-password")).toBeNull();

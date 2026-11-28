@@ -39,6 +39,15 @@ CONFIGURATIONS = {
     ],
     "connections": BASE
     + ["--set", "connections.allowedHosts={prometheus.monitoring.svc:9090}"],
+    "telemetry": BASE
+    + [
+        "--set",
+        "operator.enabled=true",
+        "--set",
+        "telemetry.otlpEndpoint=http://otel-collector.observability.svc:4318",
+        "--set",
+        "telemetry.resourceAttributes.team=sre",
+    ],
     "own credentials and digest": BASE
     + [
         "--set",
@@ -52,6 +61,10 @@ REFUSED = {
     "ingress without host": BASE + ["--set", "ingress.enabled=true"],
     "misspelled value": BASE + ["--set", "replicas=2"],
     "unknown source kind": BASE + ["--set", "operator.sources.primary.kind=thanos"],
+    "telemetry endpoint with credentials": BASE
+    + ["--set", "telemetry.otlpEndpoint=http://user:pass@collector:4318"],
+    "resource attribute with a separator": BASE
+    + ["--set", "telemetry.resourceAttributes.team=a,b"],
 }
 
 

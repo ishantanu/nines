@@ -86,3 +86,19 @@ func TestAdminTenantsCLI(t *testing.T) {
 		t.Fatal("delete", got)
 	}
 }
+
+// Login picks an environment key in auto mode; when the server rejects it,
+// the error says which variable to unset instead of a bare HTTP 401.
+func TestLoginExplainsARejectedEnvironmentKey(t *testing.T) {
+	cliEnv(t)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"error":"valid tenant API token required"}`, http.StatusUnauthorized)
+	}))
+	defer server.Close()
+	t.Setenv("NINES_API_KEY", "synthetic-stale-key")
+	var out bytes.Buffer
+	err := run([]string{"login", "--context", "playground", "--server", server.URL, "--tenant", "prometheus"}, &out)
+	if err == nil || !strings.Contains(err.Error(), "Unset NINES_API_KEY") || exitCode(err) != 3 {
+		t.Fatal("unexplained rejection", err)
+	}
+}

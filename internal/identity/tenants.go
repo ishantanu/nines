@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/tenancy"
 )
 
@@ -81,7 +82,9 @@ type TenantCreated struct {
 
 // CreateTenant registers a tenant and its first owner in one transaction.
 // Every process then serves it: this one at once, others within seconds.
-func (s *Service) CreateTenant(ctx context.Context, a Actor, in TenantInput) (TenantCreated, error) {
+func (s *Service) CreateTenant(ctx context.Context, a Actor, in TenantInput) (_ TenantCreated, err error) {
+	ctx, finish := observability.Operation(ctx, "tenant.create", in.ID)
+	defer func() { finish(err) }()
 	t := RegisteredTenant{ID: in.ID, Name: strings.TrimSpace(in.Name), State: TenantActive, CreatedAt: s.Now().UTC(), CreatedBy: a.ID, Version: 1}
 	// default maps to the base database schema and is never a console tenant.
 	if !tenancy.ValidID(in.ID) || in.ID == "default" || !validTenantName(in.Name) || in.ExpectedVersion != 0 || in.Confirm != "" {
@@ -119,7 +122,7 @@ func (s *Service) CreateTenant(ctx context.Context, a Actor, in TenantInput) (Te
 		return TenantCreated{RegisteredTenant: t}, fmt.Errorf("a tenant with this ID exists: %w", ErrConflict)
 	}
 	var link *SetupLink
-	err := s.repo.Update(ctx, "tenant:"+in.ID, func(tx Tx) error {
+	err = s.repo.Update(ctx, "tenant:"+in.ID, func(tx Tx) error {
 		if err := s.platformAdminTx(tx, a); err != nil {
 			return err
 		}
@@ -187,7 +190,9 @@ func (s *Service) updateTenant(ctx context.Context, a Actor, id string, expected
 }
 
 // RenameTenant changes a console tenant's display name. The ID never changes.
-func (s *Service) RenameTenant(ctx context.Context, a Actor, id, name string, expected int64) (RegisteredTenant, error) {
+func (s *Service) RenameTenant(ctx context.Context, a Actor, id, name string, expected int64) (_ RegisteredTenant, err error) {
+	ctx, finish := observability.Operation(ctx, "tenant.rename", id)
+	defer func() { finish(err) }()
 	if !validTenantName(name) {
 		return RegisteredTenant{}, ErrInvalid
 	}
@@ -199,7 +204,9 @@ func (s *Service) RenameTenant(ctx context.Context, a Actor, id, name string, ex
 
 // RetireTenant stops a console tenant's collection and alerting and makes it
 // read-only. Its data stays until it is deleted.
-func (s *Service) RetireTenant(ctx context.Context, a Actor, id string, expected int64) (RegisteredTenant, error) {
+func (s *Service) RetireTenant(ctx context.Context, a Actor, id string, expected int64) (_ RegisteredTenant, err error) {
+	ctx, finish := observability.Operation(ctx, "tenant.retire", id)
+	defer func() { finish(err) }()
 	return s.updateTenant(ctx, a, id, expected, "tenant.retire", func(t *RegisteredTenant) error {
 		if t.State == TenantRetired {
 			return fmt.Errorf("the tenant is already retired: %w", ErrConflict)
@@ -214,7 +221,9 @@ func (s *Service) RetireTenant(ctx context.Context, a Actor, id string, expected
 // stored data, then its registration, members and teams go. Its credentials
 // stop working at once. confirm must repeat the ID. If deleteData fails, the
 // tenant stays deleting and deleting it again resumes.
-func (s *Service) DeleteTenant(ctx context.Context, a Actor, id, confirm string, expected int64, deleteData func(context.Context) error) error {
+func (s *Service) DeleteTenant(ctx context.Context, a Actor, id, confirm string, expected int64, deleteData func(context.Context) error) (err error) {
+	ctx, finish := observability.Operation(ctx, "tenant.delete", id)
+	defer func() { finish(err) }()
 	if s.configured[id] {
 		return ErrTenantConfigured
 	}

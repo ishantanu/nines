@@ -124,7 +124,6 @@ export function TenantDialog({
   }
 
   const ready =
-    reason.trim() !== "" &&
     csrf !== "" &&
     (action === "create"
       ? tenantID.test(id) &&
@@ -308,10 +307,9 @@ export function TenantDialog({
                 />
               </FormField>
             ) : null}
-            <FormField htmlFor="tenant-reason" label="Reason for change">
+            <FormField htmlFor="tenant-reason" label="Reason (optional)">
               <Textarea
                 id="tenant-reason"
-                required
                 maxLength={1000}
                 value={reason}
                 disabled={busy}

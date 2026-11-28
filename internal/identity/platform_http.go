@@ -9,12 +9,14 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/ishantanu/nines/internal/observability"
 )
 
 // PlatformRequest is the body of every platform change. Each operation reads
-// the fields it needs; reason is always required.
+// the fields it needs. The reason is optional and audited when given.
 type PlatformRequest struct {
-	Reason          string            `json:"reason"`
+	Reason          string            `json:"reason,omitempty"`
 	Tenant          string            `json:"tenant,omitempty"`
 	UserID          string            `json:"userId,omitempty"`
 	Provider        string            `json:"provider,omitempty"`
@@ -52,7 +54,12 @@ func (s *Service) PlatformHandler() http.Handler {
 	} {
 		mux.Handle(route, h)
 	}
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Label telemetry with the matched route, such as
+		// /api/platform/tenants/create, instead of /api/*.
+		defer func() { observability.Route(r.Context(), r.Pattern) }()
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func (s *Service) platformHandler() http.Handler {
@@ -145,7 +152,9 @@ func (s *Service) platformHandler() http.Handler {
 			authFailure(w, err)
 			return
 		}
-		if !utf8.ValidString(in.Reason) || strings.TrimSpace(in.Reason) == "" || len(in.Reason) > 1000 || strings.ContainsRune(in.Reason, 0) || !s.platformReasonSafe(in.Reason) {
+		in.Reason = strings.TrimSpace(in.Reason)
+		// Optional; when given it is bounded and must not carry a credential.
+		if !utf8.ValidString(in.Reason) || len(in.Reason) > 1000 || strings.ContainsRune(in.Reason, 0) || in.Reason != "" && !s.platformReasonSafe(in.Reason) {
 			authFailure(w, ErrInvalid)
 			return
 		}

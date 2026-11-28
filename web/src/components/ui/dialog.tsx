@@ -127,7 +127,14 @@ function DialogContent({
       className={cn("sm:max-w-lg", className)}
       {...(props as object)}
     >
-      {children}
+      {/* Astryx clips its inner column at the dialog's maximum height, so
+          tall content scrolls here. The padding keeps focus rings visible. */}
+      <div
+        data-slot="dialog-body"
+        className="-m-1 min-h-0 flex-1 overflow-y-auto p-1"
+      >
+        {children}
+      </div>
       {showCloseButton ? (
         <Button
           variant="ghost"

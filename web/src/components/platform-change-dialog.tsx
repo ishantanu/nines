@@ -116,7 +116,7 @@ export function PlatformChangeDialog({
           <DialogDescription>
             {draft?.action === "policy"
               ? "Controls apply to future System One requests. Model consent and human approval remain required."
-              : "Review the account and tenant scope before saving. A reason is required."}
+              : "Review the account and tenant scope before saving."}
           </DialogDescription>
         </DialogHeader>
         {draft ? (
@@ -281,10 +281,9 @@ export function PlatformChangeDialog({
                 </p>
               </>
             ) : null}
-            <FormField htmlFor="platform-reason" label="Reason for change">
+            <FormField htmlFor="platform-reason" label="Reason (optional)">
               <Textarea
                 id="platform-reason"
-                required
                 maxLength={1000}
                 value={draft.reason}
                 disabled={busy}
@@ -300,10 +299,7 @@ export function PlatformChangeDialog({
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                disabled={busy || !draft.reason.trim() || !csrf}
-              >
+              <Button type="submit" disabled={busy || !csrf}>
                 {busy ? "Saving…" : "Save change"}
               </Button>
             </div>

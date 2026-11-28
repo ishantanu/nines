@@ -19,6 +19,7 @@ Nines supports a server/portal deployment and a standalone Kubernetes operator.
 * **Team access**: [Identity and tenant configuration](deployment/identity-and-tenants.md) · Local accounts, API keys, OIDC/Microsoft Entra, LDAP and roles
 * **Metrics and rules**: [Prometheus/Mimir routing](deployment/metrics-and-rules.md) · Explicit query connections and reviewed rule destinations
 * **Data protection**: [Backup, restore and upgrades](deployment/backup-and-restore.md) · Database, configuration and credential recovery
+* **Monitoring Nines**: [Traces, metrics and logs](deployment/monitoring.md) · OpenTelemetry export, what each signal shows, and suggested alerts
 * **Product website**: [GitHub Pages](site.md) · Static documentation, separate from the server
 
 ## Before exposing a server

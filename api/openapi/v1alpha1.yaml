@@ -4079,7 +4079,7 @@ paths:
     get:
       operationId: getPlatformOverview
       summary: Read the platform overview
-      description: 'Every tenant on the server, with who manages it, its state and version; sign-in providers and platform administrators. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      description: 'Every tenant on the server, with who manages it, its state and version; sign-in providers and platform administrators. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes check the expected version and are recorded in the platform audit log, with an optional reason. Tenants from server configuration cannot be changed.'
       parameters: []
       responses:
         '200':
@@ -4098,7 +4098,7 @@ paths:
     post:
       operationId: createTenant
       summary: Create a tenant
-      description: 'Creates a tenant and its first owner (an existing user, or a new local account) in one transaction. A new local owner gets no password: the response carries a one-time setup link, valid for 72 hours, for the owner to choose one. It is served at once on this server and within 10 seconds on others. The ID default is reserved. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      description: 'Creates a tenant and its first owner (an existing user, or a new local account) in one transaction. A new local owner gets no password: the response carries a one-time setup link, valid for 72 hours, for the owner to choose one. It is served at once on this server and within 10 seconds on others. The ID default is reserved. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes check the expected version and are recorded in the platform audit log, with an optional reason. Tenants from server configuration cannot be changed.'
       parameters: []
       requestBody:
         required: true
@@ -4129,7 +4129,7 @@ paths:
     post:
       operationId: renameTenant
       summary: Rename a tenant
-      description: 'Changes the display name at the expected version. The ID never changes. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      description: 'Changes the display name at the expected version. The ID never changes. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes check the expected version and are recorded in the platform audit log, with an optional reason. Tenants from server configuration cannot be changed.'
       parameters: []
       requestBody:
         required: true
@@ -4160,7 +4160,7 @@ paths:
     post:
       operationId: retireTenant
       summary: Retire a tenant
-      description: 'Stops collection and alerting and makes the tenant read-only, keeping its data. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      description: 'Stops collection and alerting and makes the tenant read-only, keeping its data. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes check the expected version and are recorded in the platform audit log, with an optional reason. Tenants from server configuration cannot be changed.'
       parameters: []
       requestBody:
         required: true
@@ -4191,7 +4191,7 @@ paths:
     post:
       operationId: deleteTenant
       summary: Delete a tenant
-      description: 'Permanently deletes a retired tenant: its data, members, teams and access keys. confirm must repeat the ID. If deleting its data fails, the tenant stays deleting and deleting it again resumes. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason, check the expected version, and are recorded in the platform audit log. Tenants from server configuration cannot be changed.'
+      description: 'Permanently deletes a retired tenant: its data, members, teams and access keys. confirm must repeat the ID. If deleting its data fails, the tenant stays deleting and deleting it again resumes. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes check the expected version and are recorded in the platform audit log, with an optional reason. Tenants from server configuration cannot be changed.'
       parameters: []
       requestBody:
         required: true
@@ -4222,7 +4222,7 @@ paths:
     get:
       operationId: listPlatformUsers
       summary: List users across tenants
-      description: 'Identities, their tenant memberships and effective grants, and whether each is a platform administrator. Paginated. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Identities, their tenant memberships and effective grants, and whether each is a platform administrator. Paginated. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters:
         - name: before
           in: query
@@ -4249,7 +4249,7 @@ paths:
     get:
       operationId: listPlatformAudit
       summary: List platform audit records
-      description: 'Platform changes, newest first, kept 90 days. channel says whether a change came from the browser or the CLI. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Platform changes, newest first, kept 90 days. channel says whether a change came from the browser or the CLI. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters:
         - name: before
           in: query
@@ -4276,7 +4276,7 @@ paths:
     get:
       operationId: getTenantJevPolicy
       summary: Read a tenant's Jev policy
-      description: 'Whether Jev is configured and enabled for the tenant, its daily request limit and the requests reserved today (UTC). Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Whether Jev is configured and enabled for the tenant, its daily request limit and the requests reserved today (UTC). Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters:
         - name: tenant
           in: path
@@ -4305,7 +4305,7 @@ paths:
     post:
       operationId: createPlatformLocalUser
       summary: Create a local account
-      description: 'Creates a local account with a role in one tenant (tenant, user). Without a password the account is pending and the response carries a one-time setup link, valid for 72 hours, for the person to choose one. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Creates a local account with a role in one tenant (tenant, user). Without a password the account is pending and the response carries a one-time setup link, valid for 72 hours, for the person to choose one. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -4336,7 +4336,7 @@ paths:
     post:
       operationId: updatePlatformLocalUser
       summary: Edit a local account
-      description: 'Changes a local account''s name and email at its expected version (userId, user). It never sets a password: issue a setup link instead. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Changes a local account''s name and email at its expected version (userId, user). It never sets a password: issue a setup link instead. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -4367,7 +4367,7 @@ paths:
     post:
       operationId: revokeUserSessions
       summary: Sign a user out everywhere
-      description: 'Revokes the user''s browser sessions and CLI tokens (userId, expectedVersion). Service-account keys are separate. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Revokes the user''s browser sessions and CLI tokens (userId, expectedVersion). Service-account keys are separate. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -4398,7 +4398,7 @@ paths:
     post:
       operationId: savePlatformMembership
       summary: Grant a tenant role
-      description: 'Gives a user a direct role in a tenant, at the membership''s expected version (tenant, provider, subject, role, expectedVersion). Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Gives a user a direct role in a tenant, at the membership''s expected version (tenant, provider, subject, role, expectedVersion). Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -4429,7 +4429,7 @@ paths:
     post:
       operationId: removePlatformMembership
       summary: Remove a tenant role
-      description: 'Removes a user''s direct role in a tenant (tenant, userId, expectedVersion). A tenant''s last owner cannot be removed. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Removes a user''s direct role in a tenant (tenant, userId, expectedVersion). A tenant''s last owner cannot be removed. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -4460,7 +4460,7 @@ paths:
     post:
       operationId: saveTenantJevPolicy
       summary: Change a tenant's Jev policy
-      description: 'Enables or pauses Jev for a tenant and sets its daily request limit (tenant, policy). Model routes and credentials stay in server configuration. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Enables or pauses Jev for a tenant and sets its daily request limit (tenant, policy). Model routes and credentials stay in server configuration. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -4491,7 +4491,7 @@ paths:
     post:
       operationId: issueSetupLink
       summary: Issue a setup link
-      description: 'Gives a local user a new one-time setup link (userId), valid for 72 hours, replacing any earlier one. Using it sets a new password and signs the person out everywhere, so it also resets a forgotten password. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes need a reason and are recorded in the platform audit log.'
+      description: 'Gives a local user a new one-time setup link (userId), valid for 72 hours, replacing any earlier one. Using it sets a new password and signs the person out everywhere, so it also resets a forgotten password. Platform administrators only: a configured platform administrator signed in through the browser (session cookie and CSRF token) or with a CLI token from `nines auth login`. API keys and service accounts are refused. Changes are recorded in the platform audit log, with an optional reason.'
       parameters: []
       requestBody:
         required: true
@@ -10377,7 +10377,6 @@ components:
           type: string
       required:
         - expectedVersion
-        - reason
       type: object
     PlatformTenant:
       additionalProperties: false
@@ -12374,7 +12373,6 @@ components:
           type: string
       required:
         - expectedVersion
-        - reason
         - tenant
       type: object
     TenantCreateRequest:
@@ -12386,7 +12384,6 @@ components:
           type: string
       required:
         - newTenant
-        - reason
       type: object
     TenantCreated:
       additionalProperties: false
