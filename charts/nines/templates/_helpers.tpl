@@ -61,6 +61,32 @@ http://127.0.0.1:8080
 {{- end -}}
 {{- end -}}
 
+{{/* OpenTelemetry environment for a container; the argument is (list service root). */}}
+{{- define "nines.telemetryEnv" -}}
+{{- $service := index . 0 -}}
+{{- $root := index . 1 -}}
+- name: OTEL_SERVICE_NAME
+  value: {{ $service }}
+- name: K8S_POD_NAME
+  valueFrom:
+    fieldRef:
+      fieldPath: metadata.name
+- name: OTEL_RESOURCE_ATTRIBUTES
+  value: {{ include "nines.resourceAttributes" $root | quote }}
+{{- with $root.Values.telemetry.otlpEndpoint }}
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: {{ . | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "nines.resourceAttributes" -}}
+{{- $attrs := list (printf "k8s.namespace.name=%s" .Release.Namespace) "k8s.pod.name=$(K8S_POD_NAME)" -}}
+{{- range $key, $value := .Values.telemetry.resourceAttributes -}}
+{{- $attrs = append $attrs (printf "%s=%s" $key $value) -}}
+{{- end -}}
+{{- join "," $attrs -}}
+{{- end -}}
+
 {{- define "nines.restrictedContainer" -}}
 allowPrivilegeEscalation: false
 readOnlyRootFilesystem: true

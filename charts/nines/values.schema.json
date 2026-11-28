@@ -285,6 +285,26 @@
           "type": "boolean"
         }
       }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "otlpEndpoint": {
+          "type": "string",
+          "pattern": "^(|https?://[^/?#@]+(/[^?#]*)?)$"
+        },
+        "resourceAttributes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[^,=]*$"
+          },
+          "propertyNames": {
+            "pattern": "^[A-Za-z0-9_.-]+$"
+          }
+        }
+      }
     }
   }
 }

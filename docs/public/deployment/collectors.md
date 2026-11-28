@@ -40,7 +40,7 @@ nines-server -process-role=collector -collection-workers=4
 ## Database and telemetry budgets
 
 - Collector-only stores default to two PostgreSQL connections per tenant, per process, unless `pool_max_conns` is explicitly configured. Budget additional pools for managed-source identity storage and the control plane. Multiplying tenants and replicas multiplies connections.
-- Export metrics through the existing OpenTelemetry configuration: `nines.collector.jobs`, `nines.collector.duration` and `nines.collector.schedule.lag`. Labels include tenant and outcome, without SLO IDs, queries or provider credentials. Nines does not add a Prometheus `/metrics` endpoint here.
+- Export metrics through the existing OpenTelemetry configuration: `nines.collector.jobs`, `nines.collector.duration` and `nines.collector.schedule.lag`. Labels include tenant and outcome, without SLO IDs, queries or provider credentials. Nines does not add a Prometheus `/metrics` endpoint here. See [monitor Nines itself](monitoring.md) for every signal and suggested alerts.
 - Track scheduling lag, source failures, provider throttling, database connections and storage growth. Backups and PostgreSQL availability remain deployment responsibilities.
 
 ## Measured acceptance envelope

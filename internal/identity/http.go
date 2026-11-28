@@ -17,6 +17,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
+	"github.com/ishantanu/nines/internal/observability"
 	"github.com/ishantanu/nines/internal/tenancy"
 )
 
@@ -202,6 +203,9 @@ func (s *Service) Handler() http.Handler {
 			authFailure(w, ErrForbidden)
 			return
 		}
+		// Label telemetry with the matched route, such as
+		// /auth/cli/device/token, instead of /auth/*.
+		defer func() { observability.Route(r.Context(), r.Pattern) }()
 		mux.ServeHTTP(w, r)
 	})
 }
