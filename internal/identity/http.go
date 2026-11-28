@@ -189,6 +189,7 @@ func (s *Service) Handler() http.Handler {
 	mux.HandleFunc("POST /auth/cli/logout", s.cliLogout)
 	mux.HandleFunc("POST /auth/ldap/{provider}/login", s.ldapLogin)
 	mux.HandleFunc("POST /auth/local/{provider}/login", s.localLogin)
+	mux.HandleFunc("POST /auth/local/setup", s.setupHandler)
 	mux.HandleFunc("GET /auth/oidc/{provider}/login", s.oidcStart)
 	mux.HandleFunc("GET /auth/oidc/{provider}/callback", s.oidcCallback)
 	mux.HandleFunc("POST /auth/logout", s.logout)

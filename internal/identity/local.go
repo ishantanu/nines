@@ -191,7 +191,9 @@ func (s *Service) createLocalUserTx(tx Tx, a Actor, tenant string, u User, h []b
 	if e != nil {
 		return e
 	}
-	if !equal(string(current.Hash), string(h)) {
+	// A pending account (no password until its setup link is used) stores
+	// no hash; otherwise the stored hash must be the one just written.
+	if len(h) == 0 && len(current.Hash) != 0 || len(h) != 0 && !equal(string(current.Hash), string(h)) {
 		return ErrConflict
 	}
 	if e = put(tx, "user", "global", u.ID, u, time.Time{}); e != nil {

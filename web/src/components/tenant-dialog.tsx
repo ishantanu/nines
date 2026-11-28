@@ -18,6 +18,7 @@ import { Input } from "./ui/input";
 import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import { message } from "@/lib/api";
+import { SetupLinkNotice, type SetupLink } from "./setup-link";
 import {
   platformWrite,
   type PlatformOverview,
@@ -64,11 +65,11 @@ export function TenantDialog({
     ),
     [username, setUsername] = useState(""),
     [ownerName, setOwnerName] = useState(""),
-    [password, setPassword] = useState(""),
     [confirm, setConfirm] = useState(""),
     [reason, setReason] = useState(""),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [link, setLink] = useState<SetupLink>();
 
   async function save() {
     setBusy(true);
@@ -76,23 +77,31 @@ export function TenantDialog({
     try {
       const base = { reason, expectedVersion: tenant?.version ?? 0 };
       if (action === "create") {
-        await platformWrite("tenants/create", csrf, {
-          reason,
-          newTenant: {
-            id,
-            name,
-            ...(owner === "local"
-              ? {
-                  ownerUser: {
-                    provider,
-                    username,
-                    name: ownerName,
-                    password,
-                  },
-                }
-              : { ownerProvider: provider, ownerSubject: username }),
+        const created = await platformWrite<{ setupLink?: SetupLink }>(
+          "tenants/create",
+          csrf,
+          {
+            reason,
+            newTenant: {
+              id,
+              name,
+              ...(owner === "local"
+                ? {
+                    ownerUser: {
+                      provider,
+                      username,
+                      name: ownerName,
+                    },
+                  }
+                : { ownerProvider: provider, ownerSubject: username }),
+            },
           },
-        });
+        );
+        if (created.setupLink) {
+          // The owner's only way in; show it once before closing.
+          setLink(created.setupLink);
+          return;
+        }
       } else if (action === "rename") {
         await platformWrite("tenants/rename", csrf, {
           ...base,
@@ -122,8 +131,7 @@ export function TenantDialog({
         id !== "default" &&
         name.trim() !== "" &&
         username !== "" &&
-        (owner === "existing" ||
-          (ownerName.trim() !== "" && password.length >= 12))
+        (owner === "existing" || ownerName.trim() !== "")
       : action === "rename"
         ? name.trim() !== "" && name !== tenant?.name
         : action === "delete"
@@ -134,7 +142,11 @@ export function TenantDialog({
     <Dialog
       open={true}
       onOpenChange={(open) => {
-        if (!open && !busy) onClose();
+        if (!open && !busy) {
+          // Once created, closing must still refresh the tenant list.
+          if (link) onDone();
+          else onClose();
+        }
       }}
     >
       <DialogContent
@@ -143,200 +155,193 @@ export function TenantDialog({
         className="max-h-[90vh] overflow-y-auto"
       >
         <DialogHeader>
-          <DialogTitle>{titles[action]}</DialogTitle>
+          <DialogTitle>{link ? "Tenant created" : titles[action]}</DialogTitle>
           <DialogDescription>
-            {action === "create"
-              ? "The tenant is ready as soon as you create it. Its first owner can sign in and invite others."
-              : action === "rename"
-                ? "People see the new name at once. The tenant ID does not change."
-                : action === "retire"
-                  ? `${tenant?.name} stops collecting and alerting and becomes read-only. Its data is kept until you delete it.`
-                  : `This permanently deletes ${tenant?.name}: its SLOs, measurements, history, members and access keys. It cannot be undone.`}
+            {link
+              ? `${name} is ready. Its first owner signs in once they have set their password.`
+              : action === "create"
+                ? "The tenant is ready as soon as you create it. Its first owner can sign in and invite others."
+                : action === "rename"
+                  ? "People see the new name at once. The tenant ID does not change."
+                  : action === "retire"
+                    ? `${tenant?.name} stops collecting and alerting and becomes read-only. Its data is kept until you delete it.`
+                    : `This permanently deletes ${tenant?.name}: its SLOs, measurements, history, members and access keys. It cannot be undone.`}
           </DialogDescription>
         </DialogHeader>
-        <form
-          className="space-y-5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void save();
-          }}
-        >
-          {action === "create" ? (
-            <>
-              <FormField
-                htmlFor="tenant-id"
-                label="Tenant ID"
-                description="Lowercase letters, digits and hyphens. It cannot be changed later."
-              >
+        {link ? (
+          <SetupLinkNotice
+            link={link}
+            person={ownerName || username}
+            onDone={onDone}
+          />
+        ) : (
+          <form
+            className="space-y-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void save();
+            }}
+          >
+            {action === "create" ? (
+              <>
+                <FormField
+                  htmlFor="tenant-id"
+                  label="Tenant ID"
+                  description="Lowercase letters, digits and hyphens. It cannot be changed later."
+                >
+                  <Input
+                    id="tenant-id"
+                    required
+                    value={id}
+                    maxLength={63}
+                    disabled={busy}
+                    autoComplete="off"
+                    onChange={(e) => setID(e.target.value.toLowerCase())}
+                  />
+                </FormField>
+              </>
+            ) : null}
+            {action === "create" || action === "rename" ? (
+              <FormField htmlFor="tenant-name" label="Display name">
                 <Input
-                  id="tenant-id"
+                  id="tenant-name"
                   required
-                  value={id}
-                  maxLength={63}
+                  value={name}
+                  maxLength={200}
                   disabled={busy}
-                  autoComplete="off"
-                  onChange={(e) => setID(e.target.value.toLowerCase())}
+                  onChange={(e) => setName(e.target.value)}
                 />
               </FormField>
-            </>
-          ) : null}
-          {action === "create" || action === "rename" ? (
-            <FormField htmlFor="tenant-name" label="Display name">
-              <Input
-                id="tenant-name"
-                required
-                value={name}
-                maxLength={200}
-                disabled={busy}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </FormField>
-          ) : null}
-          {action === "create" ? (
-            <>
-              <FormField htmlFor="tenant-owner" label="First owner">
-                <Select
-                  value={owner}
-                  disabled={busy}
-                  onValueChange={(value) => {
-                    const next = value as "local" | "existing";
-                    setOwner(next);
-                    setProvider(
-                      (next === "local" ? local[0] : overview.providers[0])
-                        ?.id ?? "",
-                    );
-                  }}
-                >
-                  <SelectTrigger id="tenant-owner">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {local.length ? (
-                      <SelectItem value="local">New local account</SelectItem>
-                    ) : null}
-                    <SelectItem value="existing">
-                      Someone who can already sign in
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </FormField>
-              <FormField htmlFor="tenant-provider" label="Sign-in provider">
-                <Select
-                  value={provider}
-                  disabled={busy}
-                  onValueChange={setProvider}
-                >
-                  <SelectTrigger id="tenant-provider">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(owner === "local" ? local : overview.providers).map(
-                      (p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}
-                        </SelectItem>
-                      ),
-                    )}
-                  </SelectContent>
-                </Select>
-              </FormField>
-              <FormField
-                htmlFor="tenant-username"
-                label={
-                  owner === "local" ? "Username" : "User ID at the provider"
-                }
-              >
-                <Input
-                  id="tenant-username"
-                  required
-                  value={username}
-                  maxLength={500}
-                  disabled={busy}
-                  autoComplete="off"
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </FormField>
-              {owner === "local" ? (
-                <>
-                  <FormField htmlFor="tenant-owner-name" label="Owner's name">
-                    <Input
-                      id="tenant-owner-name"
-                      required
-                      value={ownerName}
-                      maxLength={300}
-                      disabled={busy}
-                      onChange={(e) => setOwnerName(e.target.value)}
-                    />
-                  </FormField>
-                  <FormField
-                    htmlFor="tenant-password"
-                    label="Initial password"
-                    description="12 to 72 characters. Share it with the owner securely."
+            ) : null}
+            {action === "create" ? (
+              <>
+                <FormField htmlFor="tenant-owner" label="First owner">
+                  <Select
+                    value={owner}
+                    disabled={busy}
+                    onValueChange={(value) => {
+                      const next = value as "local" | "existing";
+                      setOwner(next);
+                      setProvider(
+                        (next === "local" ? local[0] : overview.providers[0])
+                          ?.id ?? "",
+                      );
+                    }}
                   >
-                    <Input
-                      id="tenant-password"
-                      type="password"
-                      autoComplete="new-password"
-                      required
-                      minLength={12}
-                      maxLength={72}
-                      value={password}
-                      disabled={busy}
-                      onChange={(e) => setPassword(e.target.value)}
-                    />
-                  </FormField>
-                </>
-              ) : null}
-            </>
-          ) : null}
-          {action === "delete" ? (
-            <FormField
-              htmlFor="tenant-confirm"
-              label={`Type ${tenant?.id} to confirm`}
-            >
-              <Input
-                id="tenant-confirm"
+                    <SelectTrigger id="tenant-owner">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {local.length ? (
+                        <SelectItem value="local">New local account</SelectItem>
+                      ) : null}
+                      <SelectItem value="existing">
+                        Someone who can already sign in
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField htmlFor="tenant-provider" label="Sign-in provider">
+                  <Select
+                    value={provider}
+                    disabled={busy}
+                    onValueChange={setProvider}
+                  >
+                    <SelectTrigger id="tenant-provider">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(owner === "local" ? local : overview.providers).map(
+                        (p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name}
+                          </SelectItem>
+                        ),
+                      )}
+                    </SelectContent>
+                  </Select>
+                </FormField>
+                <FormField
+                  htmlFor="tenant-username"
+                  label={
+                    owner === "local" ? "Username" : "User ID at the provider"
+                  }
+                >
+                  <Input
+                    id="tenant-username"
+                    required
+                    value={username}
+                    maxLength={500}
+                    disabled={busy}
+                    autoComplete="off"
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                </FormField>
+                {owner === "local" ? (
+                  <>
+                    <FormField htmlFor="tenant-owner-name" label="Owner's name">
+                      <Input
+                        id="tenant-owner-name"
+                        required
+                        value={ownerName}
+                        maxLength={300}
+                        disabled={busy}
+                        onChange={(e) => setOwnerName(e.target.value)}
+                      />
+                    </FormField>
+                  </>
+                ) : null}
+              </>
+            ) : null}
+            {action === "delete" ? (
+              <FormField
+                htmlFor="tenant-confirm"
+                label={`Type ${tenant?.id} to confirm`}
+              >
+                <Input
+                  id="tenant-confirm"
+                  required
+                  value={confirm}
+                  disabled={busy}
+                  autoComplete="off"
+                  onChange={(e) => setConfirm(e.target.value)}
+                />
+              </FormField>
+            ) : null}
+            <FormField htmlFor="tenant-reason" label="Reason for change">
+              <Textarea
+                id="tenant-reason"
                 required
-                value={confirm}
+                maxLength={1000}
+                value={reason}
                 disabled={busy}
-                autoComplete="off"
-                onChange={(e) => setConfirm(e.target.value)}
+                onChange={(e) => setReason(e.target.value)}
               />
             </FormField>
-          ) : null}
-          <FormField htmlFor="tenant-reason" label="Reason for change">
-            <Textarea
-              id="tenant-reason"
-              required
-              maxLength={1000}
-              value={reason}
-              disabled={busy}
-              onChange={(e) => setReason(e.target.value)}
-            />
-          </FormField>
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
-          <div className="dialog-actions">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={() => onClose()}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant={action === "delete" ? "destructive" : undefined}
-              disabled={busy || !ready}
-            >
-              {busy ? "Saving…" : titles[action]}
-            </Button>
-          </div>
-        </form>
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
+            <div className="dialog-actions">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => onClose()}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant={action === "delete" ? "destructive" : undefined}
+                disabled={busy || !ready}
+              >
+                {busy ? "Saving…" : titles[action]}
+              </Button>
+            </div>
+          </form>
+        )}
       </DialogContent>
     </Dialog>
   );

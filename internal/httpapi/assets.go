@@ -81,7 +81,7 @@ func portalPath(path string) bool {
 	case "/admin", "/admin/", "/admin/tenants", "/admin/tenants/", "/admin/users", "/admin/users/", "/admin/audit", "/admin/audit/":
 		return true
 	}
-	if path == "/" || path == "/login" || path == "/login/" {
+	if path == "/" || path == "/login" || path == "/login/" || path == "/setup" {
 		return true
 	}
 	parts := strings.Split(strings.TrimSuffix(path, "/"), "/")

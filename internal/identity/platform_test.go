@@ -173,7 +173,13 @@ func TestPlatformAdminSelfResetAndRevocationRemainAudited(t *testing.T) {
 	s, h := platformFixture(t, NewMemory())
 	c, csrf := platformLogin(t, h, "admin", "platform-fixture-password")
 	a := platformActor(t, s, h, c)
-	request(t, c, "POST", h.URL+"/api/platform/users/update", csrf, fmt.Sprintf(`{"reason":"Rotate administrator password","tenant":"alpha","userId":%q,"user":{"name":"Administrator","password":"rotated-admin-password","expectedVersion":1}}`, a.ID), 200)
+	// Administrators never set passwords, their own included: they use a link.
+	request(t, c, "POST", h.URL+"/api/platform/users/update", csrf, fmt.Sprintf(`{"reason":"Rotate administrator password","tenant":"alpha","userId":%q,"user":{"name":"Administrator","password":"rotated-admin-password","expectedVersion":1}}`, a.ID), 400)
+	link := request(t, c, "POST", h.URL+"/api/platform/users/setup-link", csrf, fmt.Sprintf(`{"reason":"Rotate administrator password","userId":%q}`, a.ID), 200)
+	var url string
+	_ = json.Unmarshal(link["url"], &url)
+	_, token, _ := strings.Cut(url, "/setup#")
+	request(t, newClient(), "POST", h.URL+"/auth/local/setup", "", `{"token":"`+token+`","password":"rotated-admin-password"}`, 200)
 	info := request(t, c, "GET", h.URL+"/auth/session", "", "", 200)
 	if string(info["authenticated"]) != "false" {
 		t.Fatal("reset did not revoke admin session")

@@ -79,10 +79,12 @@ function AuthBackdrop() {
 }
 
 export function SignInPanel({
+  title = "Sign in",
   description,
   children,
   badge,
 }: {
+  title?: string;
   description: string;
   children: ReactNode;
   badge?: ReactNode;
@@ -95,7 +97,7 @@ export function SignInPanel({
           <Brand className="h-8" />
           <div className="flex flex-col gap-1">
             <Heading level={1} type="display-3">
-              Sign in
+              {title}
             </Heading>
             <Text color="secondary">{description}</Text>
           </div>

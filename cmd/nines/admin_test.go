@@ -11,9 +11,9 @@ import (
 	"testing"
 )
 
-// The admin CLI calls the platform API without a tenant header, reads a new
-// owner's password only from stdin, looks up the current version when none
-// is given, and needs the ID repeated to delete.
+// The admin CLI calls the platform API without a tenant header, never sends
+// an owner password but prints the owner's setup link, looks up the current
+// version when none is given, and needs the ID repeated to delete.
 func TestAdminTenantsCLI(t *testing.T) {
 	cliEnv(t)
 	var mu sync.Mutex
@@ -38,7 +38,7 @@ func TestAdminTenantsCLI(t *testing.T) {
 			_, _ = io.WriteString(w, `{"error":"the tenant changed since you read it"}`)
 			return
 		}
-		_, _ = io.WriteString(w, `{"id":"payments","name":"Payments","state":"active","version":1}`)
+		_, _ = io.WriteString(w, `{"id":"payments","name":"Payments","state":"active","version":1,"setupLink":{"url":"http://127.0.0.1/setup#synthetic-token","expiresAt":"2030-01-01T00:00:00Z"}}`)
 	}))
 	defer server.Close()
 	base := []string{"--server", server.URL, "--tenant", "default", "--agent"}
@@ -53,18 +53,16 @@ func TestAdminTenantsCLI(t *testing.T) {
 	}
 
 	create := append([]string{"admin", "tenants", "create", "payments", "--name", "Payments", "--owner-username", "pat", "--reason", "Onboard payments"}, base...)
-	if err := run(create, &out); err == nil || !strings.Contains(err.Error(), "--owner-password-stdin") {
-		t.Fatal("password accepted without stdin", err)
-	}
-	original := passwordInput
-	passwordInput = func() io.Reader { return strings.NewReader("synthetic-password\n") }
-	defer func() { passwordInput = original }()
-	if err := run(append(create, "--owner-password-stdin"), &out); err != nil {
+	out.Reset()
+	if err := run(create, &out); err != nil {
 		t.Fatal(err)
 	}
 	owner := calls["/api/platform/tenants/create"]["newTenant"].(map[string]any)["ownerUser"].(map[string]any)
-	if owner["password"] != "synthetic-password" || owner["provider"] != "local" || owner["name"] != "pat" {
-		t.Fatal("owner", owner)
+	if _, sent := owner["password"]; sent || owner["provider"] != "local" || owner["name"] != "pat" {
+		t.Fatal("the CLI must never send an owner password", owner)
+	}
+	if !strings.Contains(out.String(), "/setup#synthetic-token") {
+		t.Fatal("setup link not shown", out.String())
 	}
 
 	if err := run(append([]string{"admin", "tenants", "rename", "payments", "--name", "Pay", "--reason", "Renamed"}, base...), &out); err == nil || !strings.Contains(err.Error(), "changed since you read it") {

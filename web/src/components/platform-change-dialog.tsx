@@ -19,14 +19,20 @@ import { Textarea } from "./ui/textarea";
 import { Button } from "./ui/button";
 import type { PlatformUser, PlatformOverview } from "@/lib/platform";
 export type PlatformDraft = {
-  action: "create" | "profile" | "membership" | "remove" | "revoke" | "policy";
+  action:
+    | "create"
+    | "profile"
+    | "membership"
+    | "remove"
+    | "revoke"
+    | "setup"
+    | "policy";
   user?: PlatformUser;
   tenant: string;
   provider: string;
   username: string;
   name: string;
   email: string;
-  password: string;
   role: string;
   reason: string;
   enabled: boolean;
@@ -103,7 +109,9 @@ export function PlatformChangeDialog({
                     ? "Tenant access"
                     : draft?.action === "remove"
                       ? "Remove tenant access"
-                      : "Revoke user sessions"}
+                      : draft?.action === "setup"
+                        ? "New setup link"
+                        : "Revoke user sessions"}
           </DialogTitle>
           <DialogDescription>
             {draft?.action === "policy"
@@ -119,7 +127,7 @@ export function PlatformChangeDialog({
               void onSave();
             }}
           >
-            {draft.action !== "revoke" ? (
+            {draft.action !== "revoke" && draft.action !== "setup" ? (
               <>
                 <FormField htmlFor="platform-tenant" label="Tenant">
                   <Choice
@@ -150,6 +158,12 @@ export function PlatformChangeDialog({
                   />
                 </FormField>
               </>
+            ) : draft.action === "setup" ? (
+              <p className="text-sm">
+                Issue a new setup link for {draft.user?.user.name}. Any earlier
+                link stops working. Using it sets a new password and signs them
+                out everywhere, so it also resets a forgotten password.
+              </p>
             ) : (
               <p className="text-sm">
                 Revoke all current browser and CLI user sessions for{" "}
@@ -202,29 +216,6 @@ export function PlatformChangeDialog({
                     maxLength={320}
                     disabled={busy}
                     onChange={(e) => set({ email: e.target.value })}
-                  />
-                </FormField>
-                <FormField
-                  htmlFor="platform-password"
-                  label={
-                    <>
-                      {" "}
-                      {draft.action === "profile"
-                        ? "New password (leave empty to preserve)"
-                        : "Initial password"}{" "}
-                    </>
-                  }
-                >
-                  <Input
-                    id="platform-password"
-                    type="password"
-                    autoComplete="new-password"
-                    value={draft.password}
-                    required={draft.action === "create"}
-                    minLength={12}
-                    maxLength={72}
-                    disabled={busy}
-                    onChange={(e) => set({ password: e.target.value })}
                   />
                 </FormField>
               </>

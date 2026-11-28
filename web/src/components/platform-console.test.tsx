@@ -57,6 +57,29 @@ beforeEach(() => {
     vi.fn(async (url: string, init?: RequestInit) => {
       calls.push({ url, init });
       let result: unknown = { ok: true };
+      if (url.endsWith("/users/create"))
+        result = {
+          id: "u-new",
+          provider: "local",
+          subject: "new-user",
+          name: "New user",
+          version: 1,
+          setupLink: {
+            url: "http://127.0.0.1/setup#user-token",
+            expiresAt: "2030-01-01T00:00:00Z",
+          },
+        };
+      if (url.endsWith("/tenants/create"))
+        result = {
+          id: "payments",
+          name: "Payments",
+          state: "active",
+          version: 1,
+          setupLink: {
+            url: "http://127.0.0.1/setup#synthetic-token",
+            expiresAt: "2030-01-01T00:00:00Z",
+          },
+        };
       if (url.endsWith("/overview")) result = overview;
       else if (url.endsWith("/users"))
         result = {
@@ -161,13 +184,13 @@ test("tenant inventory has independent administration navigation and does not se
   ).toBe(true);
   expect(calls.some((c) => c.init?.method === "POST")).toBe(false);
 });
-test("account creation requires a reason, transmits CSRF and clears the password", async () => {
+test("account creation sends no password and shows the setup link", async () => {
   await render("users");
   await act(async () => button("Create user").click());
   expect(button("Save change").getAttribute("aria-disabled")).toBe("true");
   await field("platform-username", "new-user");
   await field("platform-name", "New user");
-  await field("platform-password", "test-private-password");
+  expect(document.getElementById("platform-password")).toBeNull();
   await field("platform-reason", "Provision the tenant team");
   await act(async () => button("Save change").click());
   const request = calls.find((c) => c.url.endsWith("/users/create"))!;
@@ -180,7 +203,10 @@ test("account creation requires a reason, transmits CSRF and clears the password
     tenant: "alpha",
     user: { provider: "local", username: "new-user", role: "viewer" },
   });
-  expect(document.getElementById("platform-password")).toBeNull();
+  expect(JSON.parse(String(request.init?.body)).user.password).toBeUndefined();
+  expect(
+    (document.getElementById("setup-link") as HTMLInputElement).value,
+  ).toBe("http://127.0.0.1/setup#user-token");
   expect(refresh).toHaveBeenCalledOnce();
 });
 test("editing an existing membership preserves its current role until explicitly changed", async () => {
@@ -230,7 +256,7 @@ test("configured tenants cannot be changed; console tenants show their state", a
   expect(rows[1].textContent).toContain("Retired");
   expect(labels(rows[1])).toEqual(["Jev policy", "Delete"]);
 });
-test("creating a tenant gives it a first owner and refreshes access", async () => {
+test("creating a tenant gives its new owner a setup link, never a password", async () => {
   await render("tenants");
   await act(async () => button("Create tenant").click());
   expect(submit().getAttribute("aria-disabled")).toBe("true");
@@ -241,7 +267,7 @@ test("creating a tenant gives it a first owner and refreshes access", async () =
   await field("tenant-name", "Payments");
   await field("tenant-username", "pat");
   await field("tenant-owner-name", "Pat");
-  await field("tenant-password", "synthetic-password");
+  expect(document.getElementById("tenant-password")).toBeNull();
   await field("tenant-reason", "Onboard the payments team");
   expect(submit().getAttribute("aria-disabled")).not.toBe("true");
   await act(async () => submit().click());
@@ -258,11 +284,16 @@ test("creating a tenant gives it a first owner and refreshes access", async () =
         provider: "local",
         username: "pat",
         name: "Pat",
-        password: "synthetic-password",
       },
     },
   });
-  expect(document.getElementById("tenant-password")).toBeNull();
+  // The link is shown once, before the dialog closes.
+  const link = document.getElementById("setup-link") as HTMLInputElement;
+  expect(link.value).toBe("http://127.0.0.1/setup#synthetic-token");
+  expect(document.body.textContent).toContain("not shown again");
+  expect(refresh).not.toHaveBeenCalled();
+  await act(async () => button("Done").click());
+  expect(document.getElementById("setup-link")).toBeNull();
   expect(refresh).toHaveBeenCalledOnce();
 });
 test("deleting a tenant needs its ID typed and sends the reviewed version", async () => {
@@ -280,5 +311,18 @@ test("deleting a tenant needs its ID typed and sends the reviewed version", asyn
     expectedVersion: 3,
     tenant: "beta",
     confirm: "beta",
+  });
+});
+
+test("a new setup link for a local user replaces the old one", async () => {
+  await render("users");
+  await act(async () => button("Setup link").click());
+  expect(document.body.textContent).toContain("Any earlier link stops working");
+  await field("platform-reason", "Lost their link");
+  await act(async () => button("Save change").click());
+  const request = calls.find((c) => c.url.endsWith("/users/setup-link"))!;
+  expect(JSON.parse(String(request.init?.body))).toEqual({
+    reason: "Lost their link",
+    userId: "u-alice",
   });
 });

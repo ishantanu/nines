@@ -53,9 +53,11 @@ Create a tenant for a new team without editing the tenants file or restarting th
 
 1. Open **Tenants** and select **Create tenant**.
 2. Enter an ID (lowercase letters, digits and hyphens; it cannot change later) and a display name.
-3. Choose the first owner: a new local account with an initial password, or someone who can already sign in through a configured provider.
+3. Choose the first owner: someone who can already sign in through a configured provider, or a new local account.
 4. Give a reason and create it.
+5. For a new local account, copy the setup link the console shows and send it to the owner. They open it and choose their own password. You never set or see it.
 
+- A tenant has no password of its own. People sign in as themselves and see the tenants they are members of; the first owner then invites everyone else.
 - The tenant is ready at once: its owner can sign in, add telemetry connections, invite people and create SLOs. Every server process serves it within 10 seconds, including separate collector processes.
 - Each tenant has its own database schema, rules, collection and background work. Nothing is shared with other tenants.
 - **Rename** changes the display name. The ID stays the same.
@@ -71,15 +73,15 @@ Sign in once with `nines auth login`, then:
 
 ```sh
 nines admin tenants list
-printf '%s\n' "$INITIAL_PASSWORD" | nines admin tenants create payments --name Payments \
-  --owner-username pat --owner-name "Pat Example" --owner-password-stdin --reason "Onboard the payments team"
+nines admin tenants create payments --name Payments \
+  --owner-username pat --owner-name "Pat Example" --reason "Onboard the payments team"
 nines admin tenants rename payments --name "Payments platform" --reason "Team renamed"
 nines admin tenants retire payments --reason "Merged into billing"
 nines admin tenants delete payments --confirm-id payments --reason "Merged into billing"
 ```
 
 - To make someone who can already sign in the first owner, use `--owner-provider` and `--owner-subject` instead of the local account flags.
-- A new owner's password is read from stdin, never from a flag, so it stays out of shell history and process lists.
+- For a new local owner, `create` prints the setup link to send them, and includes it in its JSON output as `setupLink`.
 - Changes use the tenant's current version unless you pass `--expected-version`; then they are refused if someone changed the tenant since that version.
 
 ## Users and tenant access
@@ -87,14 +89,17 @@ nines admin tenants delete payments --confirm-id payments --reason "Merged into 
 - The **Users** page lists identities across configured tenants, their effective grants and whether they are explicitly configured platform administrators. The directory is paginated.
 - Administrators can:
 
-* Create a local account with an initial password and an explicit tenant role.
-* Edit a local account’s display name and email, or reset its password.
+* Create a local account with an explicit tenant role. The console shows a setup link to send to the person, who chooses their own password.
+* Edit a local account’s display name and email.
+* Issue a new **Setup link** for a local account whose link was lost or expired, or who forgot their password. Any earlier link stops working; using the new one sets a new password and signs them out everywhere.
 * Assign or change a direct tenant membership using a revision check.
 * Remove a direct tenant membership, retaining last-owner protection.
 * Revoke all current browser and derived CLI user sessions through the account’s session epoch.
-* Passwords are hashed using the existing local-account policy. Password changes revoke existing user sessions.
-  - Passwords, password hashes and session tokens are excluded from responses and audit records.
-  - Password fields are cleared from component state when submitted or dismissed, and the admin console is excluded from replay capture.
+* Setup links are single use and expire after 72 hours. Each person has at most one live link.
+  - The token travels in the link's `#` fragment, which browsers never send to servers, proxies or logs. Only a hash of it is stored.
+  - The console shows a link once. Issuing and using links are recorded in the audit history, without the token.
+  - Until a new account's link is used, it has no password and cannot sign in.
+* Passwords are hashed using the existing local-account policy, are excluded from responses and audit records, and the admin console is excluded from replay capture.
 * SSO credentials remain with the identity provider.
   - Removing a direct membership does not remove an upstream SSO entitlement; change the corresponding provider assignment or configured mapping.
   - Direct membership removal also removes the user from that tenant’s Nines teams.
@@ -144,8 +149,9 @@ nines admin tenants delete payments --confirm-id payments --reason "Merged into 
 | GET    | `/api/platform/users?before=CURSOR`   | Paginated global identity directory                                |
 | GET    | `/api/platform/audit?before=CURSOR`   | Paginated platform audit records                                   |
 | GET    | `/api/platform/tenants/ID/system-one` | Pinned Jev route, policy and UTC-day usage                         |
-| POST   | `/api/platform/users/create`          | Create a local account and tenant grant                            |
-| POST   | `/api/platform/users/update`          | Edit a local profile or reset its password                         |
+| POST   | `/api/platform/users/create`          | Create a local account and tenant grant; returns its setup link    |
+| POST   | `/api/platform/users/setup-link`      | Issue a new setup link for a local account                         |
+| POST   | `/api/platform/users/update`          | Edit a local profile                                               |
 | POST   | `/api/platform/users/revoke-sessions` | Revoke current user sessions                                       |
 | POST   | `/api/platform/memberships/save`      | Create or update a direct tenant grant                             |
 | POST   | `/api/platform/memberships/remove`    | Remove a revision-matched direct grant                             |
