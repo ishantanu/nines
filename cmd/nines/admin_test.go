@@ -94,7 +94,7 @@ func TestAdminTenantsCLI(t *testing.T) {
 func TestLoginExplainsARejectedEnvironmentKey(t *testing.T) {
 	cliEnv(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, `{"error":"valid tenant API token required"}`, 401)
+		http.Error(w, `{"error":"valid tenant API token required"}`, http.StatusUnauthorized)
 	}))
 	defer server.Close()
 	t.Setenv("NINES_API_KEY", "synthetic-stale-key")
